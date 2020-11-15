@@ -1,0 +1,8 @@
+*.swp
+*.pyc
+*.egg-info
+__pycache__
+.mypy_cache
+.pytype
+.hypothesis
+.ipynb_checkpoints
