@@ -1,34 +1,41 @@
 import abc
+import contextlib
+from typing import TYPE_CHECKING, Dict, Generator, Set, Tuple
 
-import torch
+from jax import numpy as jnp
 from overrides import overrides
 
+if TYPE_CHECKING:
+    from . import LinearFactor
 
-class Variable(abc.ABC):
-    """Container for variable nodes in our factor graphs."""
 
-    def __init__(self, value: torch.Tensor):
-        self.value = value
-        """torch.Tensor: Underlying value of this Variable."""
+class VariableBase(abc.ABC):
+    def __init__(self, parameter_dim: int):
+        self.parameter_dim = parameter_dim
 
-        if value is not None:
-            self.validate()
-
+    @contextlib.contextmanager
     @abc.abstractmethod
-    def validate(self):
-        """Validate the contained value."""
-
-    @abc.abstractmethod
-    def compute_error(self, other: torch.Tensor) -> torch.Tensor:
-        """Compute an error vector between this variable and another."""
+    def local_parameterization(self) -> Generator["RealVectorVariable", None, None]:
+        ...
 
 
-class RealVectorVariable(Variable):
+class RealVectorVariable(VariableBase):
+    @contextlib.contextmanager
     @overrides
-    def validate(self):
-        assert len(self.value.shape) == 2, "Shape of value should be (N, dim)"
+    def local_parameterization(self) -> Generator["RealVectorVariable", None, None]:
+        """No special manifold; local parameterization is just self."""
+        yield self
 
-    @overrides
-    def compute_error(self, other_value: torch.Tensor) -> torch.Tensor:
-        assert other_value.shape == self.value.shape, "Shape of values must match!"
-        return self.value - other_value
+    def compute_error_dual(
+        self,
+        factors: Set["LinearFactor"],
+        error_from_factor: Dict["LinearFactor", jnp.ndarray] = None,
+    ):
+        dual = jnp.zeros(self.parameter_dim)
+        if error_from_factor is None:
+            for factor in factors:
+                dual = dual + factor.A_from_variable[self].T @ factor.b
+        else:
+            for factor in factors:
+                dual = dual + factor.A_from_variable[self].T @ error_from_factor[factor]
+        return dual
