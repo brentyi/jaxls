@@ -71,7 +71,16 @@ class LinearFactor(FactorBase):
     @classmethod
     def linearize_from_factor(
         cls, factor: FactorBase, assignments: _types.VariableAssignments
-    ):
+    ) -> "LinearFactor":
+        """Producing a LinearFactor object by linearizing an arbitrary factor.
+
+        Args:
+            factor (FactorBase): Factor to linearize.
+            assignments (_types.VariableAssignments): Assignments to linearize around.
+
+        Returns:
+            LinearFactor: Linearized factor.
+        """
         A_from_variable: Dict["RealVectorVariable"] = {}
 
         # Pull out only the assignments that we care about
@@ -79,13 +88,15 @@ class LinearFactor(FactorBase):
 
         for variable in factor.variables:
 
-            def f(new_value: jnp.ndarray) -> jnp.ndarray:
+            def f(local_delta: jnp.ndarray) -> jnp.ndarray:
                 # Make copy of assignments with updated variable value
                 assignments_copy = assignments.copy()
-                assignments_copy[variable] = new_value
+                assignments_copy[variable] = variable.retract(
+                    local_delta, assignments_copy[variable]
+                )
 
-                # Return error
-                return factor.compute_error(assignments_copy)
+                # Return whitened error
+                return factor.scale_tril_inv @ factor.compute_error(assignments_copy)
 
             # Linearize around variable
             f_jvp = jax.linearize(f, assignments[variable])[1]
