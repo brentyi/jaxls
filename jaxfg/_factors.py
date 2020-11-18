@@ -1,6 +1,6 @@
 import abc
 import types
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Hashable, NamedTuple, Tuple
 
 import jax
 from jax import numpy as jnp
@@ -16,13 +16,12 @@ class FactorBase(abc.ABC):
     def __init__(
         self,
         variables: Tuple["VariableBase", ...],
-        error_dim: int,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
         self.variables = variables
         """Variables connected to this factor. Immutable. (currently assumed but unenforced)"""
 
-        self.error_dim: int = error_dim
+        self.error_dim: int = scale_tril_inv.shape[0]
         """Error dimensionality."""
 
         self.scale_tril_inv = scale_tril_inv
@@ -54,9 +53,7 @@ class LinearFactor(FactorBase):
 
         variables = tuple(A_from_variable.keys())
         error_dim = b.shape[0]
-        super().__init__(
-            variables=variables, error_dim=error_dim, scale_tril_inv=jnp.eye(error_dim)
-        )
+        super().__init__(variables=variables, scale_tril_inv=jnp.eye(error_dim))
 
         self.variables: Tuple["RealVectorVariable"]
         self.A_from_variable = A_from_variable
@@ -81,7 +78,9 @@ class LinearFactor(FactorBase):
         Returns:
             LinearFactor: Linearized factor.
         """
-        A_from_variable: Dict["RealVectorVariable"] = {}
+        A_from_variable: Dict[
+            "RealVectorVariable", Callable[[jnp.ndarray], jnp.ndarray]
+        ] = {}
 
         # Pull out only the assignments that we care about
         assignments = {variable: assignments[variable] for variable in factor.variables}
@@ -91,8 +90,8 @@ class LinearFactor(FactorBase):
             def f(local_delta: jnp.ndarray) -> jnp.ndarray:
                 # Make copy of assignments with updated variable value
                 assignments_copy = assignments.copy()
-                assignments_copy[variable] = variable.retract(
-                    local_delta, assignments_copy[variable]
+                assignments_copy[variable] = variable.add_local(
+                    x=assignments_copy[variable], local_delta=local_delta
                 )
 
                 # Return whitened error
@@ -116,3 +115,48 @@ class LinearFactor(FactorBase):
         for variable, A in self.A_from_variable.items():
             error = error + A(assignments[variable])
         return error
+
+
+class PriorFactor(FactorBase):
+    def __init__(
+        self,
+        variable: "VariableBase",
+        mu: jnp.ndarray,
+        scale_tril_inv: _types.ScaleTrilInv,
+    ):
+        super().__init__(variables=(variable,), scale_tril_inv=scale_tril_inv)
+        self.mu = mu
+
+    @overrides
+    def compute_error(self, assignments: _types.VariableAssignments):
+        variable = self.variables[0]
+        return variable.subtract_local(assignments[variable], self.mu)
+
+
+class BetweenFactor(FactorBase):
+    class _BeforeAfterTuple(NamedTuple):
+        before: "VariableBase"
+        after: "VariableBase"
+
+    def __init__(
+        self,
+        before: "VariableBase",
+        after: "VariableBase",
+        delta: jnp.ndarray,
+        scale_tril_inv: _types.ScaleTrilInv,
+    ):
+        self.variables: BetweenFactor._BeforeAfterTuple
+        self.delta = delta
+        super().__init__(
+            variables=self._BeforeAfterTuple(before=before, after=after),
+            scale_tril_inv=scale_tril_inv,
+        )
+
+    @overrides
+    def compute_error(self, assignments: _types.VariableAssignments):
+        before: "VariableBase" = self.variables.before
+        after: "VariableBase" = self.variables.after
+        return before.subtract_local(
+            before.add_local(x=assignments[before], local_delta=self.delta),
+            assignments[after],
+        )

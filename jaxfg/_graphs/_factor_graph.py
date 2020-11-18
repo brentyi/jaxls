@@ -83,7 +83,9 @@ class FactorGraph(FactorGraphBase):
 
         # Update assignments
         assignments = {
-            variable: variable.retract(delta_from_variable[variable], value)
+            variable: variable.add_local(
+                x=value, local_delta=delta_from_variable[variable]
+            )
             for variable, value in assignments.items()
         }
         return assignments

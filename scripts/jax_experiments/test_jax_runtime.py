@@ -61,6 +61,7 @@ def benchmark(**kwargs):
         func()
         print("JIT runtime: ", time.time() - start_time)
 
+
 jnp.zeros(5)
 benchmark(
     x_vectorized=x_vectorized,

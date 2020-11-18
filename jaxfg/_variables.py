@@ -14,6 +14,9 @@ class VariableBase(abc.ABC):
         self.parameter_dim = parameter_dim
         """Dimensionality of underlying parameterization."""
 
+        self.local_parameter_dim = local_parameter_dim
+        """Dimensionality of local parameterization."""
+
         self.local_delta_variable: RealVectorVariable
         """Variable for tracking local updates."""
         if isinstance(self, RealVectorVariable):
@@ -21,10 +24,10 @@ class VariableBase(abc.ABC):
         else:
             self.local_delta_variable = RealVectorVariable(local_parameter_dim)
 
-    # @abc.abstractmethod
     @classmethod
-    def retract(cls, local_delta: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
-        """Apply an on-manifold update.
+    @abc.abstractmethod
+    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+        """On-manifold retraction.
 
         Args:
             local_delta (jnp.ndarray): Delta value in local parameterizaiton.
@@ -32,6 +35,19 @@ class VariableBase(abc.ABC):
 
         Returns:
             jnp.ndarray: Updated parameterization.
+        """
+
+    @classmethod
+    @abc.abstractmethod
+    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+        """Compute the difference between two parameters on the manifold.
+
+        Args:
+            x (jnp.ndarray): First parameter to compare. Shape should match `self.parameter_dim`.
+            y (jnp.ndarray): Second parameter to compare. Shape should match `self.parameter_dim`.
+
+        Returns:
+            jnp.ndarray: Delta vector; dimension should match self.local_delta_variable.
         """
 
     @overrides
@@ -80,5 +96,10 @@ class RealVectorVariable(VariableBase):
 
     @classmethod
     @overrides
-    def retract(cls, local_delta: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
+    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
         return x + local_delta
+
+    @classmethod
+    @overrides
+    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+        return x - y

@@ -1,6 +1,5 @@
 import numpy as np
 
-
 # residuals, variables
 A = np.zeros((3, 5))
 
