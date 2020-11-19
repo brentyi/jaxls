@@ -1,5 +1,4 @@
 import dataclasses
-import types
 from typing import Dict, Optional, Set, Tuple, cast
 
 import jax
@@ -28,20 +27,20 @@ class FactorGraph(FactorGraphBase):
     # Use default object hash rather than dataclass one
     __hash__ = object.__hash__
 
-    @overrides
-    def with_factors(self, *to_add: LinearFactor) -> "FactorGraph":
-        return cast(FactorGraph, super().with_factors(*to_add))
-
-    @overrides
-    def without_factors(self, *to_remove: LinearFactor) -> "FactorGraph":
-        return cast(FactorGraph, super().without_factors(*to_remove))
-
     def solve(
         self,
         initial_assignments: Optional[types.VariableAssignments] = None,
-    ) -> types.RealVectorVariableAssignments:
+    ) -> types.VariableAssignments:
 
         variables = self.factors_from_variable.keys()
+
+        # Check input variables
+        if initial_assignments is not None:
+            for variable, value in initial_assignments.items():
+                assert variable in variables, "Received assignment for unused variable!"
+                assert value.shape == (
+                    variable.parameter_dim,
+                ), "Received invalid assignment!"
 
         # Define variables for local perturbations
         variable: VariableBase
@@ -58,8 +57,7 @@ class FactorGraph(FactorGraphBase):
 
         # Run some Gauss-Newton iterations
         # for i in range(10):
-        print(assignments)
-        for i in range(10):
+        for i in range(100):
             assignments = self._gauss_newton_step(assignments, delta_variables)
 
         return assignments
@@ -77,14 +75,14 @@ class FactorGraph(FactorGraphBase):
         ]
 
         # Solve for deltas
-        delta_from_variable: types.RealVectorVariableAssignments = (
+        delta_from_variable: types.VariableAssignments = (
             LinearFactorGraph().with_factors(*linearized_factors).solve()
         )
 
         # Update assignments
         assignments = {
             variable: variable.add_local(
-                x=value, local_delta=delta_from_variable[variable]
+                x=value, local_delta=delta_from_variable[variable.local_delta_variable]
             )
             for variable, value in assignments.items()
         }

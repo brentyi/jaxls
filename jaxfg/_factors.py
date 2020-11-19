@@ -98,7 +98,7 @@ class LinearFactor(FactorBase):
                 return factor.scale_tril_inv @ factor.compute_error(assignments_copy)
 
             # Linearize around variable
-            f_jvp = jax.linearize(f, assignments[variable])[1]
+            f_jvp = jax.linearize(f, jnp.zeros(variable.local_parameter_dim))[1]
             A_from_variable[variable.local_delta_variable] = f_jvp
 
         error = factor.compute_error(assignments=assignments)

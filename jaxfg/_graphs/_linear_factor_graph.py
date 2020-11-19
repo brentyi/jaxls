@@ -7,58 +7,42 @@ from overrides import overrides
 
 from .. import _types as types
 from .._factors import LinearFactor
-from .._variables import RealVectorVariable, VariableBase
+from .._variables import RealVectorVariable
 from ._factor_graph_base import FactorGraphBase
 
 
-@dataclasses.dataclass(frozen=True)
-class LinearFactorGraph(FactorGraphBase):
+# @dataclasses.dataclass(frozen=True)
+class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
     """Simple LinearFactorGraph."""
-
-    # More specific typing for factors and variables
-    factors: Set[LinearFactor] = dataclasses.field(
-        default_factory=lambda: set(), init=False
-    )
-    factors_from_variable: Dict[VariableBase, Set[LinearFactor]] = dataclasses.field(
-        default_factory=lambda: {}, init=False
-    )
 
     # Use default object hash rather than dataclass one
     __hash__ = object.__hash__
 
-    @overrides
-    def with_factors(self, *to_add: LinearFactor) -> "LinearFactorGraph":
-        return cast(LinearFactorGraph, super().with_factors(*to_add))
-
-    @overrides
-    def without_factors(self, *to_remove: LinearFactor) -> "LinearFactorGraph":
-        return cast(LinearFactorGraph, super().without_factors(*to_remove))
-
     def solve(
         self,
-        initial_assignments: Optional[types.RealVectorVariableAssignments] = None,
-    ) -> types.RealVectorVariableAssignments:
+        initial_assignments: Optional[types.VariableAssignments] = None,
+    ) -> types.VariableAssignments:
         """Finds a solution for our factor graph via an iterative conjugate gradient solver.
 
         Implicitly defines the normal equations `A.T @ A @ x = A.T @ b`.
 
         Args:
-            initial_assignments (Optional[types.RealVectorVariableAssignments]): Initial
+            initial_assignments (Optional[types.VariableAssignments]): Initial
                 variable assignments.
 
         Returns:
-            types.RealVectorVariableAssignments: Best assignments.
+            types.VariableAssignments: Best assignments.
         """
 
         variables = tuple(self.factors_from_variable.keys())
 
         def A_function(
-            x: types.RealVectorVariableAssignments,
+            x: types.VariableAssignments,
         ) -> Dict[RealVectorVariable, jnp.ndarray]:
             """Left-multiplies a vector with our Hessian/information matrix.
 
             Args:
-                x (types.RealVectorVariableAssignments): x
+                x (types.VariableAssignments): x
 
             Returns:
                 Dict[RealVectorVariable, jnp.ndarray]: `A^TAx`

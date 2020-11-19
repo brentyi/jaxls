@@ -1,23 +1,25 @@
 import abc
 import dataclasses
-from typing import Dict, Set
-
-from overrides import overrides
+from typing import Dict, Generic, Set, TypeVar
 
 from .._factors import FactorBase
 from .._variables import RealVectorVariable, VariableBase
 
+FactorGraphType = TypeVar("FactorGraphType", bound="FactorGraphBase")
+FactorType = TypeVar("FactorType", bound=FactorBase)
+VariableType = TypeVar("VariableType", bound=VariableBase)
+
 
 @dataclasses.dataclass(frozen=True)
-class FactorGraphBase(abc.ABC):
-    factors: Set[FactorBase] = dataclasses.field(
+class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
+    factors: Set[FactorType] = dataclasses.field(
         default_factory=lambda: set(), init=False
     )
-    factors_from_variable: Dict[VariableBase, Set[FactorBase]] = dataclasses.field(
+    factors_from_variable: Dict[VariableType, Set[FactorType]] = dataclasses.field(
         default_factory=lambda: {}, init=False
     )
 
-    def with_factors(self, *to_add: FactorBase) -> "FactorGraphBase":
+    def with_factors(self: FactorGraphType, *to_add: FactorType) -> FactorGraphType:
         """Generate a new graph with additional factors added.
 
         Existing graph is marked dirty and can no longer be used.
@@ -45,7 +47,9 @@ class FactorGraphBase(abc.ABC):
         # Return "new" graph
         return new_graph
 
-    def without_factors(self, *to_remove: FactorBase) -> "FactorGraphBase":
+    def without_factors(
+        self: FactorGraphType, *to_remove: FactorType
+    ) -> FactorGraphType:
         """Generate a new graph, with specified factors removed.
 
         Existing graph is marked dirty and can no longer be used.

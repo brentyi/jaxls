@@ -2,6 +2,7 @@ import abc
 import contextlib
 from typing import TYPE_CHECKING, Dict, Generator, Optional, Set, Tuple
 
+import jax
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -64,6 +65,8 @@ class VariableBase(abc.ABC):
 
 
 class RealVectorVariable(VariableBase):
+    """Variable for an arbitrary vector of real numbers."""
+
     def __init__(self, parameter_dim):
         super().__init__(parameter_dim=parameter_dim, local_parameter_dim=parameter_dim)
 
@@ -103,3 +106,67 @@ class RealVectorVariable(VariableBase):
     @overrides
     def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         return x - y
+
+
+class SO2Variable(VariableBase):
+    """Variable containing a 2D rotation."""
+
+    def __init__(self):
+        super().__init__(
+            parameter_dim=2,  # Parameterized with unit-norm complex number
+            local_parameter_dim=1,  # Local delta with scalar radians
+        )
+
+    @classmethod
+    @overrides
+    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+        assert x.shape == (2,) and local_delta.shape == (1,)
+        theta = local_delta[0]
+        cos = jnp.cos(theta)
+        sin = jnp.sin(theta)
+        return jnp.array([cos * x[0] - sin * x[1], sin * x[0] + cos * x[1]])
+
+    @classmethod
+    @overrides
+    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+        assert x.shape == y.shape == (2,)
+
+        # The intuitive solution based on the definition of a dot product would be:
+        # > delta = jnp.arccos(jnp.sum(x * y, axis=0, keepdims=True))
+        # But this ignores signs (x and y can be swapped).
+        delta = jnp.arctan2(
+            x[0] * y[1] - x[1] * y[0],  # "2D cross product"; is there a name for this?
+            x @ y,  # Aligned component with dot prodcut
+        )[None]
+        assert delta.shape == (1,)
+        return delta
+
+
+class SE2Variable(VariableBase):
+    """Variable containing a 2D pose."""
+
+    def __init__(self):
+        super().__init__(
+            parameter_dim=4,  # (x, y, cos, sin)
+            local_parameter_dim=3,  # (x, y, theta)
+        )
+
+    @classmethod
+    @overrides
+    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+        assert x.shape == (4,) and local_delta.shape == (3,)
+        summed = jnp.concatenate(
+            [x[:2] + local_delta[:2], SO2Variable.add_local(x[2:4], local_delta[2:3])]
+        )
+        assert summed.shape == (4,)
+        return summed
+
+    @classmethod
+    @overrides
+    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+        assert x.shape == y.shape == (4,)
+        delta = jnp.concatenate(
+            [x[:2] - y[:2], SO2Variable.subtract_local(x[2:4], y[2:4])]
+        )
+        assert delta.shape == (3,)
+        return delta
