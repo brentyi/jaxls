@@ -1,4 +1,4 @@
-from . import _types
+from . import _types as types
 from ._factors import BetweenFactor, FactorBase, LinearFactor, PriorFactor
 from ._graphs._factor_graph import FactorGraph
 from ._graphs._factor_graph_base import FactorGraphBase

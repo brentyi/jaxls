@@ -69,7 +69,7 @@ class LinearFactor(FactorBase):
     def linearize_from_factor(
         cls, factor: FactorBase, assignments: _types.VariableAssignments
     ) -> "LinearFactor":
-        """Producing a LinearFactor object by linearizing an arbitrary factor.
+        """Produce a LinearFactor object by linearizing an arbitrary factor.
 
         Args:
             factor (FactorBase): Factor to linearize.

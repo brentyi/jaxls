@@ -34,6 +34,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
             types.VariableAssignments: Best assignments.
         """
 
+        print("Getting variables")
         variables = tuple(self.factors_from_variable.keys())
 
         def A_function(
@@ -47,12 +48,15 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
             Returns:
                 Dict[RealVectorVariable, jnp.ndarray]: `A^TAx`
             """
+
+            print("Applying Jacobian")
             # x => Apply Jacobian => Ax
             error_from_factor: Dict[LinearFactor, jnp.ndarray] = {
                 factor: factor.compute_error_linear_component(assignments=x)
                 for factor in self.factors
             }
 
+            print("Applying Jacobian-transpose")
             # Ax => Apply Jacobian-transpose => A^TAx
             value_from_variable: Dict[RealVectorVariable, jnp.ndarray] = {}
             for variable in variables:
@@ -62,13 +66,17 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
 
             return value_from_variable
 
+        print("Computing b")
         # Compute rhs (A.T @ b)
         b: Dict[RealVectorVariable, jnp.ndarray] = {
             variable: variable.compute_error_dual(self.factors_from_variable[variable])
             for variable in variables
         }
 
+        print("Running conjugate gradient")
         assignments_solution, _unused_info = jax.scipy.sparse.linalg.cg(
             A=A_function, b=b, x0=initial_assignments
         )
+
+        print("Done solving!")
         return assignments_solution

@@ -1,15 +1,27 @@
-# torchfg
+# jaxfg
 
-- [X] Preliminary graph, variable, factor interfaces
-- [X] Log-prob evaluation interface
-- [X] Real vector variable types
-- [X] Refactor into package
-- [X] Kalman filter benchmark
-- [X] MAP inference
-- [ ] Less sketchy MAP inference
-- [X] Parallel factor computation
-- [ ] Unit test for factor parallelization
-- [ ] Manifold optimization on SO2
-- [ ] Manifold optimization on SE2
+- [x] Preliminary graph, variable, factor interfaces
+- [x] Real vector variable types
+- [x] Refactor into package
+- [x] Linear factor graph
+- [x] Non-linear factors graph
+  - [x] Very basic Gauss-Newton implementation
+  - [x] Check that GN is differentiable
+  - [ ] Damped least squares
+  - [ ] Differentiable damped least squares (a la gradslam)
+- [x] MAP inference
+- [x] Compare g2o example
+  - [x] Validate against minisam
+- [ ] Performance
+  - [ ] More intentional JIT compilation
+  - [ ] Re-implement parallel factor computation?
+  - [ ] Eliminate redundant linearizations
+- [x] Manifold optimization on SO2
+  - [ ] Analytical derivatives for SO2
+- [x] Manifold optimization on SE2
+  - [ ] Analytical derivatives for SE2
 - [ ] Manifold optimization on SO3
+  - [ ] Analytical derivatives for SO3
 - [ ] Manifold optimization on SE3
+  - [ ] Analytical derivatives for SE3
+- [ ] (in the far-off future?) Write some tests

@@ -2,6 +2,7 @@ import dataclasses
 from typing import Dict, Optional, Set, Tuple, cast
 
 import jax
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -57,7 +58,16 @@ class FactorGraph(FactorGraphBase):
 
         # Run some Gauss-Newton iterations
         # for i in range(10):
-        for i in range(100):
+        for i in range(10):
+            print("Running GN step")
+            print(
+                onp.sum(
+                    [
+                        (f.scale_tril_inv @ f.compute_error(assignments)) ** 2
+                        for f in self.factors
+                    ]
+                )
+            )
             assignments = self._gauss_newton_step(assignments, delta_variables)
 
         return assignments
@@ -68,17 +78,22 @@ class FactorGraph(FactorGraphBase):
         assignments: types.VariableAssignments,
         delta_variables: Tuple[RealVectorVariable, ...],
     ) -> types.VariableAssignments:
+        print("Linearizing....")
         # Linearize factors
+        from tqdm.auto import tqdm
+
         linearized_factors = [
             LinearFactor.linearize_from_factor(factor, assignments)
-            for factor in self.factors
+            for factor in tqdm(self.factors)
         ]
 
+        print("Solving...")
         # Solve for deltas
         delta_from_variable: types.VariableAssignments = (
             LinearFactorGraph().with_factors(*linearized_factors).solve()
         )
 
+        print("Updating...")
         # Update assignments
         assignments = {
             variable: variable.add_local(
@@ -86,4 +101,6 @@ class FactorGraph(FactorGraphBase):
             )
             for variable, value in assignments.items()
         }
+
+        print("Done!")
         return assignments

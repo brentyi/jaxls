@@ -154,9 +154,25 @@ class SE2Variable(VariableBase):
     @classmethod
     @overrides
     def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+
+        # Our pose is: T_world_A
+        # We're getting: T_A_B
+        # We want: T_world_B
+
         assert x.shape == (4,) and local_delta.shape == (3,)
+        cos = x[2]
+        sin = x[3]
+        R = jnp.array(
+            [
+                [cos, -sin],
+                [sin, cos],
+            ]
+        )
         summed = jnp.concatenate(
-            [x[:2] + local_delta[:2], SO2Variable.add_local(x[2:4], local_delta[2:3])]
+            [
+                x[:2] + R @ local_delta[:2],
+                SO2Variable.add_local(x[2:4], local_delta[2:3]),
+            ]
         )
         assert summed.shape == (4,)
         return summed
