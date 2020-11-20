@@ -7,23 +7,15 @@ from jax import numpy as jnp
 from overrides import overrides
 
 from .. import _types as types
-from .._factors import LinearFactor
+from .._factors import FactorBase, LinearFactor
 from .._variables import RealVectorVariable, VariableBase
 from ._factor_graph_base import FactorGraphBase
 from ._linear_factor_graph import LinearFactorGraph
 
 
 @dataclasses.dataclass(frozen=True)
-class FactorGraph(FactorGraphBase):
+class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
     """General nonlinear factor graph."""
-
-    # More specific typing for factors and variables
-    factors: Set[LinearFactor] = dataclasses.field(
-        default_factory=lambda: set(), init=False
-    )
-    factors_from_variable: Dict[VariableBase, Set[LinearFactor]] = dataclasses.field(
-        default_factory=lambda: {}, init=False
-    )
 
     # Use default object hash rather than dataclass one
     __hash__ = object.__hash__

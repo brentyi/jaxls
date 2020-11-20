@@ -31,9 +31,7 @@ for line in tqdm(lines):
         assert len(initial_poses) == index
 
         variable = jaxfg.SE2Variable()
-        initial_poses[variable] = jnp.array(
-            onp.array([x, y, onp.cos(theta), onp.sin(theta)])
-        )
+        initial_poses[variable] = onp.array([x, y, onp.cos(theta), onp.sin(theta)])
         pose_variables.append(variable)
 
     elif parts[0] == "EDGE_SE2":
@@ -45,7 +43,7 @@ for line in tqdm(lines):
         if after_index >= pose_count:
             continue
 
-        delta = jnp.array(onp.array(list(map(float, parts[3:6]))))
+        delta = onp.array(list(map(float, parts[3:6])))
 
         q11, q12, q13, q22, q23, q33 = map(float, parts[6:])
         information_matrix = onp.array(
@@ -55,7 +53,7 @@ for line in tqdm(lines):
                 [q13, q23, q33],
             ]
         )
-        scale_tril_inv = jnp.array(onp.linalg.cholesky(information_matrix))
+        scale_tril_inv = onp.linalg.cholesky(information_matrix)
 
         # scale_tril_inv = jnp.array(onp.array(map(float, parts[6:6])))
         factors.append(
@@ -90,11 +88,11 @@ plt.figure()
 for i, v in enumerate(pose_variables):
     x, y, cos, sin = initial_poses[v]
     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="r")
-    plt.annotate(str(i), (x,y))
+    plt.annotate(str(i), (x, y))
 for i, v in enumerate(pose_variables):
     x, y, cos, sin = solution_poses[v]
     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="b")
-    plt.annotate(str(i), (x,y))
+    plt.annotate(str(i), (x, y))
 # plt.plot(
 #     [initial_poses[v][0] for v in pose_variables],
 #     [initial_poses[v][1] for v in pose_variables],
