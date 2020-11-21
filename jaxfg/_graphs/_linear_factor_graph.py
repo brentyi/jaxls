@@ -2,12 +2,13 @@ import dataclasses
 from typing import Dict, Optional, Set, Tuple, cast
 
 import jax
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
 from .. import _types as types
 from .._factors import LinearFactor
-from .._variables import RealVectorVariable
+from .._variables import RealVectorVariable, VariableBase
 from ._factor_graph_base import FactorGraphBase
 
 
@@ -18,6 +19,178 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
     # Use default object hash rather than dataclass one
     __hash__ = object.__hash__
 
+    @jax.partial(jax.jit, static_argnums=(0,))
+    def new_solve(
+        self,
+        initial_assignments: types.VariableAssignments = {},
+    ):
+        # Stack all variables into a single vector
+        value_list = []
+        value_index_from_variable: Dict[VariableBase, int] = {}
+        value_index = 0
+        for variable in self.factors_from_variable.keys():
+            value = (
+                initial_assignments[variable]
+                if variable in initial_assignments
+                else onp.zeros(variable.parameter_dim)
+            )
+            assert len(value.shape) == 1
+            value_list.append(value)
+            value_index_from_variable[variable] = value_index
+            value_index += value.shape[0]
+        values: onp.ndarray = onp.concatenate(value_list)
+
+        # Get A matrices
+        A_matrices_from_shape = {}
+        value_indices_from_shape = {}
+        error_indices_from_shape = {}
+        b_list = []
+        error_index = 0
+        for group_key, group in self.factors.items():
+            for factor in group:
+                for variable, A_matrix in factor.A_from_variable.items():
+                    A_shape = A_matrix.shape
+
+                    if A_shape not in A_matrices_from_shape:
+                        A_matrices_from_shape[A_shape] = []
+                        value_indices_from_shape[A_shape] = []
+                        error_indices_from_shape[A_shape] = []
+
+                    A_matrices_from_shape[A_shape].append(A_matrix)
+                    value_indices_from_shape[A_shape].append(
+                        onp.arange(variable.parameter_dim)
+                        + value_index_from_variable[variable]
+                    )
+                    error_indices_from_shape[A_shape].append(
+                        onp.arange(factor.error_dim) + error_index
+                    )
+                    error_index += factor.error_dim
+
+                b_list.append(factor.b)
+
+        A_matrices_from_shape = {
+            k: onp.array(v) for k, v in A_matrices_from_shape.items()
+        }
+        value_indices_from_shape = {
+            k: onp.array(v) for k, v in value_indices_from_shape.items()
+        }
+        error_indices_from_shape = {
+            k: onp.array(v) for k, v in error_indices_from_shape.items()
+        }
+        b: onp.ndarray = onp.concatenate(b_list)
+
+        solution_values = self._solve(
+            A_matrices_from_shape=A_matrices_from_shape,
+            value_indices_from_shape=value_indices_from_shape,
+            error_indices_from_shape=error_indices_from_shape,
+            initial_values=values,
+            b=b,
+        )
+
+        # Return new assignment mapping
+        return {
+            variable: solution_values[
+                value_index_from_variable[variable] : value_index_from_variable[
+                    variable
+                ]
+                + variable.parameter_dim
+            ]
+            for variable in self.factors_from_variable.keys()
+        }
+
+    @classmethod
+    def _solve(
+        cls,
+        A_matrices_from_shape: Dict[Tuple[int, int], jnp.ndarray],
+        value_indices_from_shape: Dict[Tuple[int, int], jnp.ndarray],
+        error_indices_from_shape: Dict[Tuple[int, int], jnp.ndarray],
+        initial_values: jnp.ndarray,
+        b: jnp.ndarray,
+    ):
+        """Solves a block-sparse `Ax = b` least squares problem via CGLS.
+
+
+        How do we pass in the sparse A matrix?
+            Standard sparse: 1D vector of values, row indices, col indices
+              Pros:
+                - Super easy to take matrix product
+                - Simple simple simple w/ integer indexing
+              Cons:
+                - We know the matrix is block-sparse, a lot of unnecessary indices
+                - ^That's not a huge con, asymptotic memory usage is still linear
+
+            Dictionary: (block shape) => dense blocks, row indices, col indices
+              Pros:
+                - Much fewer indices (linear vs quadratic)
+                - Einsum: faster than pure integer indexing?
+              Cons:
+                - Complexity?
+                - Loops when we have many Jacobian shapes
+
+        """
+        assert len(b.shape) == 1, "b should be 1D!"
+
+        def ATA_function(x: jnp.ndarray):
+
+            error_dim = b.shape[0]
+
+            # Compute Ax
+            Ax: jnp.ndarray = jnp.zeros(error_dim)
+            for shape, A_matrices in A_matrices_from_shape.items():
+                # Get indices
+                value_indices = value_indices_from_shape[shape]
+                error_indices = error_indices_from_shape[shape]
+
+                # Check shapes
+                num_factors, error_dim, variable_dim = A_matrices.shape
+                assert shape == (
+                    error_dim,
+                    variable_dim,
+                ), "Incorrect `A` matrix dimension"
+                assert value_indices.shape == (num_factors, variable_dim)
+                assert error_indices.shape == (num_factors, error_dim)
+
+                # Batched matrix multiply
+                # (f) num factors, (e) error dim, (v) variable dim
+                Ax = Ax.at[error_indices].add(
+                    jnp.einsum("fev,fv->fe", A_matrices, x[value_indices])
+                )
+
+            # Compute A^TAx
+            ATAx: jnp.ndarray = jnp.zeros_like(x)
+            for shape, A_matrices in A_matrices_from_shape.items():
+                # Get indices
+                value_indices = value_indices_from_shape[shape]
+                error_indices = error_indices_from_shape[shape]
+
+                # (f) num factors, (e) error dim, (v) variable dim
+                ATAx = ATAx.at[value_indices].add(
+                    jnp.einsum("fev,fe->fv", A_matrices, Ax[error_indices])
+                )
+
+            return ATAx
+
+        # Compute ATb
+        ATb: jnp.ndarray = jnp.zeros_like(initial_values)
+        for shape, A_matrices in A_matrices_from_shape.items():
+            # Get indices
+            value_indices = value_indices_from_shape[shape]
+            error_indices = error_indices_from_shape[shape]
+
+            # (f) num factors, (e) error dim, (v) variable dim
+            ATb = ATb.at[value_indices].add(
+                jnp.einsum("fev,fe->fv", A_matrices, b[error_indices])
+            )
+
+        print("Running conjugate gradient")
+        solution_values, _unused_info = jax.scipy.sparse.linalg.cg(
+            A=ATA_function, b=ATb, x0=initial_values
+        )
+
+        print("Done solving!")
+        return solution_values
+
+    @jax.partial(jax.jit, static_argnums=(0,))
     def solve(
         self,
         initial_assignments: Optional[types.VariableAssignments] = None,
@@ -49,19 +222,19 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
                 Dict[RealVectorVariable, jnp.ndarray]: `A^TAx`
             """
 
-            print("Applying Jacobian")
             # x => Apply Jacobian => Ax
-            error_from_factor: Dict[LinearFactor, jnp.ndarray] = {
-                factor: factor.compute_error_linear_component(assignments=x)
-                for factor in self.factors
-            }
+            error_from_factor: Dict[LinearFactor, jnp.ndarray] = {}
+            for group in self.factors.values():
+                for factor in group:
+                    error_from_factor[factor] = factor.compute_error_linear_component(
+                        assignments=x
+                    )
 
-            print("Applying Jacobian-transpose")
             # Ax => Apply Jacobian-transpose => A^TAx
             value_from_variable: Dict[RealVectorVariable, jnp.ndarray] = {}
             for variable in variables:
-                value_from_variable[variable] = variable.compute_error_dual(
-                    self.factors_from_variable[variable], error_from_factor
+                value_from_variable[variable] = LinearFactorGraph.compute_error_dual(
+                    variable, self.factors_from_variable[variable], error_from_factor
                 )
 
             return value_from_variable
@@ -69,7 +242,9 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
         print("Computing b")
         # Compute rhs (A.T @ b)
         b: Dict[RealVectorVariable, jnp.ndarray] = {
-            variable: variable.compute_error_dual(self.factors_from_variable[variable])
+            variable: LinearFactorGraph.compute_error_dual(
+                variable, self.factors_from_variable[variable]
+            )
             for variable in variables
         }
 
@@ -80,3 +255,30 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
 
         print("Done solving!")
         return assignments_solution
+
+    @classmethod
+    def compute_error_dual(
+        cls,
+        variable: RealVectorVariable,
+        factors: Set["LinearFactor"],
+        error_from_factor: Optional[Dict["LinearFactor", jnp.ndarray]] = None,
+    ):
+        """Compute dual of error term; eg the terms of `A.T @ error` that correspond to
+        this variable.
+
+        Args:
+            factors (Set["LinearFactor"]): Linearized factors that are attached to this variable.
+            error_from_factor (Dict["LinearFactor", jnp.ndarray]): Mapping from factor to error term.
+                Defaults to the `b` constant from each factor.
+        """
+        dual = jnp.zeros(variable.parameter_dim)
+        if error_from_factor is None:
+            for factor in factors:
+                dual = dual + factor.A_from_variable[variable].T @ factor.b
+        else:
+            for factor in factors:
+                dual = (
+                    dual
+                    + factor.A_from_variable[variable].T @ error_from_factor[factor]
+                )
+        return dual

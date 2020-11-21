@@ -27,12 +27,23 @@ class FactorBase(abc.ABC):
         self.scale_tril_inv = scale_tril_inv
         """Inverse square root of covariance matrix."""
 
-    @abc.abstractmethod
-    def compute_error(self, assignments: _types.VariableAssignments):
-        """Compute error vector.
+    def group_key(self) -> _types.GroupKey:
+        """Get unique key for grouping factors.
 
         Args:
-            assignments (_types.VariableAssignments): assignments
+
+        Returns:
+            _types.GroupKey:
+        """
+        return _types.GroupKey(factor_type=self.__class__, secondary_key=self)
+
+    @classmethod
+    @abc.abstractmethod
+    def compute_error(cls, *args: jnp.ndarray):
+        """compute_error.
+
+        Args:
+            *args (jnp.ndarray): Arguments
         """
 
 
@@ -45,9 +56,7 @@ class LinearFactor(FactorBase):
 
     def __init__(
         self,
-        A_from_variable: Dict[
-            "RealVectorVariable", Callable[[jnp.ndarray], jnp.ndarray]
-        ],
+        A_from_variable: Dict["RealVectorVariable", jnp.ndarray],
         b: jnp.ndarray,
     ):
 
@@ -57,13 +66,17 @@ class LinearFactor(FactorBase):
 
         self.variables: Tuple["RealVectorVariable"]
         self.A_from_variable = A_from_variable
-
-        primal = b
-        self.A_transpose_from_variable = {
-            variable: jax.linear_transpose(A, primal)
-            for variable, A in A_from_variable.items()
-        }
         self.b = b
+
+    @overrides
+    def compute_error(self, assignments: _types.VariableAssignments):
+        return self.compute_error_linear_component(assignments=assignments) - self.b
+
+    def compute_error_linear_component(self, assignments: _types.VariableAssignments):
+        error = jnp.zeros(self.error_dim)
+        for variable, A in self.A_from_variable.items():
+            error = error + A @ assignments[variable]
+        return error
 
     @classmethod
     def linearize_from_factor(
@@ -105,16 +118,6 @@ class LinearFactor(FactorBase):
         return LinearFactor(
             A_from_variable=A_from_variable, b=-factor.scale_tril_inv @ error
         )
-
-    @overrides
-    def compute_error(self, assignments: _types.VariableAssignments):
-        return self.compute_error_linear_component(assignments=assignments) - self.b
-
-    def compute_error_linear_component(self, assignments: _types.VariableAssignments):
-        error = jnp.zeros(self.error_dim)
-        for variable, A in self.A_from_variable.items():
-            error = error + A(assignments[variable])
-        return error
 
 
 class PriorFactor(FactorBase):

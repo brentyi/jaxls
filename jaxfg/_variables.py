@@ -70,33 +70,6 @@ class RealVectorVariable(VariableBase):
     def __init__(self, parameter_dim):
         super().__init__(parameter_dim=parameter_dim, local_parameter_dim=parameter_dim)
 
-    def compute_error_dual(
-        self,
-        factors: Set["LinearFactor"],
-        error_from_factor: Optional[Dict["LinearFactor", jnp.ndarray]] = None,
-    ):
-        """Compute dual of error term; eg the terms of `A.T @ error` that correspond to
-        this variable.
-
-        Args:
-            factors (Set["LinearFactor"]): Linearized factors that are attached to this variable.
-            error_from_factor (Dict["LinearFactor", jnp.ndarray]): Mapping from factor to error term.
-                Defaults to the `b` constant from each factor.
-        """
-        dual = jnp.zeros(self.parameter_dim)
-        if error_from_factor is None:
-            for factor in factors:
-                dual = dual + factor.A_transpose_from_variable[self](factor.b)[0]
-        else:
-            for factor in factors:
-                dual = (
-                    dual
-                    + factor.A_transpose_from_variable[self](error_from_factor[factor])[
-                        0
-                    ]
-                )
-        return dual
-
     @classmethod
     @overrides
     def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:

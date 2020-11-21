@@ -3,6 +3,7 @@ import dataclasses
 from typing import Dict, Generic, Set, TypeVar
 
 from .._factors import FactorBase
+from .._types import GroupKey
 from .._variables import RealVectorVariable, VariableBase
 
 FactorGraphType = TypeVar("FactorGraphType", bound="FactorGraphBase")
@@ -12,8 +13,8 @@ VariableType = TypeVar("VariableType", bound=VariableBase)
 
 @dataclasses.dataclass(frozen=True)
 class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
-    factors: Set[FactorType] = dataclasses.field(
-        default_factory=lambda: set(), init=False
+    factors: Dict[GroupKey, Set[FactorType]] = dataclasses.field(
+        default_factory=lambda: {}, init=False
     )
     factors_from_variable: Dict[VariableType, Set[FactorType]] = dataclasses.field(
         default_factory=lambda: {}, init=False
@@ -36,7 +37,11 @@ class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
         for factor in to_add:
             # Add factor to graph
             assert factor not in new_graph.factors
-            new_graph.factors.add(factor)
+            group_key = factor.group_key()
+            if group_key not in new_graph.factors:
+                # Add factor group if new
+                new_graph.factors[group_key] = set()
+            new_graph.factors[group_key].add(factor)
 
             # Make constant-time variable=>factor lookup possible
             for v in factor.variables:
@@ -63,9 +68,14 @@ class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
         self.__setattr__("factors_from_variables", None)
 
         for factor in to_remove:
-            # Add factor to graph
+            # Remove factor from graph
             assert factor in new_graph.factors
-            new_graph.factors.remove(factor)
+            group_key = factor.group_key()
+            new_graph.factors[group_key].remove(factor)
+
+            if len(new_graph.factors[group_key]) == 0:
+                # Remove factor group if empty
+                new_graph.factors.pop(group_key)
 
             # Remove variables from graph
             for v in factor.variables:

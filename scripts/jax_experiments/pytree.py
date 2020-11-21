@@ -71,7 +71,7 @@ tree = {str(n): jnp.eye(4) for n in range(N)}
 #     op({Key(): jnp.eye(4)})
 #
 with jaxfg.utils.stopwatch("non-manual build"):
-    print(op(tree))
+    op(tree)
 
 with jaxfg.utils.stopwatch("non-manual loop"):
     for _ in range(5):
