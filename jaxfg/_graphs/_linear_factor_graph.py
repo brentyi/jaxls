@@ -20,7 +20,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
     __hash__ = object.__hash__
 
     @jax.partial(jax.jit, static_argnums=(0,))
-    def new_solve(
+    def solve(
         self,
         initial_assignments: Optional[types.VariableAssignments] = None,
     ):
@@ -37,7 +37,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
         error_indices_from_shape = {}
         b_list = []
         error_index = 0
-        for group_key, group in self.factors.items():
+        for group_key, group in self.factors_from_group.items():
             for factor in group:
                 for variable, A_matrix in factor.A_from_variable.items():
                     A_shape = A_matrix.shape
@@ -177,95 +177,95 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
         print("Done solving!")
         return solution_values
 
-    @jax.partial(jax.jit, static_argnums=(0,))
-    def solve(
-        self,
-        initial_assignments: Optional[types.VariableAssignments] = None,
-    ) -> types.VariableAssignments:
-        """Finds a solution for our factor graph via an iterative conjugate gradient solver.
-
-        Implicitly defines the normal equations `A.T @ A @ x = A.T @ b`.
-
-        Args:
-            initial_assignments (Optional[types.VariableAssignments]): Initial
-                variable assignments.
-
-        Returns:
-            types.VariableAssignments: Best assignments.
-        """
-
-        print("Getting variables")
-        variables = tuple(self.factors_from_variable.keys())
-
-        def A_function(
-            x: types.VariableAssignments,
-        ) -> Dict[RealVectorVariable, jnp.ndarray]:
-            """Left-multiplies a vector with our Hessian/information matrix.
-
-            Args:
-                x (types.VariableAssignments): x
-
-            Returns:
-                Dict[RealVectorVariable, jnp.ndarray]: `A^TAx`
-            """
-
-            # x => Apply Jacobian => Ax
-            error_from_factor: Dict[LinearFactor, jnp.ndarray] = {}
-            for group in self.factors.values():
-                for factor in group:
-                    error_from_factor[factor] = factor.compute_error_linear_component(
-                        assignments=x
-                    )
-
-            # Ax => Apply Jacobian-transpose => A^TAx
-            value_from_variable: Dict[RealVectorVariable, jnp.ndarray] = {}
-            for variable in variables:
-                value_from_variable[variable] = LinearFactorGraph.compute_error_dual(
-                    variable, self.factors_from_variable[variable], error_from_factor
-                )
-
-            return value_from_variable
-
-        print("Computing b")
-        # Compute rhs (A.T @ b)
-        b: Dict[RealVectorVariable, jnp.ndarray] = {
-            variable: LinearFactorGraph.compute_error_dual(
-                variable, self.factors_from_variable[variable]
-            )
-            for variable in variables
-        }
-
-        print("Running conjugate gradient")
-        assignments_solution, _unused_info = jax.scipy.sparse.linalg.cg(
-            A=A_function, b=b, x0=initial_assignments
-        )
-
-        print("Done solving!")
-        return assignments_solution
-
-    @classmethod
-    def compute_error_dual(
-        cls,
-        variable: RealVectorVariable,
-        factors: Set["LinearFactor"],
-        error_from_factor: Optional[Dict["LinearFactor", jnp.ndarray]] = None,
-    ):
-        """Compute dual of error term; eg the terms of `A.T @ error` that correspond to
-        this variable.
-
-        Args:
-            factors (Set["LinearFactor"]): Linearized factors that are attached to this variable.
-            error_from_factor (Dict["LinearFactor", jnp.ndarray]): Mapping from factor to error term.
-                Defaults to the `b` constant from each factor.
-        """
-        dual = jnp.zeros(variable.parameter_dim)
-        if error_from_factor is None:
-            for factor in factors:
-                dual = dual + factor.A_from_variable[variable].T @ factor.b
-        else:
-            for factor in factors:
-                dual = (
-                    dual
-                    + factor.A_from_variable[variable].T @ error_from_factor[factor]
-                )
-        return dual
+    # @jax.partial(jax.jit, static_argnums=(0,))
+    # def solve(
+    #     self,
+    #     initial_assignments: Optional[types.VariableAssignments] = None,
+    # ) -> types.VariableAssignments:
+    #     """Finds a solution for our factor graph via an iterative conjugate gradient solver.
+    #
+    #     Implicitly defines the normal equations `A.T @ A @ x = A.T @ b`.
+    #
+    #     Args:
+    #         initial_assignments (Optional[types.VariableAssignments]): Initial
+    #             variable assignments.
+    #
+    #     Returns:
+    #         types.VariableAssignments: Best assignments.
+    #     """
+    #
+    #     print("Getting variables")
+    #     variables = tuple(self.factors_from_variable.keys())
+    #
+    #     def A_function(
+    #         x: types.VariableAssignments,
+    #     ) -> Dict[RealVectorVariable, jnp.ndarray]:
+    #         """Left-multiplies a vector with our Hessian/information matrix.
+    #
+    #         Args:
+    #             x (types.VariableAssignments): x
+    #
+    #         Returns:
+    #             Dict[RealVectorVariable, jnp.ndarray]: `A^TAx`
+    #         """
+    #
+    #         # x => Apply Jacobian => Ax
+    #         error_from_factor: Dict[LinearFactor, jnp.ndarray] = {}
+    #         for group in self.factors.values():
+    #             for factor in group:
+    #                 error_from_factor[factor] = factor.compute_error_linear_component(
+    #                     assignments=x
+    #                 )
+    #
+    #         # Ax => Apply Jacobian-transpose => A^TAx
+    #         value_from_variable: Dict[RealVectorVariable, jnp.ndarray] = {}
+    #         for variable in variables:
+    #             value_from_variable[variable] = LinearFactorGraph.compute_error_dual(
+    #                 variable, self.factors_from_variable[variable], error_from_factor
+    #             )
+    #
+    #         return value_from_variable
+    #
+    #     print("Computing b")
+    #     # Compute rhs (A.T @ b)
+    #     b: Dict[RealVectorVariable, jnp.ndarray] = {
+    #         variable: LinearFactorGraph.compute_error_dual(
+    #             variable, self.factors_from_variable[variable]
+    #         )
+    #         for variable in variables
+    #     }
+    #
+    #     print("Running conjugate gradient")
+    #     assignments_solution, _unused_info = jax.scipy.sparse.linalg.cg(
+    #         A=A_function, b=b, x0=initial_assignments
+    #     )
+    #
+    #     print("Done solving!")
+    #     return assignments_solution
+    #
+    # @classmethod
+    # def compute_error_dual(
+    #     cls,
+    #     variable: RealVectorVariable,
+    #     factors: Set["LinearFactor"],
+    #     error_from_factor: Optional[Dict["LinearFactor", jnp.ndarray]] = None,
+    # ):
+    #     """Compute dual of error term; eg the terms of `A.T @ error` that correspond to
+    #     this variable.
+    #
+    #     Args:
+    #         factors (Set["LinearFactor"]): Linearized factors that are attached to this variable.
+    #         error_from_factor (Dict["LinearFactor", jnp.ndarray]): Mapping from factor to error term.
+    #             Defaults to the `b` constant from each factor.
+    #     """
+    #     dual = jnp.zeros(variable.parameter_dim)
+    #     if error_from_factor is None:
+    #         for factor in factors:
+    #             dual = dual + factor.A_from_variable[variable].T @ factor.b
+    #     else:
+    #         for factor in factors:
+    #             dual = (
+    #                 dual
+    #                 + factor.A_from_variable[variable].T @ error_from_factor[factor]
+    #             )
+    #     return dual

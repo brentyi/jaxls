@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import Dict, Generic, Iterable, Set, TypeVar
+from typing import Dict, Generic, Iterable, Iterator, Set, TypeVar
 
 from .._factors import FactorBase
 from .._types import GroupKey
@@ -13,7 +13,7 @@ VariableType = TypeVar("VariableType", bound=VariableBase)
 
 @dataclasses.dataclass(frozen=True)
 class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
-    factors: Dict[GroupKey, Set[FactorType]] = dataclasses.field(
+    factors_from_group: Dict[GroupKey, Set[FactorType]] = dataclasses.field(
         default_factory=lambda: {}, init=False
     )
     factors_from_variable: Dict[VariableType, Set[FactorType]] = dataclasses.field(
@@ -24,6 +24,12 @@ class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
     def variables(self) -> Iterable[VariableBase]:
         """Helper for iterating over variables."""
         return self.factors_from_variable.keys()
+
+    @property
+    def factors(self) -> Iterator[FactorBase]:
+        for group in self.factors_from_group.values():
+            for factor in group:
+                yield factor
 
     def with_factors(self: FactorGraphType, *to_add: FactorType) -> FactorGraphType:
         """Generate a new graph with additional factors added.
@@ -36,17 +42,17 @@ class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
 
         # Mark self as dirty
         # (note that we can't mutate normally)
-        object.__setattr__(self, "factors", None)
+        object.__setattr__(self, "factors_from_group", None)
         object.__setattr__(self, "factors_from_variables", None)
 
         for factor in to_add:
             # Add factor to graph
-            assert factor not in new_graph.factors
+            assert factor not in new_graph.factors_from_group
             group_key = factor.group_key()
-            if group_key not in new_graph.factors:
+            if group_key not in new_graph.factors_from_group:
                 # Add factor group if new
-                new_graph.factors[group_key] = set()
-            new_graph.factors[group_key].add(factor)
+                new_graph.factors_from_group[group_key] = set()
+            new_graph.factors_from_group[group_key].add(factor)
 
             # Make constant-time variable=>factor lookup possible
             for v in factor.variables:
@@ -69,18 +75,18 @@ class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
         new_graph = dataclasses.copy.copy(self)
 
         # Mark self as dirty
-        self.__setattr__("factors", None)
+        self.__setattr__("factors_from_group", None)
         self.__setattr__("factors_from_variables", None)
 
         for factor in to_remove:
             # Remove factor from graph
-            assert factor in new_graph.factors
+            assert factor in new_graph.factors_from_group
             group_key = factor.group_key()
-            new_graph.factors[group_key].remove(factor)
+            new_graph.factors_from_group[group_key].remove(factor)
 
-            if len(new_graph.factors[group_key]) == 0:
+            if len(new_graph.factors_from_group[group_key]) == 0:
                 # Remove factor group if empty
-                new_graph.factors.pop(group_key)
+                new_graph.factors_from_group.pop(group_key)
 
             # Remove variables from graph
             for v in factor.variables:

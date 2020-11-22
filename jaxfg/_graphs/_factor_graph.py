@@ -25,28 +25,18 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
         initial_assignments: Optional[types.VariableAssignments] = None,
     ) -> types.VariableAssignments:
 
-        variables = self.factors_from_variable.keys()
-
-        # Check input variables
-        if initial_assignments is not None:
-            for variable, value in initial_assignments.items():
-                assert variable in variables, "Received assignment for unused variable!"
-                assert value.shape == (
-                    variable.parameter_dim,
-                ), "Received invalid assignment!"
-
         # Define variables for local perturbations
         variable: VariableBase
-        delta_variables = tuple(variable.local_delta_variable for variable in variables)
+        delta_variables = tuple(
+            variable.local_delta_variable for variable in self.variables
+        )
 
-        # Sort out initial variable assignments
-        assignments: types.VariableAssignments
+        # Make default initial assignments if unavailable
         if initial_assignments is None:
-            assignments = {
-                variable: jnp.zeros(variable.parameter_dim) for variable in variables
-            }
-        else:
-            assignments = initial_assignments
+            initial_assignments = types.VariableAssignments.create_default(
+                self.variables
+            )
+        assert set(initial_assignments.variables) == set(self.variables)
 
         # Run some Gauss-Newton iterations
         # for i in range(10):

@@ -45,14 +45,8 @@ for _ in range(1000):
 # print(jit_solve(graph, (position,)))  # , assignments={position: jnp.zeros(2)}))
 # print(time.time() - start_time)
 
-with jaxfg.utils.stopwatch("old solve"):
+with jaxfg.utils.stopwatch("solve"):
     print(graph.solve())  # , assignments={position: jnp.zeros(2)}))
 
-with jaxfg.utils.stopwatch("old solve"):
+with jaxfg.utils.stopwatch("solve"):
     print(graph.solve())  # , assignments={position: jnp.zeros(2)}))
-
-with jaxfg.utils.stopwatch("new solve"):
-    print(graph.new_solve())  # , assignments={position: jnp.zeros(2)}))
-
-with jaxfg.utils.stopwatch("new solve"):
-    print(graph.new_solve())  # , assignments={position: jnp.zeros(2)}))

@@ -2,6 +2,7 @@ import time
 
 import jax
 import jaxfg
+import numpy as onp
 from jax import numpy as jnp
 
 variables = {
@@ -40,10 +41,12 @@ graph = jaxfg.FactorGraph().with_factors(
 # print(jit_solve(graph, (position,)))  # , assignments={position: jnp.zeros(2)}))
 # print(time.time() - start_time)
 
-initial_assignments = {
-    variables["pose1"]: jnp.array([1.0, 0.0, 1.0, 0.0]),
-    variables["pose2"]: jnp.array([1.0, 2.0, 1.0, 0.0]),
-}
+initial_assignments = jaxfg.types.VariableAssignments.from_dict(
+    {
+        variables["pose1"]: onp.array([1.0, 0.0, 1.0, 0.0]),
+        variables["pose2"]: onp.array([1.0, 2.0, 1.0, 0.0]),
+    }
+)
 
 start_time = time.time()
 solutions = graph.solve(initial_assignments)

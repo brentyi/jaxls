@@ -65,22 +65,22 @@ class VariableAssignments:
     def from_dict(
         assignments: Dict["VariableBase", jnp.ndarray]
     ) -> "VariableAssignments":
-        value_list = []
-        value_index_from_variable: Dict[VariableBase, int] = {}
-        value_index = 0
+        storage_list = []
+        storage_pos_from_variable: Dict[VariableBase, int] = {}
+        storage_index = 0
         for variable in assignments.keys():
             value = assignments[variable]
             assert value.shape == (variable.parameter_dim,)
-            value_list.append(value)
-            value_index_from_variable[variable] = value_index
+            storage_list.append(value)
+            storage_pos_from_variable[variable] = storage_index
 
-            value_index += variable.parameter_dim
+            storage_index += variable.parameter_dim
 
-        values: onp.ndarray = onp.concatenate(value_list)
+        values: onp.ndarray = onp.concatenate(storage_list)
 
         return VariableAssignments(
-            values=values,
-            value_index_from_variable=value_index_from_variable,
+            storage=values,
+            storage_pos_from_variable=storage_pos_from_variable,
         )
 
     @staticmethod
