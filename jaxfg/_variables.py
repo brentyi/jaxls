@@ -3,6 +3,7 @@ import contextlib
 from typing import TYPE_CHECKING, Dict, Generator, Optional, Set, Tuple
 
 import jax
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -24,6 +25,10 @@ class VariableBase(abc.ABC):
             self.local_delta_variable = self
         else:
             self.local_delta_variable = RealVectorVariable(local_parameter_dim)
+
+    def get_default_value(self) -> jnp.ndarray:
+        """Get default (on-manifold) parameter value."""
+        return onp.zeros(self.parameter_dim)
 
     @classmethod
     @abc.abstractmethod

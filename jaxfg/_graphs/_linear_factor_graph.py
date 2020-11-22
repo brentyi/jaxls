@@ -22,25 +22,16 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
     @jax.partial(jax.jit, static_argnums=(0,))
     def new_solve(
         self,
-        initial_assignments: types.VariableAssignments = {},
+        initial_assignments: Optional[types.VariableAssignments] = None,
     ):
-        # Stack all variables into a single vector
-        value_list = []
-        value_index_from_variable: Dict[VariableBase, int] = {}
-        value_index = 0
-        for variable in self.factors_from_variable.keys():
-            value = (
-                initial_assignments[variable]
-                if variable in initial_assignments
-                else onp.zeros(variable.parameter_dim)
+        # Make default initial assignments if unavailable
+        if initial_assignments is None:
+            initial_assignments = types.VariableAssignments.create_default(
+                self.variables
             )
-            assert len(value.shape) == 1
-            value_list.append(value)
-            value_index_from_variable[variable] = value_index
-            value_index += value.shape[0]
-        values: onp.ndarray = onp.concatenate(value_list)
+        assert set(initial_assignments.variables) == set(self.variables)
 
-        # Get A matrices
+        # Get A matrices + indices from values, errors
         A_matrices_from_shape = {}
         value_indices_from_shape = {}
         error_indices_from_shape = {}
@@ -59,7 +50,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
                     A_matrices_from_shape[A_shape].append(A_matrix)
                     value_indices_from_shape[A_shape].append(
                         onp.arange(variable.parameter_dim)
-                        + value_index_from_variable[variable]
+                        + initial_assignments.storage_pos_from_variable[variable]
                     )
                     error_indices_from_shape[A_shape].append(
                         onp.arange(factor.error_dim) + error_index
@@ -79,24 +70,20 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
         }
         b: onp.ndarray = onp.concatenate(b_list)
 
-        solution_values = self._solve(
+        # Solve least squares
+        solution_storage = self._solve(
             A_matrices_from_shape=A_matrices_from_shape,
             value_indices_from_shape=value_indices_from_shape,
             error_indices_from_shape=error_indices_from_shape,
-            initial_values=values,
+            initial_x=initial_assignments.storage,
             b=b,
         )
 
         # Return new assignment mapping
-        return {
-            variable: solution_values[
-                value_index_from_variable[variable] : value_index_from_variable[
-                    variable
-                ]
-                + variable.parameter_dim
-            ]
-            for variable in self.factors_from_variable.keys()
-        }
+        return types.VariableAssignments(
+            storage=solution_storage,
+            storage_pos_from_variable=initial_assignments.storage_pos_from_variable,
+        )
 
     @classmethod
     def _solve(
@@ -104,7 +91,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
         A_matrices_from_shape: Dict[Tuple[int, int], jnp.ndarray],
         value_indices_from_shape: Dict[Tuple[int, int], jnp.ndarray],
         error_indices_from_shape: Dict[Tuple[int, int], jnp.ndarray],
-        initial_values: jnp.ndarray,
+        initial_x: jnp.ndarray,
         b: jnp.ndarray,
     ):
         """Solves a block-sparse `Ax = b` least squares problem via CGLS.
@@ -171,7 +158,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
             return ATAx
 
         # Compute ATb
-        ATb: jnp.ndarray = jnp.zeros_like(initial_values)
+        ATb: jnp.ndarray = jnp.zeros_like(initial_x)
         for shape, A_matrices in A_matrices_from_shape.items():
             # Get indices
             value_indices = value_indices_from_shape[shape]
@@ -184,7 +171,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
 
         print("Running conjugate gradient")
         solution_values, _unused_info = jax.scipy.sparse.linalg.cg(
-            A=ATA_function, b=ATb, x0=initial_values
+            A=ATA_function, b=ATb, x0=initial_x
         )
 
         print("Done solving!")

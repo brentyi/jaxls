@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import Dict, Generic, Set, TypeVar
+from typing import Dict, Generic, Iterable, Set, TypeVar
 
 from .._factors import FactorBase
 from .._types import GroupKey
@@ -19,6 +19,11 @@ class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
     factors_from_variable: Dict[VariableType, Set[FactorType]] = dataclasses.field(
         default_factory=lambda: {}, init=False
     )
+
+    @property
+    def variables(self) -> Iterable[VariableBase]:
+        """Helper for iterating over variables."""
+        return self.factors_from_variable.keys()
 
     def with_factors(self: FactorGraphType, *to_add: FactorType) -> FactorGraphType:
         """Generate a new graph with additional factors added.

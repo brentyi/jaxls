@@ -1,7 +1,8 @@
 import contextlib
-import termcolor
 import time
 from typing import Generator
+
+import termcolor
 
 
 @contextlib.contextmanager

@@ -18,9 +18,7 @@ for jit_label, jit in {
         def rotate(theta):
             cos = jnp.cos(theta)
             sin = jnp.sin(theta)
-            R = jnp.array(
-                [[cos, -sin], [sin, cos]]
-            )
+            R = jnp.array([[cos, -sin], [sin, cos]])
             p = jnp.ones(2)
             return R @ R
 

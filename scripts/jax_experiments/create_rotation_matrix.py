@@ -40,10 +40,12 @@ for jit_label, jit in {
 
         @jit
         def create_R(theta):
-            so2 = jnp.array([
-                [0, theta],
-                [-theta, 0],
-            ])
+            so2 = jnp.array(
+                [
+                    [0, theta],
+                    [-theta, 0],
+                ]
+            )
             R = jax.scipy.linalg.expm(so2)
             return R
 

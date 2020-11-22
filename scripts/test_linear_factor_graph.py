@@ -14,11 +14,15 @@ graph = jaxfg.LinearFactorGraph()
 for _ in range(1000):
     graph = graph.with_factors(
         jaxfg.LinearFactor(
-            A_from_variable={position: onp.identity(2),},
+            A_from_variable={
+                position: onp.identity(2),
+            },
             b=onp.array([2.0, 3.0]),
         ),
         jaxfg.LinearFactor(
-            A_from_variable={position2: onp.identity(2),},
+            A_from_variable={
+                position2: onp.identity(2),
+            },
             b=onp.array([2.0, 3.0]),
         ),
     )
