@@ -21,7 +21,7 @@ from overrides import overrides
 from . import _types as _types
 
 if TYPE_CHECKING:
-    from . import RealVectorVariable, VariableBase
+    from . import AbstractRealVectorVariable, VariableBase
 
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
@@ -78,7 +78,7 @@ class FactorBase(abc.ABC):
         return _types.GroupKey(
             factor_type=self.__class__,
             secondary_key=(
-                tuple((type(v), v.parameter_dim) for v in self.variables),
+                tuple((type(v), v.get_parameter_dim()) for v in self.variables),
                 self.error_dim,
             ),
         )
@@ -147,7 +147,7 @@ class LinearFactor(FactorBase):
                 return factor.scale_tril_inv @ factor.compute_error(*())
 
             # Linearize around variable
-            f_jvp = jax.jacfwd(f)(jnp.zeros(variable.local_parameter_dim))[1]
+            f_jvp = jax.jacfwd(f)(jnp.zeros(variable.get_local_parameter_dim()))[1]
             A_from_variable[variable.local_delta_variable] = f_jvp
 
         error = factor.compute_error(assignments=assignments)

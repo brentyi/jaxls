@@ -58,19 +58,22 @@ class VariableAssignments:
         index = self.storage_pos_from_variable[variable]
         return self.storage[
             index : index
-            + (variable.local_parameter_dim if self.local else variable.parameter_dim)
+            + (
+                variable.get_local_parameter_dim()
+                if self.local
+                else variable.get_parameter_dim()
+            )
         ]
 
-    def to_dict(self) -> Dict["VariableBase", jnp.ndarray]:
-        """Return a variable->value dictionary."""
-        return {variable: self.get_value(variable) for variable in self.variables}
-
     def __repr__(self):
+        value_from_variable = {
+            variable: self.get_value(variable) for variable in self.variables
+        }
         k: "VariableBase"
         return str(
             {
                 f"{i}.{k.__class__.__name__}": list(v)
-                for i, (k, v) in enumerate(self.to_dict().items())
+                for i, (k, v) in enumerate(value_from_variable.items())
             }
         )
 
@@ -95,10 +98,10 @@ class VariableAssignments:
             storage_pos_from_variable_type[variable_type] = storage_index
             for variable in variables:
                 value = assignments[variable]
-                assert value.shape == (variable.parameter_dim,)
+                assert value.shape == (variable.get_parameter_dim(),)
                 storage_list.append(value)
                 storage_pos_from_variable[variable] = storage_index
-                storage_index += variable.parameter_dim
+                storage_index += variable.get_parameter_dim()
 
         values: onp.ndarray = onp.concatenate(storage_list)
 
@@ -130,7 +133,7 @@ class VariableAssignments:
             storage_pos_from_variable_type[variable_type] = storage_index
             for variable in variables:
                 storage_pos_from_variable[variable] = storage_index
-                storage_index += variable.local_parameter_dim
+                storage_index += variable.get_local_parameter_dim()
 
         return VariableAssignments(
             local=True,
@@ -169,7 +172,7 @@ class VariableAssignments:
             storage=children[0],
             storage_pos_from_variable=aux_data[1],
             storage_pos_from_variable_type=aux_data[2],
-            count_from_variable_type=aux_data[2],
+            count_from_variable_type=aux_data[3],
         )
 
 

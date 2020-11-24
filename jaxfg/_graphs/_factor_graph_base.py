@@ -4,7 +4,7 @@ from typing import Dict, Generic, Iterable, Iterator, Set, TypeVar
 
 from .._factors import FactorBase
 from .._types import GroupKey
-from .._variables import RealVectorVariable, VariableBase
+from .._variables import AbstractRealVectorVariable, VariableBase
 
 FactorGraphType = TypeVar("FactorGraphType", bound="FactorGraphBase")
 FactorType = TypeVar("FactorType", bound=FactorBase)

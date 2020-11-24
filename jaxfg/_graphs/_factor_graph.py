@@ -9,7 +9,7 @@ from overrides import overrides
 from .. import _types as types
 from .. import _utils
 from .._factors import FactorBase, LinearFactor
-from .._variables import RealVectorVariable, VariableBase
+from .._variables import AbstractRealVectorVariable, VariableBase
 from ._factor_graph_base import FactorGraphBase
 from ._linear_factor_graph import LinearFactorGraph
 
@@ -26,12 +26,6 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
         initial_assignments: Optional[types.VariableAssignments] = None,
     ) -> types.VariableAssignments:
 
-        # Define variables for local perturbations
-        variable: VariableBase
-        delta_variables = tuple(
-            variable.local_delta_variable for variable in self.variables
-        )
-
         # Make default initial assignments if unavailable
         if initial_assignments is None:
             assignments = types.VariableAssignments.create_default(self.variables)
@@ -42,39 +36,33 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
         # Run some Gauss-Newton iterations
         # for i in range(10):
         for i in range(2):
-            print("Computing error")
-            print(
-                onp.sum(
-                    [
-                        (
-                            f.scale_tril_inv
-                            @ f.compute_error(
-                                *[
-                                    assignments.get_value(variable)
-                                    for variable in f.variables
-                                ]
-                            )
-                        )
-                        ** 2
-                        for f in self.factors
-                    ]
-                )
-            )
-            print("Running GN step")
-            assignments = self._gauss_newton_step(assignments, delta_variables)
+            # print("Computing error")
+            # print(
+            #     onp.sum(
+            #         [
+            #             (
+            #                 f.scale_tril_inv
+            #                 @ f.compute_error(
+            #                     *[
+            #                         assignments.get_value(variable)
+            #                         for variable in f.variables
+            #                     ]
+            #                 )
+            #             )
+            #             ** 2
+            #             for f in self.factors
+            #         ]
+            #     )
+            # )
+            # print(assignments.storage)
+            assignments = self._gauss_newton_step(assignments)
 
         return assignments
 
-    @jax.partial(jax.jit, static_argnums=(0, 2))
+    @jax.partial(jax.jit, static_argnums=0)
     def _gauss_newton_step(
-        self,
-        assignments: types.VariableAssignments,
-        delta_variables: Tuple[RealVectorVariable, ...],
+        self, assignments: types.VariableAssignments
     ) -> types.VariableAssignments:
-        print("Linearizing....")
-        # Linearize factors
-        from tqdm.auto import tqdm
-
         # Create storage object with local deltas
         local_delta_assignments = assignments.create_local_deltas()
 
@@ -117,7 +105,8 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 ]
                 return factor.compute_error(*perturbed_values)
 
-            # Stack factor in our group
+            # Stack factors in our group
+            # This is currently our bottleneck!
             factors_stacked: FactorBase = jax.tree_multimap(
                 lambda *arrays: jnp.stack(arrays, axis=0), *group
             )
@@ -128,7 +117,9 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 for i, variable in enumerate(factor.variables):
                     storage_pos = assignments.storage_pos_from_variable[variable]
                     values_indices[i].append(
-                        onp.arange(storage_pos, storage_pos + variable.parameter_dim)
+                        onp.arange(
+                            storage_pos, storage_pos + variable.get_parameter_dim()
+                        )
                     )
             values_stacked = tuple(
                 assignments.storage[onp.array(indices)] for indices in values_indices
@@ -139,7 +130,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 factors_stacked,
                 values_stacked,
                 tuple(
-                    onp.zeros((num_factors, variable.local_parameter_dim))
+                    onp.zeros((num_factors, variable.get_local_parameter_dim()))
                     for variable in example_factor.variables
                 ),
             )
@@ -171,7 +162,8 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                     ]
                     value_indices_row.append(
                         onp.arange(
-                            storage_pos, storage_pos + variable.local_parameter_dim
+                            storage_pos,
+                            storage_pos + variable.get_local_parameter_dim(),
                         )
                     )
                     error_indices_row.append(error_indices_from_factor[factor])
@@ -197,21 +189,32 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             local_delta_assignments.storage,
             b=-jnp.concatenate(errors_list),
         )
-        exit()
-        # print("Solving...")
-        # # Solve for deltas
-        # delta_from_variable: types.VariableAssignments = (
-        #     LinearFactorGraph().with_factors(*linearized_factors).solve()
-        # )
 
-        print("Updating...")
-        # Update assignments
-        assignments = {
-            variable: variable.add_local(
-                x=value, local_delta=delta_from_variable[variable.local_delta_variable]
+        # Update on manifold
+        new_storage = jnp.zeros_like(assignments.storage)
+        variable_type: Type[VariableBase]
+        for variable_type in assignments.storage_pos_from_variable_type.keys():
+
+            # Get locations
+            count = assignments.count_from_variable_type[variable_type]
+            storage_pos = assignments.storage_pos_from_variable_type[variable_type]
+            local_storage_pos = local_delta_assignments.storage_pos_from_variable_type[
+                variable_type
+            ]
+            dim = variable_type.get_parameter_dim()
+            local_dim = variable_type.get_local_parameter_dim()
+
+            # Get batched variables
+            batched_xs = assignments.storage[
+                storage_pos : storage_pos + dim * count
+            ].reshape((count, dim))
+            batched_deltas = local_delta_values[
+                local_storage_pos : local_storage_pos + local_dim * count
+            ].reshape((count, local_dim))
+
+            # Batched variable update
+            new_storage = new_storage.at[storage_pos : storage_pos + dim * count].set(
+                jax.vmap(variable_type.add_local)(batched_xs, batched_deltas).flatten()
             )
-            for variable, value in assignments.items()
-        }
 
-        print("Done!")
-        return assignments
+        return dataclasses.replace(assignments, storage=new_storage)

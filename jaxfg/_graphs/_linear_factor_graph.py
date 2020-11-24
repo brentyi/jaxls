@@ -8,12 +8,12 @@ from overrides import overrides
 
 from .. import _types as types
 from .._factors import LinearFactor
-from .._variables import RealVectorVariable, VariableBase
+from .._variables import AbstractRealVectorVariable, VariableBase
 from ._factor_graph_base import FactorGraphBase
 
 
 # @dataclasses.dataclass(frozen=True)
-class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
+class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable]):
     """Simple LinearFactorGraph."""
 
     # Use default object hash rather than dataclass one
@@ -49,7 +49,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
 
                     A_matrices_from_shape[A_shape].append(A_matrix)
                     value_indices_from_shape[A_shape].append(
-                        onp.arange(variable.parameter_dim)
+                        onp.arange(variable.get_parameter_dim())
                         + initial_assignments.storage_pos_from_variable[variable]
                     )
                     error_indices_from_shape[A_shape].append(
@@ -258,7 +258,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
     #         error_from_factor (Dict["LinearFactor", jnp.ndarray]): Mapping from factor to error term.
     #             Defaults to the `b` constant from each factor.
     #     """
-    #     dual = jnp.zeros(variable.parameter_dim)
+    #     dual = jnp.zeros(variable.get_parameter_dim())
     #     if error_from_factor is None:
     #         for factor in factors:
     #             dual = dual + factor.A_from_variable[variable].T @ factor.b

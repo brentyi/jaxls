@@ -1,5 +1,6 @@
 import abc
 import contextlib
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Dict, Generator, Optional, Set, Tuple
 
 import jax
@@ -12,23 +13,20 @@ if TYPE_CHECKING:
 
 
 class VariableBase(abc.ABC):
-    def __init__(self, parameter_dim: int, local_parameter_dim: int):
-        self.parameter_dim = parameter_dim
+    @staticmethod
+    @abc.abstractmethod
+    def get_parameter_dim() -> int:
         """Dimensionality of underlying parameterization."""
 
-        self.local_parameter_dim = local_parameter_dim
+    @staticmethod
+    @abc.abstractmethod
+    def get_local_parameter_dim() -> int:
         """Dimensionality of local parameterization."""
 
-        self.local_delta_variable: RealVectorVariable
-        """Variable for tracking local updates."""
-        if isinstance(self, RealVectorVariable):
-            self.local_delta_variable = self
-        else:
-            self.local_delta_variable = RealVectorVariable(local_parameter_dim)
-
-    def get_default_value(self) -> jnp.ndarray:
+    @staticmethod
+    @abc.abstractmethod
+    def get_default_value() -> onp.ndarray:
         """Get default (on-manifold) parameter value."""
-        return onp.zeros(self.parameter_dim)
 
     @classmethod
     @abc.abstractmethod
@@ -49,11 +47,11 @@ class VariableBase(abc.ABC):
         """Compute the difference between two parameters on the manifold.
 
         Args:
-            x (jnp.ndarray): First parameter to compare. Shape should match `self.parameter_dim`.
-            y (jnp.ndarray): Second parameter to compare. Shape should match `self.parameter_dim`.
+            x (jnp.ndarray): First parameter to compare. Shape should match `self.get_parameter_dim()`.
+            y (jnp.ndarray): Second parameter to compare. Shape should match `self.get_parameter_dim()`.
 
         Returns:
-            jnp.ndarray: Delta vector; dimension should match self.local_delta_variable.
+            jnp.ndarray: Delta vector; dimension should match self.get_local_parameter_dim().
         """
 
     @overrides
@@ -69,11 +67,9 @@ class VariableBase(abc.ABC):
         return hash(self) < hash(other)
 
 
-class RealVectorVariable(VariableBase):
+# Fake templating; RealVectorVariable[N]
+class AbstractRealVectorVariable(VariableBase):
     """Variable for an arbitrary vector of real numbers."""
-
-    def __init__(self, parameter_dim):
-        super().__init__(parameter_dim=parameter_dim, local_parameter_dim=parameter_dim)
 
     @classmethod
     @overrides
@@ -86,14 +82,46 @@ class RealVectorVariable(VariableBase):
         return x - y
 
 
+_real_vector_variable_cache = {}
+
+
+class _RealVectorVariableTemplate:
+    def __getitem__(self, n: int):
+        assert isinstance(n, int)
+
+        if n not in _real_vector_variable_cache:
+
+            class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
+                @staticmethod
+                @overrides
+                def get_parameter_dim() -> int:
+                    return n
+
+                @staticmethod
+                @overrides
+                def get_local_parameter_dim() -> int:
+                    return n
+
+                @staticmethod
+                @overrides
+                def get_default_value() -> onp.ndarray:
+                    return onp.zeros(n)
+
+            _real_vector_variable_cache[n] = _NDimensionalRealVectorVariable
+        return _real_vector_variable_cache[n]
+
+
+RealVectorVariable = _RealVectorVariableTemplate()
+
+
+# Lie manifolds
+
+
 class SO2Variable(VariableBase):
     """Variable containing a 2D rotation."""
 
-    def __init__(self):
-        super().__init__(
-            parameter_dim=2,  # Parameterized with unit-norm complex number
-            local_parameter_dim=1,  # Local delta with scalar radians
-        )
+    # parameter_dim = 2  # Parameterized with unit-norm complex number
+    # get_local_parameter_dim() = 1  # Local delta with scalar radians
 
     @classmethod
     @overrides
@@ -123,11 +151,8 @@ class SO2Variable(VariableBase):
 class SE2Variable(VariableBase):
     """Variable containing a 2D pose."""
 
-    def __init__(self):
-        super().__init__(
-            parameter_dim=4,  # (x, y, cos, sin)
-            local_parameter_dim=3,  # (x, y, theta)
-        )
+    # parameter_dim = (4,)  # (x, y, cos, sin)
+    # get_local_parameter_dim() = (3,)  # (x, y, theta)
 
     @classmethod
     @overrides
