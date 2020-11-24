@@ -39,7 +39,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, RealVectorVariable]):
         error_index = 0
         for group_key, group in self.factors_from_group.items():
             for factor in group:
-                for variable, A_matrix in factor.A_from_variable.items():
+                for variable, A_matrix in zip(factor.variables, factor.A_matrices):
                     A_shape = A_matrix.shape
 
                     if A_shape not in A_matrices_from_shape:

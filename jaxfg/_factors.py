@@ -1,8 +1,20 @@
 import abc
+import dataclasses
 import types
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, NamedTuple, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Hashable,
+    NamedTuple,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 import jax
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -12,20 +24,47 @@ if TYPE_CHECKING:
     from . import RealVectorVariable, VariableBase
 
 
+FactorType = TypeVar("FactorType", bound="FactorBase")
+
+
+@dataclasses.dataclass(frozen=True)
 class FactorBase(abc.ABC):
-    def __init__(
-        self,
-        variables: Tuple["VariableBase", ...],
-        scale_tril_inv: _types.ScaleTrilInv,
-    ):
-        self.variables = variables
-        """Variables connected to this factor. Immutable. (currently assumed but unenforced)"""
+    variables: Tuple["VariableBase"]
+    """Variables connected to this factor. Immutable. (currently assumed but unenforced)"""
 
-        self.error_dim: int = scale_tril_inv.shape[0]
+    scale_tril_inv: _types.ScaleTrilInv
+    """Inverse square root of covariance matrix."""
+
+    # Use default object hash rather than dataclass one
+    __hash__ = object.__hash__
+
+    @property
+    def error_dim(self) -> int:
         """Error dimensionality."""
+        return self.scale_tril_inv.shape[0]
 
-        self.scale_tril_inv = scale_tril_inv
-        """Inverse square root of covariance matrix."""
+    def __init_subclass__(cls, **kwargs):
+        """Register all factors as PyTree nodes."""
+        super().__init_subclass__(**kwargs)
+        jax.tree_util.register_pytree_node(
+            cls, flatten_func=cls.flatten, unflatten_func=cls.unflatten
+        )
+
+    @classmethod
+    def flatten(
+        cls: Type[FactorType], v: FactorType
+    ) -> Tuple[Tuple[jnp.ndarray], Tuple[str]]:
+        """Flatten a factor for use as a PyTree/parameter stacking."""
+        v_dict = dataclasses.asdict(v)
+        v_dict.pop("variables")
+        return tuple(v_dict.values()), tuple(v_dict.keys())
+
+    @classmethod
+    def unflatten(
+        cls: Type[FactorType], aux_data: Tuple[str], children: Tuple[jnp.ndarray]
+    ) -> FactorType:
+        """Unflatten a factor for use as a PyTree/parameter stacking."""
+        return cls(variables=tuple(), **dict(zip(aux_data, children)))
 
     def group_key(self) -> _types.GroupKey:
         """Get unique key for grouping factors.
@@ -35,11 +74,17 @@ class FactorBase(abc.ABC):
         Returns:
             _types.GroupKey:
         """
-        return _types.GroupKey(factor_type=self.__class__, secondary_key=self)
+        v: "VariableBase"
+        return _types.GroupKey(
+            factor_type=self.__class__,
+            secondary_key=(
+                tuple((type(v), v.parameter_dim) for v in self.variables),
+                self.error_dim,
+            ),
+        )
 
-    @classmethod
     @abc.abstractmethod
-    def compute_error(cls, *args: jnp.ndarray):
+    def compute_error(self, *args: jnp.ndarray):
         """compute_error.
 
         Args:
@@ -47,6 +92,7 @@ class FactorBase(abc.ABC):
         """
 
 
+@dataclasses.dataclass(frozen=True)
 class LinearFactor(FactorBase):
     """Linearized factor, corresponding to the simple residual:
     $$
@@ -54,29 +100,19 @@ class LinearFactor(FactorBase):
     $$
     """
 
-    def __init__(
-        self,
-        A_from_variable: Dict["RealVectorVariable", jnp.ndarray],
-        b: jnp.ndarray,
-    ):
+    A_matrices: Tuple[jnp.ndarray]
+    b: jnp.ndarray
+    scale_tril_inv: jnp.ndarray
 
-        variables = tuple(A_from_variable.keys())
-        error_dim = b.shape[0]
-        super().__init__(variables=variables, scale_tril_inv=jnp.eye(error_dim))
-
-        self.variables: Tuple["RealVectorVariable"]
-        self.A_from_variable = A_from_variable
-        self.b = b
+    # Use default object hash rather than dataclass one
+    __hash__ = object.__hash__
 
     @overrides
-    def compute_error(self, assignments: _types.VariableAssignments):
-        return self.compute_error_linear_component(assignments=assignments) - self.b
-
-    def compute_error_linear_component(self, assignments: _types.VariableAssignments):
-        error = jnp.zeros(self.error_dim)
-        for variable, A in self.A_from_variable.items():
-            error = error + A @ assignments[variable]
-        return error
+    def compute_error(self, *variable_values: jnp.ndarray):
+        linear_component = jnp.zeros_like(self.b)
+        for A_matrix, value in zip(self.A_matrices, variable_values):
+            linear_component = linear_component + A_matrix @ value
+        return linear_component - self.b
 
     @classmethod
     def linearize_from_factor(
@@ -108,15 +144,28 @@ class LinearFactor(FactorBase):
                 )
 
                 # Return whitened error
-                return factor.scale_tril_inv @ factor.compute_error(assignments_copy)
+                return factor.scale_tril_inv @ factor.compute_error(*())
 
             # Linearize around variable
-            f_jvp = jax.linearize(f, jnp.zeros(variable.local_parameter_dim))[1]
+            f_jvp = jax.jacfwd(f)(jnp.zeros(variable.local_parameter_dim))[1]
             A_from_variable[variable.local_delta_variable] = f_jvp
 
         error = factor.compute_error(assignments=assignments)
         return LinearFactor(
             A_from_variable=A_from_variable, b=-factor.scale_tril_inv @ error
+        )
+
+    def group_key(self) -> _types.GroupKey:
+        """Get unique key for grouping factors.
+
+        Args:
+
+        Returns:
+            _types.GroupKey:
+        """
+        return _types.GroupKey(
+            factor_type=self.__class__,
+            secondary_key=tuple(A.shape for A in self.A_matrices),
         )
 
 

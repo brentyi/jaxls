@@ -9,21 +9,21 @@ position = jaxfg.RealVectorVariable(parameter_dim=2)
 position2 = jaxfg.RealVectorVariable(parameter_dim=2)
 
 
-graph = jaxfg.LinearFactorGraph()
+graph = jaxfg.FactorGraph()
 
 for _ in range(1000):
     graph = graph.with_factors(
         jaxfg.LinearFactor(
-            A_from_variable={
-                position: onp.identity(2),
-            },
+            A_matrices=(onp.identity(2),),
+            variables=(position,),
             b=onp.array([2.0, 3.0]),
+            scale_tril_inv=onp.eye(2),
         ),
         jaxfg.LinearFactor(
-            A_from_variable={
-                position2: onp.identity(2),
-            },
+            A_matrices=(onp.identity(2),),
+            variables=(position2,),
             b=onp.array([2.0, 3.0]),
+            scale_tril_inv=onp.eye(2),
         ),
     )
 
