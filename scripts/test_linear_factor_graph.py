@@ -5,11 +5,10 @@ import jaxfg
 import numpy as onp
 from jax import numpy as jnp
 
-
 with jaxfg.utils.stopwatch("Creating graph"):
     graph = jaxfg.FactorGraph()
 
-    for _ in range(1000):
+    for _ in range(2000):
         position = jaxfg.RealVectorVariable[2]()
         position2 = jaxfg.RealVectorVariable[2]()
 

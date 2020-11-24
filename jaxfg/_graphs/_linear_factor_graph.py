@@ -47,7 +47,9 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
                         value_indices_from_shape[A_shape] = []
                         error_indices_from_shape[A_shape] = []
 
-                    A_matrices_from_shape[A_shape].append(A_matrix)
+                    A_matrices_from_shape[A_shape].append(
+                        factor.scale_tril_inv @ A_matrix
+                    )
                     value_indices_from_shape[A_shape].append(
                         onp.arange(variable.get_parameter_dim())
                         + initial_assignments.storage_pos_from_variable[variable]
@@ -57,7 +59,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
                     )
                     error_index += factor.error_dim
 
-                b_list.append(factor.b)
+                b_list.append(factor.scale_tril_inv @ factor.b)
 
         A_matrices_from_shape = {
             k: onp.array(v) for k, v in A_matrices_from_shape.items()
@@ -80,10 +82,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
         )
 
         # Return new assignment mapping
-        return types.VariableAssignments(
-            storage=solution_storage,
-            storage_pos_from_variable=initial_assignments.storage_pos_from_variable,
-        )
+        return dataclasses.replace(initial_assignments, storage=solution_storage)
 
     @classmethod
     def _solve(

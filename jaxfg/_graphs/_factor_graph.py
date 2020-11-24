@@ -40,8 +40,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             # print(
             #     onp.sum(
             #         [
-            #             (
-            #                 f.scale_tril_inv
+            #             ( f.scale_tril_inv
             #                 @ f.compute_error(
             #                     *[
             #                         assignments.get_value(variable)
@@ -137,9 +136,13 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
 
             # Vectorized error computation
             errors_list.append(
-                jax.vmap(group_key.factor_type.compute_error)(
-                    factors_stacked, *values_stacked
-                ).reshape(-1)
+                jnp.einsum(
+                    "nij,nj->ni",
+                    factors_stacked.scale_tril_inv,
+                    jax.vmap(group_key.factor_type.compute_error)(
+                        factors_stacked, *values_stacked
+                    ),
+                ).flatten()
             )
 
             # Put Jacobians into input array
@@ -151,7 +154,9 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                     value_indices_from_shape[shape] = []
                     error_indices_from_shape[shape] = []
 
-                A_matrices_from_shape[shape].append(jacobian)
+                A_matrices_from_shape[shape].append(
+                    jnp.einsum("nij,njk->nik", factors_stacked.scale_tril_inv, jacobian)
+                )
 
                 value_indices_row = []
                 error_indices_row = []
