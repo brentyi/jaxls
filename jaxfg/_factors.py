@@ -100,9 +100,9 @@ class LinearFactor(FactorBase):
     $$
     """
 
-    A_matrices: Tuple[jnp.ndarray]
-    b: jnp.ndarray
-    scale_tril_inv: jnp.ndarray
+    A_matrices: Tuple[onp.ndarray]
+    b: onp.ndarray
+    scale_tril_inv: onp.ndarray
 
     # Use default object hash rather than dataclass one
     __hash__ = object.__hash__

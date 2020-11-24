@@ -105,9 +105,8 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 return factor.compute_error(*perturbed_values)
 
             # Stack factors in our group
-            # This is currently our bottleneck!
             factors_stacked: FactorBase = jax.tree_multimap(
-                lambda *arrays: jnp.stack(arrays, axis=0), *group
+                lambda *arrays: onp.stack(arrays, axis=0), *group
             )
 
             # Stack inputs to our factors
