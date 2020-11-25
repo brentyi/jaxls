@@ -49,16 +49,16 @@ def benchmark(**kwargs):
         print("=======")
 
         start_time = time.time()
-        func()
+        func().block_until_ready()
         print("Dynamic runtime: ", time.time() - start_time)
 
         start_time = time.time()
         func = jit(func)
-        func()
+        func().block_until_ready()
         print("JIT compile time: ", time.time() - start_time)
 
         start_time = time.time()
-        func()
+        func().block_until_ready()
         print("JIT runtime: ", time.time() - start_time)
 
 

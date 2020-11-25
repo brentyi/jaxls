@@ -23,7 +23,7 @@ for jit_label, jit in {
             return R @ R
 
         for i in range(iters):
-            rotate(i)
+            rotate(i).block_until_ready()
 
     with jaxfg.utils.stopwatch(f"{jit_label}decomposed"):
 
@@ -35,4 +35,4 @@ for jit_label, jit in {
             return jnp.array([cos * p[0] - sin * p[1], sin * p[0] + cos * p[1]])
 
         for i in range(iters):
-            rotate(i)
+            rotate(i).block_until_ready()

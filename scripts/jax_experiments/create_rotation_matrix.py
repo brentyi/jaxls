@@ -22,7 +22,7 @@ for jit_label, jit in {
             return R
 
         for i in range(iters):
-            create_R(i)
+            create_R(i).block_until_ready()
 
     with jaxfg.utils.stopwatch(f"{jit_label}jnp.array re-use cos and sin"):
 
@@ -34,7 +34,7 @@ for jit_label, jit in {
             return R
 
         for i in range(iters):
-            create_R(i)
+            create_R(i).block_until_ready()
 
     with jaxfg.utils.stopwatch(f"{jit_label}expm"):
 
@@ -50,7 +50,7 @@ for jit_label, jit in {
             return R
 
         for i in range(iters):
-            create_R(float(i))
+            create_R(float(i)).block_until_ready()
 
     with jaxfg.utils.stopwatch(f"{jit_label}zeros and fill"):
 
@@ -66,4 +66,4 @@ for jit_label, jit in {
             return R
 
         for i in range(iters):
-            create_R(i)
+            create_R(i).block_until_ready()

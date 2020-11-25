@@ -17,22 +17,22 @@ jacfwd_vmap = jax.vmap(jax.jacfwd(func))
 
 with jaxfg.utils.stopwatch("vmap"):
     for i in range(iters):
-        jacobian = jax.jit(jacfwd_vmap)(jnp.zeros((N, 5)))
+        jacobian = jax.jit(jacfwd_vmap)(jnp.zeros((N, 5))).block_until_ready()
         assert jacobian.shape == (N, 5, 5)
 
 with jaxfg.utils.stopwatch("vmap no jit"):
     for i in range(iters):
-        jacobian = jacfwd_vmap(jnp.zeros((N, 5)))
+        jacobian = jacfwd_vmap(jnp.zeros((N, 5))).block_until_ready()
         assert jacobian.shape == (N, 5, 5)
 
 with jaxfg.utils.stopwatch("loop no vec"):
     for i in range(iters):
-        jacobian = jnp.array(list(jax.jit(jacfwd)(vec) for vec in jnp.zeros((N, 5))))
+        jacobian = jnp.array(list(jax.jit(jacfwd)(vec) for vec in jnp.zeros((N, 5)))).block_until_ready()
         assert jacobian.shape == (N, 5, 5)
 
 with jaxfg.utils.stopwatch("loop no vec no jit"):
     for i in range(iters):
-        jacobian = jnp.array(list(jacfwd(vec) for vec in jnp.zeros((N, 5))))
+        jacobian = jnp.array(list(jacfwd(vec) for vec in jnp.zeros((N, 5)))).block_until_ready()
         assert jacobian.shape == (N, 5, 5)
 
 # How can we generalize this to factors?
