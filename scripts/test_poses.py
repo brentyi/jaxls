@@ -11,12 +11,12 @@ variables = {
 }
 
 graph = jaxfg.FactorGraph().with_factors(
-    jaxfg.PriorFactor(
+    jaxfg.PriorFactor.make(
         variable=variables["pose1"],
         mu=jnp.array([1.0, 0.0, 1.0, 0.0]),
         scale_tril_inv=jnp.eye(3),
     ),
-    jaxfg.BetweenFactor(
+    jaxfg.BetweenFactor.make(
         before=variables["pose1"],
         after=variables["pose2"],
         delta=jnp.array([0.0, 2.0, 0.000]),
@@ -52,10 +52,8 @@ start_time = time.time()
 solutions = graph.solve(initial_assignments)
 print("\nFirst solve runtime: ", time.time() - start_time)
 
-for name, variable in variables.items():
-    if variable in solutions:
-        print("\t", name, str(solutions[variable]))
-print()
+
+print(solutions)
 
 start_time = time.time()
 graph.solve(initial_assignments)  # , assignments={position: jnp.zeros(2)}))

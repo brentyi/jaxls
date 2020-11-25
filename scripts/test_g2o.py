@@ -1,3 +1,4 @@
+import dataclasses
 import time
 
 import jax
@@ -15,7 +16,7 @@ initial_poses: jaxfg.types.VariableAssignments = {}
 
 factors = []
 
-pose_count = 10
+pose_count = 80000
 
 for line in tqdm(lines):
     parts = line.split(" ")
@@ -55,9 +56,11 @@ for line in tqdm(lines):
         )
         scale_tril_inv = onp.linalg.cholesky(information_matrix)
 
+        print(before_index, after_index)
+
         # scale_tril_inv = jnp.array(onp.array(map(float, parts[6:6])))
         factors.append(
-            jaxfg.BetweenFactor(
+            jaxfg.BetweenFactor.make(
                 before=pose_variables[before_index],
                 after=pose_variables[after_index],
                 delta=delta,
@@ -67,7 +70,7 @@ for line in tqdm(lines):
 
 # Anchor start pose
 factors.append(
-    jaxfg.PriorFactor(
+    jaxfg.PriorFactor.make(
         variable=pose_variables[0],
         mu=initial_poses[pose_variables[0]],
         scale_tril_inv=jnp.eye(3),
@@ -79,20 +82,31 @@ print(f"Loaded {len(pose_variables)} poses and {len(factors)} factors")
 
 start_time = time.time()
 
+initial_poses = jaxfg.types.VariableAssignments.from_dict(initial_poses)
 solution_poses = jaxfg.FactorGraph().with_factors(*factors).solve(initial_poses)
 
 print("====\nSolve time: ", time.time() - start_time, "\n====")
+# print(solution_poses)
+
+with jaxfg.utils.stopwatch("Converting storage to onp"):
+    solution_poses = dataclasses.replace(
+        solution_poses, storage=onp.array(solution_poses.storage)
+    )
 
 
+print("plotting!")
 plt.figure()
-for i, v in enumerate(pose_variables):
-    x, y, cos, sin = initial_poses[v]
+# from tqdm.auto import tqdm
+# print(onp.array(solution_poses.storage).shape)
+# exit()
+for i, v in enumerate(tqdm(pose_variables)):
+    x, y, cos, sin = initial_poses.get_value(v)
     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="r")
-    plt.annotate(str(i), (x, y))
-for i, v in enumerate(pose_variables):
-    x, y, cos, sin = solution_poses[v]
+    # plt.annotate(str(i), (x, y))
+for i, v in enumerate(tqdm(pose_variables)):
+    x, y, cos, sin = solution_poses.get_value(v)
     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="b")
-    plt.annotate(str(i), (x, y))
+    # plt.annotate(str(i), (x, y))
 # plt.plot(
 #     [initial_poses[v][0] for v in pose_variables],
 #     [initial_poses[v][1] for v in pose_variables],

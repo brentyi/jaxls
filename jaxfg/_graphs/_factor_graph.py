@@ -32,7 +32,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
 
         # Run some Gauss-Newton iterations
         # for i in range(10):
-        for i in range(2):
+        for i in range(20):
             # print("Computing error")
             # print(
             #     onp.sum(
@@ -51,7 +51,9 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             #     )
             # )
             # print(assignments.storage)
-            assignments = self._gauss_newton_step(assignments)
+            with _utils.stopwatch("GN step"):
+                assignments = self._gauss_newton_step(assignments)
+                assignments.storage.block_until_ready()
 
         return assignments
 
@@ -172,16 +174,16 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 value_indices_from_shape[shape].append(value_indices_row)
                 error_indices_from_shape[shape].append(error_indices_row)
 
-            # Stack matrices together
-            A_matrices_from_shape = {
-                k: jnp.concatenate(v) for k, v in A_matrices_from_shape.items()
-            }
-            value_indices_from_shape = {
-                k: onp.concatenate(v) for k, v in value_indices_from_shape.items()
-            }
-            error_indices_from_shape = {
-                k: onp.concatenate(v) for k, v in error_indices_from_shape.items()
-            }
+        # Stack matrices together
+        A_matrices_from_shape = {
+            k: jnp.concatenate(v) for k, v in A_matrices_from_shape.items()
+        }
+        value_indices_from_shape = {
+            k: onp.concatenate(v) for k, v in value_indices_from_shape.items()
+        }
+        error_indices_from_shape = {
+            k: onp.concatenate(v) for k, v in error_indices_from_shape.items()
+        }
 
         local_delta_values = LinearFactorGraph()._solve(
             A_matrices_from_shape,

@@ -8,6 +8,7 @@ from typing import (
     Dict,
     Hashable,
     NamedTuple,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -18,8 +19,7 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from . import _types
-from . import _utils
+from . import _types, _utils
 
 if TYPE_CHECKING:
     from . import AbstractRealVectorVariable, VariableBase
@@ -36,6 +36,9 @@ class FactorBase(abc.ABC):
     scale_tril_inv: _types.ScaleTrilInv
     """Inverse square root of covariance matrix."""
 
+    _static_fields: Set[str] = dataclasses.field(default=frozenset(), init=False)
+    """Fields to ignore when stacking."""
+
     @property
     def error_dim(self) -> int:
         """Error dimensionality."""
@@ -51,18 +54,42 @@ class FactorBase(abc.ABC):
     @classmethod
     def flatten(
         cls: Type[FactorType], v: FactorType
-    ) -> Tuple[Tuple[jnp.ndarray], Tuple[str]]:
+    ) -> Tuple[Tuple[jnp.ndarray], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
         v_dict = dataclasses.asdict(v)
         v_dict.pop("variables")
-        return tuple(v_dict.values()), tuple(v_dict.keys())
+        v_dict.pop("_static_fields")
+
+        array_data = {k: v for k, v in v_dict.items() if k not in cls._static_fields}
+        aux_dict = {k: v for k, v in v_dict.items() if k not in array_data}
+
+        return (
+            tuple(array_data.values()),
+            tuple(array_data.keys())
+            + tuple(aux_dict.keys())
+            + tuple(aux_dict.values()),
+        )
+
+    # _FactorAuxData(
+    #     array_keys=tuple(v_dict.keys()), aux_dict=aux_dict
+    # )
 
     @classmethod
     def unflatten(
-        cls: Type[FactorType], aux_data: Tuple[str], children: Tuple[jnp.ndarray]
+        cls: Type[FactorType], treedef: Tuple, children: Tuple[jnp.ndarray]
     ) -> FactorType:
         """Unflatten a factor for use as a PyTree/parameter stacking."""
-        return cls(variables=tuple(), **dict(zip(aux_data, children)))
+        array_keys = treedef[: len(children)]
+        aux = treedef[len(children) :]
+        aux_keys = aux[: len(aux) // 2]
+        aux_values = aux[len(aux) // 2 :]
+
+        return cls(
+            variables=tuple(),
+            **dict(zip(array_keys, children)),
+            **dict(zip(aux_keys, aux_values)),
+            # **aux_data.aux_dict
+        )
 
     def group_key(self) -> _types.GroupKey:
         """Get unique key for grouping factors.
@@ -109,101 +136,103 @@ class LinearFactor(FactorBase):
             linear_component = linear_component + A_matrix @ value
         return linear_component - self.b
 
-    @classmethod
-    def linearize_from_factor(
-        cls, factor: FactorBase, assignments: _types.VariableAssignments
-    ) -> "LinearFactor":
-        """Produce a LinearFactor object by linearizing an arbitrary factor.
-
-        Args:
-            factor (FactorBase): Factor to linearize.
-            assignments (_types.VariableAssignments): Assignments to linearize around.
-
-        Returns:
-            LinearFactor: Linearized factor.
-        """
-        A_from_variable: Dict[
-            "RealVectorVariable", Callable[[jnp.ndarray], jnp.ndarray]
-        ] = {}
-
-        # Pull out only the assignments that we care about
-        assignments = {variable: assignments[variable] for variable in factor.variables}
-
-        for variable in factor.variables:
-
-            def f(local_delta: jnp.ndarray) -> jnp.ndarray:
-                # Make copy of assignments with updated variable value
-                assignments_copy = assignments.copy()
-                assignments_copy[variable] = variable.add_local(
-                    x=assignments_copy[variable], local_delta=local_delta
-                )
-
-                # Return whitened error
-                return factor.scale_tril_inv @ factor.compute_error(*())
-
-            # Linearize around variable
-            f_jvp = jax.jacfwd(f)(jnp.zeros(variable.get_local_parameter_dim()))[1]
-            A_from_variable[variable.local_delta_variable] = f_jvp
-
-        error = factor.compute_error(assignments=assignments)
-        return LinearFactor(
-            A_from_variable=A_from_variable, b=-factor.scale_tril_inv @ error
-        )
-
-    def group_key(self) -> _types.GroupKey:
-        """Get unique key for grouping factors.
-
-        Args:
-
-        Returns:
-            _types.GroupKey:
-        """
-        return _types.GroupKey(
-            factor_type=self.__class__,
-            secondary_key=tuple(A.shape for A in self.A_matrices),
-        )
+    # @classmethod
+    # def linearize_from_factor(
+    #     cls, factor: FactorBase, assignments: _types.VariableAssignments
+    # ) -> "LinearFactor":
+    #     """Produce a LinearFactor object by linearizing an arbitrary factor.
+    #
+    #     Args:
+    #         factor (FactorBase): Factor to linearize.
+    #         assignments (_types.VariableAssignments): Assignments to linearize around.
+    #
+    #     Returns:
+    #         LinearFactor: Linearized factor.
+    #     """
+    #     A_from_variable: Dict[
+    #         "RealVectorVariable", Callable[[jnp.ndarray], jnp.ndarray]
+    #     ] = {}
+    #
+    #     # Pull out only the assignments that we care about
+    #     assignments = {variable: assignments[variable] for variable in factor.variables}
+    #
+    #     for variable in factor.variables:
+    #
+    #         def f(local_delta: jnp.ndarray) -> jnp.ndarray:
+    #             # Make copy of assignments with updated variable value
+    #             assignments_copy = assignments.copy()
+    #             assignments_copy[variable] = variable.add_local(
+    #                 x=assignments_copy[variable], local_delta=local_delta
+    #             )
+    #
+    #             # Return whitened error
+    #             return factor.scale_tril_inv @ factor.compute_error(*())
+    #
+    #         # Linearize around variable
+    #         f_jvp = jax.jacfwd(f)(jnp.zeros(variable.get_local_parameter_dim()))[1]
+    #         A_from_variable[variable.local_delta_variable] = f_jvp
+    #
+    #     error = factor.compute_error(assignments=assignments)
+    #     return LinearFactor(
+    #         A_from_variable=A_from_variable, b=-factor.scale_tril_inv @ error
+    #     )
 
 
+@_utils.immutable_dataclass
 class PriorFactor(FactorBase):
-    def __init__(
-        self,
+    mu: jnp.ndarray
+    variable_type: Type["VariableBase"]
+    _static_fields = frozenset({"variable_type"})
+
+    @staticmethod
+    def make(
         variable: "VariableBase",
         mu: jnp.ndarray,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
-        super().__init__(variables=(variable,), scale_tril_inv=scale_tril_inv)
-        self.mu = mu
+        print(variable)
+        return PriorFactor(
+            variables=(variable,),
+            mu=mu,
+            scale_tril_inv=scale_tril_inv,
+            variable_type=type(variable),
+        )
 
     @overrides
-    def compute_error(self, assignments: _types.VariableAssignments):
-        variable = self.variables[0]
-        return variable.subtract_local(assignments[variable], self.mu)
+    def compute_error(self, variable_value: jnp.ndarray):
+        return self.variable_type.subtract_local(variable_value, self.mu)
 
 
+class _BeforeAfterTuple(NamedTuple):
+    before: "VariableBase"
+    after: "VariableBase"
+
+
+@_utils.immutable_dataclass
 class BetweenFactor(FactorBase):
-    class _BeforeAfterTuple(NamedTuple):
-        before: "VariableBase"
-        after: "VariableBase"
+    variables: _BeforeAfterTuple
+    delta: jnp.ndarray
+    variable_type: Type["VariableBase"]
+    _static_fields = frozenset({"variable_type"})
 
-    def __init__(
-        self,
+    @staticmethod
+    def make(
         before: "VariableBase",
         after: "VariableBase",
         delta: jnp.ndarray,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
-        self.variables: BetweenFactor._BeforeAfterTuple
-        self.delta = delta
-        super().__init__(
-            variables=self._BeforeAfterTuple(before=before, after=after),
+        assert type(before) == type(after)
+        return BetweenFactor(
+            variables=_BeforeAfterTuple(before=before, after=after),
+            delta=delta,
             scale_tril_inv=scale_tril_inv,
+            variable_type=type(before),
         )
 
     @overrides
-    def compute_error(self, assignments: _types.VariableAssignments):
-        before: "VariableBase" = self.variables.before
-        after: "VariableBase" = self.variables.after
-        return before.subtract_local(
-            before.add_local(x=assignments[before], local_delta=self.delta),
-            assignments[after],
+    def compute_error(self, before_value: jnp.ndarray, after_value: jnp.ndarray):
+        return self.variable_type.subtract_local(
+            self.variable_type.add_local(x=before_value, local_delta=self.delta),
+            after_value,
         )

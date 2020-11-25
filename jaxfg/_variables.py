@@ -120,8 +120,20 @@ RealVectorVariable = _RealVectorVariableTemplate()
 class SO2Variable(VariableBase):
     """Variable containing a 2D rotation."""
 
-    # parameter_dim = 2  # Parameterized with unit-norm complex number
-    # get_local_parameter_dim() = 1  # Local delta with scalar radians
+    @staticmethod
+    @overrides
+    def get_parameter_dim() -> int:
+        return 2
+
+    @staticmethod
+    @overrides
+    def get_local_parameter_dim() -> int:
+        return 1
+
+    @staticmethod
+    @overrides
+    def get_default_value() -> onp.ndarray:
+        return onp.array([1.0, 0.0])
 
     @classmethod
     @overrides
@@ -130,7 +142,13 @@ class SO2Variable(VariableBase):
         theta = local_delta[0]
         cos = jnp.cos(theta)
         sin = jnp.sin(theta)
-        return jnp.array([cos * x[0] - sin * x[1], sin * x[0] + cos * x[1]])
+        R = jnp.array(
+            [
+                [cos, -sin],
+                [sin, cos],
+            ]
+        )
+        return R @ x
 
     @classmethod
     @overrides
@@ -151,8 +169,22 @@ class SO2Variable(VariableBase):
 class SE2Variable(VariableBase):
     """Variable containing a 2D pose."""
 
-    # parameter_dim = (4,)  # (x, y, cos, sin)
-    # get_local_parameter_dim() = (3,)  # (x, y, theta)
+    @staticmethod
+    @overrides
+    def get_parameter_dim() -> int:
+        # (x, y, cos, sin)
+        return 4
+
+    @staticmethod
+    @overrides
+    def get_local_parameter_dim() -> int:
+        # (x, y, theta)
+        return 3
+
+    @staticmethod
+    @overrides
+    def get_default_value() -> onp.ndarray:
+        return onp.array([0.0, 0.0, 1.0, 0.0])
 
     @classmethod
     @overrides
