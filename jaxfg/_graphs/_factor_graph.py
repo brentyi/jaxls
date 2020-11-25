@@ -51,9 +51,9 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             #     )
             # )
             # print(assignments.storage)
-            with _utils.stopwatch("GN step"):
-                assignments = self._gauss_newton_step(assignments)
-                assignments.storage.block_until_ready()
+            # with _utils.stopwatch("GN step"):
+            assignments = self._gauss_newton_step(assignments)
+            assignments.storage.block_until_ready()
 
         return assignments
 

@@ -46,13 +46,13 @@ with jaxfg.utils.stopwatch("Creating graph"):
 # print(time.time() - start_time)
 
 with jaxfg.utils.stopwatch("solve"):
-    graph.solve()  # , assignments={position: jnp.zeros(2)}))
+    graph.solve().storage.block_until_ready()  # , assignments={position: jnp.zeros(2)}))
 
 with jaxfg.utils.stopwatch("solve"):
-    graph.solve()  # , assignments={position: jnp.zeros(2)}))
+    graph.solve().storage.block_until_ready()  # , assignments={position: jnp.zeros(2)}))
 
 with jaxfg.utils.stopwatch("solve"):
-    graph.solve()  # , assignments={position: jnp.zeros(2)}))
+    graph.solve().storage.block_until_ready()  # , assignments={position: jnp.zeros(2)}))
 
 with jaxfg.utils.stopwatch("solve"):
-    graph.solve()  # , assignments={position: jnp.zeros(2)}))
+    graph.solve().storage.block_until_ready()  # , assignments={position: jnp.zeros(2)}))

@@ -28,9 +28,9 @@ class VariableBase(abc.ABC):
     def get_default_value() -> onp.ndarray:
         """Get default (on-manifold) parameter value."""
 
-    @classmethod
+    @staticmethod
     @abc.abstractmethod
-    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+    def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
         """On-manifold retraction.
 
         Args:
@@ -41,9 +41,9 @@ class VariableBase(abc.ABC):
             jnp.ndarray: Updated parameterization.
         """
 
-    @classmethod
+    @staticmethod
     @abc.abstractmethod
-    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         """Compute the difference between two parameters on the manifold.
 
         Args:
@@ -71,14 +71,14 @@ class VariableBase(abc.ABC):
 class AbstractRealVectorVariable(VariableBase):
     """Variable for an arbitrary vector of real numbers."""
 
-    @classmethod
+    @staticmethod
     @overrides
-    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+    def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
         return x + local_delta
 
-    @classmethod
+    @staticmethod
     @overrides
-    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         return x - y
 
 
@@ -135,9 +135,9 @@ class SO2Variable(VariableBase):
     def get_default_value() -> onp.ndarray:
         return onp.array([1.0, 0.0])
 
-    @classmethod
-    @overrides
-    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+    @staticmethod
+    #  @jax.custom_jvp
+    def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
         assert x.shape == (2,) and local_delta.shape == (1,)
         theta = local_delta[0]
         cos = jnp.cos(theta)
@@ -150,9 +150,9 @@ class SO2Variable(VariableBase):
         )
         return R @ x
 
-    @classmethod
+    @staticmethod
     @overrides
-    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         assert x.shape == y.shape == (2,)
 
         # The intuitive solution based on the definition of a dot product would be:
@@ -164,6 +164,28 @@ class SO2Variable(VariableBase):
         )[None]
         assert delta.shape == (1,)
         return delta
+
+
+# Analytical JVP for SO2 add_local; slower than having Jax figure it out for us hah
+#
+#  @SO2Variable.add_local.defjvp
+#  def add_local_jvp(primals: Tuple[jnp.ndarray, jnp.ndarray], tangents):
+#      x, local_delta = primals
+#      x_dot, local_delta_dot = tangents
+#
+#      # Primal out is: exp(skew(local_delta)) @ x
+#      primal_out = SO2Variable.add_local(x, local_delta)
+#
+#      local_delta = local_delta[0]
+#      local_delta_dot = local_delta_dot[0]
+#
+#      cos = jnp.cos(local_delta)
+#      sin = jnp.sin(local_delta)
+#      R = jnp.array([[cos, -sin], [sin, cos]])
+#      so2_generator = jnp.array([[0.0, -local_delta_dot], [local_delta_dot, 0.0]])
+#      tangent_out = R @ x_dot + so2_generator @ primal_out
+#
+#      return primal_out, tangent_out
 
 
 class SE2Variable(VariableBase):
@@ -186,9 +208,9 @@ class SE2Variable(VariableBase):
     def get_default_value() -> onp.ndarray:
         return onp.array([0.0, 0.0, 1.0, 0.0])
 
-    @classmethod
+    @staticmethod
     @overrides
-    def add_local(cls, x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+    def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
 
         # Our pose is: T_world_A
         # We're getting: T_A_B
@@ -212,9 +234,9 @@ class SE2Variable(VariableBase):
         assert summed.shape == (4,)
         return summed
 
-    @classmethod
+    @staticmethod
     @overrides
-    def subtract_local(cls, x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         assert x.shape == y.shape == (4,)
         delta = jnp.concatenate(
             [x[:2] - y[:2], SO2Variable.subtract_local(x[2:4], y[2:4])]
