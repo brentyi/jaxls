@@ -2,6 +2,7 @@ import abc
 import dataclasses
 from typing import Dict, Generic, Iterable, Iterator, Set, TypeVar
 
+from .. import _utils
 from .._factors import FactorBase
 from .._types import GroupKey
 from .._variables import AbstractRealVectorVariable, VariableBase
@@ -11,7 +12,7 @@ FactorType = TypeVar("FactorType", bound=FactorBase)
 VariableType = TypeVar("VariableType", bound=VariableBase)
 
 
-@dataclasses.dataclass(frozen=True)
+@_utils.immutable_dataclass
 class FactorGraphBase(abc.ABC, Generic[FactorType, VariableType]):
     factors_from_group: Dict[GroupKey, Set[FactorType]] = dataclasses.field(
         default_factory=lambda: {}, init=False

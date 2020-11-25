@@ -18,7 +18,8 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from . import _types as _types
+from . import _types
+from . import _utils
 
 if TYPE_CHECKING:
     from . import AbstractRealVectorVariable, VariableBase
@@ -27,16 +28,13 @@ if TYPE_CHECKING:
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
 
-@dataclasses.dataclass(frozen=True)
+@_utils.immutable_dataclass
 class FactorBase(abc.ABC):
     variables: Tuple["VariableBase"]
     """Variables connected to this factor. Immutable. (currently assumed but unenforced)"""
 
     scale_tril_inv: _types.ScaleTrilInv
     """Inverse square root of covariance matrix."""
-
-    # Use default object hash rather than dataclass one
-    __hash__ = object.__hash__
 
     @property
     def error_dim(self) -> int:
@@ -92,7 +90,7 @@ class FactorBase(abc.ABC):
         """
 
 
-@dataclasses.dataclass(frozen=True)
+@_utils.immutable_dataclass
 class LinearFactor(FactorBase):
     """Linearized factor, corresponding to the simple residual:
     $$
@@ -103,9 +101,6 @@ class LinearFactor(FactorBase):
     A_matrices: Tuple[onp.ndarray]
     b: onp.ndarray
     scale_tril_inv: onp.ndarray
-
-    # Use default object hash rather than dataclass one
-    __hash__ = object.__hash__
 
     @overrides
     def compute_error(self, *variable_values: jnp.ndarray):

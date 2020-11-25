@@ -14,12 +14,9 @@ from ._factor_graph_base import FactorGraphBase
 from ._linear_factor_graph import LinearFactorGraph
 
 
-@dataclasses.dataclass(frozen=True)
+@_utils.immutable_dataclass
 class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
     """General nonlinear factor graph."""
-
-    # Use default object hash rather than dataclass one
-    __hash__ = object.__hash__
 
     def solve(
         self,

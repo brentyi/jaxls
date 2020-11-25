@@ -1,23 +1,20 @@
 import dataclasses
-from typing import Dict, Optional, Set, Tuple, cast
+from typing import Dict, Optional, Tuple
 
 import jax
 import numpy as onp
 from jax import numpy as jnp
-from overrides import overrides
 
 from .. import _types as types
+from .. import _utils
 from .._factors import LinearFactor
-from .._variables import AbstractRealVectorVariable, VariableBase
+from .._variables import AbstractRealVectorVariable
 from ._factor_graph_base import FactorGraphBase
 
 
-# @dataclasses.dataclass(frozen=True)
+@_utils.immutable_dataclass
 class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable]):
     """Simple LinearFactorGraph."""
-
-    # Use default object hash rather than dataclass one
-    __hash__ = object.__hash__
 
     @jax.partial(jax.jit, static_argnums=(0,))
     def solve(
