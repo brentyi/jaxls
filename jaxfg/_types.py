@@ -56,14 +56,12 @@ class VariableAssignments:
     def get_value(self, variable: "VariableBase") -> jnp.ndarray:
         """Get value corresponding to specific variable.  """
         index = self.storage_pos_from_variable[variable]
-        return self.storage[
-            index : index
-            + (
-                variable.get_local_parameter_dim()
-                if self.local
-                else variable.get_parameter_dim()
+        if self.local:
+            return self.storage[index : index + variable.get_local_parameter_dim()]
+        else:
+            return self.storage[index : index + variable.get_parameter_dim()].reshape(
+                variable.get_parameter_shape()
             )
-        ]
 
     def __repr__(self):
         value_from_variable = {
@@ -98,8 +96,8 @@ class VariableAssignments:
             storage_pos_from_variable_type[variable_type] = storage_index
             for variable in variables:
                 value = assignments[variable]
-                assert value.shape == (variable.get_parameter_dim(),)
-                storage_list.append(value)
+                assert value.shape == variable.get_parameter_shape()
+                storage_list.append(value.flatten())
                 storage_pos_from_variable[variable] = storage_index
                 storage_index += variable.get_parameter_dim()
 

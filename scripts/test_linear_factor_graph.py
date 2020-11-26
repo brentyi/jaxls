@@ -1,9 +1,10 @@
 import time
 
 import jax
-import jaxfg
 import numpy as onp
 from jax import numpy as jnp
+
+import jaxfg
 
 with jaxfg.utils.stopwatch("Creating graph"):
     graph = jaxfg.FactorGraph()

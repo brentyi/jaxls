@@ -200,7 +200,7 @@ class PriorFactor(FactorBase):
 
     @overrides
     def compute_error(self, variable_value: jnp.ndarray):
-        return self.variable_type.subtract_local(variable_value, self.mu)
+        return self.variable_type.subtract_local(self.mu, variable_value)
 
 
 class _BeforeAfterTuple(NamedTuple):
@@ -232,7 +232,13 @@ class BetweenFactor(FactorBase):
 
     @overrides
     def compute_error(self, before_value: jnp.ndarray, after_value: jnp.ndarray):
+        # return self.variable_type.subtract_local(before_value, after_value) - self.delta
+
+        # const T diff = traits<T>::Compose(traits<T>::Inverse(v1), v2);
+        # // manifold equivalent of x-z -> Local(z,x)
+        # return traits<T>::Local(diff_, diff);
+
         return self.variable_type.subtract_local(
-            self.variable_type.add_local(x=before_value, local_delta=self.delta),
             after_value,
+            self.variable_type.add_local(x=before_value, local_delta=self.delta),
         )

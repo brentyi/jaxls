@@ -165,9 +165,27 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
                 jnp.einsum("fev,fe->fv", A_matrices, b[error_indices])
             )
 
+        # Super basic diagonal preconditioner
+        diagonals = jnp.zeros_like(initial_x)
+        for shape, A_matrices in A_matrices_from_shape.items():
+            # Get indices
+            value_indices = value_indices_from_shape[shape]
+            assert A_matrices.shape[:2] == value_indices.shape
+            diagonals = diagonals.at[value_indices].add(
+                jnp.sum(A_matrices ** 2, axis=1)
+            )
+
+        def preconditioner(x):
+            return x / diagonals
+
         print("Running conjugate gradient")
         solution_values, _unused_info = jax.scipy.sparse.linalg.cg(
-            A=ATA_function, b=ATb, x0=initial_x
+            A=ATA_function,
+            b=ATb,
+            x0=initial_x,
+            maxiter=100,
+            tol=1e-10,
+            M=preconditioner,
         )
 
         print("Done solving!")

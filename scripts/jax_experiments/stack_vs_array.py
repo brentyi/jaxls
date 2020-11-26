@@ -2,9 +2,10 @@ import time
 
 import jax
 import jax.numpy as jnp
-import jaxfg
 import numpy as onp
 from jax import numpy as jnp
+
+import jaxfg
 
 dim = 10
 rows = 200

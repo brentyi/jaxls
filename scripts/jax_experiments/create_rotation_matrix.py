@@ -2,8 +2,9 @@ import time
 
 import jax
 import jax.numpy as jnp
-import jaxfg
 import numpy as onp
+
+import jaxfg
 
 iters = 100
 

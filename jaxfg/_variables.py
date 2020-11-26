@@ -13,10 +13,20 @@ if TYPE_CHECKING:
 
 
 class VariableBase(abc.ABC):
+    _parameter_dim: int
+
     @staticmethod
     @abc.abstractmethod
-    def get_parameter_dim() -> int:
+    def get_parameter_shape() -> int:
         """Dimensionality of underlying parameterization."""
+
+    @classmethod
+    def get_parameter_dim(cls) -> int:
+        return cls._parameter_dim
+
+    def __init_subclass__(cls, **kwargs):
+        """Register all factors as PyTree nodes."""
+        cls._parameter_dim = onp.prod(cls.get_parameter_shape())
 
     @staticmethod
     @abc.abstractmethod
@@ -47,8 +57,8 @@ class VariableBase(abc.ABC):
         """Compute the difference between two parameters on the manifold.
 
         Args:
-            x (jnp.ndarray): First parameter to compare. Shape should match `self.get_parameter_dim()`.
-            y (jnp.ndarray): Second parameter to compare. Shape should match `self.get_parameter_dim()`.
+            x (jnp.ndarray): First parameter to compare. Shape should match `self.get_parameter_shape()`.
+            y (jnp.ndarray): Second parameter to compare. Shape should match `self.get_parameter_shape()`.
 
         Returns:
             jnp.ndarray: Delta vector; dimension should match self.get_local_parameter_dim().
@@ -94,8 +104,8 @@ class _RealVectorVariableTemplate:
             class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
                 @staticmethod
                 @overrides
-                def get_parameter_dim() -> int:
-                    return n
+                def get_parameter_shape() -> int:
+                    return (n,)
 
                 @staticmethod
                 @overrides
@@ -122,8 +132,9 @@ class SO2Variable(VariableBase):
 
     @staticmethod
     @overrides
-    def get_parameter_dim() -> int:
-        return 2
+    def get_parameter_shape() -> int:
+        # Full 2x2 rotation matrix
+        return (4,)
 
     @staticmethod
     @overrides
@@ -133,37 +144,33 @@ class SO2Variable(VariableBase):
     @staticmethod
     @overrides
     def get_default_value() -> onp.ndarray:
-        return onp.array([1.0, 0.0])
+        return onp.eye(2)
 
     @staticmethod
     #  @jax.custom_jvp
     def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
-        assert x.shape == (2,) and local_delta.shape == (1,)
+        assert x.shape == (4,) and local_delta.shape == (1,)
         theta = local_delta[0]
         cos = jnp.cos(theta)
         sin = jnp.sin(theta)
-        R = jnp.array(
+        exp = jnp.array(
             [
                 [cos, -sin],
                 [sin, cos],
             ]
         )
-        return R @ x
+        return exp @ x.reshape((2, 2))
 
     @staticmethod
     @overrides
     def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
-        assert x.shape == y.shape == (2,)
+        assert x.shape == y.shape == (4,)
 
-        # The intuitive solution based on the definition of a dot product would be:
-        # > delta = jnp.arccos(jnp.sum(x * y, axis=0, keepdims=True))
-        # But this ignores signs (x and y can be swapped).
-        delta = jnp.arctan2(
-            x[0] * y[1] - x[1] * y[0],  # "2D cross product"; is there a name for this?
-            x @ y,  # Aligned component with dot prodcut
-        )[None]
-        assert delta.shape == (1,)
-        return delta
+        R_world_A = x.reshape((2, 2))
+        R_world_B = y.reshape((2, 2))
+        R_A_B = R_world_A.T @ R_world_B
+
+        return jnp.arctan2(R_A_B[1:2, 0], R_A_B[0:1, 0])
 
 
 # Analytical JVP for SO2 add_local; slower than having Jax figure it out for us hah
@@ -193,53 +200,68 @@ class SE2Variable(VariableBase):
 
     @staticmethod
     @overrides
-    def get_parameter_dim() -> int:
-        # (x, y, cos, sin)
-        return 4
+    def get_parameter_shape() -> int:
+        # Full SE(2) homogeneous transform :shrug:
+        return (3, 3)
 
     @staticmethod
     @overrides
     def get_local_parameter_dim() -> int:
-        # (x, y, theta)
+        # se(2) generator: (x, y, theta)
         return 3
 
     @staticmethod
     @overrides
     def get_default_value() -> onp.ndarray:
-        return onp.array([0.0, 0.0, 1.0, 0.0])
+        return onp.eye(3)
 
     @staticmethod
     @overrides
     def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
 
+        # y = x (+) delta
+        #
         # Our pose is: T_world_A
         # We're getting: T_A_B
         # We want: T_world_B
 
-        assert x.shape == (4,) and local_delta.shape == (3,)
-        cos = x[2]
-        sin = x[3]
-        R = jnp.array(
+        T_world_A = x
+        assert T_world_A.shape == (3, 3)
+
+        x, y, theta = local_delta
+        theta = theta
+        cos = jnp.cos(theta)
+        sin = jnp.sin(theta)
+        T_A_B = jnp.array(
             [
-                [cos, -sin],
-                [sin, cos],
+                [cos, -sin, x],
+                [sin, cos, y],
+                [0.0, 0.0, 1.0],
             ]
         )
-        summed = jnp.concatenate(
-            [
-                x[:2] + R @ local_delta[:2],
-                SO2Variable.add_local(x[2:4], local_delta[2:3]),
-            ]
-        )
-        assert summed.shape == (4,)
-        return summed
+
+        T_world_B = T_world_A @ T_A_B
+
+        return T_world_B
 
     @staticmethod
     @overrides
     def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
-        assert x.shape == y.shape == (4,)
-        delta = jnp.concatenate(
-            [x[:2] - y[:2], SO2Variable.subtract_local(x[2:4], y[2:4])]
-        )
-        assert delta.shape == (3,)
-        return delta
+
+        T_world_A = x.reshape((3, 3))
+        T_world_B = y.reshape((3, 3))
+
+        R_world_A = T_world_A[:2, :2]
+        t_world_A = T_world_A[:2, 2]
+
+        T_A_world = jnp.eye(3)
+        T_A_world = T_A_world.at[:2, :2].set(R_world_A.T)
+        T_A_world = T_A_world.at[:2, 2].set(-R_world_A.T @ t_world_A)
+
+        T_A_B = T_A_world @ T_world_B
+
+        x = T_A_B[0, 2]
+        y = T_A_B[1, 2]
+        theta = jnp.arctan2(T_A_B[0, 1], T_A_B[0, 0])
+
+        return jnp.array([x, y, theta])

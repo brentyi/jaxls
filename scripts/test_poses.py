@@ -1,9 +1,10 @@
 import time
 
 import jax
-import jaxfg
 import numpy as onp
 from jax import numpy as jnp
+
+import jaxfg
 
 variables = {
     "pose1": jaxfg.SE2Variable(),
@@ -13,7 +14,7 @@ variables = {
 graph = jaxfg.FactorGraph().with_factors(
     jaxfg.PriorFactor.make(
         variable=variables["pose1"],
-        mu=jnp.array([1.0, 0.0, 1.0, 0.0]),
+        mu=onp.eye(3),
         scale_tril_inv=jnp.eye(3),
     ),
     jaxfg.BetweenFactor.make(
@@ -43,8 +44,8 @@ graph = jaxfg.FactorGraph().with_factors(
 
 initial_assignments = jaxfg.types.VariableAssignments.from_dict(
     {
-        variables["pose1"]: onp.array([1.0, 0.0, 1.0, 0.0]),
-        variables["pose2"]: onp.array([1.0, 2.0, 1.0, 0.0]),
+        variables["pose1"]: onp.eye(3),
+        variables["pose2"]: onp.eye(3),
     }
 )
 

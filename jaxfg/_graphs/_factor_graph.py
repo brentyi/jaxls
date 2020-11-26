@@ -5,6 +5,7 @@ import jax
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
+from tqdm.auto import tqdm
 
 from .. import _types as types
 from .. import _utils
@@ -32,7 +33,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
 
         # Run some Gauss-Newton iterations
         # for i in range(10):
-        for i in range(20):
+        for i in tqdm(range(10)):
             # print("Computing error")
             # print(
             #     onp.sum(
@@ -52,7 +53,8 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             # )
             # print(assignments.storage)
             # with _utils.stopwatch("GN step"):
-            assignments = self._gauss_newton_step(assignments)
+            assignments, error = self._gauss_newton_step(assignments)
+            print(0.5 * error)
             assignments.storage.block_until_ready()
 
         return assignments
@@ -96,7 +98,10 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             ):
                 variable_type: Type["VariableBase"]
                 perturbed_values = [
-                    variable_type.add_local(x=x, local_delta=local_delta)
+                    variable_type.add_local(
+                        x=x.reshape(variable_type.get_parameter_shape()),
+                        local_delta=local_delta,
+                    )
                     for variable_type, x, local_delta in zip(
                         variable_types, values, local_deltas
                     )
@@ -116,7 +121,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                     values_indices[i].append(
                         onp.arange(
                             storage_pos, storage_pos + variable.get_parameter_dim()
-                        )
+                        ).reshape(variable.get_parameter_shape())
                     )
             values_stacked = tuple(
                 assignments.storage[onp.array(indices)] for indices in values_indices
@@ -184,13 +189,14 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
         error_indices_from_shape = {
             k: onp.concatenate(v) for k, v in error_indices_from_shape.items()
         }
+        error_vector = -jnp.concatenate(errors_list)
 
-        local_delta_values = LinearFactorGraph()._solve(
+        local_delta_values = LinearFactorGraph._solve(
             A_matrices_from_shape,
             value_indices_from_shape,
             error_indices_from_shape,
-            local_delta_assignments.storage,
-            b=-jnp.concatenate(errors_list),
+            initial_x=local_delta_assignments.storage,
+            b=error_vector,
         )
 
         # Update on manifold
@@ -205,12 +211,13 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 variable_type
             ]
             dim = variable_type.get_parameter_dim()
+            shape = variable_type.get_parameter_shape()
             local_dim = variable_type.get_local_parameter_dim()
 
             # Get batched variables
             batched_xs = assignments.storage[
                 storage_pos : storage_pos + dim * count
-            ].reshape((count, dim))
+            ].reshape((count,) + shape)
             batched_deltas = local_delta_values[
                 local_storage_pos : local_storage_pos + local_dim * count
             ].reshape((count, local_dim))
@@ -220,4 +227,6 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 jax.vmap(variable_type.add_local)(batched_xs, batched_deltas).flatten()
             )
 
-        return dataclasses.replace(assignments, storage=new_storage)
+        return dataclasses.replace(assignments, storage=new_storage), jnp.linalg.norm(
+            error_vector
+        )
