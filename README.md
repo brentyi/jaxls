@@ -20,15 +20,26 @@
   - [x] Vectorized linearization
   - [x] Basic CGLS preconditioning
   - [ ] Better preconditioning and/or debugging -- still slow
-- [ ] Manifold optimization
+- [x] Manifold optimization
   - [x] Basic interface
   - [x] Manifold optimization on SO2
+    - [ ] Analytical JVP?
+    - [ ] Analytical VJP?
   - [x] Manifold optimization on SE2
+    - [ ] Analytical JVP?
+    - [ ] Analytical VJP?
   - [ ] Manifold optimization on SO3
+    - [ ] Analytical JVP?
+    - [ ] Analytical VJP?
   - [ ] Manifold optimization on SE3
+    - [ ] Analytical JVP?
+    - [ ] Analytical VJP?
 - [ ] Code health (low priority unti
   - [ ] Cleanup/refactor
     - [ ] Do it
+      - [ ] Better parallel factor interface
+      - [ ] Separate out utils, lie group helpers
+      - [ ] Put things in folders
     - [ ] Do it again
   - [ ] Package cleanup: dependencies, etc
   - [ ] Add CI: mypy, flake8, pytest, etc.

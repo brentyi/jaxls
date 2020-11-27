@@ -54,8 +54,8 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             # print(assignments.storage)
             # with _utils.stopwatch("GN step"):
             assignments, error = self._gauss_newton_step(assignments)
-            print(0.5 * error)
-            assignments.storage.block_until_ready()
+            print(0.5 * (error ** 2))
+            # assignments.storage.block_until_ready()
 
         return assignments
 
