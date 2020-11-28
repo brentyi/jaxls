@@ -144,27 +144,27 @@ def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
         @staticmethod
         @overrides
         def product(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
-            return (Group(a) @ Group(b)).compact()
+            return (Group(a) @ Group(b)).parameters
 
         @staticmethod
         @overrides
         def get_parameter_shape() -> int:
-            return (Group.compact_dim(),)
+            return (Group.parameters_dim,)
 
         @staticmethod
         @overrides
         def get_local_parameter_dim() -> int:
-            return Group.tangent_dim()
+            return Group.tangent_dim
 
         @staticmethod
         @overrides
         def get_default_value() -> onp.ndarray:
-            return Group.identity().compact()
+            return Group.identity().parameters
 
         @staticmethod
         #  @jax.custom_jvp
         def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
-            return (Group(x) @ Group.exp(local_delta)).compact()
+            return (Group(x) @ Group.exp(local_delta)).parameters
 
         @staticmethod
         @overrides
