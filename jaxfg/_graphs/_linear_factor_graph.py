@@ -102,7 +102,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
                 - We know the matrix is block-sparse, a lot of unnecessary indices
                 - ^That's not a huge con, asymptotic memory usage is still linear
 
-            Dictionary: (block shape) => dense blocks, row indices, col indices
+            Dictionary: (block shape) => dense blocks, row indicesjacobi_preconditioner(ATb), col indices
               Pros:
                 - Much fewer indices (linear vs quadratic)
                 - Einsum: faster than pure integer indexing?
@@ -182,8 +182,8 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
             A=ATA_function,
             b=ATb,
             x0=initial_x,
-            maxiter=2000,
-            tol=_utils.get_epsilon(initial_x),
+            maxiter=len(initial_x),
+            tol=1e-5,
             M=jacobi_preconditioner,
         )
 

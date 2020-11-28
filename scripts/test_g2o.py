@@ -3,7 +3,9 @@ import time
 from typing import List
 
 import jax
+import jax.profiler
 import jaxfg
+import jaxlie
 import matplotlib.pyplot as plt
 import numpy as onp
 from jax import numpy as jnp
@@ -21,19 +23,7 @@ initial_poses: jaxfg.types.VariableAssignments = {}
 
 factors: List[jaxfg.FactorBase] = []
 
-pose_count = 5000
-
-
-def make_SE2(x, y, theta):
-    cos = onp.cos(theta)
-    sin = onp.sin(theta)
-    return onp.array(
-        [
-            [cos, -sin, x],
-            [sin, cos, y],
-            [0.0, 0.0, 1.0],
-        ]
-    )
+pose_count = 50000
 
 
 for line in tqdm(lines):
@@ -51,7 +41,9 @@ for line in tqdm(lines):
 
         variable = jaxfg.SE2Variable()
 
-        initial_poses[variable] = make_SE2(x, y, theta)
+        initial_poses[variable] = jax.jit(jaxlie.SE2.from_xy_theta)(
+            x, y, theta
+        ).xy_unit_complex
 
         pose_variables.append(variable)
 
@@ -66,7 +58,9 @@ for line in tqdm(lines):
         # if after_index != before_index + 1:
         #     continue
 
-        delta = make_SE2(*(float(p) for p in parts[3:6]))
+        delta = jax.jit(jaxlie.SE2.from_xy_theta)(
+            *(float(p) for p in parts[3:6])
+        ).xy_unit_complex
 
         q11, q12, q13, q22, q23, q33 = map(float, parts[6:])
         information_matrix = onp.array(
@@ -92,9 +86,8 @@ for line in tqdm(lines):
 factors.append(
     jaxfg.PriorFactor.make(
         variable=pose_variables[0],
-        mu=initial_poses[pose_variables[0]]
-        + onp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0], [0.0, 0.0, 0.0]]),
-        scale_tril_inv=jnp.eye(3),
+        mu=initial_poses[pose_variables[0]],
+        scale_tril_inv=jnp.eye(3) * 100.0,
     )
 )
 print("Prior factor:", initial_poses[pose_variables[0]])
@@ -102,8 +95,6 @@ print("Prior factor:", initial_poses[pose_variables[0]])
 print(f"Loaded {len(pose_variables)} poses and {len(factors)} factors")
 
 print("Initial cost")
-
-start_time = time.time()
 
 initial_poses = jaxfg.types.VariableAssignments.from_dict(initial_poses)
 graph = jaxfg.FactorGraph().with_factors(*factors)
@@ -143,28 +134,31 @@ with jaxfg.utils.stopwatch("stacked"):
 
     print(jnp.sum(jnp.concatenate(errors_list) ** 2) * 0.5)
 
-with jaxfg.utils.stopwatch("sequential"):
-    cost = 0.0
+# with jaxfg.utils.stopwatch("sequential"):
+#     cost = 0.0
+#
+#     for factor in tqdm(list(graph.factors)):
+#         cost = cost + jnp.sum(
+#             (
+#                 factor.scale_tril_inv
+#                 @ factor.compute_error(
+#                     *(
+#                         initial_poses.get_value(variable)
+#                         for variable in factor.variables
+#                     )
+#                 )
+#             )
+#             ** 2
+#         )
+#
+#     print(cost * 0.5)
 
-    for factor in tqdm(list(graph.factors)):
-        cost = cost + jnp.sum(
-            (
-                factor.scale_tril_inv
-                @ factor.compute_error(
-                    *(
-                        initial_poses.get_value(variable)
-                        for variable in factor.variables
-                    )
-                )
-            )
-            ** 2
-        )
+with jaxfg.utils.stopwatch("GN step JIT build"):
+    graph._gauss_newton_step(initial_poses)
 
-    print(cost * 0.5)
+with jaxfg.utils.stopwatch("Solve"):
+    solution_poses = graph.solve(initial_poses)
 
-solution_poses = graph.solve(initial_poses)
-
-print("====\nSolve time: ", time.time() - start_time, "\n====")
 # print(solution_poses)
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):
@@ -175,15 +169,16 @@ with jaxfg.utils.stopwatch("Converting storage to onp"):
 
 print("Plotting!")
 plt.figure()
-# from tqdm.auto import tqdm
-# print(onp.array(solution_poses.storage).shape)
-# exit()
 
 plt.plot(
-    *(onp.array([initial_poses.get_value(v)[:2, 2] for v in pose_variables]).T), c="r"
+    *(onp.array([initial_poses.get_value(v)[:2] for v in pose_variables]).T),
+    c="r",
+    label="Dead-reckoned",
 )
 plt.plot(
-    *(onp.array([solution_poses.get_value(v)[:2, 2] for v in pose_variables]).T), c="b"
+    *(onp.array([solution_poses.get_value(v)[:2] for v in pose_variables]).T),
+    c="b",
+    label="Optimized",
 )
 
 

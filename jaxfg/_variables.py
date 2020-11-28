@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Dict, Generator, Optional, Set, Tuple, Type
 
 import jax
+import jaxlie
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
@@ -129,41 +130,51 @@ RealVectorVariable = _RealVectorVariableTemplate()
 # Lie manifolds
 
 
-def make_lie_variable(group: Type[_utils.MatrixLieGroup]):
-    class _LieVariable(VariableBase):
+class LieVariableBase(VariableBase, abc.ABC):
+    @staticmethod
+    @abc.abstractmethod
+    def product(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+        ...
+
+
+def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
+    class _LieVariable(LieVariableBase):
         """Variable containing a 2D rotation."""
 
         @staticmethod
         @overrides
+        def product(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
+            return (Group(a) @ Group(b)).compact()
+
+        @staticmethod
+        @overrides
         def get_parameter_shape() -> int:
-            # Full 2x2 rotation matrix
-            dim = group.get_matrix_dim()
-            return (dim, dim)
+            return (Group.compact_dim(),)
 
         @staticmethod
         @overrides
         def get_local_parameter_dim() -> int:
-            return group.get_tangent_dim()
+            return Group.tangent_dim()
 
         @staticmethod
         @overrides
         def get_default_value() -> onp.ndarray:
-            return group.identity()
+            return Group.identity().compact()
 
         @staticmethod
         #  @jax.custom_jvp
         def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
-            return x @ group.exp(local_delta)
+            return (Group(x) @ Group.exp(local_delta)).compact()
 
         @staticmethod
         @overrides
         def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
             # x = world<-A, y = world<-B
             # Difference = A<-B
-            return group.log(group.inverse(x) @ y)
+            return (Group(x).inverse() @ Group(y)).log()
 
     return _LieVariable
 
 
-SO2Variable = make_lie_variable(_utils.SO2)
-SE2Variable = make_lie_variable(_utils.SE2)
+SO2Variable = make_lie_variable(jaxlie.SO2)
+SE2Variable = make_lie_variable(jaxlie.SE2)

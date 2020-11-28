@@ -6,6 +6,7 @@ from ._graphs._factor_graph_base import FactorGraphBase
 from ._graphs._linear_factor_graph import LinearFactorGraph
 from ._variables import (
     AbstractRealVectorVariable,
+    LieVariableBase,
     RealVectorVariable,
     SE2Variable,
     SO2Variable,

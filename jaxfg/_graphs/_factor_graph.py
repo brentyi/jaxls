@@ -33,7 +33,10 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
 
         # Run some Gauss-Newton iterations
         # for i in range(10):
-        for i in tqdm(range(10)):
+        error_tol = 1e-3
+        max_iters = 10000
+        prev_error = float("inf")
+        for i in range(max_iters):
             # print("Computing error")
             # print(
             #     onp.sum(
@@ -54,7 +57,10 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             # print(assignments.storage)
             # with _utils.stopwatch("GN step"):
             assignments, error = self._gauss_newton_step(assignments)
-            print(0.5 * (error ** 2))
+            print(f"{i}: {error}")
+            if onp.abs(prev_error - error) < error_tol:
+                break
+            prev_error = error
             # assignments.storage.block_until_ready()
 
         return assignments
@@ -227,6 +233,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
                 jax.vmap(variable_type.add_local)(batched_xs, batched_deltas).flatten()
             )
 
-        return dataclasses.replace(assignments, storage=new_storage), jnp.linalg.norm(
-            error_vector
+        return (
+            dataclasses.replace(assignments, storage=new_storage),
+            0.5 * jnp.sum(error_vector ** 2),
         )

@@ -22,7 +22,7 @@ from overrides import overrides
 from . import _types, _utils
 
 if TYPE_CHECKING:
-    from . import AbstractRealVectorVariable, VariableBase
+    from . import AbstractRealVectorVariable, LieVariableBase, VariableBase
 
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
@@ -212,13 +212,14 @@ class _BeforeAfterTuple(NamedTuple):
 class BetweenFactor(FactorBase):
     variables: _BeforeAfterTuple
     delta: jnp.ndarray
-    variable_type: Type["VariableBase"]
-    _static_fields = frozenset({"variable_type"})
+    """(before, delta) -> after"""
+    variable_type: Type["LieVariableBase"]
+    _static_fields = frozenset({"variable_type", "forward_fn"})
 
     @staticmethod
     def make(
-        before: "VariableBase",
-        after: "VariableBase",
+        before: "LieVariableBase",
+        after: "LieVariableBase",
         delta: jnp.ndarray,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
@@ -233,13 +234,7 @@ class BetweenFactor(FactorBase):
     @jax.jit
     @overrides
     def compute_error(self, before_value: jnp.ndarray, after_value: jnp.ndarray):
-        # return self.variable_type.subtract_local(before_value, after_value) - self.delta
-
-        # const T diff = traits<T>::Compose(traits<T>::Inverse(v1), v2);
-        # // manifold equivalent of x-z -> Local(z,x)
-        # return traits<T>::Local(diff_, diff);
-
         return self.variable_type.subtract_local(
-            before_value @ self.delta,
+            self.variable_type.product(before_value, self.delta),
             after_value,
         )
