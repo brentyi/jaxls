@@ -1,5 +1,13 @@
 # jaxfg
 
+Library for solving factor graph-based least squares problems with JAX. Heavily
+influenced by [minisam](https://github.com/dongjing3309/minisam),
+[GTSAM](https://gtsam.org/), and [g2o](https://github.com/RainerKuemmerle/g2o).
+
+Applications include sensor fusion, optimal control, planning, SLAM, etc.
+
+![M3500 results](scripts/data/optimized_m3500.png)
+
 ### To-do
 
 - [x] Preliminary graph, variable, factor interfaces

@@ -170,6 +170,7 @@ with jaxfg.utils.stopwatch("Converting storage to onp"):
 print("Plotting!")
 plt.figure()
 
+plt.title("Optimization on M3500 dataset, Olson et al. 2006")
 plt.plot(
     *(onp.array([initial_poses.get_value(v)[:2] for v in pose_variables]).T),
     c="r",

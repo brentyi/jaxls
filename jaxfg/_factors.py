@@ -212,7 +212,6 @@ class _BeforeAfterTuple(NamedTuple):
 class BetweenFactor(FactorBase):
     variables: _BeforeAfterTuple
     delta: jnp.ndarray
-    """(before, delta) -> after"""
     variable_type: Type["LieVariableBase"]
     _static_fields = frozenset({"variable_type", "forward_fn"})
 
