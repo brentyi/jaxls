@@ -42,7 +42,8 @@ class FactorBase(abc.ABC):
     @property
     def error_dim(self) -> int:
         """Error dimensionality."""
-        return self.scale_tril_inv.shape[0]
+        # We can't use [0] here, because (for stacked factors) there might be a batch dimension!
+        return self.scale_tril_inv.shape[-1]
 
     def __init_subclass__(cls, **kwargs):
         """Register all factors as PyTree nodes."""
@@ -61,7 +62,12 @@ class FactorBase(abc.ABC):
         v_dict.pop("_static_fields")
 
         array_data = {k: v for k, v in v_dict.items() if k not in cls._static_fields}
+
+        # Store variable types to make sure treedef hashes match
         aux_dict = {k: v for k, v in v_dict.items() if k not in array_data}
+        aux_dict["variable_types"] = tuple(type(variable) for variable in v.variables)
+
+        variable_types = tuple(type(variable) for variable in v.variables)
 
         return (
             tuple(array_data.values()),
@@ -69,10 +75,6 @@ class FactorBase(abc.ABC):
             + tuple(aux_dict.keys())
             + tuple(aux_dict.values()),
         )
-
-    # _FactorAuxData(
-    #     array_keys=tuple(v_dict.keys()), aux_dict=aux_dict
-    # )
 
     @classmethod
     def unflatten(
@@ -84,11 +86,14 @@ class FactorBase(abc.ABC):
         aux_keys = aux[: len(aux) // 2]
         aux_values = aux[len(aux) // 2 :]
 
+        # Create new dummy variables
+        aux_dict = dict(zip(aux_keys, aux_values))
+        aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variable_types"))
+
         return cls(
-            variables=tuple(),
+            # variables=tuple(),
             **dict(zip(array_keys, children)),
-            **dict(zip(aux_keys, aux_values)),
-            # **aux_data.aux_dict
+            **aux_dict
         )
 
     def group_key(self) -> _types.GroupKey:

@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, Iterable, Optional, Set, Tuple, Type, cast
+from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple, Type, cast
 
 import jax
 import numpy as onp
@@ -10,14 +10,98 @@ from tqdm.auto import tqdm
 from .. import _types as types
 from .. import _utils
 from .._factors import FactorBase, LinearFactor
+from .._optimizers._linear_solver import sparse_linear_solve
 from .._variables import AbstractRealVectorVariable, VariableBase
 from ._factor_graph_base import FactorGraphBase
 from ._linear_factor_graph import LinearFactorGraph
+from ._prepared_factor_graph import PreparedFactorGraph
 
 
 @_utils.immutable_dataclass
-class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
+class FactorGraph:
     """General nonlinear factor graph."""
+
+    factors_from_group: Dict[types.GroupKey, Set[FactorBase]] = dataclasses.field(
+        default_factory=lambda: {}, init=False
+    )
+    factors_from_variable: Dict[VariableBase, Set[FactorBase]] = dataclasses.field(
+        default_factory=lambda: {}, init=False
+    )
+
+    @property
+    def variables(self) -> Iterable[VariableBase]:
+        """Helper for iterating over variables."""
+        return self.factors_from_variable.keys()
+
+    @property
+    def factors(self) -> Iterator[FactorBase]:
+        for group in self.factors_from_group.values():
+            for factor in group:
+                yield factor
+
+    def with_factors(self, *to_add: FactorBase) -> "FactorGraph":
+        """Generate a new graph with additional factors added.
+
+        Existing graph is marked dirty and can no longer be used.
+        """
+
+        # Create shallow copy of self
+        new_graph = dataclasses.copy.copy(self)
+
+        # Mark self as dirty
+        # (note that we can't mutate normally)
+        object.__setattr__(self, "factors_from_group", None)
+        object.__setattr__(self, "factors_from_variables", None)
+
+        for factor in to_add:
+            # Add factor to graph
+            assert factor not in new_graph.factors_from_group
+            group_key = factor.group_key()
+            if group_key not in new_graph.factors_from_group:
+                # Add factor group if new
+                new_graph.factors_from_group[group_key] = set()
+            new_graph.factors_from_group[group_key].add(factor)
+
+            # Make constant-time variable=>factor lookup possible
+            for v in factor.variables:
+                if v not in new_graph.factors_from_variable:
+                    new_graph.factors_from_variable[v] = set()
+                new_graph.factors_from_variable[v].add(factor)
+
+        # Return "new" graph
+        return new_graph
+
+    def without_factors(self, *to_remove: FactorBase) -> "FactorGraph":
+        """Generate a new graph, with specified factors removed.
+
+        Existing graph is marked dirty and can no longer be used.
+        """
+
+        # Copy self
+        new_graph = dataclasses.copy.copy(self)
+
+        # Mark self as dirty
+        self.__setattr__("factors_from_group", None)
+        self.__setattr__("factors_from_variables", None)
+
+        for factor in to_remove:
+            # Remove factor from graph
+            assert factor in new_graph.factors_from_group
+            group_key = factor.group_key()
+            new_graph.factors_from_group[group_key].remove(factor)
+
+            if len(new_graph.factors_from_group[group_key]) == 0:
+                # Remove factor group if empty
+                new_graph.factors_from_group.pop(group_key)
+
+            # Remove variables from graph
+            for v in factor.variables:
+                new_graph.factors_from_variable[v].remove(factor)
+                if len(new_graph.factors_from_variable[v]) == 0:
+                    new_graph.factors_from_variable.pop(v)
+
+        # Return "new" graph
+        return new_graph
 
     def solve(
         self,
@@ -64,6 +148,112 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
             # assignments.storage.block_until_ready()
 
         return assignments
+
+    def prepare(self) -> PreparedFactorGraph:
+
+        stacked_factors: List[FactorBase] = []
+        jacobian_coords = []
+        value_indices: List[Tuple[jnp.ndarray, ...]] = []
+        error_indices: List[jnp.ndarray] = []
+
+        # Create dummy assignments; this tells us how all of the variables are stored
+        dummy_assignments = types.VariableAssignments.create_default(self.variables)
+        local_delta_assignments = dummy_assignments.create_local_deltas()
+
+        # Prepare each factor group
+        error_index = 0
+        for group_key, group in self.factors_from_group.items():
+            # Stack factors in our group
+            stacked_factor: FactorBase = jax.tree_multimap(
+                lambda *arrays: onp.stack(arrays, axis=0), *group
+            )
+
+            # Get indices for each variable
+            value_indices_list = tuple([] for _ in range(len(stacked_factor.variables)))
+            local_value_indices_list = tuple(
+                [] for _ in range(len(stacked_factor.variables))
+            )
+            for factor in group:
+                for i, variable in enumerate(factor.variables):
+                    # Record variable parameterization indices
+                    storage_pos = dummy_assignments.storage_pos_from_variable[variable]
+                    value_indices_list[i].append(
+                        onp.arange(
+                            storage_pos, storage_pos + variable.get_parameter_dim()
+                        ).reshape(variable.get_parameter_shape())
+                    )
+
+                    # Record local parameterization indices
+                    storage_pos = local_delta_assignments.storage_pos_from_variable[
+                        variable
+                    ]
+                    local_value_indices_list[i].append(
+                        onp.arange(
+                            storage_pos,
+                            storage_pos + variable.get_local_parameter_dim(),
+                        )
+                    )
+
+            # Stack: end result should be Tuple[array of shape (N, *parameter_shape), ...]
+            value_indices_list = tuple(onp.array(l) for l in value_indices_list)
+            local_value_indices_list = tuple(
+                onp.array(l) for l in local_value_indices_list
+            )
+
+            # Update PreparedFactorGraph fields
+            stacked_factors.append(stacked_factor)
+            value_indices.append(value_indices_list)
+            error_indices.append(
+                onp.arange(
+                    error_index, error_index + len(group) * factor.error_dim
+                ).reshape((len(group), factor.error_dim))
+            )
+            error_index += stacked_factor.error_dim * len(group)
+
+            # Get Jacobian coordinates
+            num_factors = len(group)
+            error_dim = stacked_factor.error_dim
+            for variable_index, variable in enumerate(stacked_factor.variables):
+                variable_dim = variable.get_local_parameter_dim()
+                #  jacobian_coords.append(
+                #      # Row indices
+                #      onp.broadcast_to(
+                #          error_indices[-1][:, :, None],
+                #          (num_factors, error_dim, variable_dim),
+                #      )
+                #  )
+                #  jacobian_coords.append(
+                #      # Column indices
+                #      onp.broadcast_to(
+                #          local_value_indices_list[variable_index][:, None, :],
+                #          (num_factors, error_dim, variable_dim),
+                #      )
+                #  )
+                jacobian_coords.append(
+                    onp.stack(
+                        (
+                            # Row indices
+                            onp.broadcast_to(
+                                error_indices[-1][:, :, None],
+                                (num_factors, error_dim, variable_dim),
+                            ),
+                            # Column indices
+                            onp.broadcast_to(
+                                local_value_indices_list[variable_index][:, None, :],
+                                (num_factors, error_dim, variable_dim),
+                            ),
+                        ),
+                        axis=-1,
+                    ).reshape((num_factors * error_dim * variable_dim, 2))
+                )
+
+        return PreparedFactorGraph(
+            stacked_factors=stacked_factors,
+            jacobian_coords=jacobian_coords,
+            value_indices=value_indices,
+            error_indices=error_indices,
+            local_delta_assignments=local_delta_assignments,
+        )
 
     @jax.partial(jax.jit, static_argnums=0)
     def _gauss_newton_step(
@@ -197,7 +387,7 @@ class FactorGraph(FactorGraphBase[FactorBase, VariableBase]):
         }
         error_vector = -jnp.concatenate(errors_list)
 
-        local_delta_values = LinearFactorGraph._solve(
+        local_delta_values, ATb = LinearFactorGraph._solve(
             A_matrices_from_shape,
             value_indices_from_shape,
             error_indices_from_shape,

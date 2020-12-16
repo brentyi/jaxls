@@ -23,7 +23,7 @@ initial_poses: jaxfg.types.VariableAssignments = {}
 
 factors: List[jaxfg.FactorBase] = []
 
-pose_count = 50000
+pose_count = 10000
 
 
 for line in tqdm(lines):
@@ -153,11 +153,18 @@ with jaxfg.utils.stopwatch("stacked"):
 #
 #     print(cost * 0.5)
 
+with jaxfg.utils.stopwatch("prepare"):
+    prepared = graph.prepare()
+with jaxfg.utils.stopwatch("prepared GN step"):
+    prepared._gauss_newton_step(initial_poses)
+with jaxfg.utils.stopwatch("prepared solve"):
+    solution_poses = prepared.solve(initial_poses)
+
 with jaxfg.utils.stopwatch("GN step JIT build"):
     graph._gauss_newton_step(initial_poses)
 
 with jaxfg.utils.stopwatch("Solve"):
-    solution_poses = graph.solve(initial_poses)
+    graph.solve(initial_poses)
 
 # print(solution_poses)
 

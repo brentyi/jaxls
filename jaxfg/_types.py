@@ -79,20 +79,22 @@ class VariableAssignments:
     def from_dict(
         assignments: Dict["VariableBase", jnp.ndarray]
     ) -> "VariableAssignments":
-        # Sort variables by type
-        variable_from_variable_type: DefaultDict[
+
+        # Bucket variables by type + sort deterministically!
+        variables_from_type: DefaultDict[
             Type["VariableBase"], List["VariableBase"]
         ] = DefaultDict(list)
+        for variable in sorted(assignments.keys()):
+            variables_from_type[type(variable)].append(variable)
+        for variables in variables_from_type.values():
+            variables.sort()
 
-        for variable in assignments.keys():
-            variable_from_variable_type[type(variable)].append(variable)
-
-        # Create
+        # Assign block of storage vector for each variable
         storage_list = []
         storage_pos_from_variable: Dict["VariableBase", int] = {}
         storage_pos_from_variable_type: Dict[Type["VariableBase"], int] = {}
         storage_index = 0
-        for variable_type, variables in variable_from_variable_type.items():
+        for variable_type, variables in variables_from_type.items():
             storage_pos_from_variable_type[variable_type] = storage_index
             for variable in variables:
                 value = assignments[variable]
@@ -109,7 +111,7 @@ class VariableAssignments:
             storage_pos_from_variable=storage_pos_from_variable,
             storage_pos_from_variable_type=storage_pos_from_variable_type,
             count_from_variable_type={
-                k: len(v) for k, v in variable_from_variable_type.items()
+                k: len(v) for k, v in variables_from_type.items()
             },
         )
 
@@ -122,8 +124,7 @@ class VariableAssignments:
         for variable in self.variables:
             variable_from_variable_type[type(variable)].append(variable)
 
-        #
-        # Create
+        # Assign block of storage vector for each local delta
         storage_pos_from_variable: Dict["VariableBase", int] = {}
         storage_pos_from_variable_type: Dict[Type["VariableBase"], int] = {}
         storage_index = 0

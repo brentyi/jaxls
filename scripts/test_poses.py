@@ -1,4 +1,5 @@
 import time
+import jaxlie
 
 import jax
 import numpy as onp
@@ -8,21 +9,26 @@ import jaxfg
 
 variables = {
     "pose1": jaxfg.SE2Variable(),
-    "pose2": jaxfg.SE2Variable(),
+    # "pose2": jaxfg.SE2Variable(),
 }
 
 graph = jaxfg.FactorGraph().with_factors(
     jaxfg.PriorFactor.make(
         variable=variables["pose1"],
-        mu=onp.eye(3),
+        mu=jaxlie.SE2.from_xy_theta(1., 0., 0.).xy_unit_complex,
         scale_tril_inv=jnp.eye(3),
     ),
-    jaxfg.BetweenFactor.make(
-        before=variables["pose1"],
-        after=variables["pose2"],
-        delta=jnp.array([0.0, 2.0, 0.000]),
+    jaxfg.PriorFactor.make(
+        variable=variables["pose1"],
+        mu=jaxlie.SE2.from_xy_theta(2., 0., 0.).xy_unit_complex,
         scale_tril_inv=jnp.eye(3),
     ),
+    # jaxfg.BetweenFactor.make(
+    #     before=variables["pose1"],
+    #     after=variables["pose2"],
+    #     delta=jaxlie.SE2.from_xy_theta(1., 0., 0.).xy_unit_complex,
+    #     scale_tril_inv=jnp.eye(3),
+    # ),
 )
 
 # graph = graph.with_factors(
@@ -42,17 +48,16 @@ graph = jaxfg.FactorGraph().with_factors(
 # print(jit_solve(graph, (position,)))  # , assignments={position: jnp.zeros(2)}))
 # print(time.time() - start_time)
 
-initial_assignments = jaxfg.types.VariableAssignments.from_dict(
-    {
-        variables["pose1"]: onp.eye(3),
-        variables["pose2"]: onp.eye(3),
-    }
-)
+initial_assignments = jaxfg.types.VariableAssignments.create_default(variables.values())
 
 start_time = time.time()
 solutions = graph.solve(initial_assignments)
 print("\nFirst solve runtime: ", time.time() - start_time)
 
+start_time = time.time()
+solutions = graph.prepare().solve(initial_assignments)
+print("\nPrepared solve runtime: ", time.time() - start_time)
+exit()
 
 print(solutions)
 

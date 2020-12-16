@@ -187,7 +187,7 @@ class LinearFactorGraph(FactorGraphBase[LinearFactor, AbstractRealVectorVariable
             M=jacobi_preconditioner,
         )
 
-        return solution_values
+        return solution_values, ATb
 
     # @jax.partial(jax.jit, static_argnums=(0,))
     # def solve(
