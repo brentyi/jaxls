@@ -13,5 +13,8 @@ setup(
         "jax",
         "jaxlib",
         "overrides",
+        "termcolor",
+        "tqdm",
+        "matplotlib",
     ],
 )
