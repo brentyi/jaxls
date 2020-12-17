@@ -58,11 +58,7 @@ class FactorBase(abc.ABC):
     ) -> Tuple[Tuple[jnp.ndarray], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
         v_dict = vars(v)
-        array_data = {
-            k: v
-            for k, v in v_dict.items()
-            if k not in cls._static_fields
-        }
+        array_data = {k: v for k, v in v_dict.items() if k not in cls._static_fields}
 
         # Store variable types to make sure treedef hashes match
         aux_dict = {k: v for k, v in v_dict.items() if k not in array_data}
@@ -140,47 +136,6 @@ class LinearFactor(FactorBase):
         for A_matrix, value in zip(self.A_matrices, variable_values):
             linear_component = linear_component + A_matrix @ value
         return linear_component - self.b
-
-    # @classmethod
-    # def linearize_from_factor(
-    #     cls, factor: FactorBase, assignments: _types.VariableAssignments
-    # ) -> "LinearFactor":
-    #     """Produce a LinearFactor object by linearizing an arbitrary factor.
-    #
-    #     Args:
-    #         factor (FactorBase): Factor to linearize.
-    #         assignments (_types.VariableAssignments): Assignments to linearize around.
-    #
-    #     Returns:
-    #         LinearFactor: Linearized factor.
-    #     """
-    #     A_from_variable: Dict[
-    #         "RealVectorVariable", Callable[[jnp.ndarray], jnp.ndarray]
-    #     ] = {}
-    #
-    #     # Pull out only the assignments that we care about
-    #     assignments = {variable: assignments[variable] for variable in factor.variables}
-    #
-    #     for variable in factor.variables:
-    #
-    #         def f(local_delta: jnp.ndarray) -> jnp.ndarray:
-    #             # Make copy of assignments with updated variable value
-    #             assignments_copy = assignments.copy()
-    #             assignments_copy[variable] = variable.add_local(
-    #                 x=assignments_copy[variable], local_delta=local_delta
-    #             )
-    #
-    #             # Return whitened error
-    #             return factor.scale_tril_inv @ factor.compute_error(*())
-    #
-    #         # Linearize around variable
-    #         f_jvp = jax.jacfwd(f)(jnp.zeros(variable.get_local_parameter_dim()))[1]
-    #         A_from_variable[variable.local_delta_variable] = f_jvp
-    #
-    #     error = factor.compute_error(assignments=assignments)
-    #     return LinearFactor(
-    #         A_from_variable=A_from_variable, b=-factor.scale_tril_inv @ error
-    #     )
 
 
 @_utils.immutable_dataclass

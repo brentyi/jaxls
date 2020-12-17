@@ -19,7 +19,7 @@ with open("./data/input_M3500_g2o.g2o") as file:
     lines = [line.strip() for line in file.readlines()]
 
 pose_variables = []
-initial_poses: jaxfg.types.VariableAssignments = {}
+initial_poses: jaxfg.VariableAssignments = {}
 
 factors: List[jaxfg.FactorBase] = []
 
@@ -96,77 +96,14 @@ print(f"Loaded {len(pose_variables)} poses and {len(factors)} factors")
 
 print("Initial cost")
 
-initial_poses = jaxfg.types.VariableAssignments.from_dict(initial_poses)
-graph = jaxfg.FactorGraph().with_factors(*factors)
+initial_poses = jaxfg.VariableAssignments.from_dict(initial_poses)
+graph = jaxfg.PreparedFactorGraph.from_factors(factors)
 
-with jaxfg.utils.stopwatch("stacked"):
-    errors_list = []
-    for group_key, group in graph.factors_from_group.items():
-        # Stack factors in our group
-        factors_stacked: jaxfg.FactorBase = jax.tree_multimap(
-            lambda *arrays: onp.stack(arrays, axis=0), *group
-        )
-        example_factor = next(iter(group))
-        # Stack inputs to our factors
-        values_indices = tuple([] for _ in range(len(example_factor.variables)))
-        for factor in group:
-            for i, variable in enumerate(factor.variables):
-                storage_pos = initial_poses.storage_pos_from_variable[variable]
-                values_indices[i].append(
-                    onp.arange(
-                        storage_pos, storage_pos + variable.get_parameter_dim()
-                    ).reshape(variable.get_parameter_shape())
-                )
-        values_stacked = tuple(
-            initial_poses.storage[onp.array(indices)] for indices in values_indices
-        )
-        # Vectorized error computation
-        print(factors_stacked.scale_tril_inv[0])
-        errors_list.append(
-            jnp.einsum(
-                "nij,nj->ni",
-                factors_stacked.scale_tril_inv,
-                jax.vmap(group_key.factor_type.compute_error)(
-                    factors_stacked, *values_stacked
-                ),
-            ).flatten()
-        )
-
-    print(jnp.sum(jnp.concatenate(errors_list) ** 2) * 0.5)
-
-# with jaxfg.utils.stopwatch("sequential"):
-#     cost = 0.0
-#
-#     for factor in tqdm(list(graph.factors)):
-#         cost = cost + jnp.sum(
-#             (
-#                 factor.scale_tril_inv
-#                 @ factor.compute_error(
-#                     *(
-#                         initial_poses.get_value(variable)
-#                         for variable in factor.variables
-#                     )
-#                 )
-#             )
-#             ** 2
-#         )
-#
-#     print(cost * 0.5)
-
-with jaxfg.utils.stopwatch("prepare"):
-    prepared = graph.prepare()
-with jaxfg.utils.stopwatch("prepared GN step"):
-    prepared._gauss_newton_step(initial_poses)
-with jaxfg.utils.stopwatch("prepared solve"):
-    solution_poses = prepared.solve(initial_poses)
-
-with jaxfg.utils.stopwatch("GN step JIT build"):
-    graph._gauss_newton_step(initial_poses)
+with jaxfg.utils.stopwatch("Compute error"):
+    print(jnp.sum(graph.compute_error_vector(initial_poses) ** 2) * 0.5)
 
 with jaxfg.utils.stopwatch("Solve"):
-    graph.solve(initial_poses)
-
-# print(solution_poses)
+    solution_poses = graph.solve(initial_poses)
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):
     solution_poses = dataclasses.replace(
