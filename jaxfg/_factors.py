@@ -57,17 +57,17 @@ class FactorBase(abc.ABC):
         cls: Type[FactorType], v: FactorType
     ) -> Tuple[Tuple[jnp.ndarray], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
-        v_dict = dataclasses.asdict(v)
-        v_dict.pop("variables")
-        v_dict.pop("_static_fields")
-
-        array_data = {k: v for k, v in v_dict.items() if k not in cls._static_fields}
+        v_dict = vars(v)
+        array_data = {
+            k: v
+            for k, v in v_dict.items()
+            if k not in cls._static_fields
+        }
 
         # Store variable types to make sure treedef hashes match
         aux_dict = {k: v for k, v in v_dict.items() if k not in array_data}
         aux_dict["variable_types"] = tuple(type(variable) for variable in v.variables)
-
-        variable_types = tuple(type(variable) for variable in v.variables)
+        array_data.pop("variables")
 
         return (
             tuple(array_data.values()),
@@ -195,7 +195,6 @@ class PriorFactor(FactorBase):
         mu: jnp.ndarray,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
-        print(variable)
         return PriorFactor(
             variables=(variable,),
             mu=mu,
