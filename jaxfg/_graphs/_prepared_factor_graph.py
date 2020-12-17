@@ -16,6 +16,7 @@ from ._factor_graph_base import FactorGraphBase
 from ._linear_factor_graph import LinearFactorGraph
 
 
+@jax.tree_util.register_pytree_node_class
 @_utils.immutable_dataclass
 class PreparedFactorGraph:
     stacked_factors: List[FactorBase]
@@ -62,10 +63,9 @@ class PreparedFactorGraph:
 
         return assignments
 
-    @jax.partial(jax.jit, static_argnums=0)
     def _gauss_newton_step(
         self, assignments: types.VariableAssignments
-    ) -> types.VariableAssignments:
+    ) -> Tuple[types.VariableAssignments, float]:
         # Linearize factors by group
         A_values_list = []
         errors_list = []
@@ -169,4 +169,30 @@ class PreparedFactorGraph:
         return (
             dataclasses.replace(assignments, storage=new_storage),
             0.5 * jnp.sum(error_vector ** 2),
+        )
+
+    def tree_flatten(v: "PreparedFactorGraph") -> Tuple[Tuple[jnp.ndarray], Tuple]:
+        """Flatten a factor for use as a PyTree/parameter stacking."""
+        v_dict = dataclasses.asdict(v)
+        array_data = {k: v for k, v in v_dict.items()}
+        return (tuple(array_data.values()), tuple(array_data.keys()))
+
+    @classmethod
+    def tree_unflatten(
+        cls, treedef: Tuple, children: Tuple[jnp.ndarray]
+    ) -> "PreparedFactorGraph":
+        """Unflatten a factor for use as a PyTree/parameter stacking."""
+        array_keys = treedef[: len(children)]
+        aux = treedef[len(children) :]
+        aux_keys = aux[: len(aux) // 2]
+        aux_values = aux[len(aux) // 2 :]
+
+        # Create new dummy variables
+        aux_dict = dict(zip(aux_keys, aux_values))
+        aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variable_types"))
+
+        return cls(
+            # variables=tuple(),
+            **dict(zip(array_keys, children)),
+            **aux_dict,
         )

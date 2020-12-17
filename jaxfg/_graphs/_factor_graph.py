@@ -215,37 +215,24 @@ class FactorGraph:
             error_dim = stacked_factor.error_dim
             for variable_index, variable in enumerate(stacked_factor.variables):
                 variable_dim = variable.get_local_parameter_dim()
-                #  jacobian_coords.append(
-                #      # Row indices
-                #      onp.broadcast_to(
-                #          error_indices[-1][:, :, None],
-                #          (num_factors, error_dim, variable_dim),
-                #      )
-                #  )
-                #  jacobian_coords.append(
-                #      # Column indices
-                #      onp.broadcast_to(
-                #          local_value_indices_list[variable_index][:, None, :],
-                #          (num_factors, error_dim, variable_dim),
-                #      )
-                #  )
-                jacobian_coords.append(
-                    onp.stack(
-                        (
-                            # Row indices
-                            onp.broadcast_to(
-                                error_indices[-1][:, :, None],
-                                (num_factors, error_dim, variable_dim),
-                            ),
-                            # Column indices
-                            onp.broadcast_to(
-                                local_value_indices_list[variable_index][:, None, :],
-                                (num_factors, error_dim, variable_dim),
-                            ),
+
+                coords = onp.stack(
+                    (
+                        # Row indices
+                        onp.broadcast_to(
+                            error_indices[-1][:, :, None],
+                            (num_factors, error_dim, variable_dim),
                         ),
-                        axis=-1,
-                    ).reshape((num_factors * error_dim * variable_dim, 2))
-                )
+                        # Column indices
+                        onp.broadcast_to(
+                            local_value_indices_list[variable_index][:, None, :],
+                            (num_factors, error_dim, variable_dim),
+                        ),
+                    ),
+                    axis=-1,
+                ).reshape((num_factors * error_dim * variable_dim, 2))
+
+                jacobian_coords.append(coords)
 
         return PreparedFactorGraph(
             stacked_factors=stacked_factors,
