@@ -1,22 +1,21 @@
 import dataclasses
-from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple, Type, cast
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Type, cast
 
 import jax
 import numpy as onp
 from jax import numpy as jnp
-from overrides import overrides
-from tqdm.auto import tqdm
 
 from . import _types as types
 from . import _utils
-from ._factors import FactorBase, LinearFactor
+from ._factors import FactorBase
 from ._optimizers._nonlinear import GaussNewtonSolver, NonlinearSolver
-from ._variable_assignments import VariableAssignments
-from ._variables import AbstractRealVectorVariable, VariableBase
+from ._variable_assignments import StorageMetadata, VariableAssignments
+from ._variables import VariableBase
 
 
 @jax.tree_util.register_pytree_node_class
-@_utils.immutable_dataclass
+@_utils.hashable
+@dataclasses.dataclass(frozen=True)
 class PreparedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 
@@ -28,7 +27,7 @@ class PreparedFactorGraph:
     value_indices: List[
         Tuple[jnp.ndarray, ...]
     ]  # List index: factor #, tuple index: variable #
-    local_delta_assignments: VariableAssignments
+    local_storage_metadata: StorageMetadata
 
     def __post_init__(self):
         """Check that inputs make sense!"""
@@ -70,8 +69,8 @@ class PreparedFactorGraph:
         value_indices: List[Tuple[jnp.ndarray, ...]] = []
 
         # Create dummy assignments; these tell us how variables are stored
-        dummy_assignments = VariableAssignments.create_default(variables)
-        local_delta_assignments = dummy_assignments.create_local_deltas()
+        storage_metadata = StorageMetadata.from_variables(variables, local=False)
+        delta_storage_metadata = StorageMetadata.from_variables(variables, local=True)
 
         # Prepare each factor group
         error_index = 0
@@ -83,14 +82,16 @@ class PreparedFactorGraph:
             )
 
             # Get indices for each variable
-            value_indices_list = tuple([] for _ in range(len(stacked_factor.variables)))
-            local_value_indices_list = tuple(
+            value_indices_list: Tuple[List[jnp.ndarray], ...] = tuple(
+                [] for _ in range(len(stacked_factor.variables))
+            )
+            local_value_indices_list: Tuple[List[jnp.ndarray], ...] = tuple(
                 [] for _ in range(len(stacked_factor.variables))
             )
             for factor in group:
                 for i, variable in enumerate(factor.variables):
                     # Record variable parameterization indices
-                    storage_pos = dummy_assignments.storage_pos_from_variable[variable]
+                    storage_pos = storage_metadata.index_from_variable[variable]
                     value_indices_list[i].append(
                         onp.arange(
                             storage_pos, storage_pos + variable.get_parameter_dim()
@@ -98,9 +99,7 @@ class PreparedFactorGraph:
                     )
 
                     # Record local parameterization indices
-                    storage_pos = local_delta_assignments.storage_pos_from_variable[
-                        variable
-                    ]
+                    storage_pos = delta_storage_metadata.index_from_variable[variable]
                     local_value_indices_list[i].append(
                         onp.arange(
                             storage_pos,
@@ -109,14 +108,16 @@ class PreparedFactorGraph:
                     )
 
             # Stack: end result should be Tuple[array of shape (N, *parameter_shape), ...]
-            value_indices_list = tuple(onp.array(l) for l in value_indices_list)
-            local_value_indices_list = tuple(
+            value_indices_stacked: Tuple[jnp.ndarray] = tuple(
+                onp.array(l) for l in value_indices_list
+            )
+            local_value_indices_stacked: Tuple[jnp.ndarray] = tuple(
                 onp.array(l) for l in local_value_indices_list
             )
 
             # Record values
             stacked_factors.append(stacked_factor)
-            value_indices.append(value_indices_list)
+            value_indices.append(value_indices_stacked)
             error_indices.append(
                 onp.arange(
                     error_index, error_index + len(group) * factor.error_dim
@@ -139,7 +140,7 @@ class PreparedFactorGraph:
                         ),
                         # Column indices
                         onp.broadcast_to(
-                            local_value_indices_list[variable_index][:, None, :],
+                            local_value_indices_stacked[variable_index][:, None, :],
                             (num_factors, error_dim, variable_dim),
                         ),
                     ),
@@ -152,7 +153,7 @@ class PreparedFactorGraph:
             stacked_factors=stacked_factors,
             jacobian_coords=jacobian_coords,
             value_indices=value_indices,
-            local_delta_assignments=local_delta_assignments,
+            local_storage_metadata=delta_storage_metadata,
         )
 
     def compute_error_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
@@ -172,8 +173,10 @@ class PreparedFactorGraph:
             self.value_indices,
         ):
             # Stack inputs to our factor
+            variable: VariableBase
             values_stacked = tuple(
-                assignments.storage[indices] for indices in value_indices
+                type(variable).unflatten(assignments.storage[indices])
+                for variable, indices in zip(stacked_factors.variables, value_indices)
             )
 
             # Vectorized error computation
@@ -198,18 +201,26 @@ class PreparedFactorGraph:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)
 
-    def tree_flatten(v: "PreparedFactorGraph") -> Tuple[Tuple[jnp.ndarray], Tuple]:
+    def tree_flatten(v: "PreparedFactorGraph") -> Tuple[Tuple[jnp.ndarray, ...], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
         v_dict = vars(v)
         array_data = {k: v for k, v in v_dict.items()}
-        return (tuple(array_data.values()), tuple(array_data.keys()))
+        local_storage_metadata = array_data.pop("local_storage_metadata")
+
+        children = tuple(array_data.values())
+        treedef = (
+            tuple(array_data.keys()),
+            local_storage_metadata,
+        )
+        return children, treedef
 
     @classmethod
     def tree_unflatten(
         cls, treedef: Tuple, children: Tuple[jnp.ndarray]
     ) -> "PreparedFactorGraph":
         """Unflatten a factor for use as a PyTree/parameter stacking."""
-        array_keys = treedef
-        return cls(
+        array_keys = treedef[0]
+        return PreparedFactorGraph(
+            local_storage_metadata=treedef[1],
             **dict(zip(array_keys, children)),
         )

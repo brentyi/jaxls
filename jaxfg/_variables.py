@@ -1,7 +1,17 @@
 import abc
 import contextlib
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Dict, Generator, Optional, Set, Tuple, Type
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Generator,
+    Generic,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 import jax
 import jaxlie
@@ -9,18 +19,21 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from . import _utils
+from . import _types, _utils
 
 if TYPE_CHECKING:
     from . import LinearFactor
 
 
-class VariableBase(abc.ABC):
+VariableValueType = TypeVar("VariableValueType", bound=_types.VariableValue)
+
+
+class VariableBase(abc.ABC, Generic[VariableValueType]):
     _parameter_dim: int
 
     @staticmethod
     @abc.abstractmethod
-    def get_parameter_shape() -> int:
+    def get_parameter_shape() -> Tuple[int, ...]:
         """Dimensionality of underlying parameterization."""
 
     @classmethod
@@ -38,17 +51,19 @@ class VariableBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def get_default_value() -> onp.ndarray:
+    def get_default_value() -> VariableValueType:
         """Get default (on-manifold) parameter value."""
 
     @staticmethod
     @abc.abstractmethod
-    def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+    def add_local(
+        x: VariableValueType, local_delta: VariableValueType
+    ) -> VariableValueType:
         """On-manifold retraction.
 
         Args:
-            local_delta (jnp.ndarray): Delta value in local parameterizaiton.
-            x (jnp.ndarray): Absolute parameter to update.
+            x (VariableValue): Absolute parameter to update.
+            local_delta (VariableValue): Delta value in local parameterizaiton.
 
         Returns:
             jnp.ndarray: Updated parameterization.
@@ -56,16 +71,45 @@ class VariableBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
-        """Compute the difference between two parameters on the manifold.
+    def subtract_local(
+        x: VariableValueType, y: VariableValueType
+    ) -> _types.LocalVariableValue:
+        """Compute the local difference between two variable values.
 
         Args:
-            x (jnp.ndarray): First parameter to compare. Shape should match `self.get_parameter_shape()`.
-            y (jnp.ndarray): Second parameter to compare. Shape should match `self.get_parameter_shape()`.
+            x (VariableValue): First parameter to compare. Shape should match `self.get_parameter_shape()`.
+            y (VariableValue): Second parameter to compare. Shape should match `self.get_parameter_shape()`.
 
         Returns:
-            jnp.ndarray: Delta vector; dimension should match self.get_local_parameter_dim().
+            LocalVariableValue: Delta vector; dimension should match self.get_local_parameter_dim().
         """
+
+    @staticmethod
+    @abc.abstractmethod
+    def flatten(x: VariableValueType) -> jnp.ndarray:
+        """Flatten variable value to 1D array.
+        Should be similar to `jax.flatten_util.ravel_pytree`.
+
+        Args:
+            flat (jnp.ndarray): 1D vector.
+
+        Returns:
+            VariableValueType: Variable value.
+        """
+        pass
+
+    @staticmethod
+    @abc.abstractmethod
+    def unflatten(flat: jnp.ndarray) -> VariableValueType:
+        """Get variable value from flattened representation.
+
+        Args:
+            flat (jnp.ndarray): 1D vector.
+
+        Returns:
+            VariableValueType: Variable value.
+        """
+        pass
 
     @overrides
     def __lt__(self, other) -> bool:
@@ -81,7 +125,7 @@ class VariableBase(abc.ABC):
 
 
 # Fake templating; RealVectorVariable[N]
-class AbstractRealVectorVariable(VariableBase):
+class AbstractRealVectorVariable(VariableBase[jnp.ndarray]):
     """Variable for an arbitrary vector of real numbers."""
 
     @staticmethod
@@ -93,6 +137,16 @@ class AbstractRealVectorVariable(VariableBase):
     @overrides
     def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         return x - y
+
+    @staticmethod
+    @overrides
+    def flatten(x: jnp.ndarray) -> jnp.ndarray:
+        return x
+
+    @staticmethod
+    @overrides
+    def unflatten(flat: jnp.ndarray) -> jnp.ndarray:
+        return flat
 
 
 _real_vector_variable_cache = {}
@@ -107,7 +161,7 @@ class _RealVectorVariableTemplate:
             class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
                 @staticmethod
                 @overrides
-                def get_parameter_shape() -> int:
+                def get_parameter_shape() -> Tuple[int, ...]:
                     return (n,)
 
                 @staticmethod
@@ -127,28 +181,16 @@ class _RealVectorVariableTemplate:
 RealVectorVariable = _RealVectorVariableTemplate()
 
 
-# Lie manifolds
-
-
-class LieVariableBase(VariableBase, abc.ABC):
-    @staticmethod
-    @abc.abstractmethod
-    def product(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
-        ...
+# Lie groups
 
 
 def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
-    class _LieVariable(LieVariableBase):
-        """Variable containing a 2D rotation."""
+    class _LieVariable(VariableBase[Group]):
+        """Variable containing a transformation."""
 
         @staticmethod
         @overrides
-        def product(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
-            return (Group(a) @ Group(b)).parameters
-
-        @staticmethod
-        @overrides
-        def get_parameter_shape() -> int:
+        def get_parameter_shape() -> Tuple[int, ...]:
             return (Group.parameters_dim,)
 
         @staticmethod
@@ -158,20 +200,30 @@ def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
 
         @staticmethod
         @overrides
-        def get_default_value() -> onp.ndarray:
-            return Group.identity().parameters
+        def get_default_value() -> Group:
+            return Group.identity()
 
         @staticmethod
         #  @jax.custom_jvp
-        def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
-            return (Group(x) @ Group.exp(local_delta)).parameters
+        def add_local(x: Group, local_delta: jaxlie.types.TangentVector) -> Group:
+            return Group(x) @ Group.exp(local_delta)
 
         @staticmethod
         @overrides
-        def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+        def subtract_local(x: Group, y: Group) -> _types.LocalVariableValue:
             # x = world<-A, y = world<-B
             # Difference = A<-B
-            return (Group(x).inverse() @ Group(y)).log()
+            return (x.inverse() @ y).log()
+
+        @staticmethod
+        @overrides
+        def flatten(x: Group) -> jnp.ndarray:
+            return x.parameters
+
+        @staticmethod
+        @overrides
+        def unflatten(flat: jnp.ndarray) -> Group:
+            return Group(flat)
 
     return _LieVariable
 

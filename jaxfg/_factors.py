@@ -15,6 +15,7 @@ from typing import (
 )
 
 import jax
+import jaxlie
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
@@ -28,7 +29,8 @@ if TYPE_CHECKING:
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
 
-@_utils.immutable_dataclass
+@_utils.hashable
+@dataclasses.dataclass(frozen=True)
 class FactorBase(abc.ABC):
     variables: Tuple["VariableBase"]
     """Variables connected to this factor. Immutable. (currently assumed but unenforced)"""
@@ -55,7 +57,7 @@ class FactorBase(abc.ABC):
     @classmethod
     def flatten(
         cls: Type[FactorType], v: FactorType
-    ) -> Tuple[Tuple[jnp.ndarray], Tuple]:
+    ) -> Tuple[Tuple[_types.PyTree, ...], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
         v_dict = vars(v)
         array_data = {k: v for k, v in v_dict.items() if k not in cls._static_fields}
@@ -86,11 +88,12 @@ class FactorBase(abc.ABC):
         aux_dict = dict(zip(aux_keys, aux_values))
         aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variable_types"))
 
-        return cls(
+        out = cls(
             # variables=tuple(),
             **dict(zip(array_keys, children)),
             **aux_dict
         )
+        return out
 
     def group_key(self) -> _types.GroupKey:
         """Get unique key for grouping factors.
@@ -110,15 +113,16 @@ class FactorBase(abc.ABC):
         )
 
     @abc.abstractmethod
-    def compute_error(self, *args: jnp.ndarray):
-        """compute_error.
+    def compute_error(self, *variable_values: _types.VariableValue):
+        """Compute factor error.
 
         Args:
-            *args (jnp.ndarray): Arguments
+            variable_values (_types.VariableValue): Values of self.variables
         """
 
 
-@_utils.immutable_dataclass
+@_utils.hashable
+@dataclasses.dataclass(frozen=True)
 class LinearFactor(FactorBase):
     """Linearized factor, corresponding to the simple residual:
     $$
@@ -131,23 +135,24 @@ class LinearFactor(FactorBase):
     scale_tril_inv: onp.ndarray
 
     @overrides
-    def compute_error(self, *variable_values: jnp.ndarray):
+    def compute_error(self, *variable_values: _types.VariableValue):
         linear_component = jnp.zeros_like(self.b)
         for A_matrix, value in zip(self.A_matrices, variable_values):
             linear_component = linear_component + A_matrix @ value
         return linear_component - self.b
 
 
-@_utils.immutable_dataclass
+@_utils.hashable
+@dataclasses.dataclass(frozen=True)
 class PriorFactor(FactorBase):
-    mu: jnp.ndarray
+    mu: _types.VariableValue
     variable_type: Type["VariableBase"]
     _static_fields = frozenset({"variable_type"})
 
     @staticmethod
     def make(
         variable: "VariableBase",
-        mu: jnp.ndarray,
+        mu: _types.VariableValue,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
         return PriorFactor(
@@ -158,27 +163,28 @@ class PriorFactor(FactorBase):
         )
 
     @overrides
-    def compute_error(self, variable_value: jnp.ndarray):
+    def compute_error(self, variable_value: _types.VariableValue):
         return self.variable_type.subtract_local(variable_value, self.mu)
 
 
 class _BeforeAfterTuple(NamedTuple):
-    before: "VariableBase"
-    after: "VariableBase"
+    before: "LieVariableBase"
+    after: "LieVariableBase"
 
 
-@_utils.immutable_dataclass
+@_utils.hashable
+@dataclasses.dataclass(frozen=True)
 class BetweenFactor(FactorBase):
     variables: _BeforeAfterTuple
-    delta: jnp.ndarray
+    delta: jaxlie.MatrixLieGroup
     variable_type: Type["LieVariableBase"]
-    _static_fields = frozenset({"variable_type", "forward_fn"})
+    _static_fields = frozenset({"variable_type"})
 
     @staticmethod
     def make(
         before: "LieVariableBase",
         after: "LieVariableBase",
-        delta: jnp.ndarray,
+        delta: _types.VariableValue,
         scale_tril_inv: _types.ScaleTrilInv,
     ):
         assert type(before) == type(after)
@@ -191,8 +197,13 @@ class BetweenFactor(FactorBase):
 
     @jax.jit
     @overrides
-    def compute_error(self, before_value: jnp.ndarray, after_value: jnp.ndarray):
-        return self.variable_type.subtract_local(
-            self.variable_type.product(before_value, self.delta),
-            after_value,
-        )
+    def compute_error(
+        self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
+    ):
+        # before is T_wb
+        # delta is T_ba
+        # after is T_wa
+        #
+        # Our error is the tangent-space difference between our actual computed and T_wa
+        # transforms
+        return ((before_value @ self.delta).inverse() @ after_value).log()

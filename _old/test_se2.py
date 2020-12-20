@@ -1,7 +1,8 @@
-import jaxfg
 import numpy as onp
 from jax import numpy as jnp
 from scipy.linalg import expm, logm
+
+import jaxfg
 
 for _ in range(5):
     tangent = onp.random.randn(3)

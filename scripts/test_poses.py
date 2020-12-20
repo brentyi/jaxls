@@ -1,10 +1,11 @@
 import time
 
 import jax
-import jaxfg
 import jaxlie
 import numpy as onp
 from jax import numpy as jnp
+
+import jaxfg
 
 variables = {
     "pose1": jaxfg.SE2Variable(),

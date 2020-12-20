@@ -5,6 +5,8 @@ import jax
 import jax.numpy as jnp
 import numpy as onp
 
+from .. import _types
+
 if TYPE_CHECKING:
     from .._factors import FactorBase
     from .._prepared_factor_graph import PreparedFactorGraph
@@ -41,7 +43,7 @@ def gauss_newton_step(
         # Helper for computing Jacobians wrt local parameterizations
         def compute_cost_with_local_delta(
             factor: "FactorBase",
-            values: Tuple[jnp.ndarray],
+            values: Tuple[_types.VariableValue, ...],
             local_deltas: Tuple[jnp.ndarray],
         ):
             variable_type: Type["VariableBase"]
@@ -81,7 +83,7 @@ def gauss_newton_step(
     local_delta_values = sparse_linear_solve(
         A_values=A_values,
         A_coords=A_coords,
-        initial_x=graph.local_delta_assignments.storage,  # This is just all zeros
+        initial_x=jnp.zeros((graph.local_storage_metadata.dim,)),
         b=-error_vector,
         tol=tol,
     )
@@ -89,29 +91,33 @@ def gauss_newton_step(
     # Update on manifold
     new_storage = jnp.zeros_like(assignments.storage)
     variable_type: Type["VariableBase"]
-    for variable_type in assignments.storage_pos_from_variable_type.keys():
+    for variable_type in assignments.storage_metadata.index_from_variable_type.keys():
 
         # Get locations
-        count = assignments.count_from_variable_type[variable_type]
-        storage_pos = assignments.storage_pos_from_variable_type[variable_type]
-        local_storage_pos = (
-            graph.local_delta_assignments.storage_pos_from_variable_type[variable_type]
-        )
+        count = assignments.storage_metadata.count_from_variable_type[variable_type]
+        storage_index = assignments.storage_metadata.index_from_variable_type[
+            variable_type
+        ]
+        local_storage_index = graph.local_storage_metadata.index_from_variable_type[
+            variable_type
+        ]
         dim = variable_type.get_parameter_dim()
         shape = variable_type.get_parameter_shape()
         local_dim = variable_type.get_local_parameter_dim()
 
         # Get batched variables
         batched_xs = assignments.storage[
-            storage_pos : storage_pos + dim * count
+            storage_index : storage_index + dim * count
         ].reshape((count,) + shape)
         batched_deltas = local_delta_values[
-            local_storage_pos : local_storage_pos + local_dim * count
+            local_storage_index : local_storage_index + local_dim * count
         ].reshape((count, local_dim))
 
         # Batched variable update
-        new_storage = new_storage.at[storage_pos : storage_pos + dim * count].set(
-            jax.vmap(variable_type.add_local)(batched_xs, batched_deltas).flatten()
+        new_storage = new_storage.at[storage_index : storage_index + dim * count].set(
+            variable_type.flatten(
+                jax.vmap(variable_type.add_local)(batched_xs, batched_deltas)
+            ).flatten()
         )
 
     return (

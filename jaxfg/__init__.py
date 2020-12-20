@@ -6,7 +6,6 @@ from ._prepared_factor_graph import PreparedFactorGraph
 from ._variable_assignments import VariableAssignments
 from ._variables import (
     AbstractRealVectorVariable,
-    LieVariableBase,
     RealVectorVariable,
     SE2Variable,
     SO2Variable,
