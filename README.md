@@ -16,7 +16,7 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
 - [x] Linear factor graph
 - [x] Non-linear factors graph
   - [x] Very basic Gauss-Newton implementation
-  - [ ] Proper termination criteria
+  - [x] Proper termination criteria
   - [ ] Damped least squares
   - [ ] Gradslam-style damped least squares?
 - [x] MAP inference
@@ -26,27 +26,19 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
   - [x] More intentional JIT compilation
   - [x] Re-implement parallel factor computation
   - [x] Vectorized linearization
-  - [x] Basic CGLS preconditioning
-  - [ ] Better preconditioning and/or debugging -- still slow
-- [x] Manifold optimization
+  - [x] Basic (Jacobi) CGLS preconditioning
+- [x] Manifold optimization (mostly offloaded to
+      [jaxlie](https://github.com/brentyi/jaxlie))
   - [x] Basic interface
   - [x] Manifold optimization on SO2
-    - [ ] Analytical JVP?
-    - [ ] Analytical VJP?
   - [x] Manifold optimization on SE2
-    - [ ] Analytical JVP?
-    - [ ] Analytical VJP?
-  - [ ] Manifold optimization on SO3
-    - [ ] Analytical JVP?
-    - [ ] Analytical VJP?
-  - [ ] Manifold optimization on SE3
-    - [ ] Analytical JVP?
-    - [ ] Analytical VJP?
-- [ ] Code health (low priority unti
+  - [x] Manifold optimization on SO3
+  - [x] Manifold optimization on SE3
+- [ ] Usability + code health (low priority)
   - [ ] Cleanup/refactor
     - [ ] Do it
-      - [ ] Better parallel factor interface
-      - [ ] Separate out utils, lie group helpers
+      - [x] Better parallel factor interface
+      - [x] Separate out utils, lie group helpers
       - [ ] Put things in folders
     - [ ] Do it again
   - [ ] Package cleanup: dependencies, etc

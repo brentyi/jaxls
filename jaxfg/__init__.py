@@ -8,6 +8,8 @@ from ._variables import (
     AbstractRealVectorVariable,
     RealVectorVariable,
     SE2Variable,
+    SE3Variable,
     SO2Variable,
+    SO3Variable,
     VariableBase,
 )

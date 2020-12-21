@@ -230,3 +230,5 @@ def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
 
 SO2Variable = make_lie_variable(jaxlie.SO2)
 SE2Variable = make_lie_variable(jaxlie.SE2)
+SO3Variable = make_lie_variable(jaxlie.SO3)
+SE3Variable = make_lie_variable(jaxlie.SE3)
