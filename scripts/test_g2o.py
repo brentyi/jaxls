@@ -102,7 +102,7 @@ with jaxfg.utils.stopwatch("Compute error"):
     print(jnp.sum(graph.compute_error_vector(initial_poses) ** 2) * 0.5)
 
 with jaxfg.utils.stopwatch("Solve"):
-    solution_poses = graph.solve(initial_poses)
+    solution_poses = graph.solve(initial_poses, solver=jaxfg.LevenbergMarquardtSolver())
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):
     solution_poses = dataclasses.replace(

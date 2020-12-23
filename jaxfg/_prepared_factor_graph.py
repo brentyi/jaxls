@@ -13,8 +13,10 @@ from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
 
 
-@jax.tree_util.register_pytree_node_class
-@_utils.hashable
+@jax.partial(
+    _utils.register_dataclass_pytree,
+    static_fields=("local_storage_metadata", "error_dim"),
+)
 @dataclasses.dataclass(frozen=True)
 class PreparedFactorGraph:
     """Dataclass for vectorized factor graph computations.
@@ -28,6 +30,7 @@ class PreparedFactorGraph:
         Tuple[jnp.ndarray, ...]
     ]  # List index: factor #, tuple index: variable #
     local_storage_metadata: StorageMetadata
+    error_dim: int
 
     def __post_init__(self):
         """Check that inputs make sense!"""
@@ -154,6 +157,7 @@ class PreparedFactorGraph:
             jacobian_coords=jacobian_coords,
             value_indices=value_indices,
             local_storage_metadata=delta_storage_metadata,
+            error_dim=error_index,
         )
 
     def compute_error_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
@@ -191,7 +195,25 @@ class PreparedFactorGraph:
             )
 
         # Concatenate errors from all groups
-        return jnp.concatenate(errors_list, axis=0)
+        error_vector = jnp.concatenate(errors_list, axis=0)
+        assert error_vector.shape == (self.error_dim,)
+        return error_vector
+
+    def compute_sum_squared_error(
+        self, assignments: VariableAssignments
+    ) -> Tuple[float, jnp.ndarray]:
+        """Compute the sum of squared errors associated with a factor graph. Also
+        returns intermediate error vector.
+
+        Args:
+            assignments (VariableAssignments): Variable assignments.
+
+        Returns:
+            Tuple[float, jnp.ndarray]: Scalar error, error vector.
+        """
+        error_vector = self.compute_error_vector(assignments)
+        sum_squared_error = jnp.sum(error_vector ** 2)
+        return sum_squared_error, error_vector
 
     def solve(
         self,
@@ -200,27 +222,3 @@ class PreparedFactorGraph:
     ) -> VariableAssignments:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)
-
-    def tree_flatten(v: "PreparedFactorGraph") -> Tuple[Tuple[jnp.ndarray, ...], Tuple]:
-        """Flatten a factor for use as a PyTree/parameter stacking."""
-        v_dict = vars(v)
-        array_data = {k: v for k, v in v_dict.items()}
-        local_storage_metadata = array_data.pop("local_storage_metadata")
-
-        children = tuple(array_data.values())
-        treedef = (
-            tuple(array_data.keys()),
-            local_storage_metadata,
-        )
-        return children, treedef
-
-    @classmethod
-    def tree_unflatten(
-        cls, treedef: Tuple, children: Tuple[jnp.ndarray]
-    ) -> "PreparedFactorGraph":
-        """Unflatten a factor for use as a PyTree/parameter stacking."""
-        array_keys = treedef[0]
-        return PreparedFactorGraph(
-            local_storage_metadata=treedef[1],
-            **dict(zip(array_keys, children)),
-        )

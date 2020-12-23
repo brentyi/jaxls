@@ -23,18 +23,27 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     print(f"========")
 
 
-def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
+def register_dataclass_pytree(
+    cls: Type[T], static_fields: Tuple[str, ...] = tuple()
+) -> Type[T]:
     """Register a dataclass as a PyTree."""
 
     assert dataclasses.is_dataclass(cls)
 
-    keys = [field.name for field in dataclasses.fields(cls)]
+    field: dataclasses.Field
+    field_names = [field.name for field in dataclasses.fields(cls)]
+    children_fields = [name for name in field_names if name not in static_fields]
+    assert set(field_names) == set(children_fields) | set(static_fields)
 
     def _flatten(obj):
-        return [getattr(obj, key) for key in keys], None
+        return [getattr(obj, key) for key in children_fields], tuple(
+            getattr(obj, key) for key in static_fields
+        )
 
-    def _unflatten(_, children):
-        return cls(**dict(zip(keys, children)))
+    def _unflatten(treedef, children):
+        return cls(
+            **dict(zip(children_fields, children)), **dict(zip(static_fields, treedef))
+        )
 
     jax.tree_util.register_pytree_node(cls, _flatten, _unflatten)
 

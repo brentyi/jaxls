@@ -16,8 +16,9 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
 - [x] Linear factor graph
 - [x] Non-linear factors graph
   - [x] Very basic Gauss-Newton implementation
-  - [x] Proper termination criteria
-  - [ ] Damped least squares
+  - [x] Termination criteria
+  - [x] Damped least squares
+  - [ ] Fix termination criteria
   - [ ] Gradslam-style damped least squares?
 - [x] MAP inference
 - [x] Compare g2o example
