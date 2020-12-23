@@ -8,7 +8,8 @@ from jax import numpy as jnp
 from . import _types as types
 from . import _utils
 from ._factors import FactorBase
-from ._optimizers._nonlinear import GaussNewtonSolver, NonlinearSolver
+from ._optimizers._gauss_newton_solver import GaussNewtonSolver
+from ._optimizers._nonlinear_solver_base import NonlinearSolverBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
 
@@ -218,7 +219,7 @@ class PreparedFactorGraph:
     def solve(
         self,
         initial_assignments: VariableAssignments,
-        solver: NonlinearSolver = GaussNewtonSolver(),
+        solver: NonlinearSolverBase = GaussNewtonSolver(),
     ) -> VariableAssignments:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)

@@ -79,8 +79,7 @@ class StorageMetadata:
         )
 
 
-# @_utils.register_dataclass_pytree
-@jax.tree_util.register_pytree_node_class
+@jax.partial(_utils.register_dataclass_pytree, static_fields=("storage_metadata",))
 @dataclasses.dataclass(frozen=True)
 class VariableAssignments:
     storage: jnp.ndarray
@@ -143,32 +142,4 @@ class VariableAssignments:
         variable: "VariableBase"
         return VariableAssignments.from_dict(
             {variable: variable.get_default_value() for variable in variables}
-        )
-
-    def tree_flatten(v: "VariableAssignments") -> Tuple[Tuple[jnp.ndarray], Tuple]:
-        metadata = v.storage_metadata
-        treedef = (
-            metadata.dim,
-            tuple(metadata.index_from_variable.keys()),
-            tuple(metadata.index_from_variable.values()),
-            tuple(metadata.index_from_variable_type.keys()),
-            tuple(metadata.index_from_variable_type.values()),
-            tuple(metadata.count_from_variable_type.keys()),
-            tuple(metadata.count_from_variable_type.values()),
-        )
-
-        return (v.storage,), treedef
-
-    @classmethod
-    def tree_unflatten(
-        cls, treedef: Tuple, children: Tuple[jnp.ndarray]
-    ) -> "PreparedFactorGraph":
-        return VariableAssignments(
-            storage=children[0],
-            storage_metadata=StorageMetadata(
-                dim=treedef[0],
-                index_from_variable=dict(zip(treedef[1], treedef[2])),
-                index_from_variable_type=dict(zip(treedef[3], treedef[4])),
-                count_from_variable_type=dict(zip(treedef[5], treedef[6])),
-            ),
         )

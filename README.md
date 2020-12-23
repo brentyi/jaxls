@@ -18,7 +18,6 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
   - [x] Very basic Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
-  - [ ] Fix termination criteria
   - [ ] Gradslam-style damped least squares?
 - [x] MAP inference
 - [x] Compare g2o example

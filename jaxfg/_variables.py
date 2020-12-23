@@ -96,7 +96,6 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             VariableValueType: Variable value.
         """
-        pass
 
     @staticmethod
     @abc.abstractmethod
@@ -109,7 +108,6 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             VariableValueType: Variable value.
         """
-        pass
 
     @overrides
     def __lt__(self, other) -> bool:
