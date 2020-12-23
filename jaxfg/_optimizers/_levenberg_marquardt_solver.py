@@ -32,7 +32,7 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
     """Simple damped least-squares implementation."""
 
     lambda_initial: float = 1e-5
-    lambda_factor: float = 10.0
+    lambda_factor: float = 2.0
     lambda_min: float = 1e-10
     lambda_max: float = 1e10
     diagonal_damping: bool = True
