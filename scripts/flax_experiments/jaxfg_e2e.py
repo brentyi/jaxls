@@ -1,6 +1,3 @@
-# Some options
-# > Nested optimization
-
 import jax
 import numpy as onp
 from flax import optim
