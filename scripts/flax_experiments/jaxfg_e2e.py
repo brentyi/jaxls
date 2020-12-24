@@ -140,7 +140,7 @@ with utils.stopwatch(f"Compute loss"):
     loss_value = compute_loss(params)
 with utils.stopwatch(f"Compute loss"):
     loss_value = compute_loss(params)
-for i in range(300):
+for i in range(2000): # This is far more steps than necessary
     with utils.stopwatch(f"Loss step {i}: {loss_value}"):
         loss_value, grad = loss_grad_fn(optimizer.target)
         optimizer = optimizer.apply_gradient(grad)
@@ -156,7 +156,7 @@ plot_assignments(
 )
 plot_assignments(
     label="Noisy factors + optimized",
-    color="g",
+    color="b",
     assignments=get_graph(optimizer.target["error_scale"]).solve(
         assignments_initializer
     ),
