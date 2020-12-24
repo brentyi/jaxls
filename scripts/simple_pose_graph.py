@@ -1,27 +1,25 @@
 import time
 
 import jax
+import jaxfg
 import jaxlie
 import numpy as onp
 from jax import numpy as jnp
 
-import jaxfg
-
 variables = {
-    "pose1": jaxfg.SE2Variable(),
-    # "pose2": jaxfg.SE2Variable(),
+    "pose1": jaxfg.geometry.SE2Variable(),
 }
 
-graph = jaxfg.PreparedFactorGraph.from_factors(
+graph = jaxfg.core.PreparedFactorGraph.from_factors(
     [
-        jaxfg.PriorFactor.make(
+        jaxfg.geometry.PriorFactor.make(
             variable=variables["pose1"],
-            mu=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0).xy_unit_complex,
+            mu=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
             scale_tril_inv=jnp.eye(3),
         ),
-        jaxfg.PriorFactor.make(
+        jaxfg.geometry.PriorFactor.make(
             variable=variables["pose1"],
-            mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0).xy_unit_complex,
+            mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0),
             scale_tril_inv=jnp.eye(3),
         ),
         # jaxfg.BetweenFactor.make(
@@ -32,7 +30,8 @@ graph = jaxfg.PreparedFactorGraph.from_factors(
         # ),
     ]
 )
-initial_assignments = jaxfg.VariableAssignments.create_default(variables.values())
+initial_assignments = jaxfg.core.VariableAssignments.create_default(variables.values())
+print(initial_assignments)
 
 start_time = time.time()
 solutions = graph.solve(initial_assignments)

@@ -15,7 +15,7 @@ import jax
 import numpy as onp
 from jax import numpy as jnp
 
-from . import _types, _utils
+from .. import types, utils
 
 if TYPE_CHECKING:
     from ._variables import VariableBase
@@ -79,7 +79,7 @@ class StorageMetadata:
         )
 
 
-@jax.partial(_utils.register_dataclass_pytree, static_fields=("storage_metadata",))
+@jax.partial(utils.register_dataclass_pytree, static_fields=("storage_metadata",))
 @dataclasses.dataclass(frozen=True)
 class VariableAssignments:
     storage: jnp.ndarray
@@ -109,14 +109,14 @@ class VariableAssignments:
         k: "VariableBase"
         return str(
             {
-                f"{i}.{k.__class__.__name__}": list(v)
+                f"{i}.{k.__class__.__name__}": v
                 for i, (k, v) in enumerate(value_from_variable.items())
             }
         )
 
     @staticmethod
     def from_dict(
-        assignments: Dict["VariableBase", _types.VariableValue]
+        assignments: Dict["VariableBase", types.VariableValue]
     ) -> "VariableAssignments":
         # Figure out how variables are stored
         storage_metadata = StorageMetadata.from_variables(assignments.keys())

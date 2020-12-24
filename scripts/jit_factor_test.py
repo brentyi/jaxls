@@ -9,11 +9,11 @@ from jax import numpy as jnp
 import jaxfg
 
 variables = {
-    "pose1": jaxfg.SE2Variable(),
+    "pose1": jaxfg.geometry.SE2Variable(),
     # "pose2": jaxfg.SE2Variable(),
 }
 
-f = jaxfg.PriorFactor.make(
+f = jaxfg.geometry.PriorFactor.make(
     variable=variables["pose1"],
     mu=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
     scale_tril_inv=jnp.eye(3),
@@ -21,7 +21,7 @@ f = jaxfg.PriorFactor.make(
 
 
 @jax.jit
-def do_something_with_factor(factor: jaxfg.FactorBase) -> jaxfg.FactorBase:
+def do_something_with_factor(factor: jaxfg.core.FactorBase) -> jaxfg.core.FactorBase:
     return factor
 
 
@@ -41,8 +41,8 @@ jax.vmap(do_something_with_factor)(jaxlie.SO2.identity())
 #
 initial_assignments = jaxfg.VariableAssignments.create_default(variables.values())
 
-graph = jaxfg.PreparedFactorGraph.from_factors([f])
-jaxfg.PriorFactor.compute_error(
+graph = jaxfg.core.PreparedFactorGraph.from_factors([f])
+jaxfg.core.PriorFactor.compute_error(
     f, jaxlie.SE2(xy_unit_complex=jnp.array([1.0, 1.0, 0.0, 1.0]))
 )
 # jax.vmap(jaxfg.PriorFactor.compute_error)(

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Hashable, Tuple, Type
 import jax
 from jax import numpy as jnp
 
-from . import _utils
+from . import utils
 
 if TYPE_CHECKING:
     from ._factors import FactorBase
@@ -17,7 +17,7 @@ ScaleTril = jnp.ndarray
 ScaleTrilInv = jnp.ndarray
 
 
-@jax.partial(_utils.register_dataclass_pytree, static_fields=("shape",))
+@jax.partial(utils.register_dataclass_pytree, static_fields=("shape",))
 @dataclasses.dataclass(frozen=True)
 class SparseMatrix:
     """Sparse matrix in COO form."""

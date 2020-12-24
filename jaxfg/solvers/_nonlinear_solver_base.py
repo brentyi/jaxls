@@ -7,8 +7,8 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import _types, _utils
-from .._variable_assignments import VariableAssignments
+from .. import types, utils
+from ..core._variable_assignments import VariableAssignments
 from . import _linear_utils
 
 if TYPE_CHECKING:
@@ -29,6 +29,7 @@ class _NonlinearSolverBase:
         """Prefixed printing helper. No-op if `verbose` is set to `False`."""
         if self.verbose:
             print(f"[{type(self).__name__}]", *args, **kwargs)
+
 
 class NonlinearSolverBase(_NonlinearSolverBase, abc.ABC):
     @abc.abstractmethod

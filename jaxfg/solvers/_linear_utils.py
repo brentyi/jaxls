@@ -5,8 +5,8 @@ import jax
 import jax.numpy as jnp
 import numpy as onp
 
-from .. import _types
-from .._variable_assignments import VariableAssignments
+from .. import types
+from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
     from .._factors import FactorBase
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 def linearize_graph(
     graph: "PreparedFactorGraph",
     assignments: VariableAssignments,
-) -> _types.SparseMatrix:
+) -> types.SparseMatrix:
     """Compute the Jacobian of a graph's residual vector with respect to the stacked
     local delta vectors."""
 
@@ -35,7 +35,7 @@ def linearize_graph(
         # Helper for computing Jacobians wrt local parameterizations
         def compute_cost_with_local_delta(
             factor: "FactorBase",
-            values: Tuple[_types.VariableValue, ...],
+            values: Tuple[types.VariableValue, ...],
             local_deltas: Tuple[jnp.ndarray],
         ):
             variable_type: Type["VariableBase"]
@@ -69,7 +69,7 @@ def linearize_graph(
             )
 
     # Solve subproblem
-    A = _types.SparseMatrix(
+    A = types.SparseMatrix(
         values=jnp.concatenate(A_values_list),
         coords=jnp.concatenate(graph.jacobian_coords),
         shape=(graph.error_dim, graph.local_storage_metadata.dim),
@@ -119,7 +119,7 @@ def apply_local_deltas(
 
 
 def sparse_linear_solve(
-    A: _types.SparseMatrix,
+    A: types.SparseMatrix,
     initial_x: jnp.ndarray,
     b: jnp.ndarray,
     tol: float,

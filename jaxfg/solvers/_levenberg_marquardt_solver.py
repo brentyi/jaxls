@@ -5,8 +5,8 @@ import jax
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import _types, _utils
-from .._variable_assignments import VariableAssignments
+from .. import types, utils
+from ..core._variable_assignments import VariableAssignments
 from . import _linear_utils
 from ._nonlinear_solver_base import NonlinearSolverBase
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .._prepared_factor_graph import PreparedFactorGraph
 
 
-@_utils.register_dataclass_pytree
+@utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class _LevenbergMarqaurdtState:
     """Helper for state passed between LM iterations."""
@@ -26,7 +26,7 @@ class _LevenbergMarqaurdtState:
     done: bool
 
 
-@jax.partial(_utils.register_dataclass_pytree, static_fields=("diagonal_damping",))
+@jax.partial(utils.register_dataclass_pytree, static_fields=("diagonal_damping",))
 @dataclasses.dataclass(frozen=True)
 class LevenbergMarquardtSolver(NonlinearSolverBase):
     """Simple damped least-squares implementation."""
@@ -75,7 +75,7 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         """Linearize, solve linear subproblem, and accept or reject update."""
         # There's currently some redundancy here: we only need to re-linearize when
         # updates are accepted.
-        A: _types.SparseMatrix = _linear_utils.linearize_graph(
+        A: types.SparseMatrix = _linear_utils.linearize_graph(
             graph, state_prev.assignments
         )
         local_deltas = _linear_utils.sparse_linear_solve(

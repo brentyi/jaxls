@@ -5,17 +5,16 @@ import jax
 import numpy as onp
 from jax import numpy as jnp
 
-from . import _types as types
-from . import _utils
+from .. import types as types
+from .. import utils
 from ._factors import FactorBase
-from ._optimizers._gauss_newton_solver import GaussNewtonSolver
-from ._optimizers._nonlinear_solver_base import NonlinearSolverBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
+from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 
 
 @jax.partial(
-    _utils.register_dataclass_pytree,
+    utils.register_dataclass_pytree,
     static_fields=("local_storage_metadata", "error_dim"),
 )
 @dataclasses.dataclass(frozen=True)

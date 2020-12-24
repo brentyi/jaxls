@@ -5,8 +5,8 @@ import jax
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import _types, _utils
-from .._variable_assignments import VariableAssignments
+from .. import types, utils
+from ..core._variable_assignments import VariableAssignments
 from . import _linear_utils
 from ._nonlinear_solver_base import NonlinearSolverBase
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .._prepared_factor_graph import PreparedFactorGraph
 
 
-@_utils.register_dataclass_pytree
+@utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class _GaussNewtonState:
     """Helper for state passed between GN iterations."""
@@ -25,7 +25,7 @@ class _GaussNewtonState:
     done: bool
 
 
-@_utils.register_dataclass_pytree
+@utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class GaussNewtonSolver(NonlinearSolverBase):
     @overrides
@@ -65,7 +65,7 @@ class GaussNewtonSolver(NonlinearSolverBase):
         state_prev: _GaussNewtonState,
     ) -> _GaussNewtonState:
         """Linearize, solve linear subproblem, and update on manifold."""
-        A: _types.SparseMatrix = _linear_utils.linearize_graph(
+        A: types.SparseMatrix = _linear_utils.linearize_graph(
             graph, state_prev.assignments
         )
         local_deltas = _linear_utils.sparse_linear_solve(

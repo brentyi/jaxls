@@ -4,14 +4,13 @@ from typing import Dict, List
 
 import jax
 import jax.profiler
+import jaxfg
 import jaxlie
 import matplotlib.pyplot as plt
 import numpy as onp
 from jax import numpy as jnp
 from jax.config import config
 from tqdm.auto import tqdm
-
-import jaxfg
 
 # config.update("jax_enable_x64", True)
 
@@ -22,7 +21,7 @@ with open("./data/input_M3500_g2o.g2o") as file:
 pose_variables = []
 initial_poses_dict: Dict[str, jaxlie.SE2] = {}
 
-factors: List[jaxfg.FactorBase] = []
+factors: List[jaxfg.core.FactorBase] = []
 
 pose_count = 10000
 
@@ -40,7 +39,7 @@ for line in tqdm(lines):
 
         assert len(initial_poses_dict) == index
 
-        variable = jaxfg.SE2Variable()
+        variable = jaxfg.geometry.SE2Variable()
 
         initial_poses_dict[variable] = jax.jit(jaxlie.SE2.from_xy_theta)(x, y, theta)
 
@@ -71,7 +70,7 @@ for line in tqdm(lines):
 
         # scale_tril_inv = jnp.array(onp.array(map(float, parts[6:6])))
         factors.append(
-            jaxfg.BetweenFactor.make(
+            jaxfg.geometry.BetweenFactor.make(
                 before=pose_variables[before_index],
                 after=pose_variables[after_index],
                 delta=delta,
@@ -81,7 +80,7 @@ for line in tqdm(lines):
 
 # Anchor start pose
 factors.append(
-    jaxfg.PriorFactor.make(
+    jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[0],
         mu=initial_poses_dict[pose_variables[0]],
         scale_tril_inv=jnp.eye(3) * 100.0,
@@ -95,14 +94,16 @@ print("Initial cost")
 import fannypack
 
 fannypack.utils.pdb_safety_net()
-initial_poses = jaxfg.VariableAssignments.from_dict(initial_poses_dict)
-graph = jaxfg.PreparedFactorGraph.from_factors(factors)
+initial_poses = jaxfg.core.VariableAssignments.from_dict(initial_poses_dict)
+graph = jaxfg.core.PreparedFactorGraph.from_factors(factors)
 
 with jaxfg.utils.stopwatch("Compute error"):
     print(jnp.sum(graph.compute_error_vector(initial_poses) ** 2) * 0.5)
 
 with jaxfg.utils.stopwatch("Solve"):
-    solution_poses = graph.solve(initial_poses, solver=jaxfg.LevenbergMarquardtSolver())
+    solution_poses = graph.solve(
+        initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
+    )
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):
     solution_poses = dataclasses.replace(

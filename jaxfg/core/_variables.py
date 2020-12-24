@@ -1,31 +1,13 @@
 import abc
-import contextlib
-from types import SimpleNamespace
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Generator,
-    Generic,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Generic, Tuple, TypeVar
 
-import jax
-import jaxlie
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from . import _types, _utils
+from .. import types
 
-if TYPE_CHECKING:
-    from . import LinearFactor
-
-
-VariableValueType = TypeVar("VariableValueType", bound=_types.VariableValue)
+VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
 
 class VariableBase(abc.ABC, Generic[VariableValueType]):
@@ -73,7 +55,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
     @abc.abstractmethod
     def subtract_local(
         x: VariableValueType, y: VariableValueType
-    ) -> _types.LocalVariableValue:
+    ) -> types.LocalVariableValue:
         """Compute the local difference between two variable values.
 
         Args:
@@ -177,56 +159,3 @@ class _RealVectorVariableTemplate:
 
 
 RealVectorVariable = _RealVectorVariableTemplate()
-
-
-# Lie groups
-
-
-def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
-    class _LieVariable(VariableBase[Group]):
-        """Variable containing a transformation."""
-
-        @staticmethod
-        @overrides
-        def get_parameter_shape() -> Tuple[int, ...]:
-            return (Group.parameters_dim,)
-
-        @staticmethod
-        @overrides
-        def get_local_parameter_dim() -> int:
-            return Group.tangent_dim
-
-        @staticmethod
-        @overrides
-        def get_default_value() -> Group:
-            return Group.identity()
-
-        @staticmethod
-        #  @jax.custom_jvp
-        def add_local(x: Group, local_delta: jaxlie.types.TangentVector) -> Group:
-            return Group(x) @ Group.exp(local_delta)
-
-        @staticmethod
-        @overrides
-        def subtract_local(x: Group, y: Group) -> _types.LocalVariableValue:
-            # x = world<-A, y = world<-B
-            # Difference = A<-B
-            return (x.inverse() @ y).log()
-
-        @staticmethod
-        @overrides
-        def flatten(x: Group) -> jnp.ndarray:
-            return x.parameters
-
-        @staticmethod
-        @overrides
-        def unflatten(flat: jnp.ndarray) -> Group:
-            return Group(flat)
-
-    return _LieVariable
-
-
-SO2Variable = make_lie_variable(jaxlie.SO2)
-SE2Variable = make_lie_variable(jaxlie.SE2)
-SO3Variable = make_lie_variable(jaxlie.SO3)
-SE3Variable = make_lie_variable(jaxlie.SE3)
