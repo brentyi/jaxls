@@ -4,6 +4,7 @@ from flax import optim
 from jax import numpy as jnp
 from jaxfg import core, geometry, solvers, utils
 from jaxlie import SE2
+from matplotlib import pyplot as plt
 
 from _fixed_iteration_gn import FixedIterationGaussNewtonSolver
 
@@ -37,11 +38,9 @@ def sample_se2_noise(std_dev=1.0):
 noise1 = sample_se2_noise()
 noise2 = sample_se2_noise()
 
-# Loss computation helper
-# Should be zero when `error_scale` is zero
-def compute_loss(params):
-    error_scale = params["error_scale"]
-    graph = core.PreparedFactorGraph.from_factors(
+# Graph construction helper
+def get_graph(error_scale) -> core.PreparedFactorGraph:
+    return core.PreparedFactorGraph.from_factors(
         [
             geometry.PriorFactor.make(
                 variable=variable_A, mu=SE2.identity(), scale_tril_inv=jnp.eye(3)
@@ -71,6 +70,44 @@ def compute_loss(params):
             ),
         ]
     )
+
+
+# Plotting helper
+def plot_poses(label: str, *poses: SE2, color: str):
+    for i, pose in enumerate(poses):
+        plt.arrow(
+            *pose.translation,
+            *(pose.rotation.unit_complex * 0.05),
+            width=0.01,
+            color=color,
+            label=label if i == 0 else None,
+        )
+
+
+def plot_assignments(label: str, color: str, assignments: core.VariableAssignments):
+    plot_poses(
+        label,
+        assignments.get_value(variable_A),
+        assignments.get_value(variable_B),
+        assignments.get_value(variable_C),
+        color=color,
+    )
+
+
+# Noisy assignments for initializing nonlinear solvers
+assignments_initializer = core.VariableAssignments.from_dict(
+    {
+        variable_A: T_wa @ sample_se2_noise(0.1),
+        variable_B: T_wb @ sample_se2_noise(0.1),
+        variable_C: T_wc @ sample_se2_noise(0.1),
+    }
+)
+
+# Loss computation helper
+# Should be zero when `error_scale` is zero
+def compute_loss(params):
+    error_scale = params["error_scale"]
+    graph = get_graph(error_scale)
 
     # Find optimal poses given our factor graph
     assignments_solved = graph.solve(
@@ -110,3 +147,22 @@ for i in range(300):
 
 # Print optimized value
 print(optimizer.target)
+
+plot_assignments(label="Ground-truth", color="r", assignments=assignments_ground_truth)
+plot_assignments(
+    label="Noisy factors",
+    color="g",
+    assignments=get_graph(params["error_scale"]).solve(assignments_initializer),
+)
+plot_assignments(
+    label="Noisy factors + optimized",
+    color="g",
+    assignments=get_graph(optimizer.target["error_scale"]).solve(
+        assignments_initializer
+    ),
+)
+# plot_poses("Noisy", T_wa, T_wb, T_wc, color="g")
+# plot_poses("Optimized", T_wa, T_wb, T_wc, color="b")
+plt.legend()
+plt.show()
+exit()
