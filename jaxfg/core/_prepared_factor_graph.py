@@ -2,15 +2,14 @@ import dataclasses
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Type, cast
 
 import jax
-import numpy as onp
 from jax import numpy as jnp
 
 from .. import types as types
 from .. import utils
+from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factors import FactorBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
-from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 
 
 @jax.partial(
@@ -81,7 +80,7 @@ class PreparedFactorGraph:
         for group_key, group in factors_from_group.items():
             # Stack factors in our group
             stacked_factor: FactorBase = jax.tree_multimap(
-                lambda *arrays: onp.stack(arrays, axis=0), *group
+                lambda *arrays: jnp.stack(arrays, axis=0), *group
             )
 
             # Get indices for each variable
@@ -96,7 +95,7 @@ class PreparedFactorGraph:
                     # Record variable parameterization indices
                     storage_pos = storage_metadata.index_from_variable[variable]
                     value_indices_list[i].append(
-                        onp.arange(
+                        jnp.arange(
                             storage_pos, storage_pos + variable.get_parameter_dim()
                         ).reshape(variable.get_parameter_shape())
                     )
@@ -104,7 +103,7 @@ class PreparedFactorGraph:
                     # Record local parameterization indices
                     storage_pos = delta_storage_metadata.index_from_variable[variable]
                     local_value_indices_list[i].append(
-                        onp.arange(
+                        jnp.arange(
                             storage_pos,
                             storage_pos + variable.get_local_parameter_dim(),
                         )
@@ -112,17 +111,17 @@ class PreparedFactorGraph:
 
             # Stack: end result should be Tuple[array of shape (N, *parameter_shape), ...]
             value_indices_stacked: Tuple[jnp.ndarray] = tuple(
-                onp.array(l) for l in value_indices_list
+                jnp.array(l) for l in value_indices_list
             )
             local_value_indices_stacked: Tuple[jnp.ndarray] = tuple(
-                onp.array(l) for l in local_value_indices_list
+                jnp.array(l) for l in local_value_indices_list
             )
 
             # Record values
             stacked_factors.append(stacked_factor)
             value_indices.append(value_indices_stacked)
             error_indices.append(
-                onp.arange(
+                jnp.arange(
                     error_index, error_index + len(group) * factor.error_dim
                 ).reshape((len(group), factor.error_dim))
             )
@@ -134,15 +133,15 @@ class PreparedFactorGraph:
             for variable_index, variable in enumerate(stacked_factor.variables):
                 variable_dim = variable.get_local_parameter_dim()
 
-                coords = onp.stack(
+                coords = jnp.stack(
                     (
                         # Row indices
-                        onp.broadcast_to(
+                        jnp.broadcast_to(
                             error_indices[-1][:, :, None],
                             (num_factors, error_dim, variable_dim),
                         ),
                         # Column indices
-                        onp.broadcast_to(
+                        jnp.broadcast_to(
                             local_value_indices_stacked[variable_index][:, None, :],
                             (num_factors, error_dim, variable_dim),
                         ),

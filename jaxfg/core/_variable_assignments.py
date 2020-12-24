@@ -20,8 +20,6 @@ from .. import types, utils
 if TYPE_CHECKING:
     from ._variables import VariableBase
 
-T = TypeVar("T")
-
 
 @dataclasses.dataclass(frozen=True)
 class StorageMetadata:
@@ -79,6 +77,9 @@ class StorageMetadata:
         )
 
 
+VariableValueType = TypeVar("T", bound=types.VariableValue)
+
+
 @jax.partial(utils.register_dataclass_pytree, static_fields=("storage_metadata",))
 @dataclasses.dataclass(frozen=True)
 class VariableAssignments:
@@ -93,13 +94,25 @@ class VariableAssignments:
         """Helper for iterating over variables."""
         return self.storage_metadata.ordered_variables
 
-    def get_value(self, variable: "VariableBase[T]") -> T:
+    def get_value(self, variable: "VariableBase[T]") -> VariableValueType:
         """Get value corresponding to specific variable.  """
         index = self.storage_metadata.index_from_variable[variable]
         return type(variable).unflatten(
             self.storage[index : index + variable.get_parameter_dim()].reshape(
                 variable.get_parameter_shape()
             )
+        )
+
+    def get_stacked_value(
+        self, variable_type: Type[VariableValueType]
+    ) -> VariableValueType:
+        """Get values of all variables corresponding to a specific type."""
+        index = self.storage_metadata.index_from_variable_type[variable_type]
+        count = self.storage_metadata.count_from_variable_type[variable_type]
+        return jax.vmap(variable_type.unflatten)(
+            self.storage[
+                index : index + variable_type.get_parameter_dim() * count
+            ].reshape((count,) + variable_type.get_parameter_shape())
         )
 
     def __repr__(self):
