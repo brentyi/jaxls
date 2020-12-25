@@ -26,7 +26,7 @@ class _LevenbergMarqaurdtState:
     done: bool
 
 
-@jax.partial(utils.register_dataclass_pytree, static_fields=("diagonal_damping",))
+@utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class LevenbergMarquardtSolver(NonlinearSolverBase):
     """Simple damped least-squares implementation."""

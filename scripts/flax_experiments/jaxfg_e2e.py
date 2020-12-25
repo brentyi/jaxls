@@ -1,3 +1,5 @@
+import dataclasses
+
 import jax
 import numpy as onp
 from flax import optim
@@ -105,14 +107,29 @@ assignments_initializer = core.VariableAssignments.from_dict(
 
 # Loss computation helper
 # Should be zero when `error_scale` is zero
+graph = get_graph(1.0)
+
+
 def compute_loss(params):
     error_scale = params["error_scale"]
-    graph = get_graph(error_scale)
+
+    # Incorporate error scale to noisy factors
+    stacked_factors = []
+    for f in graph.stacked_factors:
+        if isinstance(f, geometry.PriorFactor):
+            f = dataclasses.replace(
+                f,
+                scale_tril_inv=f.scale_tril_inv.at[1:, :, :].set(
+                    f.scale_tril_inv[1:, :, :] * error_scale
+                ),
+            )
+        stacked_factors.append(f)
+    graph_scaled = dataclasses.replace(graph, stacked_factors=stacked_factors)
 
     # Find optimal poses given our factor graph
-    assignments_solved = graph.solve(
+    assignments_solved = graph_scaled.solve(
         assignments_ground_truth,
-        solver=FixedIterationGaussNewtonSolver(max_iters=3, verbose=False),
+        solver=FixedIterationGaussNewtonSolver(max_iters=5),
     )
 
     # Loss is difference between ground-truth and solved poses
@@ -126,7 +143,6 @@ def compute_loss(params):
     sse = jnp.sum(error ** 2)
     return sse
 
-
 # Create initial parameters to optimize
 params = {"error_scale": 5.0}
 
@@ -136,11 +152,11 @@ optimizer = optimizer_def.create(params)
 loss_grad_fn = jax.value_and_grad(compute_loss)
 
 # Run optimizer
-with utils.stopwatch(f"Compute loss"):
+with utils.stopwatch("Compute loss"):
     loss_value = compute_loss(params)
-with utils.stopwatch(f"Compute loss"):
+with utils.stopwatch("Compute loss"):
     loss_value = compute_loss(params)
-for i in range(2000): # This is far more steps than necessary
+for i in range(500):  # This is far more steps than necessary
     with utils.stopwatch(f"Loss step {i}: {loss_value}"):
         loss_value, grad = loss_grad_fn(optimizer.target)
         optimizer = optimizer.apply_gradient(grad)

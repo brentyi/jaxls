@@ -51,19 +51,20 @@ class PreparedFactorGraph:
             "PreparedFactorGraph":
         """
 
-        # Start by grouping our factors, and grabbing a list of variables
+        # Start by grouping our factors and grabbing a list of variables
         variables: Set[VariableBase] = set()
-        factors_from_group: Dict[types.GroupKey, Set[FactorBase]] = {}
+        factors_from_group: Dict[types.GroupKey, List[FactorBase]] = {}
         for factor in factors:
             group_key = factor.group_key()
             if group_key not in factors_from_group:
-                factors_from_group[group_key] = set()
+                factors_from_group[group_key] = []
 
-            assert (
-                factor not in factors_from_group[group_key]
-            ), "Found a duplicate factor!"
-            factors_from_group[group_key].add(factor)
+            factors_from_group[group_key].append(factor)
             variables.update(factor.variables)
+
+        # Make sure factors are unique
+        for factors in factors_from_group.values():
+            assert len(factors) == len(set(factors))
 
         # Fields we want to populate
         stacked_factors: List[FactorBase] = []

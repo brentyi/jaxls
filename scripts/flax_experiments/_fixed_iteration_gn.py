@@ -1,5 +1,5 @@
 import dataclasses
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import jax
 from jax import numpy as jnp
@@ -22,9 +22,9 @@ class _GaussNewtonState:
     error_vector: jnp.ndarray
 
 
-@utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
+    @jax.partial(jax.jit, static_argnums=0)
     @overrides
     def solve(
         self,
@@ -42,21 +42,19 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
         self._print(f"Starting solve with {self}, initial error={state.error}")
 
         # Optimization
-        for i in range(self.max_iters):
-            # Gauss-newton step
-            state = self._step(graph, state)
-
-            # Exit if either error threshold is met
-            self._print(f"Iteration #{i}: error={str(state.error).ljust(15)}")
+        state, unused_errors = jax.lax.scan(
+            f=lambda state, x: self._step(graph, state),
+            init=state,
+            xs=jnp.zeros(self.max_iters),
+        )
 
         return state.assignments
 
-    @jax.jit
     def _step(
         self,
         graph: "PreparedFactorGraph",
         state_prev: _GaussNewtonState,
-    ) -> _GaussNewtonState:
+    ) -> Tuple[_GaussNewtonState, float]:
         """Linearize, solve linear subproblem, and update on manifold."""
         A: types.SparseMatrix = _linear_utils.linearize_graph(
             graph, state_prev.assignments
@@ -77,8 +75,11 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
         )
         error, error_vector = graph.compute_sum_squared_error(assignments)
 
-        return _GaussNewtonState(
-            assignments=assignments,
-            error=error,
-            error_vector=error_vector,
+        return (
+            _GaussNewtonState(
+                assignments=assignments,
+                error=error,
+                error_vector=error_vector,
+            ),
+            error,
         )
