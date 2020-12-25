@@ -98,9 +98,7 @@ class VariableAssignments:
         """Get value corresponding to specific variable.  """
         index = self.storage_metadata.index_from_variable[variable]
         return type(variable).unflatten(
-            self.storage[index : index + variable.get_parameter_dim()].reshape(
-                variable.get_parameter_shape()
-            )
+            self.storage[index : index + variable.get_parameter_dim()]
         )
 
     def get_stacked_value(
@@ -112,7 +110,7 @@ class VariableAssignments:
         return jax.vmap(variable_type.unflatten)(
             self.storage[
                 index : index + variable_type.get_parameter_dim() * count
-            ].reshape((count,) + variable_type.get_parameter_shape())
+            ].reshape((count, variable_type.get_parameter_dim()))
         )
 
     def __repr__(self):

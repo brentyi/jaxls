@@ -75,10 +75,7 @@ class FactorBase(abc.ABC):
         aux_dict = dict(zip(aux_keys, aux_values))
         aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variabletypes"))
 
-        out = cls(
-            **dict(zip(array_keys, children)),
-            **aux_dict
-        )
+        out = cls(**dict(zip(array_keys, children)), **aux_dict)
         return out
 
     def group_key(self) -> types.GroupKey:

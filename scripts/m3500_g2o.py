@@ -4,13 +4,14 @@ from typing import Dict, List
 
 import jax
 import jax.profiler
-import jaxfg
 import jaxlie
 import matplotlib.pyplot as plt
 import numpy as onp
 from jax import numpy as jnp
 from jax.config import config
 from tqdm.auto import tqdm
+
+import jaxfg
 
 # config.update("jax_enable_x64", True)
 

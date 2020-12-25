@@ -7,13 +7,15 @@ from overrides import overrides
 from .. import types
 from ..core._variables import VariableBase
 
+
 def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
     class _LieVariable(VariableBase[Group]):
         """Variable containing a transformation."""
+
         @staticmethod
         @overrides
-        def get_parameter_shape() -> Tuple[int, ...]:
-            return (Group.parameters_dim,)
+        def get_parameter_dim() -> int:
+            return Group.parameters_dim
 
         @staticmethod
         @overrides

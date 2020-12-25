@@ -2,13 +2,13 @@ import dataclasses
 
 import jax
 import numpy as onp
+from _fixed_iteration_gn import FixedIterationGaussNewtonSolver
 from flax import optim
 from jax import numpy as jnp
-from jaxfg import core, geometry, solvers, utils
 from jaxlie import SE2
 from matplotlib import pyplot as plt
 
-from _fixed_iteration_gn import FixedIterationGaussNewtonSolver
+from jaxfg import core, geometry, solvers, utils
 
 # Compute ground-truth values for three poses: A, B, and C
 T_ab = SE2.from_xy_theta(1.0, 0.0, 0.2)
@@ -142,6 +142,7 @@ def compute_loss(params):
     )
     sse = jnp.sum(error ** 2)
     return sse
+
 
 # Create initial parameters to optimize
 params = {"error_scale": 5.0}

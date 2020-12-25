@@ -15,16 +15,8 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
 
     @staticmethod
     @abc.abstractmethod
-    def get_parameter_shape() -> Tuple[int, ...]:
-        """Dimensionality of underlying parameterization."""
-
-    @classmethod
     def get_parameter_dim(cls) -> int:
-        return cls._parameter_dim
-
-    def __init_subclass__(cls, **kwargs):
-        """Register all factors as PyTree nodes."""
-        cls._parameter_dim = onp.prod(cls.get_parameter_shape())
+        """Dimensionality of underlying parameterization."""
 
     @staticmethod
     @abc.abstractmethod
@@ -59,8 +51,8 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         """Compute the local difference between two variable values.
 
         Args:
-            x (VariableValue): First parameter to compare. Shape should match `self.get_parameter_shape()`.
-            y (VariableValue): Second parameter to compare. Shape should match `self.get_parameter_shape()`.
+            x (VariableValue): First parameter to compare. Shape should match `self.get_parameter_dim()`.
+            y (VariableValue): Second parameter to compare. Shape should match `self.get_parameter_dim()`.
 
         Returns:
             LocalVariableValue: Delta vector; dimension should match self.get_local_parameter_dim().
@@ -141,8 +133,8 @@ class _RealVectorVariableTemplate:
             class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
                 @staticmethod
                 @overrides
-                def get_parameter_shape() -> Tuple[int, ...]:
-                    return (n,)
+                def get_parameter_dim() -> Tuple[int, ...]:
+                    return n
 
                 @staticmethod
                 @overrides

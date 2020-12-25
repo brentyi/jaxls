@@ -98,7 +98,7 @@ class PreparedFactorGraph:
                     value_indices_list[i].append(
                         jnp.arange(
                             storage_pos, storage_pos + variable.get_parameter_dim()
-                        ).reshape(variable.get_parameter_shape())
+                        )
                     )
 
                     # Record local parameterization indices

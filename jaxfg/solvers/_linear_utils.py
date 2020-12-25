@@ -41,7 +41,7 @@ def linearize_graph(
             variable_type: Type["VariableBase"]
             perturbed_values = [
                 variable.add_local(
-                    x=x.reshape(variable.get_parameter_shape()),
+                    x=x,
                     local_delta=local_delta,
                 )
                 for variable, x, local_delta in zip(
@@ -98,13 +98,12 @@ def apply_local_deltas(
             ]
         )
         dim = variable_type.get_parameter_dim()
-        shape = variable_type.get_parameter_shape()
         local_dim = variable_type.get_local_parameter_dim()
 
         # Get batched variables
         batched_xs = assignments.storage[
             storage_index : storage_index + dim * count
-        ].reshape((count,) + shape)
+        ].reshape((count, dim))
         batched_deltas = local_delta_assignments.storage[
             local_storage_index : local_storage_index + local_dim * count
         ].reshape((count, local_dim))
