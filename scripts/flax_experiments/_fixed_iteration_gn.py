@@ -66,7 +66,6 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
             b=-state_prev.error_vector,
             tol=self.atol,
             lambd=0.0,
-            diagonal_damping=False,
         )
         assignments = _linear_utils.apply_local_deltas(
             state_prev.assignments,

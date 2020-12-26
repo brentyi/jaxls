@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
 
-@utils.hashable
 @dataclasses.dataclass(frozen=True)
 class FactorBase(abc.ABC):
     variables: Tuple["VariableBase"]
@@ -35,11 +34,12 @@ class FactorBase(abc.ABC):
         return self.scale_tril_inv.shape[-1]
 
     def __init_subclass__(cls, **kwargs):
-        """Register all factors as PyTree nodes."""
+        """Register all factors as hashable PyTree nodes."""
         super().__init_subclass__(**kwargs)
         jax.tree_util.register_pytree_node(
             cls, flatten_func=cls.flatten, unflatten_func=cls.unflatten
         )
+        cls.__hash__ = object.__hash__
 
     @classmethod
     def flatten(
@@ -104,7 +104,6 @@ class FactorBase(abc.ABC):
         """
 
 
-@utils.hashable
 @dataclasses.dataclass(frozen=True)
 class LinearFactor(FactorBase):
     r"""Linearized factor, corresponding to the simple residual:

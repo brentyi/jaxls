@@ -68,7 +68,7 @@ def linearize_graph(
                 ).flatten()
             )
 
-    # Solve subproblem
+    # Build full Jacobian
     A = types.SparseMatrix(
         values=jnp.concatenate(A_values_list),
         coords=jnp.concatenate(graph.jacobian_coords),
@@ -122,8 +122,8 @@ def sparse_linear_solve(
     initial_x: jnp.ndarray,
     b: jnp.ndarray,
     tol: float,
+    atol: float,
     lambd: float,
-    diagonal_damping: bool,
 ) -> jnp.ndarray:
     """Solves a block-sparse `Ax = b` least squares problem via CGLS.
 
@@ -144,16 +144,16 @@ def sparse_linear_solve(
     # Form normal equation
     def ATA_function(x: jnp.ndarray):
         # Compute ATAx
-        ATAx = A.transpose_inner(A.inner(x))
+        ATAx = A.T @ (A @ x)
 
-        # Return regularized
-        if diagonal_damping:
-            return ATAx + lambd * ATA_diagonals * x
-        else:
-            return ATAx + lambd * x
+        # Return regularized (scale-invariant)
+        return ATAx + lambd * ATA_diagonals * x
+
+        # Vanilla regularization
+        # return ATAx + lambd * x
 
     # Compute ATb
-    ATb = A.transpose_inner(b)
+    ATb = A.T @ b
 
     def jacobi_preconditioner(x):
         return x / ATA_diagonals
@@ -165,6 +165,7 @@ def sparse_linear_solve(
         x0=initial_x,
         maxiter=len(initial_x),  # Default value used by Eigen
         tol=tol,
+        atol=atol,
         M=jacobi_preconditioner,
     )
     return solution_values

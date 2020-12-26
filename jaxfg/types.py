@@ -31,23 +31,26 @@ class SparseMatrix:
 
     def __post_init__(self):
         assert self.coords.shape == self.values.shape + (2,)
+        assert len(self.shape) == 2
 
-    def inner(self, x: jnp.ndarray):
+    def __matmul__(self, other: jnp.ndarray):
         """Compute `Ax`, where `x` is a 1D vector."""
-        assert x.shape == (self.shape[1],)
+        assert other.shape == (
+            self.shape[1],
+        ), "Inner product only supported for 1D vectors!"
         return (
-            jnp.zeros(self.shape[0], dtype=x.dtype)
+            jnp.zeros(self.shape[0], dtype=other.dtype)
             .at[self.coords[:, 0]]
-            .add(self.values * x[self.coords[:, 1]])
+            .add(self.values * other[self.coords[:, 1]])
         )
 
-    def transpose_inner(self, x: jnp.ndarray):
-        """Compute `A^Tx`, where `x` is a 1D vector."""
-        assert x.shape == (self.shape[0],)
-        return (
-            jnp.zeros(self.shape[1], dtype=x.dtype)
-            .at[self.coords[:, 1]]
-            .add(self.values * x[self.coords[:, 0]])
+    @property
+    def T(self):
+        """Return transpose of our sparse matrix."""
+        return SparseMatrix(
+            values=self.values,
+            coords=jnp.flip(self.coords, axis=-1),
+            shape=self.shape[::-1],
         )
 
 

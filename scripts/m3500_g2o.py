@@ -103,7 +103,7 @@ with jaxfg.utils.stopwatch("Compute error"):
 
 with jaxfg.utils.stopwatch("Solve"):
     solution_poses = graph.solve(
-        initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
+        initial_poses, solver=jaxfg.solvers.GaussNewtonSolver()
     )
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):

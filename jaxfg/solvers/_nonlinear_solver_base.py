@@ -23,7 +23,7 @@ class _NonlinearSolverBase:
 
     # Stopping criteria
     atol: float = 1e-4
-    rtol: float = 1e-4
+    rtol: float = 5e-4
 
     def _print(self, *args, **kwargs):
         """Prefixed printing helper. No-op if `verbose` is set to `False`."""

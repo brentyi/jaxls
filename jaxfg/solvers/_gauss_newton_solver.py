@@ -72,9 +72,9 @@ class GaussNewtonSolver(NonlinearSolverBase):
             A=A,
             initial_x=jnp.zeros(graph.local_storage_metadata.dim),
             b=-state_prev.error_vector,
-            tol=self.atol,
+            tol=self.rtol,
+            atol=self.atol,
             lambd=0.0,
-            diagonal_damping=False,
         )
         assignments = _linear_utils.apply_local_deltas(
             state_prev.assignments,

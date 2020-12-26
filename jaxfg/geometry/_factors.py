@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 LieGroupType = TypeVar("T", bound=jaxlie.MatrixLieGroup)
 
 
-@utils.hashable
 @dataclasses.dataclass(frozen=True)
 class PriorFactor(FactorBase, Generic[LieGroupType]):
     mu: jaxlie.MatrixLieGroup
@@ -44,7 +43,6 @@ class _BeforeAfterTuple(NamedTuple):
     after: "VariableBase[LieGroupType]"
 
 
-@utils.hashable
 @dataclasses.dataclass(frozen=True)
 class BetweenFactor(FactorBase, Generic[LieGroupType]):
     variables: _BeforeAfterTuple

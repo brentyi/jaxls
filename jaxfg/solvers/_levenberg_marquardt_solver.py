@@ -35,7 +35,6 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
     lambda_factor: float = 2.0
     lambda_min: float = 1e-10
     lambda_max: float = 1e10
-    diagonal_damping: bool = True
 
     @overrides
     def solve(
@@ -82,9 +81,9 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
             A=A,
             initial_x=jnp.zeros(graph.local_storage_metadata.dim),
             b=-state_prev.error_vector,
-            tol=self.atol,
+            tol=self.rtol,
+            atol=self.atol,
             lambd=state_prev.lambd,
-            diagonal_damping=False,
         )
         assignments_proposed = _linear_utils.apply_local_deltas(
             state_prev.assignments,
