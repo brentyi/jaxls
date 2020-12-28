@@ -14,11 +14,13 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
 - [x] Real vector variable types
 - [x] Refactor into package
 - [x] Linear factor graph
-- [x] Non-linear factors graph
+- [x] Non-linear factor graph
   - [x] Very basic Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
   - [ ] Gradslam-style damped least squares?
+  - [x] Inexact Newton steps
+  - [ ] Revisit termination criteria
 - [x] MAP inference
 - [x] Compare g2o example
   - [x] Validate against minisam
@@ -35,12 +37,11 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
   - [x] Manifold optimization on SO3
   - [x] Manifold optimization on SE3
 - [ ] Usability + code health (low priority)
-  - [ ] Cleanup/refactor
-    - [ ] Do it
-      - [x] Better parallel factor interface
-      - [x] Separate out utils, lie group helpers
-      - [x] Put things in folders
-    - [ ] Do it again
+  - [x] Basic cleanup/refactor
+    - [x] Better parallel factor interface
+    - [x] Separate out utils, lie group helpers
+    - [x] Put things in folders
+  - [ ] Cleanup/refactor (more)
   - [ ] Package cleanup: dependencies, etc
   - [ ] Add CI: mypy, flake8, pytest, etc.
   - [ ] Tests

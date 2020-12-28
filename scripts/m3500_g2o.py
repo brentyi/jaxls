@@ -101,9 +101,15 @@ graph = jaxfg.core.PreparedFactorGraph.from_factors(factors)
 with jaxfg.utils.stopwatch("Compute error"):
     print(jnp.sum(graph.compute_error_vector(initial_poses) ** 2) * 0.5)
 
+
 with jaxfg.utils.stopwatch("Solve"):
     solution_poses = graph.solve(
-        initial_poses, solver=jaxfg.solvers.GaussNewtonSolver()
+        initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
+    )
+
+with jaxfg.utils.stopwatch("Solve (#2)"):
+    solution_poses = graph.solve(
+        initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
     )
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):

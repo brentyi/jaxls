@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 class _LevenbergMarqaurdtState:
     """Helper for state passed between LM iterations."""
 
+    iterations: int
     assignments: "VariableAssignments"
     lambd: float
     error: float
@@ -31,9 +32,9 @@ class _LevenbergMarqaurdtState:
 class LevenbergMarquardtSolver(NonlinearSolverBase):
     """Simple damped least-squares implementation."""
 
-    lambda_initial: float = 1e-5
+    lambda_initial: float = 5e-4
     lambda_factor: float = 2.0
-    lambda_min: float = 1e-10
+    lambda_min: float = 1e-6
     lambda_max: float = 1e10
 
     @overrides
@@ -47,6 +48,7 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         self._print(f"Starting solve with {self}, initial error={error_prev}")
 
         state = _LevenbergMarqaurdtState(
+            iterations=0,
             assignments=initial_assignments,
             lambd=self.lambda_initial,
             error=error_prev,
@@ -58,14 +60,16 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         for i in range(self.max_iters):
             # LM step
             state = self._step(graph, state)
-            self._print(f"Iteration #{i}: error={str(state.error).ljust(15)}")
+            self._print(
+                f"Iteration #{i}: error={str(state.error).ljust(15)} lambda={str(state.lambd)}"
+            )
             if state.done:
                 self._print("Terminating early!")
                 break
 
         return state.assignments
 
-    @jax.jit
+    # @jax.jit
     def _step(
         self,
         graph: "PreparedFactorGraph",
@@ -81,7 +85,7 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
             A=A,
             initial_x=jnp.zeros(graph.local_storage_metadata.dim),
             b=-state_prev.error_vector,
-            tol=self.rtol,
+            tol=self.inexact_step_forcing_sequence(state_prev.iterations),
             atol=self.atol,
             lambd=state_prev.lambd,
         )
@@ -102,8 +106,13 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         # > pg. 27, Algorithm 3.16
         lambd = jnp.where(
             accept_flag,
-            jnp.maximum(state_prev.lambd / self.lambda_factor, self.lambda_min),
-            jnp.minimum(state_prev.lambd * self.lambda_factor, self.lambda_max),
+            # If accept, decrease damping... note that we *don't* enforce any bounds here
+            state_prev.lambd / self.lambda_factor,
+            # If reject: increase lambda and enforce bounds
+            jnp.maximum(
+                self.lambda_min,
+                jnp.minimum(state_prev.lambd * self.lambda_factor, self.lambda_max),
+            ),
         )
 
         # Get output assignments
@@ -127,9 +136,12 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         )
 
         return _LevenbergMarqaurdtState(
+            iterations=state_prev.iterations + 1,
             assignments=assignments,
             lambd=lambd,
-            error=error,
+            error=jnp.where(
+                accept_flag, error, state_prev.error
+            ),  # Use old error if update is rejected
             error_vector=error_vector,
             done=done,
         )

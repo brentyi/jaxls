@@ -3,11 +3,10 @@ from typing import TYPE_CHECKING, Tuple
 
 import jax
 from jax import numpy as jnp
-from overrides import overrides
-
 from jaxfg import types, utils
 from jaxfg.core import VariableAssignments
 from jaxfg.solvers import NonlinearSolverBase, _linear_utils
+from overrides import overrides
 
 if TYPE_CHECKING:
     from jaxfg.core import PreparedFactorGraph
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
 class _GaussNewtonState:
     """Helper for state passed between GN iterations."""
 
+    iterations: int
     assignments: VariableAssignments
     error: float
     error_vector: jnp.ndarray
@@ -36,6 +36,7 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
         assignments = initial_assignments
         error, error_vector = graph.compute_sum_squared_error(assignments)
         state = _GaussNewtonState(
+            iterations=0,
             assignments=assignments,
             error=error,
             error_vector=error_vector,
@@ -64,7 +65,8 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
             A=A,
             initial_x=jnp.zeros(graph.local_storage_metadata.dim),
             b=-state_prev.error_vector,
-            tol=self.atol,
+            tol=self.inexact_step_forcing_sequence(state_prev.iterations),
+            atol=self.atol,
             lambd=0.0,
         )
         assignments = _linear_utils.apply_local_deltas(
@@ -77,6 +79,7 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
 
         return (
             _GaussNewtonState(
+                iterations=state_prev.iterations + 1,
                 assignments=assignments,
                 error=error,
                 error_vector=error_vector,

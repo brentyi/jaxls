@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .._variables import VariableBase
 
 
+@jax.jit
 def linearize_graph(
     graph: "PreparedFactorGraph",
     assignments: VariableAssignments,
@@ -77,6 +78,7 @@ def linearize_graph(
     return A
 
 
+@jax.jit
 def apply_local_deltas(
     assignments: VariableAssignments,
     local_delta_assignments: VariableAssignments,
@@ -117,6 +119,7 @@ def apply_local_deltas(
     return dataclasses.replace(assignments, storage=new_storage)
 
 
+@jax.jit
 def sparse_linear_solve(
     A: types.SparseMatrix,
     initial_x: jnp.ndarray,

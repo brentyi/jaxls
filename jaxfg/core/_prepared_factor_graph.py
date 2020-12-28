@@ -179,7 +179,7 @@ class PreparedFactorGraph:
             # Stack inputs to our factor
             variable: VariableBase
             values_stacked = tuple(
-                type(variable).unflatten(assignments.storage[indices])
+                jax.vmap(type(variable).unflatten)(assignments.storage[indices])
                 for variable, indices in zip(stacked_factors.variables, value_indices)
             )
 
@@ -199,6 +199,7 @@ class PreparedFactorGraph:
         assert error_vector.shape == (self.error_dim,)
         return error_vector
 
+    @jax.jit
     def compute_sum_squared_error(
         self, assignments: VariableAssignments
     ) -> Tuple[float, jnp.ndarray]:

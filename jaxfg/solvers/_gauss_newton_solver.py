@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 class _GaussNewtonState:
     """Helper for state passed between GN iterations."""
 
+    iterations: int
     assignments: "VariableAssignments"
     error: float
     error_vector: jnp.ndarray
@@ -38,6 +39,7 @@ class GaussNewtonSolver(NonlinearSolverBase):
         assignments = initial_assignments
         error, error_vector = graph.compute_sum_squared_error(assignments)
         state = _GaussNewtonState(
+            iterations=0,
             assignments=assignments,
             error=error,
             error_vector=error_vector,
@@ -58,7 +60,7 @@ class GaussNewtonSolver(NonlinearSolverBase):
 
         return state.assignments
 
-    @jax.jit
+    # @jax.jit
     def _step(
         self,
         graph: "PreparedFactorGraph",
@@ -72,7 +74,7 @@ class GaussNewtonSolver(NonlinearSolverBase):
             A=A,
             initial_x=jnp.zeros(graph.local_storage_metadata.dim),
             b=-state_prev.error_vector,
-            tol=self.rtol,
+            tol=self.inexact_step_forcing_sequence(state_prev.iterations),
             atol=self.atol,
             lambd=0.0,
         )
@@ -92,6 +94,7 @@ class GaussNewtonSolver(NonlinearSolverBase):
         )
 
         return _GaussNewtonState(
+            iterations=state_prev.iterations + 1,
             assignments=assignments,
             error=error,
             error_vector=error_vector,
