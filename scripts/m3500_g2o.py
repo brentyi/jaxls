@@ -57,7 +57,7 @@ for line in tqdm(lines):
         # if after_index != before_index + 1:
         #     continue
 
-        delta = jaxlie.SE2.from_xy_theta(*(float(p) for p in parts[3:6]))
+        between = jaxlie.SE2.from_xy_theta(*(float(p) for p in parts[3:6]))
 
         q11, q12, q13, q22, q23, q33 = map(float, parts[6:])
         information_matrix = onp.array(
@@ -74,7 +74,7 @@ for line in tqdm(lines):
             jaxfg.geometry.BetweenFactor.make(
                 before=pose_variables[before_index],
                 after=pose_variables[after_index],
-                delta=delta,
+                between=between,
                 scale_tril_inv=scale_tril_inv,
             )
         )
@@ -104,12 +104,12 @@ with jaxfg.utils.stopwatch("Compute error"):
 
 with jaxfg.utils.stopwatch("Solve"):
     solution_poses = graph.solve(
-        initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
+        initial_poses, solver=jaxfg.solvers.GaussNewtonSolver()
     )
 
 with jaxfg.utils.stopwatch("Solve (#2)"):
     solution_poses = graph.solve(
-        initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
+        initial_poses, solver=jaxfg.solvers.GaussNewtonSolver()
     )
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):

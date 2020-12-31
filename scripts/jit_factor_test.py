@@ -33,7 +33,7 @@ jax.vmap(do_something_with_factor)(jaxlie.SO2.identity())
 #     jaxfg.BetweenFactor.make(
 #         before=variables["pose1"],
 #         after=variables["pose1"],
-#         delta=jaxlie.SE2.identity(),
+#         between=jaxlie.SE2.identity(),
 #         scale_tril_inv=jnp.eye(3),
 #     )
 # )

@@ -1,4 +1,4 @@
-from typing import Tuple, Type
+from typing import Tuple, Type, TypeVar
 
 import jaxlie
 from jax import numpy as jnp
@@ -7,10 +7,19 @@ from overrides import overrides
 from .. import types
 from ..core._variables import VariableBase
 
+T = TypeVar("T", bound=jaxlie.MatrixLieGroup)
+
+
+class LieVariableBase(VariableBase[T]):
+    MatrixLieGroupType: Type[jaxlie.MatrixLieGroup] = jaxlie.MatrixLieGroup
+    """Lie group type."""
+
 
 def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
-    class _LieVariable(VariableBase[Group]):
+    class _LieVariable(LieVariableBase):
         """Variable containing a transformation."""
+
+        MatrixLieGroupType = Group
 
         @staticmethod
         @overrides
@@ -30,14 +39,14 @@ def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
         @staticmethod
         #  @jax.custom_jvp
         def add_local(x: Group, local_delta: jaxlie.types.TangentVector) -> Group:
-            return Group(x) @ Group.exp(local_delta)
+            return jaxlie.manifold.rplus(x, local_delta)
 
         @staticmethod
         @overrides
         def subtract_local(x: Group, y: Group) -> types.LocalVariableValue:
             # x = world<-A, y = world<-B
             # Difference = A<-B
-            return (x.inverse() @ y).log()
+            return jaxlie.manifold.rminus(x, y)
 
         @staticmethod
         @overrides

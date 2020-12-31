@@ -3,10 +3,11 @@ from typing import TYPE_CHECKING, Tuple
 
 import jax
 from jax import numpy as jnp
+from overrides import overrides
+
 from jaxfg import types, utils
 from jaxfg.core import VariableAssignments
 from jaxfg.solvers import NonlinearSolverBase, _linear_utils
-from overrides import overrides
 
 if TYPE_CHECKING:
     from jaxfg.core import PreparedFactorGraph

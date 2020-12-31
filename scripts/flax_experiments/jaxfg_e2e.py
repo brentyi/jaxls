@@ -50,13 +50,13 @@ def get_graph(error_scale) -> core.PreparedFactorGraph:
             geometry.BetweenFactor.make(
                 before=variable_A,
                 after=variable_B,
-                delta=T_ab,
+                between=T_ab,
                 scale_tril_inv=jnp.eye(3),
             ),
             geometry.BetweenFactor.make(
                 before=variable_B,
                 after=variable_C,
-                delta=T_bc,
+                between=T_bc,
                 scale_tril_inv=jnp.eye(3),
             ),
             # Noisy factors

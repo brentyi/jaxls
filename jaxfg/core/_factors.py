@@ -96,12 +96,45 @@ class FactorBase(abc.ABC):
         )
 
     @abc.abstractmethod
-    def compute_error(self, *variable_values: types.VariableValue):
+    def compute_error(self, *variable_values: types.VariableValue) -> jnp.ndarray:
         """Compute factor error.
 
         Args:
             variable_values (types.VariableValue): Values of self.variables
         """
+
+    def compute_error_jacobians(
+        self, *variable_values: types.VariableValue
+    ) -> Tuple[jnp.ndarray, ...]:
+        """Compute Jacobian of error with respect to local parameterization.
+
+        Uses `jax.jacfwd` by default, but can optionally be overriden.
+
+        Args:
+            variable_values (types.VariableValue): Values of variables to linearize around.
+        """
+
+        def compute_cost_with_local_delta(
+            local_deltas: Tuple[jnp.ndarray, ...]
+        ) -> jnp.ndarray:
+            perturbed_values = [
+                variable.add_local(
+                    x=variable_value,
+                    local_delta=local_delta,
+                )
+                for variable, variable_value, local_delta in zip(
+                    self.variables, variable_values, local_deltas
+                )
+            ]
+            return self.compute_error(*perturbed_values)
+
+        # Evaluate Jacobian when deltas are zero
+        return jax.jacfwd(compute_cost_with_local_delta)(
+            tuple(
+                onp.zeros(variable.get_local_parameter_dim())
+                for variable in self.variables
+            )
+        )
 
 
 @dataclasses.dataclass(frozen=True)

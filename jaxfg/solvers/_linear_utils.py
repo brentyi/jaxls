@@ -1,5 +1,5 @@
 import dataclasses
-from typing import TYPE_CHECKING, Tuple, Type
+from typing import TYPE_CHECKING, Type
 
 import jax
 import jax.numpy as jnp
@@ -9,9 +9,9 @@ from .. import types
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
-    from .._factors import FactorBase
-    from .._prepared_factor_graph import PreparedFactorGraph
-    from .._variables import VariableBase
+    from ..core._factors import FactorBase
+    from ..core._prepared_factor_graph import PreparedFactorGraph
+    from ..core._variables import VariableBase
 
 
 @jax.jit
@@ -30,36 +30,13 @@ def linearize_graph(
     ):
         # Stack inputs to our factors
         values_stacked = tuple(
-            assignments.storage[indices] for indices in value_indices
+            variable.unflatten(assignments.storage[indices])
+            for indices, variable in zip(value_indices, stacked_factors.variables)
         )
 
-        # Helper for computing Jacobians wrt local parameterizations
-        def compute_cost_with_local_delta(
-            factor: "FactorBase",
-            values: Tuple[types.VariableValue, ...],
-            local_deltas: Tuple[jnp.ndarray],
-        ):
-            variable_type: Type["VariableBase"]
-            perturbed_values = [
-                variable.add_local(
-                    x=x,
-                    local_delta=local_delta,
-                )
-                for variable, x, local_delta in zip(
-                    factor.variables, values, local_deltas
-                )
-            ]
-            return factor.compute_error(*perturbed_values)
-
-        # Vectorized Jacobian computation
-        num_factors = stacked_factors.scale_tril_inv.shape[0]
-        jacobians = jax.vmap(jax.jacfwd(compute_cost_with_local_delta, argnums=2))(
-            stacked_factors,
-            values_stacked,
-            tuple(
-                onp.zeros((num_factors, variable.get_local_parameter_dim()))
-                for variable in stacked_factors.variables
-            ),
+        # Compute Jacobians wrt local parameterizations
+        jacobians = jax.vmap(type(stacked_factors).compute_error_jacobians)(
+            stacked_factors, *values_stacked
         )
         for jacobian in jacobians:
             # Whiten Jacobian, then record flattened values
@@ -113,7 +90,9 @@ def apply_local_deltas(
         # Batched variable update
         new_storage = new_storage.at[storage_index : storage_index + dim * count].set(
             variable_type.flatten(
-                jax.vmap(variable_type.add_local)(batched_xs, batched_deltas)
+                jax.vmap(variable_type.add_local)(
+                    variable_type.unflatten(batched_xs), batched_deltas
+                )
             ).flatten()
         )
     return dataclasses.replace(assignments, storage=new_storage)
