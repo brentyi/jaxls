@@ -2,7 +2,6 @@ import dataclasses
 
 import jax
 import numpy as onp
-from _fixed_iteration_gn import FixedIterationGaussNewtonSolver
 from flax import optim
 from jax import numpy as jnp
 from jaxlie import SE2
@@ -129,7 +128,7 @@ def compute_loss(params):
     # Find optimal poses given our factor graph
     assignments_solved = graph_scaled.solve(
         assignments_ground_truth,
-        solver=FixedIterationGaussNewtonSolver(max_iters=5),
+        solver=solvers.FixedIterationGaussNewtonSolver(max_iterations=5, verbose=False),
     )
 
     # Loss is difference between ground-truth and solved poses

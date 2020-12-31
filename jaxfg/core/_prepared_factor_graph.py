@@ -14,7 +14,7 @@ from ._variables import VariableBase
 
 @jax.partial(
     utils.register_dataclass_pytree,
-    static_fields=("local_storage_metadata", "error_dim"),
+    static_fields=("local_storage_metadata", "residual_dim"),
 )
 @dataclasses.dataclass(frozen=True)
 class PreparedFactorGraph:
@@ -29,7 +29,7 @@ class PreparedFactorGraph:
         Tuple[jnp.ndarray, ...]
     ]  # List index: factor #, tuple index: variable #
     local_storage_metadata: StorageMetadata
-    error_dim: int
+    residual_dim: int
 
     def __post_init__(self):
         """Check that inputs make sense!"""
@@ -76,8 +76,8 @@ class PreparedFactorGraph:
         delta_storage_metadata = StorageMetadata.from_variables(variables, local=True)
 
         # Prepare each factor group
-        error_index = 0
-        error_indices: List[jnp.ndarray] = []
+        residual_index = 0
+        residual_indices: List[jnp.ndarray] = []
         for group_key, group in factors_from_group.items():
             # Stack factors in our group
             stacked_factor: FactorBase = jax.tree_multimap(
@@ -121,16 +121,16 @@ class PreparedFactorGraph:
             # Record values
             stacked_factors.append(stacked_factor)
             value_indices.append(value_indices_stacked)
-            error_indices.append(
+            residual_indices.append(
                 jnp.arange(
-                    error_index, error_index + len(group) * factor.error_dim
-                ).reshape((len(group), factor.error_dim))
+                    residual_index, residual_index + len(group) * factor.residual_dim
+                ).reshape((len(group), factor.residual_dim))
             )
-            error_index += stacked_factor.error_dim * len(group)
+            residual_index += stacked_factor.residual_dim * len(group)
 
             # Get Jacobian coordinates
             num_factors = len(group)
-            error_dim = stacked_factor.error_dim
+            residual_dim = stacked_factor.residual_dim
             for variable_index, variable in enumerate(stacked_factor.variables):
                 variable_dim = variable.get_local_parameter_dim()
 
@@ -138,17 +138,17 @@ class PreparedFactorGraph:
                     (
                         # Row indices
                         jnp.broadcast_to(
-                            error_indices[-1][:, :, None],
-                            (num_factors, error_dim, variable_dim),
+                            residual_indices[-1][:, :, None],
+                            (num_factors, residual_dim, variable_dim),
                         ),
                         # Column indices
                         jnp.broadcast_to(
                             local_value_indices_stacked[variable_index][:, None, :],
-                            (num_factors, error_dim, variable_dim),
+                            (num_factors, residual_dim, variable_dim),
                         ),
                     ),
                     axis=-1,
-                ).reshape((num_factors * error_dim * variable_dim, 2))
+                ).reshape((num_factors * residual_dim * variable_dim, 2))
 
                 jacobian_coords.append(coords)
 
@@ -157,21 +157,21 @@ class PreparedFactorGraph:
             jacobian_coords=jacobian_coords,
             value_indices=value_indices,
             local_storage_metadata=delta_storage_metadata,
-            error_dim=error_index,
+            residual_dim=residual_index,
         )
 
-    def compute_error_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
-        """Computes error vector associated with our factor graph.
+    def compute_residual_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
+        """Computes residual vector associated with our factor graph.
 
         Args:
             assignments (VariableAssignments): Variable assignments.
 
         Returns:
-            jnp.ndarray: Error vector.
+            jnp.ndarray: Residual vector.
         """
 
-        # Get error vector associated with each group
-        errors_list: List[jnp.ndarray] = []
+        # Get residual vector associated with each group
+        residuals_list: List[jnp.ndarray] = []
         for stacked_factors, value_indices in zip(
             self.stacked_factors,
             self.value_indices,
@@ -183,38 +183,38 @@ class PreparedFactorGraph:
                 for variable, indices in zip(stacked_factors.variables, value_indices)
             )
 
-            # Vectorized error computation
-            errors_list.append(
+            # Vectorized residual computation
+            residuals_list.append(
                 jnp.einsum(
                     "nij,nj->ni",
                     stacked_factors.scale_tril_inv,
-                    jax.vmap(type(stacked_factors).compute_error)(
+                    jax.vmap(type(stacked_factors).compute_residual_vector)(
                         stacked_factors, *values_stacked
                     ),
                 ).flatten()
             )
 
-        # Concatenate errors from all groups
-        error_vector = jnp.concatenate(errors_list, axis=0)
-        assert error_vector.shape == (self.error_dim,)
-        return error_vector
+        # Concatenate residuals from all groups
+        residual_vector = jnp.concatenate(residuals_list, axis=0)
+        assert residual_vector.shape == (self.residual_dim,)
+        return residual_vector
 
     @jax.jit
-    def compute_sum_squared_error(
+    def compute_cost(
         self, assignments: VariableAssignments
     ) -> Tuple[float, jnp.ndarray]:
-        """Compute the sum of squared errors associated with a factor graph. Also
-        returns intermediate error vector.
+        """Compute the sum of squared residuals associated with a factor graph. Also
+        returns intermediate residual vector.
 
         Args:
             assignments (VariableAssignments): Variable assignments.
 
         Returns:
-            Tuple[float, jnp.ndarray]: Scalar error, error vector.
+            Tuple[float, jnp.ndarray]: Scalar cost, residual vector.
         """
-        error_vector = self.compute_error_vector(assignments)
-        sum_squared_error = jnp.sum(error_vector ** 2)
-        return sum_squared_error, error_vector
+        residual_vector = self.compute_residual_vector(assignments)
+        cost = jnp.sum(residual_vector ** 2)
+        return cost, residual_vector
 
     def solve(
         self,

@@ -28,7 +28,7 @@ class FactorBase(abc.ABC):
     """Fields to ignore when stacking."""
 
     @property
-    def error_dim(self) -> int:
+    def residual_dim(self) -> int:
         """Error dimensionality."""
         # We can't use [0] here, because (for stacked factors) there might be a batch dimension!
         return self.scale_tril_inv.shape[-1]
@@ -91,22 +91,24 @@ class FactorBase(abc.ABC):
             factor_type=self.__class__,
             secondary_key=(
                 tuple((type(v), v.get_parameter_dim()) for v in self.variables),
-                self.error_dim,
+                self.residual_dim,
             ),
         )
 
     @abc.abstractmethod
-    def compute_error(self, *variable_values: types.VariableValue) -> jnp.ndarray:
+    def compute_residual_vector(
+        self, *variable_values: types.VariableValue
+    ) -> jnp.ndarray:
         """Compute factor error.
 
         Args:
             variable_values (types.VariableValue): Values of self.variables
         """
 
-    def compute_error_jacobians(
+    def compute_residual_jacobians(
         self, *variable_values: types.VariableValue
     ) -> Tuple[jnp.ndarray, ...]:
-        """Compute Jacobian of error with respect to local parameterization.
+        """Compute Jacobian of residual with respect to local parameterization.
 
         Uses `jax.jacfwd` by default, but can optionally be overriden.
 
@@ -126,7 +128,7 @@ class FactorBase(abc.ABC):
                     self.variables, variable_values, local_deltas
                 )
             ]
-            return self.compute_error(*perturbed_values)
+            return self.compute_residual_vector(*perturbed_values)
 
         # Evaluate Jacobian when deltas are zero
         return jax.jacfwd(compute_cost_with_local_delta)(
@@ -150,7 +152,7 @@ class LinearFactor(FactorBase):
     scale_tril_inv: onp.ndarray
 
     @overrides
-    def compute_error(self, *variable_values: types.VariableValue):
+    def compute_residual_vector(self, *variable_values: types.VariableValue):
         linear_component = jnp.zeros_like(self.b)
         for A_matrix, value in zip(self.A_matrices, variable_values):
             linear_component = linear_component + A_matrix @ value

@@ -17,7 +17,7 @@ LieGroupType = TypeVar("T", bound=jaxlie.MatrixLieGroup)
 class PriorFactor(FactorBase, Generic[LieGroupType]):
     """Factor for defining a fixed prior on a frame.
 
-    Errors are computed as `(variable.inverse() @ mu).log()`.
+    Residuals are computed as `(variable.inverse() @ mu).log()`.
     """
 
     mu: jaxlie.MatrixLieGroup
@@ -38,11 +38,13 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
         )
 
     @overrides
-    def compute_error(self, variable_value: jaxlie.MatrixLieGroup) -> jnp.ndarray:
+    def compute_residual_vector(
+        self, variable_value: jaxlie.MatrixLieGroup
+    ) -> jnp.ndarray:
         return (variable_value.inverse() @ self.mu).log()
 
     @overrides
-    def compute_error_jacobians(
+    def compute_residual_jacobians(
         self, variable_value: jaxlie.MatrixLieGroup
     ) -> Tuple[jnp.ndarray]:
 
@@ -51,10 +53,10 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
         # Implementing this is totally optional -- we should get the same results even
         # with this function commented out!
 
-        J_error_wrt_value = jax.jacfwd(PriorFactor.compute_error, argnums=1)(
-            self, variable_value
-        ).parameters
-        assert J_error_wrt_value.shape == (
+        J_residual_wrt_value = jax.jacfwd(
+            PriorFactor.compute_residual_vector, argnums=1
+        )(self, variable_value).parameters
+        assert J_residual_wrt_value.shape == (
             variable_value.tangent_dim,
             variable_value.parameters_dim,
         )
@@ -67,8 +69,8 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
             variable_value.tangent_dim,
         )
 
-        J_error_wrt_delta = J_error_wrt_value @ J_value_wrt_delta
-        return (J_error_wrt_delta,)
+        J_residual_wrt_delta = J_residual_wrt_value @ J_value_wrt_delta
+        return (J_residual_wrt_delta,)
 
 
 class _BeforeAfterTuple(NamedTuple):
@@ -85,7 +87,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         "after" -> `T_wa`
         "between" -> `T_ba`
 
-    Errors are computed as `((T_wb @ T_ba).inverse() @ T_wa).log()`
+    Residuals are computed as `((T_wb @ T_ba).inverse() @ T_wa).log()`
     """
 
     variables: _BeforeAfterTuple
@@ -110,19 +112,19 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
 
     @jax.jit
     @overrides
-    def compute_error(
+    def compute_residual_vector(
         self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
     ) -> jnp.ndarray:
         # before is T_wb
         # between is T_ba
         # after is T_wa
         #
-        # Our error is the tangent-space difference between our actual computed and T_wa
+        # Our residual is the tangent-space difference between our actual computed and T_wa
         # transforms
         return ((before_value @ self.between).inverse() @ after_value).log()
 
     @overrides
-    def compute_error_jacobians(
+    def compute_residual_jacobians(
         self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
@@ -131,9 +133,9 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         # Implementing this is totally optional -- we should get the same results even
         # with this function commented out!
 
-        J_error_wrt_before_value, J_error_wrt_after_value = (
+        J_residual_wrt_before_value, J_residual_wrt_after_value = (
             J.parameters
-            for J in jax.jacfwd(BetweenFactor.compute_error, argnums=(1, 2))(
+            for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=(1, 2))(
                 self, before_value, after_value
             )
         )
@@ -147,6 +149,6 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         ).parameters
 
         return (
-            J_error_wrt_before_value @ J_before_value_wrt_delta,
-            J_error_wrt_after_value @ J_after_value_wrt_delta,
+            J_residual_wrt_before_value @ J_before_value_wrt_delta,
+            J_residual_wrt_after_value @ J_after_value_wrt_delta,
         )

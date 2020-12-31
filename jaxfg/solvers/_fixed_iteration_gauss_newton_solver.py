@@ -1,7 +1,6 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-import jax
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -12,7 +11,6 @@ from ._nonlinear_solver_base import (
     NonlinearSolverBase,
     _InexactStepSolverMixin,
     _NonlinearSolverState,
-    _TerminationCriteriaMixin,
 )
 
 if TYPE_CHECKING:
@@ -21,9 +19,7 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
-class GaussNewtonSolver(
-    NonlinearSolverBase, _InexactStepSolverMixin, _TerminationCriteriaMixin
-):
+class FixedIterationGaussNewtonSolver(NonlinearSolverBase, _InexactStepSolverMixin):
     @overrides
     def solve(
         self,
@@ -47,11 +43,6 @@ class GaussNewtonSolver(
             # Gauss-newton step
             state = self._step(graph, state)
             self._print(f"Iteration #{i}: cost={str(state.cost).ljust(15)}")
-
-            # Exit if either cost threshold is met
-            if state.done:
-                print("Terminating early!")
-                break
 
         return state.assignments
 
@@ -87,14 +78,9 @@ class GaussNewtonSolver(
             local_delta_assignments=local_delta_assignments,
         )
 
-        # Check for convergence
+        # Re-compute cost / residual
         cost, residual_vector = graph.compute_cost(assignments)
-        done = self.check_convergence(
-            state_prev=state_prev,
-            cost_updated=cost,
-            local_delta_assignments=local_delta_assignments,
-            negative_gradient=ATb,
-        )
+        done = False
 
         return _NonlinearSolverState(
             iterations=state_prev.iterations + 1,

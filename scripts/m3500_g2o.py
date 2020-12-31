@@ -84,7 +84,7 @@ factors.append(
     jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[0],
         mu=initial_poses_dict[pose_variables[0]],
-        scale_tril_inv=jnp.eye(3) * 100.0,
+        scale_tril_inv=jnp.eye(3) * 100,
     )
 )
 print("Prior factor:", initial_poses_dict[pose_variables[0]])
@@ -98,8 +98,8 @@ fannypack.utils.pdb_safety_net()
 initial_poses = jaxfg.core.VariableAssignments.from_dict(initial_poses_dict)
 graph = jaxfg.core.PreparedFactorGraph.from_factors(factors)
 
-with jaxfg.utils.stopwatch("Compute error"):
-    print(jnp.sum(graph.compute_error_vector(initial_poses) ** 2) * 0.5)
+with jaxfg.utils.stopwatch("Compute residual"):
+    print(jnp.sum(graph.compute_residual_vector(initial_poses) ** 2) * 0.5)
 
 
 with jaxfg.utils.stopwatch("Solve"):

@@ -8,28 +8,30 @@ from overrides import overrides
 from .. import types, utils
 from ..core._variable_assignments import VariableAssignments
 from . import _linear_utils
-from ._nonlinear_solver_base import NonlinearSolverBase
+from ._nonlinear_solver_base import (
+    NonlinearSolverBase,
+    _InexactStepSolverMixin,
+    _NonlinearSolverState,
+    _TerminationCriteriaMixin,
+)
 
 if TYPE_CHECKING:
-    from .._prepared_factor_graph import PreparedFactorGraph
+    from ..core._prepared_factor_graph import PreparedFactorGraph
 
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
-class _LevenbergMarqaurdtState:
+class _LevenbergMarqaurdtState(_NonlinearSolverState):
     """Helper for state passed between LM iterations."""
 
-    iterations: int
-    assignments: "VariableAssignments"
     lambd: float
-    error: float
-    error_vector: jnp.ndarray
-    done: bool
 
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
-class LevenbergMarquardtSolver(NonlinearSolverBase):
+class LevenbergMarquardtSolver(
+    NonlinearSolverBase, _InexactStepSolverMixin, _TerminationCriteriaMixin
+):
     """Simple damped least-squares implementation."""
 
     lambda_initial: float = 5e-4
@@ -44,24 +46,24 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         initial_assignments: "VariableAssignments",
     ) -> "VariableAssignments":
         # Initialize
-        error_prev, error_vector = graph.compute_sum_squared_error(initial_assignments)
-        self._print(f"Starting solve with {self}, initial error={error_prev}")
+        cost_prev, residual_vector = graph.compute_cost(initial_assignments)
+        self._print(f"Starting solve with {self}, initial cost={cost_prev}")
 
         state = _LevenbergMarqaurdtState(
             iterations=0,
             assignments=initial_assignments,
             lambd=self.lambda_initial,
-            error=error_prev,
-            error_vector=error_vector,
+            cost=cost_prev,
+            residual_vector=residual_vector,
             done=False,
         )
 
         # Optimization
-        for i in range(self.max_iters):
+        for i in range(self.max_iterations):
             # LM step
             state = self._step(graph, state)
             self._print(
-                f"Iteration #{i}: error={str(state.error).ljust(15)} lambda={str(state.lambd)}"
+                f"Iteration #{i}: cost={str(state.cost).ljust(15)} lambda={str(state.lambd)}"
             )
             if state.done:
                 self._print("Terminating early!")
@@ -81,24 +83,24 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
         A: types.SparseMatrix = _linear_utils.linearize_graph(
             graph, state_prev.assignments
         )
-        local_deltas = _linear_utils.sparse_linear_solve(
-            A=A,
-            initial_x=jnp.zeros(graph.local_storage_metadata.dim),
-            b=-state_prev.error_vector,
-            tol=self.inexact_step_forcing_sequence(state_prev.iterations),
-            atol=self.atol,
-            lambd=state_prev.lambd,
+        ATb = A.T @ -state_prev.residual_vector
+        local_delta_assignments = VariableAssignments(
+            storage=_linear_utils.sparse_linear_solve(
+                A=A,
+                ATb=ATb,
+                initial_x=jnp.zeros(graph.local_storage_metadata.dim),
+                tol=self.inexact_step_forcing_sequence(state_prev.iterations),
+                lambd=state_prev.lambd,
+            ),
+            storage_metadata=graph.local_storage_metadata,
         )
         assignments_proposed = _linear_utils.apply_local_deltas(
-            state_prev.assignments,
-            local_delta_assignments=VariableAssignments(
-                storage=local_deltas, storage_metadata=graph.local_storage_metadata
-            ),
+            state_prev.assignments, local_delta_assignments=local_delta_assignments
         )
-        error, error_vector = graph.compute_sum_squared_error(assignments_proposed)
+        cost, residual_vector = graph.compute_cost(assignments_proposed)
 
-        # Check if error dropped
-        accept_flag = error <= state_prev.error
+        # Check if cost dropped
+        accept_flag = cost <= state_prev.cost
 
         # Update damping
         # In the future, we may consider more sophisticated lambda updates, eg:
@@ -125,13 +127,14 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
             ),
         )
 
-        # Determine whether or not we want to terminate
-        error_delta = jnp.abs(state_prev.error - error)
+        # Check for convergence
         done = jnp.logical_and(
             accept_flag,
-            jnp.logical_or(
-                error_delta < self.atol,
-                error_delta / state_prev.error < self.rtol,
+            self.check_convergence(
+                state_prev=state_prev,
+                cost_updated=cost,
+                local_delta_assignments=local_delta_assignments,
+                negative_gradient=ATb,
             ),
         )
 
@@ -139,9 +142,9 @@ class LevenbergMarquardtSolver(NonlinearSolverBase):
             iterations=state_prev.iterations + 1,
             assignments=assignments,
             lambd=lambd,
-            error=jnp.where(
-                accept_flag, error, state_prev.error
-            ),  # Use old error if update is rejected
-            error_vector=error_vector,
+            cost=jnp.where(
+                accept_flag, cost, state_prev.cost
+            ),  # Use old cost if update is rejected
+            residual_vector=residual_vector,
             done=done,
         )

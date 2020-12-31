@@ -35,7 +35,7 @@ def linearize_graph(
         )
 
         # Compute Jacobians wrt local parameterizations
-        jacobians = jax.vmap(type(stacked_factors).compute_error_jacobians)(
+        jacobians = jax.vmap(type(stacked_factors).compute_residual_jacobians)(
             stacked_factors, *values_stacked
         )
         for jacobian in jacobians:
@@ -50,7 +50,7 @@ def linearize_graph(
     A = types.SparseMatrix(
         values=jnp.concatenate(A_values_list),
         coords=jnp.concatenate(graph.jacobian_coords),
-        shape=(graph.error_dim, graph.local_storage_metadata.dim),
+        shape=(graph.residual_dim, graph.local_storage_metadata.dim),
     )
     return A
 
@@ -101,16 +101,17 @@ def apply_local_deltas(
 @jax.jit
 def sparse_linear_solve(
     A: types.SparseMatrix,
+    ATb: jnp.ndarray,
     initial_x: jnp.ndarray,
-    b: jnp.ndarray,
     tol: float,
-    atol: float,
     lambd: float,
 ) -> jnp.ndarray:
     """Solves a block-sparse `Ax = b` least squares problem via CGLS.
 
     More specifically: solves `(A^TA + lambd * diag(A^TA)) x = b` if `diagonal_damping`
     is `True`, otherwise `(A^TA + lambd I) x = b`.
+
+    TODO: consider adding `atol` term back in.
     """
 
     assert len(A.values.shape) == 1, "A.values should be 1D"
@@ -118,7 +119,7 @@ def sparse_linear_solve(
         A.values.shape[0],
         2,
     ), "A.coords should be rows of (row, col)"
-    assert len(b.shape) == 1, "b should be 1D!"
+    assert len(ATb.shape) == 1, "ATb should be 1D!"
 
     # Get diagonals of ATA, for regularization + Jacobi preconditioning
     ATA_diagonals = jnp.zeros_like(initial_x).at[A.coords[:, 1]].add(A.values ** 2)
@@ -134,9 +135,6 @@ def sparse_linear_solve(
         # Vanilla regularization
         # return ATAx + lambd * x
 
-    # Compute ATb
-    ATb = A.T @ b
-
     def jacobi_preconditioner(x):
         return x / ATA_diagonals
 
@@ -147,7 +145,6 @@ def sparse_linear_solve(
         x0=initial_x,
         maxiter=len(initial_x),  # Default value used by Eigen
         tol=tol,
-        atol=atol,
         M=jacobi_preconditioner,
     )
     return solution_values
