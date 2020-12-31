@@ -20,7 +20,7 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
   - [x] Damped least squares
   - [ ] Gradslam-style damped least squares?
   - [x] Inexact Newton steps
-  - [ ] Revisit termination criteria
+  - [x] Revisit termination criteria
 - [x] MAP inference
 - [x] Compare g2o example
   - [x] Validate against minisam
