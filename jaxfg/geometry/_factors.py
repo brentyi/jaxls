@@ -15,6 +15,11 @@ LieGroupType = TypeVar("T", bound=jaxlie.MatrixLieGroup)
 
 @dataclasses.dataclass(frozen=True)
 class PriorFactor(FactorBase, Generic[LieGroupType]):
+    """Factor for defining a fixed prior on a frame.
+
+    Errors are computed as `(variable.inverse() @ mu).log()`.
+    """
+
     mu: jaxlie.MatrixLieGroup
     variable_type: Type[LieVariableBase]
     _static_fields = frozenset({"variable_type"})
@@ -33,15 +38,18 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
         )
 
     @overrides
-    def compute_error(self, variable_value: jaxlie.MatrixLieGroup):
+    def compute_error(self, variable_value: jaxlie.MatrixLieGroup) -> jnp.ndarray:
         return (variable_value.inverse() @ self.mu).log()
 
     @overrides
     def compute_error_jacobians(
         self, variable_value: jaxlie.MatrixLieGroup
     ) -> Tuple[jnp.ndarray]:
-        # We want: J_error_wrt_delta
-        # Which is: J_error_wrt_value @ J_value_wrt_delta
+
+        # Helper for using analytical `rplus` Jacobians
+        #
+        # Implementing this is totally optional -- we should get the same results even
+        # with this function commented out!
 
         J_error_wrt_value = jax.jacfwd(PriorFactor.compute_error, argnums=1)(
             self, variable_value
@@ -70,6 +78,16 @@ class _BeforeAfterTuple(NamedTuple):
 
 @dataclasses.dataclass(frozen=True)
 class BetweenFactor(FactorBase, Generic[LieGroupType]):
+    """Factor for defining a geometric relationship between two frames.
+
+    Nominally, we have:
+        "before" -> `T_wb`
+        "after" -> `T_wa`
+        "between" -> `T_ba`
+
+    Errors are computed as `((T_wb @ T_ba).inverse() @ T_wa).log()`
+    """
+
     variables: _BeforeAfterTuple
     between: jaxlie.MatrixLieGroup
     variable_type: Type[LieVariableBase]
@@ -94,7 +112,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_error(
         self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
-    ):
+    ) -> jnp.ndarray:
         # before is T_wb
         # between is T_ba
         # after is T_wa
@@ -102,3 +120,33 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         # Our error is the tangent-space difference between our actual computed and T_wa
         # transforms
         return ((before_value @ self.between).inverse() @ after_value).log()
+
+    @overrides
+    def compute_error_jacobians(
+        self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+
+        # Helper for using analytical `rplus` Jacobians
+        #
+        # Implementing this is totally optional -- we should get the same results even
+        # with this function commented out!
+
+        J_error_wrt_before_value, J_error_wrt_after_value = (
+            J.parameters
+            for J in jax.jacfwd(BetweenFactor.compute_error, argnums=(1, 2))(
+                self, before_value, after_value
+            )
+        )
+
+        J_before_value_wrt_delta = jaxlie.manifold.rplus_jacobian_wrt_delta_at_zero(
+            transform=before_value
+        ).parameters
+
+        J_after_value_wrt_delta = jaxlie.manifold.rplus_jacobian_wrt_delta_at_zero(
+            transform=after_value
+        ).parameters
+
+        return (
+            J_error_wrt_before_value @ J_before_value_wrt_delta,
+            J_error_wrt_after_value @ J_after_value_wrt_delta,
+        )
