@@ -61,9 +61,9 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
             variable_value.parameters_dim,
         )
 
-        J_value_wrt_delta = jaxlie.manifold.rplus_jacobian_wrt_delta_at_zero(
+        J_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
             transform=variable_value
-        ).parameters
+        )
         assert J_value_wrt_delta.shape == (
             variable_value.parameters_dim,
             variable_value.tangent_dim,
@@ -140,13 +140,13 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
             )
         )
 
-        J_before_value_wrt_delta = jaxlie.manifold.rplus_jacobian_wrt_delta_at_zero(
+        J_before_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
             transform=before_value
-        ).parameters
+        )
 
-        J_after_value_wrt_delta = jaxlie.manifold.rplus_jacobian_wrt_delta_at_zero(
+        J_after_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
             transform=after_value
-        ).parameters
+        )
 
         return (
             J_residual_wrt_before_value @ J_before_value_wrt_delta,
