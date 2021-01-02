@@ -1,5 +1,5 @@
 import abc
-from typing import TYPE_CHECKING, Generic, Tuple, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, Tuple, Type, TypeVar
 
 import numpy as onp
 from jax import numpy as jnp
@@ -33,7 +33,9 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
     def add_local(
         x: VariableValueType, local_delta: VariableValueType
     ) -> VariableValueType:
-        """On-manifold retraction.
+        r"""Add local (on-manifold) perturbation.
+
+        Typically written as `x $\oplus$ local_delta` or `x $\boxplus$ local_delta`.
 
         Args:
             x (VariableValue): Absolute parameter to update.
@@ -49,6 +51,8 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         x: VariableValueType, y: VariableValueType
     ) -> types.LocalVariableValue:
         """Compute the local difference between two variable values.
+
+        Typically written as `x $\ominus$ y` or `x $\boxminus$ y`.
 
         Args:
             x (VariableValue): First parameter to compare. Shape should match `self.get_parameter_dim()`.
@@ -121,33 +125,36 @@ class AbstractRealVectorVariable(VariableBase[jnp.ndarray]):
         return flat
 
 
-_real_vector_variable_cache = {}
-
-
 class _RealVectorVariableTemplate:
-    def __getitem__(self, n: int):
-        assert isinstance(n, int)
+    """Usage: `RealVectorVariable[N]`, where `N` is an integer dimension."""
 
-        if n not in _real_vector_variable_cache:
+    _real_vector_variable_cache: Dict[int, Type[AbstractRealVectorVariable]] = {}
+
+    @classmethod
+    def __getitem__(cls, dim: int) -> Type[AbstractRealVectorVariable]:
+        assert isinstance(dim, int)
+
+        if dim not in cls._real_vector_variable_cache:
 
             class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
                 @staticmethod
                 @overrides
                 def get_parameter_dim() -> Tuple[int, ...]:
-                    return n
+                    return dim
 
                 @staticmethod
                 @overrides
                 def get_local_parameter_dim() -> int:
-                    return n
+                    return dim
 
                 @staticmethod
                 @overrides
                 def get_default_value() -> onp.ndarray:
-                    return onp.zeros(n)
+                    return onp.zeros(dim)
 
-            _real_vector_variable_cache[n] = _NDimensionalRealVectorVariable
-        return _real_vector_variable_cache[n]
+            cls._real_vector_variable_cache[dim] = _NDimensionalRealVectorVariable
+
+        return cls._real_vector_variable_cache[dim]
 
 
 RealVectorVariable = _RealVectorVariableTemplate()
