@@ -3,21 +3,19 @@ from typing import TYPE_CHECKING, Type
 
 import jax
 import jax.numpy as jnp
-import numpy as onp
 
 from .. import types
-from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
-    from ..core._factors import FactorBase
     from ..core._prepared_factor_graph import PreparedFactorGraph
+    from ..core._variable_assignments import VariableAssignments
     from ..core._variables import VariableBase
 
 
 @jax.jit
 def linearize_graph(
     graph: "PreparedFactorGraph",
-    assignments: VariableAssignments,
+    assignments: "VariableAssignments",
 ) -> types.SparseMatrix:
     """Compute the Jacobian of a graph's residual vector with respect to the stacked
     local delta vectors."""
@@ -57,9 +55,9 @@ def linearize_graph(
 
 @jax.jit
 def apply_local_deltas(
-    assignments: VariableAssignments,
-    local_delta_assignments: VariableAssignments,
-) -> VariableAssignments:
+    assignments: "VariableAssignments",
+    local_delta_assignments: "VariableAssignments",
+) -> "VariableAssignments":
     """Update variables on manifold."""
 
     new_storage = jnp.zeros_like(assignments.storage)

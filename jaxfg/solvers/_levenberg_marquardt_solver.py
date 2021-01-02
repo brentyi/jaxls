@@ -71,7 +71,7 @@ class LevenbergMarquardtSolver(
 
         return state.assignments
 
-    # @jax.jit
+    @jax.jit
     def _step(
         self,
         graph: "PreparedFactorGraph",

@@ -1,6 +1,7 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
+import jax
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -46,7 +47,7 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase, _InexactStepSolverMix
 
         return state.assignments
 
-    # @jax.jit
+    @jax.jit
     def _step(
         self,
         graph: "PreparedFactorGraph",

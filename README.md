@@ -6,7 +6,19 @@ influenced by [minisam](https://github.com/dongjing3309/minisam),
 
 Applications include sensor fusion, optimal control, planning, SLAM, etc.
 
-![M3500 results](scripts/data/optimized_m3500.png)
+---
+
+### Example scripts:
+
+`scripts/m3500_g2o.py`:
+
+![m3500 results](scripts/data/optimized_m3500.png)
+
+`scripts/sphere2500_g2o.py`:
+
+![sphere2500 results](scripts/data/optimized_sphere2500.png)
+
+---
 
 ### To-do
 
@@ -18,9 +30,9 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
   - [x] Very basic Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
-  - [ ] Gradslam-style damped least squares?
   - [x] Inexact Newton steps
   - [x] Revisit termination criteria
+  - [ ] Reduce redundant code
 - [x] MAP inference
 - [x] Compare g2o example
   - [x] Validate against minisam

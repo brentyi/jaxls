@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, Iterable, List, Optional, Set, Tuple, Type, cast
+from typing import Dict, Iterable, List, Set, Tuple
 
 import jax
 from jax import numpy as jnp
@@ -112,10 +112,10 @@ class PreparedFactorGraph:
 
             # Stack: end result should be Tuple[array of shape (N, *parameter_shape), ...]
             value_indices_stacked: Tuple[jnp.ndarray] = tuple(
-                jnp.array(l) for l in value_indices_list
+                jnp.array(indices) for indices in value_indices_list
             )
             local_value_indices_stacked: Tuple[jnp.ndarray] = tuple(
-                jnp.array(l) for l in local_value_indices_list
+                jnp.array(indices) for indices in local_value_indices_list
             )
 
             # Record values

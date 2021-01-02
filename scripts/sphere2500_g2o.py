@@ -17,11 +17,11 @@ import jaxfg
 # config.update("jax_enable_x64", True)
 
 
-with open("./data/input_M3500_g2o.g2o") as file:
+with open("./data/sphere2500.g2o") as file:
     lines = [line.strip() for line in file.readlines()]
 
 pose_variables = []
-initial_poses_dict: Dict[str, jaxlie.SE2] = {}
+initial_poses_dict: Dict[str, jaxlie.SE3] = {}
 
 factors: List[jaxfg.core.FactorBase] = []
 
@@ -29,25 +29,25 @@ pose_count = 10000
 
 
 for line in tqdm(lines):
-    parts = line.split(" ")
-    if parts[0] == "VERTEX_SE2":
-        _, index, x, y, theta = parts
+    parts = [part for part in line.split(" ") if part != ""]
+    if parts[0] == "VERTEX_SE3:QUAT":
+        _, index, x, y, z, qx, qy, qz, qw = parts
         index = int(index)
 
         if index >= pose_count:
             continue
 
-        x, y, theta = map(float, [x, y, theta])
-
         assert len(initial_poses_dict) == index
 
-        variable = jaxfg.geometry.SE2Variable()
+        variable = jaxfg.geometry.SE3Variable()
 
-        initial_poses_dict[variable] = jax.jit(jaxlie.SE2.from_xy_theta)(x, y, theta)
+        initial_poses_dict[variable] = jaxlie.SE3(
+            xyz_wxyz=onp.array(list(map(float, [x, y, z, qw, qx, qy, qz])))
+        )
 
         pose_variables.append(variable)
 
-    elif parts[0] == "EDGE_SE2":
+    elif parts[0] == "EDGE_SE3:QUAT":
         before_index = int(parts[1])
         after_index = int(parts[2])
 
@@ -58,16 +58,25 @@ for line in tqdm(lines):
         # if after_index != before_index + 1:
         #     continue
 
-        between = jaxlie.SE2.from_xy_theta(*(float(p) for p in parts[3:6]))
+        numerical_parts = list(map(float, parts[3:]))
+        assert len(numerical_parts) == 7 + 21
 
-        information_matrix_components = onp.array(list(map(float, parts[6:])))
-        information_matrix = onp.zeros((3, 3))
-        information_matrix[onp.triu_indices(3)] = information_matrix_components
+        #  between = jaxlie.SE3.from_xy_theta(*(float(p) for p in parts[3:6]))
+
+        xyz = numerical_parts[0:3]
+        quaternion = numerical_parts[3:7]
+        between = jaxlie.SE3.from_rotation_and_translation(
+            rotation=jaxlie.SO3.from_quaternion_xyzw(onp.array(quaternion)),
+            translation=onp.array(xyz),
+        )
+
+        information_matrix = onp.zeros((6, 6))
+        information_matrix[onp.triu_indices(6)] = numerical_parts[7:]
         information_matrix = information_matrix.T
-        information_matrix[onp.triu_indices(3)] = information_matrix_components
+        information_matrix[onp.triu_indices(6)] = numerical_parts[7:]
+
         scale_tril_inv = onp.linalg.cholesky(information_matrix).T
 
-        # scale_tril_inv = jnp.array(onp.array(map(float, parts[6:6])))
         factors.append(
             jaxfg.geometry.BetweenFactor.make(
                 before=pose_variables[before_index],
@@ -76,15 +85,13 @@ for line in tqdm(lines):
                 scale_tril_inv=scale_tril_inv,
             )
         )
-    else:
-        assert False, f"Unexpected line type: {parts[0]}"
 
 # Anchor start pose
 factors.append(
     jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[0],
         mu=initial_poses_dict[pose_variables[0]],
-        scale_tril_inv=jnp.eye(3) * 100,
+        scale_tril_inv=jnp.eye(6) * 100,
     )
 )
 print("Prior factor:", initial_poses_dict[pose_variables[0]])
@@ -106,10 +113,10 @@ with jaxfg.utils.stopwatch("Solve"):
         initial_poses, solver=jaxfg.solvers.GaussNewtonSolver()
     )
 
-with jaxfg.utils.stopwatch("Solve (#2)"):
-    solution_poses = graph.solve(
-        initial_poses, solver=jaxfg.solvers.GaussNewtonSolver()
-    )
+# with jaxfg.utils.stopwatch("Solve (#2)"):
+#     solution_poses = graph.solve(
+#         initial_poses, solver=jaxfg.solvers.LevenbergMarquardtSolver()
+#     )
 
 with jaxfg.utils.stopwatch("Converting storage to onp"):
     solution_poses = dataclasses.replace(
@@ -119,38 +126,21 @@ with jaxfg.utils.stopwatch("Converting storage to onp"):
 
 print("Plotting!")
 plt.figure()
+ax = plt.axes(projection="3d")
+ax.set_box_aspect((1, 1, 1))
 
-plt.title("Optimization on M3500 dataset, Olson et al. 2006")
+plt.title("Optimization on Sphere2500 dataset (Kaess et al, 2012)")
 
-plt.plot(
+ax.plot3D(
     *(onp.array([initial_poses.get_value(v).translation for v in pose_variables]).T),
     c="r",
     label="Dead-reckoned",
 )
-plt.plot(
+ax.plot3D(
     *(onp.array([solution_poses.get_value(v).translation for v in pose_variables]).T),
     c="b",
     label="Optimized",
 )
 
-
-# for i, v in enumerate(tqdm(pose_variables)):
-#     x, y, cos, sin = initial_poses.get_value(v)
-#     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="r")
-#     # plt.annotate(str(i), (x, y))
-# for i, v in enumerate(tqdm(pose_variables)):
-#     x, y, cos, sin = solution_poses.get_value(v)
-#     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="b")
-# plt.annotate(str(i), (x, y))
-# plt.plot(
-#     [initial_poses[v][0] for v in pose_variables],
-#     [initial_poses[v][1] for v in pose_variables],
-#     label="Initial poses",
-# )
-# plt.plot(
-#     [solution_poses[v][0] for v in pose_variables],
-#     [solution_poses[v][1] for v in pose_variables],
-#     label="Solution poses",
-# )
 plt.legend()
 plt.show()
