@@ -74,9 +74,8 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase, _InexactStepSolverMix
         )
 
         # On-manifold retraction
-        assignments = _linear_utils.apply_local_deltas(
-            state_prev.assignments,
-            local_delta_assignments=local_delta_assignments,
+        assignments = state_prev.assignments.apply_local_deltas(
+            local_delta_assignments=local_delta_assignments
         )
 
         # Re-compute cost / residual

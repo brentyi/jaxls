@@ -82,8 +82,7 @@ class GaussNewtonSolver(
         )
 
         # On-manifold retraction
-        assignments = _linear_utils.apply_local_deltas(
-            state_prev.assignments,
+        assignments = state_prev.assignments.apply_local_deltas(
             local_delta_assignments=local_delta_assignments,
         )
 

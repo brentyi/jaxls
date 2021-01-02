@@ -54,49 +54,6 @@ def linearize_graph(
 
 
 @jax.jit
-def apply_local_deltas(
-    assignments: "VariableAssignments",
-    local_delta_assignments: "VariableAssignments",
-) -> "VariableAssignments":
-    """Update variables on manifold."""
-
-    new_storage = jnp.zeros_like(assignments.storage)
-    variable_type: Type["VariableBase"]
-    for variable_type in assignments.storage_metadata.index_from_variable_type.keys():
-
-        # Get locations
-        count = assignments.storage_metadata.count_from_variable_type[variable_type]
-        storage_index = assignments.storage_metadata.index_from_variable_type[
-            variable_type
-        ]
-        local_storage_index = (
-            local_delta_assignments.storage_metadata.index_from_variable_type[
-                variable_type
-            ]
-        )
-        dim = variable_type.get_parameter_dim()
-        local_dim = variable_type.get_local_parameter_dim()
-
-        # Get batched variables
-        batched_xs = assignments.storage[
-            storage_index : storage_index + dim * count
-        ].reshape((count, dim))
-        batched_deltas = local_delta_assignments.storage[
-            local_storage_index : local_storage_index + local_dim * count
-        ].reshape((count, local_dim))
-
-        # Batched variable update
-        new_storage = new_storage.at[storage_index : storage_index + dim * count].set(
-            variable_type.flatten(
-                jax.vmap(variable_type.add_local)(
-                    variable_type.unflatten(batched_xs), batched_deltas
-                )
-            ).flatten()
-        )
-    return dataclasses.replace(assignments, storage=new_storage)
-
-
-@jax.jit
 def sparse_linear_solve(
     A: types.SparseMatrix,
     ATb: jnp.ndarray,

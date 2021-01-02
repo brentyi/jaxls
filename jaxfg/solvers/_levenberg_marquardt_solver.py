@@ -94,8 +94,8 @@ class LevenbergMarquardtSolver(
             ),
             storage_metadata=graph.local_storage_metadata,
         )
-        assignments_proposed = _linear_utils.apply_local_deltas(
-            state_prev.assignments, local_delta_assignments=local_delta_assignments
+        assignments_proposed = state_prev.assignments.apply_local_deltas(
+            local_delta_assignments=local_delta_assignments
         )
         cost, residual_vector = graph.compute_cost(assignments_proposed)
 

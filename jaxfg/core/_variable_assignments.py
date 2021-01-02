@@ -23,8 +23,15 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(frozen=True)
 class StorageMetadata:
+    """Contains information about where the values of each variable are in a flattened
+    storage vector.
+    """
+
+    local_flag: bool
+    """Set to `True` for local parameterization storage."""
+
     dim: int
-    """Dimension of storage vector."""
+    """Total dimension of storage vector."""
 
     index_from_variable: Dict["VariableBase", int]
     """Start index of each stored variable."""
@@ -68,6 +75,7 @@ class StorageMetadata:
                 )
 
         return StorageMetadata(
+            local_flag=local,
             dim=storage_index,
             index_from_variable=index_from_variable,
             index_from_variable_type=index_from_variable_type,
@@ -84,7 +92,8 @@ VariableValueType = TypeVar("T", bound=types.VariableValue)
 @dataclasses.dataclass(frozen=True)
 class VariableAssignments:
     storage: jnp.ndarray
-    """Values of variables stacked."""
+    """Values of variables stacked. Can either be local or global parameterizations,
+    depending on the value of `.storage_metadata.local_flag`."""
 
     storage_metadata: StorageMetadata
     """Metadata for how variables are stored."""
@@ -154,3 +163,53 @@ class VariableAssignments:
         return VariableAssignments.from_dict(
             {variable: variable.get_default_value() for variable in variables}
         )
+
+    @jax.jit
+    def apply_local_deltas(
+        self, local_delta_assignments: "VariableAssignments"
+    ) -> "VariableAssignments":
+        """Update variables on manifold."""
+
+        # Check that inputs make sense
+        assert not self.storage_metadata.local_flag
+        assert local_delta_assignments.storage_metadata.local_flag
+
+        # On-manifold retractions, one variable type at a time!
+        new_storage = jnp.zeros_like(self.storage)
+        variable_type: Type["VariableBase"]
+        for (
+            variable_type
+        ) in self.storage_metadata.index_from_variable_type.keys():
+
+            # Get locations
+            count = self.storage_metadata.count_from_variable_type[variable_type]
+            storage_index = self.storage_metadata.index_from_variable_type[
+                variable_type
+            ]
+            local_storage_index = (
+                local_delta_assignments.storage_metadata.index_from_variable_type[
+                    variable_type
+                ]
+            )
+            dim = variable_type.get_parameter_dim()
+            local_dim = variable_type.get_local_parameter_dim()
+
+            # Get batched variables
+            batched_xs = self.storage[
+                storage_index : storage_index + dim * count
+            ].reshape((count, dim))
+            batched_deltas = local_delta_assignments.storage[
+                local_storage_index : local_storage_index + local_dim * count
+            ].reshape((count, local_dim))
+
+            # Batched variable update
+            new_storage = new_storage.at[
+                storage_index : storage_index + dim * count
+            ].set(
+                variable_type.flatten(
+                    jax.vmap(variable_type.add_local)(
+                        variable_type.unflatten(batched_xs), batched_deltas
+                    )
+                ).flatten()
+            )
+        return dataclasses.replace(self, storage=new_storage)

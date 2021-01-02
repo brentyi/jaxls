@@ -104,8 +104,7 @@ class _TerminationCriteriaMixin:
         converged_gradient = (
             jnp.max(
                 state_prev.assignments.storage
-                - _linear_utils.apply_local_deltas(
-                    state_prev.assignments,
+                - state_prev.assignments.apply_local_deltas(
                     VariableAssignments(
                         storage=negative_gradient,
                         storage_metadata=local_delta_assignments.storage_metadata,
