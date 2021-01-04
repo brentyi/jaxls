@@ -13,6 +13,11 @@ from overrides import overrides
 T = TypeVar("T")
 
 
+def pytree_stack(*trees: T, axis=0) -> T:
+    """Stack PyTrees along a specified axis."""
+    return jax.tree_multimap(lambda *arrays: jnp.stack(arrays, axis=axis), *trees)
+
+
 @contextlib.contextmanager
 def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     start_time = time.time()

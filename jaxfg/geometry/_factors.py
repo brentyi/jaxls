@@ -74,58 +74,52 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
 
 
 class _BeforeAfterTuple(NamedTuple):
-    before: LieVariableBase
-    after: LieVariableBase
+    variable_T_world_a: LieVariableBase
+    variable_T_world_b: LieVariableBase
 
 
 @dataclasses.dataclass(frozen=True)
 class BetweenFactor(FactorBase, Generic[LieGroupType]):
-    """Factor for defining a geometric relationship between two frames.
+    """Factor for defining a geometric relationship between frames `a` and `b`.
 
-    Nominally, we have:
-        "before" -> `T_wb`
-        "after" -> `T_wa`
-        "between" -> `T_ba`
-
-    Residuals are computed as `((T_wb @ T_ba).inverse() @ T_wa).log()`
+    Residuals are computed as `((T_world_a @ T_a_b).inverse() @ T_world_b).log()`.
     """
 
     variables: _BeforeAfterTuple
-    between: jaxlie.MatrixLieGroup
+    T_a_b: jaxlie.MatrixLieGroup
     variable_type: Type[LieVariableBase]
     _static_fields = frozenset({"variable_type"})
 
     @staticmethod
     def make(
-        before: LieVariableBase,
-        after: LieVariableBase,
-        between: types.VariableValue,
+        variable_T_world_a: LieVariableBase,
+        variable_T_world_b: LieVariableBase,
+        T_a_b: jaxlie.MatrixLieGroup,
         scale_tril_inv: types.ScaleTrilInv,
     ):
-        assert type(before) == type(after)
+        assert type(variable_T_world_a) is type(variable_T_world_b)
+        assert variable_T_world_a.MatrixLieGroupType is type(T_a_b)
+
         return BetweenFactor(
-            variables=_BeforeAfterTuple(before=before, after=after),
-            between=between,
+            variables=_BeforeAfterTuple(
+                variable_T_world_a=variable_T_world_a,
+                variable_T_world_b=variable_T_world_b,
+            ),
+            T_a_b=T_a_b,
             scale_tril_inv=scale_tril_inv,
-            variable_type=type(before),
+            variable_type=type(variable_T_world_a),
         )
 
     @jax.jit
     @overrides
     def compute_residual_vector(
-        self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
+        self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
     ) -> jnp.ndarray:
-        # before is T_wb
-        # between is T_ba
-        # after is T_wa
-        #
-        # Our residual is the tangent-space difference between our actual computed and T_wa
-        # transforms
-        return ((before_value @ self.between).inverse() @ after_value).log()
+        return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
 
     @overrides
     def compute_residual_jacobians(
-        self, before_value: jaxlie.MatrixLieGroup, after_value: jaxlie.MatrixLieGroup
+        self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
 
         # Helper for using analytical `rplus` Jacobians
@@ -133,22 +127,15 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         # Implementing this is totally optional -- we should get the same results even
         # with this function commented out!
 
-        J_residual_wrt_before_value, J_residual_wrt_after_value = (
+        J_residual_wrt_a, J_residual_wrt_b = (
             J.parameters
             for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=(1, 2))(
-                self, before_value, after_value
+                self, T_world_a, T_world_b
             )
         )
 
-        J_before_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
-            transform=before_value
-        )
+        J_a_wrt_delta, J_b_wrt_delta = jax.vmap(
+            jaxlie.manifold.rplus_jacobian_parameters_wrt_delta
+        )(utils.pytree_stack(T_world_a, T_world_b))
 
-        J_after_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
-            transform=after_value
-        )
-
-        return (
-            J_residual_wrt_before_value @ J_before_value_wrt_delta,
-            J_residual_wrt_after_value @ J_after_value_wrt_delta,
-        )
+        return (J_residual_wrt_a @ J_a_wrt_delta, J_residual_wrt_b @ J_b_wrt_delta)

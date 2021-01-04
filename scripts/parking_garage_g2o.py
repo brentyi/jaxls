@@ -65,7 +65,7 @@ for line in tqdm(lines):
 
         xyz = numerical_parts[0:3]
         quaternion = numerical_parts[3:7]
-        between = jaxlie.SE3.from_rotation_and_translation(
+        T_a_b = jaxlie.SE3.from_rotation_and_translation(
             rotation=jaxlie.SO3.from_quaternion_xyzw(onp.array(quaternion)),
             translation=onp.array(xyz),
         )
@@ -79,9 +79,9 @@ for line in tqdm(lines):
 
         factors.append(
             jaxfg.geometry.BetweenFactor.make(
-                before=pose_variables[before_index],
-                after=pose_variables[after_index],
-                between=between,
+                variable_T_world_a=pose_variables[before_index],
+                variable_T_world_b=pose_variables[after_index],
+                T_a_b=T_a_b,
                 scale_tril_inv=scale_tril_inv,
             )
         )

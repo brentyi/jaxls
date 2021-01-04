@@ -24,9 +24,9 @@ graph = jaxfg.core.PreparedFactorGraph.from_factors(
             scale_tril_inv=jnp.eye(3),
         ),
         # jaxfg.BetweenFactor.make(
-        #     before=variables["pose1"],
-        #     after=variables["pose2"],
-        #     delta=jaxlie.SE2.from_xy_theta(1., 0., 0.).xy_unit_complex,
+        #     variable_T_world_a=variables["pose1"],
+        #     variable_T_world_b=variables["pose2"],
+        #     T_a_b=jaxlie.SE2.from_xy_theta(1., 0., 0.).xy_unit_complex,
         #     scale_tril_inv=jnp.eye(3),
         # ),
     ]

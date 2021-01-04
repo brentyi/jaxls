@@ -70,9 +70,9 @@ for line in tqdm(lines):
         # scale_tril_inv = jnp.array(onp.array(map(float, parts[6:6])))
         factors.append(
             jaxfg.geometry.BetweenFactor.make(
-                before=pose_variables[before_index],
-                after=pose_variables[after_index],
-                between=between,
+                variable_T_world_a=pose_variables[before_index],
+                variable_T_world_b=pose_variables[after_index],
+                T_a_b=between,
                 scale_tril_inv=scale_tril_inv,
             )
         )
