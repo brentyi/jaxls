@@ -107,7 +107,8 @@ minibatch_size = 100
 batched_x = (onp.arange(-3140, 3140) / 1000.0)[:, onp.newaxis]
 batched_y = onp.cos(batched_x)
 
-progress = tqdm(range(10000))
+progress = tqdm(range(1000))
+losses = []
 for i in progress:
     minibatch_indices = onp.random.randint(
         low=0, high=batched_x.shape[0], size=(minibatch_size,)
@@ -119,6 +120,7 @@ for i in progress:
     )
     optimizer = optimizer.apply_gradient(grad)
     progress.set_description(f"Current loss: {loss_value:10.6f}")
+    losses.append(loss_value)
     # if i % 10 == 0:
     # print(f"Loss step {i}: {loss_value}")
 
@@ -137,12 +139,21 @@ vmap_forward = jax.jit(jax.vmap(lambda x: e2e_forward(model_params, x)))
 plt.plot(
     all_x.flatten(),
     vmap_forward(all_x).flatten(),
-    label="Model extrapolation",
+    label="MLP extrapolation",
 )
 plt.plot(
     batched_x.flatten(),
     vmap_forward(batched_x).flatten(),
-    label="Model output on training data",
+    label="MLP output on training data",
 )
-plt.show()
 plt.legend()
+plt.show()
+
+
+plt.figure()
+
+plt.plot(onp.arange(len(losses)), losses)
+plt.xlabel("Iteration #")
+plt.ylabel("MSE loss")
+plt.legend()
+plt.show()
