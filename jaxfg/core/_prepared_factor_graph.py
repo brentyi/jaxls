@@ -40,6 +40,10 @@ class PreparedFactorGraph:
             for value_indices, variable in zip(v, s.variables):
                 assert value_indices.shape == (N, variable.get_parameter_dim())
 
+    @property
+    def variables(self) -> List[VariableBase]:
+        return self.local_storage_metadata.ordered_variables
+
     @staticmethod
     def from_factors(factors: Iterable[FactorBase]) -> "PreparedFactorGraph":
         """Create a factor graph from a set of factors.

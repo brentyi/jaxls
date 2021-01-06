@@ -177,9 +177,7 @@ class VariableAssignments:
         # On-manifold retractions, one variable type at a time!
         new_storage = jnp.zeros_like(self.storage)
         variable_type: Type["VariableBase"]
-        for (
-            variable_type
-        ) in self.storage_metadata.index_from_variable_type.keys():
+        for variable_type in self.storage_metadata.index_from_variable_type.keys():
 
             # Get locations
             count = self.storage_metadata.count_from_variable_type[variable_type]
