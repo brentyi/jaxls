@@ -19,7 +19,7 @@ RgbColor = Tuple[int, int, int]
 class Disk:
     radius: int
     position: onp.ndarray
-    """Position of disk. Origin should be at center."""
+    """Position of disk. Origin at center of image."""
 
     velocity: onp.ndarray
     color: RgbColor
@@ -125,8 +125,8 @@ class ToySystem:
 
 
 config = DatasetConfig(
-    sequences_per_file=10,
-    sequence_length=50,
+    sequences_per_file=1,
+    sequence_length=10,
     num_files=5,
 )
 system = ToySystem(
