@@ -116,8 +116,8 @@ class ToySystem:
         )
 
         # Update positions, velocities & return
-        position_updated = disk.position + disk.velocity + velocity_noise
-        velocity_updated = disk.velocity + spring_force + drag_force + position_noise
+        position_updated = disk.position + disk.velocity + position_noise
+        velocity_updated = disk.velocity + spring_force + drag_force + velocity_noise
 
         return dataclasses.replace(
             disk, position=position_updated, velocity=velocity_updated

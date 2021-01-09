@@ -18,14 +18,52 @@ import jaxfg
 # [x] CNN definition
 # [x] CNN
 
+DATASET_MEANS = {
+    "image": 6.942841319444445,
+    "position": 0.43589213,
+    "velocity": 0.10219889,
+}
+DATASET_STD_DEVS = {
+    "image": 41.49965651510064,
+    "position": 26.558552,
+    "velocity": 5.8443174,
+}
 
-@jaxfg.utils.register_dataclass_pytree
+
+@jax.partial(jaxfg.utils.register_dataclass_pytree, static_fields=("normalized",))
 @dataclasses.dataclass(frozen=True)
 class ToyDatasetStruct:
+    normalized: bool
     image: jnp.ndarray
     visible_pixels_count: jnp.ndarray
     position: jnp.ndarray
     velocity: jnp.ndarray
+
+    def normalize(self) -> "ToyDatasetStruct":
+        assert not self.normalized
+
+        # Data normalization
+        return dataclasses.replace(
+            self,
+            normalized=True,
+            **{
+                k: (self.__getattribute__(k) - DATASET_MEANS[k]) / DATASET_STD_DEVS[k]
+                for k in DATASET_MEANS.keys()
+            },
+        )
+
+    def unnormalize(self) -> "ToyDatasetStruct":
+        assert self.normalized
+
+        # Data normalization
+        return dataclasses.replace(
+            self,
+            normalized=False,
+            **{
+                k: (self.__getattribute__(k) * DATASET_STD_DEVS[k]) - DATASET_MEANS[k]
+                for k in DATASET_MEANS.keys()
+            },
+        )
 
 
 def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
@@ -34,26 +72,16 @@ def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
         with fannypack.data.TrajectoriesFile(path) as traj_file:
             for trajectory in traj_file:
                 timestamps = len(trajectory["image"])
-
-                # Data normalization
-                trajectory["image"] = (trajectory["image"] - 6.942841319444445).astype(
-                    onp.float32
-                )
-                trajectory["image"] /= 41.49965651510064
-                trajectory["position"] -= 0.43589213
-                trajectory["position"] /= 26.558552
-                trajectory["velocity"] -= 0.10219889
-                trajectory["velocity"] /= 5.8443174
-
                 trajectories.append(
                     ToyDatasetStruct(
+                        normalized=False,
                         **{
                             # Assume all dataclass field names exist as string keys
                             # in our HDF5 file
                             field.name: trajectory[field.name]
                             for field in dataclasses.fields(ToyDatasetStruct)
-                        }
-                    )
+                        },
+                    ).normalize()
                 )
 
     # Print some data statistics
@@ -167,9 +195,7 @@ def mse_loss(
 ):
     pred_positions = model.apply(model_params, batched_images)
     assert pred_positions.shape == batched_positions.shape
-    return jnp.mean(
-        (pred_positions - batched_positions) ** 2
-    )
+    return jnp.mean((pred_positions - batched_positions) ** 2)
 
 
 @jax.jit
