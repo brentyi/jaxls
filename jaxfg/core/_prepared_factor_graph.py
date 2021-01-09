@@ -41,7 +41,7 @@ class PreparedFactorGraph:
                 assert value_indices.shape == (N, variable.get_parameter_dim())
 
     @property
-    def variables(self) -> List[VariableBase]:
+    def variables(self) -> Tuple[VariableBase]:
         return self.local_storage_metadata.ordered_variables
 
     @staticmethod
@@ -164,6 +164,7 @@ class PreparedFactorGraph:
             residual_dim=residual_index,
         )
 
+    @jax.jit
     def compute_residual_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
         """Computes residual vector associated with our factor graph.
 
@@ -219,6 +220,98 @@ class PreparedFactorGraph:
         residual_vector = self.compute_residual_vector(assignments)
         cost = jnp.sum(residual_vector ** 2)
         return cost, residual_vector
+
+    @jax.jit
+    def compute_jacobian(self, assignments: VariableAssignments) -> types.SparseMatrix:
+        """Compute the Jacobian of a graph's residual vector with respect to the stacked
+        local delta vectors. Shape should be `(residual_dim, local_delta_storage_dim)`."""
+
+        # Linearize factors by group
+        A_values_list = []
+        for stacked_factors, value_indices in zip(
+            self.stacked_factors,
+            self.value_indices,
+        ):
+            # Stack inputs to our factors
+            values_stacked = tuple(
+                variable.unflatten(assignments.storage[indices])
+                for indices, variable in zip(value_indices, stacked_factors.variables)
+            )
+
+            # Compute Jacobians wrt local parameterizations
+            jacobians = jax.vmap(type(stacked_factors).compute_residual_jacobians)(
+                stacked_factors, *values_stacked
+            )
+            for jacobian in jacobians:
+                # Whiten Jacobian, then record flattened values
+                A_values_list.append(
+                    jnp.einsum(
+                        "nij,njk->nik", stacked_factors.scale_tril_inv, jacobian
+                    ).flatten()
+                )
+
+        # Build full Jacobian
+        A = types.SparseMatrix(
+            values=jnp.concatenate(A_values_list),
+            coords=jnp.concatenate(self.jacobian_coords),
+            shape=(self.residual_dim, self.local_storage_metadata.dim),
+        )
+        return A
+
+    @jax.partial(jax.jit, static_argnums=2)
+    def _compute_variable_hessian_block(
+        self, assignments: VariableAssignments, variable: VariableBase
+    ) -> jnp.ndarray:
+        """Extract a Hessian block associated with a specific variable, given a set of
+        assignments. Should be equivalent to an inverse covariance conditioned on the
+        rest of the variables.
+
+        Possible precursor to implementing proper variable elimination, etc...
+
+        TODO: hack for debugging, should revisit. This is currently inefficient for many
+        reasons, including that we build out a dense slice of the (sparse) Jacobian and
+        square it to compute a much smaller block from the Hessian. Seems really
+        inefficient for big problems!
+        """
+        local_dim = variable.get_local_parameter_dim()
+        start_col_index = self.local_storage_metadata.index_from_variable[variable]
+        end_col_index = start_col_index + local_dim
+
+        # Construct the full Jacobian, then grab only the columns that we care about
+        #
+        # Unfortunately it's not possible to JIT compile normal boolean masking because
+        # it results in dynamic shapes, so we resort to zeroing out the terms that we
+        # don't care about...
+        A_all = self.compute_jacobian(assignments)
+        mask = jnp.logical_and(
+            A_all.coords[:, 1] >= start_col_index, A_all.coords[:, 1] < end_col_index
+        )
+        A_sliced = types.SparseMatrix(
+            values=jnp.where(
+                mask,
+                A_all.values,
+                jnp.zeros_like(A_all.values),
+            ),
+            coords=jnp.where(
+                mask[:, None],
+                A_all.coords - jnp.array([[0, start_col_index]]),
+                jnp.zeros_like(A_all.coords),
+            ),
+            shape=(A_all.shape[0], local_dim),
+        )
+
+        # Build out a dense matrix, yikes
+        # Note that we add instead of setting to make sure the zero terms don't impact
+        # our results
+        A_sliced_dense = (
+            jnp.zeros(A_sliced.shape)
+            .at[A_sliced.coords[:, 0], A_sliced.coords[:, 1]]
+            .add(A_sliced.values)
+        )
+        hessian_block = A_sliced_dense.T @ A_sliced_dense
+        assert hessian_block.shape == (local_dim, local_dim)
+
+        return hessian_block
 
     def solve(
         self,

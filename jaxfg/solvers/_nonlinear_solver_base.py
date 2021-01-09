@@ -77,13 +77,17 @@ class _TerminationCriteriaMixin:
     """Mixin for Ceres-style termination criteria."""
 
     cost_tolerance: float = 1e-5
-    """We terminate if `|cost change| / cost <= cost_tolerance`."""
+    """We terminate if `|cost change| / cost < cost_tolerance`."""
 
-    gradient_tolerance: float = 1e-8
-    """We terminate if `norm_inf(x - rplus(x, linear delta)) <= gradient_tolerance`."""
+    gradient_tolerance: float = 1e-9
+    """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
 
-    parameter_tolerance: float = 1e-5
-    """We terminate if `norm_2(linear delta) <= (norm2(x) + parameter_tolerance) * parameter_tolerance`."""
+    gradient_tolerance_start_step: int = 10
+    """When to start checking the gradient tolerance condition. Helps solve precision
+    issues caused by inexact Newton steps."""
+
+    parameter_tolerance: float = 1e-7
+    """We terminate if `norm_2(linear delta) < (norm2(x) + parameter_tolerance) * parameter_tolerance`."""
 
     @jax.jit
     def check_convergence(
@@ -97,11 +101,12 @@ class _TerminationCriteriaMixin:
         # Cost tolerance
         converged_cost = (
             jnp.abs(cost_updated - state_prev.cost) / state_prev.cost
-            <= self.cost_tolerance
+            < self.cost_tolerance
         )
 
         # Gradient tolerance
-        converged_gradient = (
+        converged_gradient = jnp.where(
+            state_prev.iterations >= self.gradient_tolerance_start_step,
             jnp.max(
                 state_prev.assignments.storage
                 - state_prev.assignments.apply_local_deltas(
@@ -111,13 +116,14 @@ class _TerminationCriteriaMixin:
                     ),
                 ).storage
             )
-            <= self.gradient_tolerance
+            < self.gradient_tolerance,
+            False,
         )
 
         # Parameter tolerance
         converged_parameters = (
             jnp.linalg.norm(jnp.abs(local_delta_assignments.storage))
-            <= (
+            < (
                 jnp.linalg.norm(state_prev.assignments.storage)
                 + self.parameter_tolerance
             )

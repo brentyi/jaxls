@@ -80,9 +80,7 @@ class LevenbergMarquardtSolver(
         """Linearize, solve linear subproblem, and accept or reject update."""
         # There's currently some redundancy here: we only need to re-linearize when
         # updates are accepted.
-        A: types.SparseMatrix = _linear_utils.linearize_graph(
-            graph, state_prev.assignments
-        )
+        A: types.SparseMatrix = graph.compute_jacobian(state_prev.assignments)
         ATb = A.T @ -state_prev.residual_vector
         local_delta_assignments = VariableAssignments(
             storage=_linear_utils.sparse_linear_solve(

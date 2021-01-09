@@ -18,8 +18,8 @@ FactorType = TypeVar("FactorType", bound="FactorBase")
 
 @dataclasses.dataclass(frozen=True)
 class FactorBase(abc.ABC):
-    variables: Tuple["VariableBase"]
-    """Variables connected to this factor. Immutable. (currently assumed but unenforced)"""
+    variables: Tuple["VariableBase", ...]
+    """Variables connected to this factor."""
 
     scale_tril_inv: types.ScaleTrilInv
     """Inverse square root of covariance matrix."""

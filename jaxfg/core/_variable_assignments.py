@@ -43,9 +43,9 @@ class StorageMetadata:
     """Number of variables of each type."""
 
     @property
-    def ordered_variables(self) -> Iterable["VariableBase"]:
+    def ordered_variables(self) -> Tuple["VariableBase"]:
         # Dictionaries from Python 3.7 retain insertion order
-        return self.index_from_variable.keys()
+        return tuple(self.index_from_variable.keys())
 
     @staticmethod
     def from_variables(
@@ -127,12 +127,14 @@ class VariableAssignments:
             variable: self.get_value(variable) for variable in self.variables
         }
         k: "VariableBase"
-        return str(
-            {
-                f"{i}.{k.__class__.__name__}": v
+
+        contents: str = "\n".join(
+            [
+                f"\t{i}.{k.__class__.__name__}: {v}"
                 for i, (k, v) in enumerate(value_from_variable.items())
-            }
+            ]
         )
+        return f"VariableAssignments(\n{contents}\n)"
 
     @staticmethod
     def from_dict(

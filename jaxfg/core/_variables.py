@@ -1,5 +1,5 @@
 import abc
-from typing import TYPE_CHECKING, Dict, Generic, Tuple, Type, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, Mapping, Tuple, Type, TypeVar
 
 import numpy as onp
 from jax import numpy as jnp
@@ -139,7 +139,7 @@ class _RealVectorVariableTemplate:
             class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
                 @staticmethod
                 @overrides
-                def get_parameter_dim() -> Tuple[int, ...]:
+                def get_parameter_dim() -> int:
                     return dim
 
                 @staticmethod
@@ -157,4 +157,5 @@ class _RealVectorVariableTemplate:
         return cls._real_vector_variable_cache[dim]
 
 
-RealVectorVariable = _RealVectorVariableTemplate()
+RealVectorVariable: Mapping[int, Type[AbstractRealVectorVariable]]
+RealVectorVariable = _RealVectorVariableTemplate()  # type: ignore

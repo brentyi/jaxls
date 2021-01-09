@@ -64,9 +64,7 @@ class GaussNewtonSolver(
         """Linearize, solve linear subproblem, and update on manifold."""
 
         # Linearize graph
-        A: types.SparseMatrix = _linear_utils.linearize_graph(
-            graph, state_prev.assignments
-        )
+        A: types.SparseMatrix = graph.compute_jacobian(state_prev.assignments)
         ATb = A.T @ -state_prev.residual_vector
 
         # Solve linear subproblem

@@ -13,47 +13,6 @@ if TYPE_CHECKING:
 
 
 @jax.jit
-def linearize_graph(
-    graph: "PreparedFactorGraph",
-    assignments: "VariableAssignments",
-) -> types.SparseMatrix:
-    """Compute the Jacobian of a graph's residual vector with respect to the stacked
-    local delta vectors."""
-
-    # Linearize factors by group
-    A_values_list = []
-    for stacked_factors, value_indices in zip(
-        graph.stacked_factors,
-        graph.value_indices,
-    ):
-        # Stack inputs to our factors
-        values_stacked = tuple(
-            variable.unflatten(assignments.storage[indices])
-            for indices, variable in zip(value_indices, stacked_factors.variables)
-        )
-
-        # Compute Jacobians wrt local parameterizations
-        jacobians = jax.vmap(type(stacked_factors).compute_residual_jacobians)(
-            stacked_factors, *values_stacked
-        )
-        for jacobian in jacobians:
-            # Whiten Jacobian, then record flattened values
-            A_values_list.append(
-                jnp.einsum(
-                    "nij,njk->nik", stacked_factors.scale_tril_inv, jacobian
-                ).flatten()
-            )
-
-    # Build full Jacobian
-    A = types.SparseMatrix(
-        values=jnp.concatenate(A_values_list),
-        coords=jnp.concatenate(graph.jacobian_coords),
-        shape=(graph.residual_dim, graph.local_storage_metadata.dim),
-    )
-    return A
-
-
-@jax.jit
 def sparse_linear_solve(
     A: types.SparseMatrix,
     ATb: jnp.ndarray,
