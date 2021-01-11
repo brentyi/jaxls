@@ -25,6 +25,12 @@ class SimpleMLP(nn.Module):
 
 
 class SimpleCNN(nn.Module):
+    """CNN.
+
+    Input is (N, 120, 120, 3) images.
+    Output is (N, 2) position prediction.
+    """
+
     @nn.compact
     def __call__(self, inputs: jnp.ndarray):
         x = inputs
