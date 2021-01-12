@@ -4,11 +4,11 @@ import datargs
 import fannypack
 import flax
 import jax
+import jaxfg
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
 
-import jaxfg
 from data import ToyDatasetStruct, ToySingleStepDataset, collate_fn
 from networks import SimpleCNN
 from trainer import Trainer
@@ -41,13 +41,12 @@ prng_key = jax.random.PRNGKey(0)
 # Create our optimizer
 dummy_image = jnp.zeros((1, 120, 120, 3))
 
-trainer = Trainer(
-    experiment_name=args.experiment_name,
-    optimizer=flax.optim.Adam(learning_rate=1e-4).create(
-        target=model.init(prng_key, dummy_image)  # Initial MLP parameters
-    ),
+trainer = Trainer(experiment_name=args.experiment_name)
+
+optimizer = flax.optim.Adam(learning_rate=1e-3).create(
+    target=model.init(prng_key, dummy_image),  # Initial MLP parameters
 )
-trainer.optimizer.optimizer_def
+
 # Define loss, gradients, etc
 @jax.jit
 def mse_loss(
@@ -63,13 +62,12 @@ def mse_loss(
 @jax.jit
 def get_standard_deviations(minibatch):
     return (
-        jnp.std(model.apply(trainer.optimizer.target, minibatch.image), axis=0),
+        jnp.std(model.apply(optimizer.target, minibatch.image), axis=0),
         jnp.std(minibatch.position, axis=0),
     )
 
 
 loss_grad_fn = jax.jit(jax.value_and_grad(mse_loss, argnums=0))
-
 
 num_epochs = 5000
 progress = tqdm(range(num_epochs))
@@ -78,16 +76,21 @@ for epoch in progress:
     minibatch: ToyDatasetStruct
     for i, minibatch in enumerate(dataloader):
         loss_value, grad = loss_grad_fn(
-            trainer.optimizer.target,
+            optimizer.target,
             minibatch.image,
             minibatch.position,
         )
-        trainer.apply_gradient(grad)
+        optimizer = optimizer.apply_gradient(grad)
         losses.append(loss_value)
 
-        if trainer.step % 10 == 0:
+        if optimizer.state.step < 10 or optimizer.state.step % 100 == 0:
             print(
-                f"{trainer.step} Standard deviations:",
+                f"{optimizer.state.step} Standard deviations:",
                 get_standard_deviations(minibatch),
             )
             progress.set_description(f"Current loss: {loss_value:10.6f}")
+
+            trainer.metadata["loss"] = float(loss_value)
+            trainer.save_checkpoint(optimizer)
+
+trainer.save_checkpoint(optimizer)

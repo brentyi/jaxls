@@ -1,23 +1,22 @@
 import dataclasses
-from typing import List
+from typing import List, Optional
 
 import fannypack
 import jax
+import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
 
-import jaxfg
-
 DATASET_MEANS = {
-    "image": 6.942841319444445,
-    "position": 0.43589213,
-    "velocity": 0.10219889,
+    "image": onp.array([8.26625, 13.777969, 6.1713543]),
+    "position": onp.array([-4.0143294, -19.234016]),
+    "velocity": onp.array([1.765901, 1.1825078]),
 }
 DATASET_STD_DEVS = {
-    "image": 41.49965651510064,
-    "position": 26.558552,
-    "velocity": 5.8443174,
+    "image": onp.array([45.161514, 57.650227, 39.186855]),
+    "position": onp.array([32.284786, 4.5147696]),
+    "velocity": onp.array([8.180047, 2.5003078]),
 }
 
 
@@ -27,10 +26,10 @@ class ToyDatasetStruct:
     """Fields in our toy dataset. Holds an array or timestep."""
 
     normalized: bool
-    image: jnp.ndarray
-    visible_pixels_count: jnp.ndarray
-    position: jnp.ndarray
-    velocity: jnp.ndarray
+    image: Optional[jnp.ndarray] = None
+    visible_pixels_count: Optional[jnp.ndarray] = None
+    position: Optional[jnp.ndarray] = None
+    velocity: Optional[jnp.ndarray] = None
 
     def normalize(self) -> "ToyDatasetStruct":
         assert not self.normalized
@@ -42,6 +41,7 @@ class ToyDatasetStruct:
             **{
                 k: (self.__getattribute__(k) - DATASET_MEANS[k]) / DATASET_STD_DEVS[k]
                 for k in DATASET_MEANS.keys()
+                if self.__getattribute__(k) is not None
             },
         )
 
@@ -55,6 +55,7 @@ class ToyDatasetStruct:
             **{
                 k: (self.__getattribute__(k) * DATASET_STD_DEVS[k]) + DATASET_MEANS[k]
                 for k in DATASET_MEANS.keys()
+                if self.__getattribute__(k) is not None
             },
         )
 
@@ -80,7 +81,12 @@ def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
     # Print some data statistics
     for field in ("image", "position", "velocity"):
         values = jaxfg.utils.pytree_stack(*trajectories).__getattribute__(field)
-        print(f"({field}) Mean, std dev:", onp.mean(values), onp.std(values))
+        values = values.reshape((-1, values.shape[-1]))
+        print(
+            f"({field}) Mean, std dev:",
+            onp.mean(values, axis=0),
+            onp.std(values, axis=0),
+        )
 
     return trajectories
 

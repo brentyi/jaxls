@@ -126,12 +126,12 @@ class ToySystem:
 
 config = DatasetConfig(
     sequences_per_file=1,
-    sequence_length=10,
+    sequence_length=50,
     num_files=5,
 )
 system = ToySystem(
     image_size=120,
-    num_distractors=5,
+    num_distractors=20,
     spring_constant=0.05,
     drag_constant=0.0075,
     position_noise_std=0.1,

@@ -16,6 +16,11 @@ def pytree_stack(*trees: T, axis=0) -> T:
     return jax.tree_multimap(lambda *arrays: jnp.stack(arrays, axis=axis), *trees)
 
 
+def pytree_concatenate(*trees: T, axis=0) -> T:
+    """Concatenate PyTrees along a specified axis."""
+    return jax.tree_multimap(lambda *arrays: jnp.concatenate(arrays, axis=axis), *trees)
+
+
 @contextlib.contextmanager
 def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     """Context manager for measuring runtime."""

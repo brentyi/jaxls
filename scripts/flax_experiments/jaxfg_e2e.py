@@ -10,11 +10,11 @@ from matplotlib import pyplot as plt
 from jaxfg import core, geometry, solvers, utils
 
 # Compute ground-truth values for three poses: A, B, and C
-T_ab = SE2.from_xy_theta(1.0, 0.0, 0.2)
+T_a_b = SE2.from_xy_theta(1.0, 0.0, 0.2)
 T_bc = SE2.from_xy_theta(1.0, 0.0, 0.2)
 
 T_wa = SE2.identity()
-T_wb = T_wa @ T_ab
+T_wb = T_wa @ T_a_b
 T_wc = T_wb @ T_bc
 
 # Create variables for each pose: these represent nodes in our factor graph
@@ -47,15 +47,15 @@ def get_graph(error_scale) -> core.PreparedFactorGraph:
                 variable=variable_A, mu=SE2.identity(), scale_tril_inv=jnp.eye(3)
             ),
             geometry.BetweenFactor.make(
-                before=variable_A,
-                after=variable_B,
-                between=T_ab,
+                variable_T_world_a=variable_A,
+                variable_T_world_b=variable_B,
+                T_a_b=T_a_b,
                 scale_tril_inv=jnp.eye(3),
             ),
             geometry.BetweenFactor.make(
-                before=variable_B,
-                after=variable_C,
-                between=T_bc,
+                variable_T_world_a=variable_B,
+                variable_T_world_b=variable_C,
+                T_a_b=T_bc,
                 scale_tril_inv=jnp.eye(3),
             ),
             # Noisy factors
