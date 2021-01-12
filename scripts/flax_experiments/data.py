@@ -7,16 +7,17 @@ import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
+from tqdm.auto import tqdm
 
 DATASET_MEANS = {
-    "image": onp.array([8.26625, 13.777969, 6.1713543]),
-    "position": onp.array([-4.0143294, -19.234016]),
-    "velocity": onp.array([1.765901, 1.1825078]),
+    "image": onp.array([24.30598765, 29.76503314, 29.86749727], dtype=onp.float32),
+    "position": onp.array([-0.08499543, 0.07917813], dtype=onp.float32),
+    "velocity": onp.array([0.02876372, 0.06096543], dtype=onp.float32),
 }
 DATASET_STD_DEVS = {
-    "image": onp.array([45.161514, 57.650227, 39.186855]),
-    "position": onp.array([32.284786, 4.5147696]),
-    "velocity": onp.array([8.180047, 2.5003078]),
+    "image": onp.array([74.88154621, 81.87872827, 82.00088091], dtype=onp.float32),
+    "position": onp.array([30.53421, 30.84835], dtype=onp.float32),
+    "velocity": onp.array([6.636913, 6.647381], dtype=onp.float32),
 }
 
 
@@ -33,6 +34,7 @@ class ToyDatasetStruct:
 
     def normalize(self) -> "ToyDatasetStruct":
         assert not self.normalized
+        # return self
 
         # Data normalization
         return dataclasses.replace(
@@ -65,7 +67,7 @@ def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
     trajectories = []
     for path in paths:
         with fannypack.data.TrajectoriesFile(path) as traj_file:
-            for trajectory in traj_file:
+            for trajectory in tqdm(traj_file):
                 trajectory["normalized"] = False
                 trajectories.append(
                     ToyDatasetStruct(
@@ -80,7 +82,9 @@ def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
 
     # Print some data statistics
     for field in ("image", "position", "velocity"):
-        values = jaxfg.utils.pytree_stack(*trajectories).__getattribute__(field)
+        values = jax.tree_multimap(
+            lambda *x: onp.stack(x, axis=0), *trajectories
+        ).__getattribute__(field)
         values = values.reshape((-1, values.shape[-1]))
         print(
             f"({field}) Mean, std dev:",

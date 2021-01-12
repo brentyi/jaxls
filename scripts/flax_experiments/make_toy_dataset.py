@@ -30,9 +30,9 @@ class Disk:
 
 @dataclasses.dataclass(frozen=True)
 class DatasetConfig:
-    sequences_per_file: int
+    train_sequences: int
+    val_sequences: int
     sequence_length: int
-    num_files: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -125,13 +125,13 @@ class ToySystem:
 
 
 config = DatasetConfig(
-    sequences_per_file=1,
-    sequence_length=50,
-    num_files=5,
+    train_sequences=5000,
+    val_sequences=50,
+    sequence_length=20,
 )
 system = ToySystem(
     image_size=120,
-    num_distractors=20,
+    num_distractors=25,
     spring_constant=0.05,
     drag_constant=0.0075,
     position_noise_std=0.1,
@@ -156,13 +156,16 @@ output_dir = "data"
 # animation = camera.animate(interval=50)
 # animation.save("animation.mp4")
 
-for i in range(config.num_files):
+for label, num_sequences in {
+    "train": config.train_sequences,
+    "val": config.val_sequences,
+}.items():
     with fp.data.TrajectoriesFile(
-        f"{output_dir}/toy_{i}.hdf5", read_only=False
+        f"{output_dir}/toy_{label}.hdf5", read_only=False
     ) as traj_file:
 
         # Add timesteps in trajectory
-        for _ in range(config.sequences_per_file):
+        for _ in range(num_sequences):
             # Record some metadata; this is duplicated for each trajectory!
             traj_file.add_meta(dataclasses.asdict(system))
 

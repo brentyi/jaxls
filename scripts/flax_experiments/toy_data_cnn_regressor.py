@@ -24,11 +24,15 @@ class Args:
 
 args: Args = datargs.parse(Args)
 
+# Set up tensorboard
+summary_writer = torch.utils.tensorboard.SummaryWriter(
+    log_dir=f"logs/{args.experiment_name}"
+)
 
 # Prep for training
 dataloader = torch.utils.data.DataLoader(
     ToySingleStepDataset(
-        "data/toy_0.hdf5",
+        "data/toy_train.hdf5",
     ),
     batch_size=32,
     collate_fn=collate_fn,
@@ -43,7 +47,7 @@ dummy_image = jnp.zeros((1, 120, 120, 3))
 
 trainer = Trainer(experiment_name=args.experiment_name)
 
-optimizer = flax.optim.Adam(learning_rate=1e-3).create(
+optimizer = flax.optim.Adam().create(
     target=model.init(prng_key, dummy_image),  # Initial MLP parameters
 )
 
@@ -69,7 +73,7 @@ def get_standard_deviations(minibatch):
 
 loss_grad_fn = jax.jit(jax.value_and_grad(mse_loss, argnums=0))
 
-num_epochs = 5000
+num_epochs = 20
 progress = tqdm(range(num_epochs))
 losses = []
 for epoch in progress:
@@ -80,17 +84,47 @@ for epoch in progress:
             minibatch.image,
             minibatch.position,
         )
-        optimizer = optimizer.apply_gradient(grad)
+        optimizer = optimizer.apply_gradient(
+            grad, learning_rate=1e-3 if epoch < 10 else 1e-4
+        )
         losses.append(loss_value)
 
         if optimizer.state.step < 10 or optimizer.state.step % 100 == 0:
-            print(
-                f"{optimizer.state.step} Standard deviations:",
-                get_standard_deviations(minibatch),
+            # Log to Tensorboard
+            summary_writer.add_scalar(
+                "train/loss", float(loss_value), global_step=optimizer.state.step
             )
-            progress.set_description(f"Current loss: {loss_value:10.6f}")
 
-            trainer.metadata["loss"] = float(loss_value)
-            trainer.save_checkpoint(optimizer)
+            if optimizer.state.step % 100 == 0:
+                trainer.metadata["loss"] = float(loss_value)
+                trainer.save_checkpoint(optimizer)
+
+            if optimizer.state.step % 500 == 0:
+                standard_deviations = get_standard_deviations(minibatch)
+                print(
+                    f"{optimizer.state.step} Standard deviations:", standard_deviations
+                )
+                summary_writer.add_scalar(
+                    "train/std_pred_x",
+                    float(standard_deviations[0][0]),
+                    global_step=optimizer.state.step,
+                )
+                summary_writer.add_scalar(
+                    "train/std_pred_y",
+                    float(standard_deviations[0][1]),
+                    global_step=optimizer.state.step,
+                )
+
+                summary_writer.add_scalar(
+                    "train/std_label_x",
+                    float(standard_deviations[1][0]),
+                    global_step=optimizer.state.step,
+                )
+                summary_writer.add_scalar(
+                    "train/std_label_y",
+                    float(standard_deviations[1][1]),
+                    global_step=optimizer.state.step,
+                )
+
 
 trainer.save_checkpoint(optimizer)
