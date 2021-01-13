@@ -111,7 +111,7 @@ def load_trajectories(train: bool) -> List[ToyDatasetStruct]:
     return trajectories
 
 
-class ToyTrajectoryDataset(torch.utils.data.Dataset):
+class ToySubsequenceDataset(torch.utils.data.Dataset):
     def __init__(self, train: bool, subsequence_length: int = 5):
         self.samples: List[ToyDatasetStruct] = []
 

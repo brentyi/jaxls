@@ -6,7 +6,7 @@ import flax
 import jax
 import numpy as onp
 import torch
-from data import ToyTrajectoryDataset, collate_fn
+from data import ToySubsequenceDataset, collate_fn
 from jax import numpy as jnp
 from networks import SimpleCNN
 from toy_system import (
