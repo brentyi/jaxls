@@ -1,13 +1,23 @@
 import dataclasses
+import pathlib
 from typing import List, Optional
 
 import fannypack
 import jax
-import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
+
+import jaxfg
+
+# Download Google Drive files to same directory as this file
+fannypack.data.set_cache_path(pathlib.Path(__file__).parent.absolute() / ".cache/")
+
+DATASET_URLS = {
+    "toy_tracking_train.hdf5": "https://drive.google.com/file/d/175y7rlpVLcX6WJk5rHqcG5yT79CnOLab/view?usp=sharing",
+    "toy_tracking_val.hdf5": "https://drive.google.com/file/d/1hPujtHgYWWHyMikzGTvv1UpL3QrZfN1i/view?usp=sharing",
+}
 
 DATASET_MEANS = {
     "image": onp.array([24.30598765, 29.76503314, 29.86749727], dtype=onp.float32),
@@ -62,23 +72,29 @@ class ToyDatasetStruct:
         )
 
 
-def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
-    """Grabs a list of trajectories from a set of input files."""
+def load_trajectories(train: bool) -> List[ToyDatasetStruct]:
+    """Grabs a list of trajectories from a set of input files.
+
+    Set `train` to False to load validation set.
+    """
     trajectories = []
-    for path in paths:
-        with fannypack.data.TrajectoriesFile(path) as traj_file:
-            for trajectory in tqdm(traj_file):
-                trajectory["normalized"] = False
-                trajectories.append(
-                    ToyDatasetStruct(
-                        **{
-                            # Assume all dataclass field names exist as string keys
-                            # in our HDF5 file
-                            field.name: trajectory[field.name]
-                            for field in dataclasses.fields(ToyDatasetStruct)
-                        },
-                    ).normalize()
-                )
+
+    filename = "toy_tracking_train.hdf5" if train else "toy_tracking_val.hdf5"
+    path = fannypack.data.cached_drive_file(filename, DATASET_URLS[filename])
+
+    with fannypack.data.TrajectoriesFile(path) as traj_file:
+        for trajectory in tqdm(traj_file):
+            trajectory["normalized"] = False
+            trajectories.append(
+                ToyDatasetStruct(
+                    **{
+                        # Assume all dataclass field names exist as string keys
+                        # in our HDF5 file
+                        field.name: trajectory[field.name]
+                        for field in dataclasses.fields(ToyDatasetStruct)
+                    },
+                ).normalize()
+            )
 
     # Print some data statistics
     for field in ("image", "position", "velocity"):
@@ -96,10 +112,10 @@ def load_trajectories(*paths: str) -> List[ToyDatasetStruct]:
 
 
 class ToyTrajectoryDataset(torch.utils.data.Dataset):
-    def __init__(self, *paths: str, subsequence_length: int = 5):
+    def __init__(self, train: bool, subsequence_length: int = 5):
         self.samples: List[ToyDatasetStruct] = []
 
-        for trajectory in load_trajectories(*paths):
+        for trajectory in load_trajectories(train=train):
             timesteps = len(trajectory.image)
             index = 0
             while index + subsequence_length <= timesteps:
@@ -118,10 +134,10 @@ class ToyTrajectoryDataset(torch.utils.data.Dataset):
 
 
 class ToySingleStepDataset(torch.utils.data.Dataset):
-    def __init__(self, *paths: str):
+    def __init__(self, train: bool):
         self.samples: List[ToyDatasetStruct] = []
 
-        for trajectory in load_trajectories(*paths):
+        for trajectory in load_trajectories(train=train):
             timesteps = len(trajectory.image)
             for t in range(timesteps):
                 self.samples.append(

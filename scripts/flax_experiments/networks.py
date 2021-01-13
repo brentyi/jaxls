@@ -1,5 +1,12 @@
+from typing import Tuple
+
+import flax
+import jax
+import numpy as onp
 from flax import linen as nn
 from jax import numpy as jnp
+
+import jaxfg
 
 
 class SimpleMLP(nn.Module):
@@ -59,3 +66,19 @@ class SimpleCNN(nn.Module):
         x = SimpleMLP.make(units=32, layers=3, output_dim=2)(x)
 
         return x
+
+
+def make_position_cnn(seed: int = 0) -> Tuple[SimpleCNN, flax.optim.Adam]:
+    """Make CNN and ADAM optimizer for disk tracking predictions.
+
+    Args:
+        seed (int): Random seed.
+
+    Returns:
+        Tuple[SimpleCNN, jaxfg.types.PyTree]: Tuple of (model, model_parameters).
+    """
+    model = SimpleCNN()
+
+    prng_key = jax.random.PRNGKey(seed=seed)
+    dummy_image = onp.zeros((1, 120, 120, 3))
+    return model, flax.optim.Adam().create(model.init(prng_key, dummy_image))

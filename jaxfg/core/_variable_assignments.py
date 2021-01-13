@@ -53,11 +53,11 @@ class StorageMetadata:
     ) -> "StorageMetadata":
         """Determine storage indexing from variable list."""
 
-        # Bucket variables by type + sort deterministically!
+        # Bucket variables by type
         variables_from_type: DefaultDict[
             Type["VariableBase"], List["VariableBase"]
         ] = DefaultDict(list)
-        for variable in sorted(variables):
+        for variable in variables:
             variables_from_type[type(variable)].append(variable)
 
         # Assign block of storage vector for each variable

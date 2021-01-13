@@ -87,13 +87,13 @@ class VisionFactor(jaxfg.core.FactorBase):
     @staticmethod
     def make(
         state_variable: StateVariable,
-        position: jnp.ndarray,
+        predicted_position: jnp.ndarray,
         scale_tril_inv: jaxfg.types.ScaleTrilInv,
     ) -> "VisionFactor":
         return VisionFactor(
             variables=(state_variable,),
             scale_tril_inv=scale_tril_inv,
-            predicted_position=position,
+            predicted_position=predicted_position,
         )
 
     @overrides
@@ -120,7 +120,7 @@ class DummyVelocityFactor(jaxfg.core.FactorBase):
 
 SPRING_CONSTANT = 0.05
 DRAG_CONSTANT = 0.0075
-POSITION_NOISE_STD = 1.0  # 0.1
+POSITION_NOISE_STD = 0.1
 VELOCITY_NOISE_STD = 2.0
 
 SCALE_TRIL_INV = onp.diag(

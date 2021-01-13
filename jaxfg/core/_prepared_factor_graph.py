@@ -23,9 +23,9 @@ class PreparedFactorGraph:
     Improves runtime by stacking factors based on their group key.
     """
 
-    stacked_factors: List[FactorBase]
-    jacobian_coords: List[jnp.ndarray]
-    value_indices: List[
+    stacked_factors: Tuple[FactorBase, ...]
+    jacobian_coords: Tuple[jnp.ndarray, ...]
+    value_indices: Tuple[
         Tuple[jnp.ndarray, ...]
     ]  # List index: factor #, tuple index: variable #
     local_storage_metadata: StorageMetadata
@@ -55,8 +55,8 @@ class PreparedFactorGraph:
             "PreparedFactorGraph":
         """
 
-        # Start by grouping our factors and grabbing a list of variables
-        variables: Set[VariableBase] = set()
+        # Start by grouping our factors and grabbing a list of (ordered!) variables
+        variables_ordered_set: Dict[VariableBase, None] = {}
         factors_from_group: Dict[types.GroupKey, List[FactorBase]] = {}
         for factor in factors:
             group_key = factor.group_key()
@@ -64,7 +64,9 @@ class PreparedFactorGraph:
                 factors_from_group[group_key] = []
 
             factors_from_group[group_key].append(factor)
-            variables.update(factor.variables)
+            for v in factor.variables:
+                variables_ordered_set[v] = None
+        variables = list(variables_ordered_set.keys())
 
         # Make sure factors are unique
         for factors in factors_from_group.values():
@@ -157,9 +159,9 @@ class PreparedFactorGraph:
                 jacobian_coords.append(coords)
 
         return PreparedFactorGraph(
-            stacked_factors=stacked_factors,
-            jacobian_coords=jacobian_coords,
-            value_indices=value_indices,
+            stacked_factors=tuple(stacked_factors),
+            jacobian_coords=tuple(jacobian_coords),
+            value_indices=tuple(value_indices),
             local_storage_metadata=delta_storage_metadata,
             residual_dim=residual_index,
         )

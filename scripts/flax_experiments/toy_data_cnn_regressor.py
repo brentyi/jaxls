@@ -4,13 +4,13 @@ import datargs
 import fannypack
 import flax
 import jax
-import jaxfg
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
 
+import jaxfg
+import networks
 from data import ToyDatasetStruct, ToySingleStepDataset, collate_fn
-from networks import SimpleCNN
 from trainer import Trainer
 
 # Setup configuration
@@ -31,25 +31,16 @@ summary_writer = torch.utils.tensorboard.SummaryWriter(
 
 # Prep for training
 dataloader = torch.utils.data.DataLoader(
-    ToySingleStepDataset(
-        "data/toy_train.hdf5",
-    ),
+    ToySingleStepDataset(train=True),
     batch_size=32,
     collate_fn=collate_fn,
 )
 
 # Create our network
-model = SimpleCNN()
-prng_key = jax.random.PRNGKey(0)
-
-# Create our optimizer
-dummy_image = jnp.zeros((1, 120, 120, 3))
+model, optimizer = networks.make_position_cnn(seed=0)
 
 trainer = Trainer(experiment_name=args.experiment_name)
-
-optimizer = flax.optim.Adam().create(
-    target=model.init(prng_key, dummy_image),  # Initial MLP parameters
-)
+optimizer = trainer.load_checkpoint(optimizer)
 
 # Define loss, gradients, etc
 @jax.jit
@@ -84,47 +75,43 @@ for epoch in progress:
             minibatch.image,
             minibatch.position,
         )
-        optimizer = optimizer.apply_gradient(
-            grad, learning_rate=1e-3 if epoch < 10 else 1e-4
-        )
+        optimizer = optimizer.apply_gradient(grad, learning_rate=1e-4)
         losses.append(loss_value)
 
-        if optimizer.state.step < 10 or optimizer.state.step % 100 == 0:
+        if optimizer.state.step < 10 or optimizer.state.step % 10 == 0:
             # Log to Tensorboard
             summary_writer.add_scalar(
                 "train/loss", float(loss_value), global_step=optimizer.state.step
             )
 
-            if optimizer.state.step % 100 == 0:
-                trainer.metadata["loss"] = float(loss_value)
-                trainer.save_checkpoint(optimizer)
+        if optimizer.state.step % 100 == 0:
+            trainer.metadata["loss"] = float(loss_value)
+            trainer.save_checkpoint(optimizer)
 
-            if optimizer.state.step % 500 == 0:
-                standard_deviations = get_standard_deviations(minibatch)
-                print(
-                    f"{optimizer.state.step} Standard deviations:", standard_deviations
-                )
-                summary_writer.add_scalar(
-                    "train/std_pred_x",
-                    float(standard_deviations[0][0]),
-                    global_step=optimizer.state.step,
-                )
-                summary_writer.add_scalar(
-                    "train/std_pred_y",
-                    float(standard_deviations[0][1]),
-                    global_step=optimizer.state.step,
-                )
+        if optimizer.state.step % 500 == 0:
+            standard_deviations = get_standard_deviations(minibatch)
+            print(f"{optimizer.state.step} Standard deviations:", standard_deviations)
+            summary_writer.add_scalar(
+                "train/std_pred_x",
+                float(standard_deviations[0][0]),
+                global_step=optimizer.state.step,
+            )
+            summary_writer.add_scalar(
+                "train/std_pred_y",
+                float(standard_deviations[0][1]),
+                global_step=optimizer.state.step,
+            )
 
-                summary_writer.add_scalar(
-                    "train/std_label_x",
-                    float(standard_deviations[1][0]),
-                    global_step=optimizer.state.step,
-                )
-                summary_writer.add_scalar(
-                    "train/std_label_y",
-                    float(standard_deviations[1][1]),
-                    global_step=optimizer.state.step,
-                )
+            summary_writer.add_scalar(
+                "train/std_label_x",
+                float(standard_deviations[1][0]),
+                global_step=optimizer.state.step,
+            )
+            summary_writer.add_scalar(
+                "train/std_label_y",
+                float(standard_deviations[1][1]),
+                global_step=optimizer.state.step,
+            )
 
 
 trainer.save_checkpoint(optimizer)
