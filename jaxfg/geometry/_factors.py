@@ -10,7 +10,7 @@ from .. import types, utils
 from ..core._factors import FactorBase
 from ._lie_variables import LieVariableBase
 
-LieGroupType = TypeVar("T", bound=jaxlie.MatrixLieGroup)
+LieGroupType = TypeVar("LieGroupType", bound=jaxlie.MatrixLieGroup)
 
 
 @dataclasses.dataclass(frozen=True)

@@ -1,20 +1,10 @@
 import dataclasses
-from typing import TYPE_CHECKING, Any, Hashable, Tuple, Type
+from typing import Tuple
 
 import jax
 from jax import numpy as jnp
 
-from . import utils
-
-if TYPE_CHECKING:
-    from ._factors import FactorBase
-
-PyTree = Any
-VariableValue = PyTree
-LocalVariableValue = PyTree
-
-ScaleTril = jnp.ndarray
-ScaleTrilInv = jnp.ndarray
+from .. import utils
 
 
 @jax.partial(utils.register_dataclass_pytree, static_fields=("shape",))
@@ -52,22 +42,3 @@ class SparseMatrix:
             coords=jnp.flip(self.coords, axis=-1),
             shape=self.shape[::-1],
         )
-
-
-@dataclasses.dataclass(frozen=True)
-class GroupKey:
-    """Key for grouping factors that can be computed in parallel."""
-
-    factor_type: Type["FactorBase"]
-    secondary_key: Hashable
-
-
-__all__ = [
-    "PyTree",
-    "VariableValue",
-    "LocalVariableValue",
-    "ScaleTril",
-    "ScaleTrilInv",
-    "SparseMatrix",
-    "GroupKey",
-]

@@ -18,13 +18,12 @@
 
 import flax
 import jax
+import jaxfg
 import matplotlib.pyplot as plt
 import numpy as onp
 from flax import linen as nn
 from jax import numpy as jnp
 from tqdm.auto import tqdm
-
-import jaxfg
 
 
 # Helper class for MLPs

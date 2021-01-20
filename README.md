@@ -53,7 +53,11 @@ Applications include sensor fusion, optimal control, planning, SLAM, etc.
     - [x] Better parallel factor interface
     - [x] Separate out utils, lie group helpers
     - [x] Put things in folders
+  - [x] Resolve typing errors
   - [ ] Cleanup/refactor (more)
   - [ ] Package cleanup: dependencies, etc
-  - [ ] Add CI: mypy, flake8, pytest, etc.
+  - [ ] Add CI:
+    - [x] mypy
+    - [x] lint
+    - [ ] build
   - [ ] Tests

@@ -5,13 +5,13 @@ import datargs
 import fannypack
 import flax
 import jax
+import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
 
 import data
-import jaxfg
 import networks
 import toy_system
 from trainer import Trainer

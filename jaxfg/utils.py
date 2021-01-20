@@ -93,7 +93,7 @@ def register_dataclass_pytree(
             if name not in state:
                 raise ValueError(
                     f"Missing field {name} in state dict while restoring"
-                    f" an instance of {clz.__name__}"
+                    f" an instance of {cls.__name__}"
                 )
             value = getattr(x, name)
             value_state = state.pop(name)
@@ -102,7 +102,7 @@ def register_dataclass_pytree(
             names = ",".join(state.keys())
             raise ValueError(
                 f'Unknown field(s) "{names}" in state dict while'
-                f" restoring an instance of {clz.__name__}"
+                f" restoring an instance of {cls.__name__}"
             )
         return dataclasses.replace(x, **updates)
 

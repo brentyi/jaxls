@@ -43,7 +43,7 @@ class StorageMetadata:
     """Number of variables of each type."""
 
     @property
-    def ordered_variables(self) -> Tuple["VariableBase"]:
+    def ordered_variables(self) -> Tuple["VariableBase", ...]:
         # Dictionaries from Python 3.7 retain insertion order
         return tuple(self.index_from_variable.keys())
 
@@ -85,7 +85,7 @@ class StorageMetadata:
         )
 
 
-VariableValueType = TypeVar("T", bound=types.VariableValue)
+VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
 
 @jax.partial(utils.register_dataclass_pytree, static_fields=("storage_metadata",))
@@ -103,7 +103,9 @@ class VariableAssignments:
         """Helper for iterating over variables."""
         return self.storage_metadata.ordered_variables
 
-    def get_value(self, variable: "VariableBase[T]") -> VariableValueType:
+    def get_value(
+        self, variable: "VariableBase[VariableValueType]"
+    ) -> VariableValueType:
         """Get value corresponding to specific variable.  """
         index = self.storage_metadata.index_from_variable[variable]
         return type(variable).unflatten(
@@ -111,7 +113,7 @@ class VariableAssignments:
         )
 
     def get_stacked_value(
-        self, variable_type: Type[VariableValueType]
+        self, variable_type: Type[VariableBase[VariableValueType]]
     ) -> VariableValueType:
         """Get values of all variables corresponding to a specific type."""
         index = self.storage_metadata.index_from_variable_type[variable_type]
@@ -207,7 +209,7 @@ class VariableAssignments:
                 storage_index : storage_index + dim * count
             ].set(
                 variable_type.flatten(
-                    jax.vmap(variable_type.add_local)(
+                    jax.vmap(variable_type.manifold_retract)(
                         variable_type.unflatten(batched_xs), batched_deltas
                     )
                 ).flatten()

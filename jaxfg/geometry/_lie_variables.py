@@ -1,4 +1,4 @@
-from typing import Tuple, Type, TypeVar
+from typing import Generic, Type, TypeVar, cast
 
 import jaxlie
 from jax import numpy as jnp
@@ -10,13 +10,13 @@ from ..core._variables import VariableBase
 T = TypeVar("T", bound=jaxlie.MatrixLieGroup)
 
 
-class LieVariableBase(VariableBase[T]):
-    MatrixLieGroupType: Type[jaxlie.MatrixLieGroup] = jaxlie.MatrixLieGroup
+class LieVariableBase(VariableBase[T], Generic[T]):
+    MatrixLieGroupType: Type[T]
     """Lie group type."""
 
 
-def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
-    class _LieVariable(LieVariableBase):
+def make_lie_variable(Group: Type[T]):
+    class _LieVariable(LieVariableBase[T]):
         """Variable containing a transformation."""
 
         MatrixLieGroupType = Group
@@ -33,29 +33,28 @@ def make_lie_variable(Group: Type[jaxlie.MatrixLieGroup]):
 
         @staticmethod
         @overrides
-        def get_default_value() -> Group:
-            return Group.identity()
+        def get_default_value() -> T:
+            return cast(T, Group.identity())
 
         @staticmethod
-        #  @jax.custom_jvp
-        def add_local(x: Group, local_delta: jaxlie.types.TangentVector) -> Group:
+        def manifold_retract(x: T, local_delta: jaxlie.types.TangentVector) -> T:
             return jaxlie.manifold.rplus(x, local_delta)
 
         @staticmethod
         @overrides
-        def subtract_local(x: Group, y: Group) -> types.LocalVariableValue:
+        def manifold_inverse_retract(x: T, y: T) -> types.LocalVariableValue:
             # x = world<-A, y = world<-B
             # Difference = A<-B
             return jaxlie.manifold.rminus(x, y)
 
         @staticmethod
         @overrides
-        def flatten(x: Group) -> jnp.ndarray:
+        def flatten(x: T) -> jnp.ndarray:
             return x.parameters
 
         @staticmethod
         @overrides
-        def unflatten(flat: jnp.ndarray) -> Group:
+        def unflatten(flat: jnp.ndarray) -> T:
             return Group(flat)
 
     return _LieVariable

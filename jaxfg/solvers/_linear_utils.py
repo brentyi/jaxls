@@ -1,15 +1,7 @@
-import dataclasses
-from typing import TYPE_CHECKING, Type
-
 import jax
-import jax.numpy as jnp
+from jax import numpy as jnp
 
 from .. import types
-
-if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import PreparedFactorGraph
-    from ..core._variable_assignments import VariableAssignments
-    from ..core._variables import VariableBase
 
 
 @jax.jit
@@ -57,7 +49,9 @@ def sparse_linear_solve(
         A=ATA_function,
         b=ATb,
         x0=initial_x,
-        maxiter=len(initial_x),  # Default value used by Eigen
+        maxiter=len(
+            initial_x
+        ),  # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
         tol=tol,
         M=jacobi_preconditioner,
     )

@@ -2,11 +2,10 @@ from typing import Tuple
 
 import flax
 import jax
+import jaxfg
 import numpy as onp
 from flax import linen as nn
 from jax import numpy as jnp
-
-import jaxfg
 
 
 class SimpleMLP(nn.Module):

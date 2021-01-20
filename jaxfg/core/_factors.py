@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import TYPE_CHECKING, Set, Tuple, Type, TypeVar
+from typing import TYPE_CHECKING, FrozenSet, Tuple, Type, TypeVar
 
 import jax
 import numpy as onp
@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
 
-@dataclasses.dataclass(frozen=True)
+# Disable type-checking here
+# > https://github.com/python/mypy/issues/5374
+@dataclasses.dataclass(frozen=True)  # type: ignore
 class FactorBase(abc.ABC):
     variables: Tuple["VariableBase", ...]
     """Variables connected to this factor."""
@@ -24,7 +26,7 @@ class FactorBase(abc.ABC):
     scale_tril_inv: types.ScaleTrilInv
     """Inverse square root of covariance matrix."""
 
-    _static_fields: Set[str] = dataclasses.field(default=frozenset(), init=False)
+    _static_fields: FrozenSet[str] = dataclasses.field(default=frozenset(), init=False)
     """Fields to ignore when stacking."""
 
     @property
@@ -75,7 +77,7 @@ class FactorBase(abc.ABC):
         aux_dict = dict(zip(aux_keys, aux_values))
         aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variabletypes"))
 
-        out = cls(**dict(zip(array_keys, children)), **aux_dict)
+        out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
         return out
 
     def group_key(self) -> types.GroupKey:
@@ -120,7 +122,7 @@ class FactorBase(abc.ABC):
             local_deltas: Tuple[jnp.ndarray, ...]
         ) -> jnp.ndarray:
             perturbed_values = [
-                variable.add_local(
+                variable.manifold_retract(
                     x=variable_value,
                     local_delta=local_delta,
                 )

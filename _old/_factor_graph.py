@@ -281,7 +281,7 @@ class FactorGraph:
             ):
                 variable_type: Type["VariableBase"]
                 perturbed_values = [
-                    variable_type.add_local(
+                    variable_type.manifold_retract(
                         x=x.reshape(variable_type.get_parameter_shape()),
                         local_delta=local_delta,
                     )
@@ -407,7 +407,9 @@ class FactorGraph:
 
             # Batched variable update
             new_storage = new_storage.at[storage_pos : storage_pos + dim * count].set(
-                jax.vmap(variable_type.add_local)(batched_xs, batched_deltas).flatten()
+                jax.vmap(variable_type.manifold_retract)(
+                    batched_xs, batched_deltas
+                ).flatten()
             )
 
         return (

@@ -4,11 +4,11 @@ import datargs
 import fannypack
 import flax
 import jax
+import jaxfg
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
 
-import jaxfg
 import networks
 from data import ToyDatasetStruct, ToySingleStepDataset, collate_fn
 from trainer import Trainer

@@ -4,12 +4,11 @@ from typing import List, Optional
 
 import fannypack
 import jax
+import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
-
-import jaxfg
 
 # Download Google Drive files to same directory as this file
 fannypack.data.set_cache_path(pathlib.Path(__file__).parent.absolute() / ".cache/")

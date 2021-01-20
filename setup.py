@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name="jaxfg",
@@ -8,7 +8,8 @@ setup(
     author="brentyi",
     author_email="brentyi@berkeley.edu",
     license="BSD",
-    packages=["jaxfg"],
+    packages=find_packages(),
+    package_data={"jaxlie": ["py.typed"]},
     install_requires=[
         "jax",
         "jaxlib",

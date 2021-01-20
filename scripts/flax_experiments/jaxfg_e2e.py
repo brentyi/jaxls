@@ -4,10 +4,9 @@ import jax
 import numpy as onp
 from flax import optim
 from jax import numpy as jnp
+from jaxfg import core, geometry, solvers, utils
 from jaxlie import SE2
 from matplotlib import pyplot as plt
-
-from jaxfg import core, geometry, solvers, utils
 
 # Compute ground-truth values for three poses: A, B, and C
 T_a_b = SE2.from_xy_theta(1.0, 0.0, 0.2)

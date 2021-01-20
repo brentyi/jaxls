@@ -4,10 +4,13 @@ from typing import cast
 import fannypack
 import flax
 import jax
+import jaxfg
 import numpy as onp
 import torch
-from data import ToySubsequenceDataset, collate_fn
 from jax import numpy as jnp
+from tqdm.auto import tqdm
+
+from data import ToySubsequenceDataset, collate_fn
 from networks import SimpleCNN
 from toy_system import (
     DummyVelocityFactor,
@@ -16,9 +19,6 @@ from toy_system import (
     StateVariable,
     VisionFactor,
 )
-from tqdm.auto import tqdm
-
-import jaxfg
 
 fannypack.utils.pdb_safety_net()
 

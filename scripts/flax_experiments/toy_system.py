@@ -1,11 +1,10 @@
 import dataclasses
 from typing import Type
 
+import jaxfg
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
-
-import jaxfg
 
 
 @jaxfg.utils.register_dataclass_pytree
@@ -61,12 +60,12 @@ class StateVariable(jaxfg.core.VariableBase):  # type: ignore
 
     @staticmethod
     @overrides
-    def add_local(x: State, local_delta: jnp.ndarray) -> State:
+    def manifold_retract(x: State, local_delta: jnp.ndarray) -> State:
         return State(params=x.params + local_delta)
 
     @staticmethod
     @overrides
-    def subtract_local(x: State, y: State) -> jnp.ndarray:
+    def manifold_inverse_retract(x: State, y: State) -> jnp.ndarray:
         return x.params - y.params
 
     @staticmethod

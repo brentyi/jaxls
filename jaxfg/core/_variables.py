@@ -15,7 +15,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
 
     @staticmethod
     @abc.abstractmethod
-    def get_parameter_dim(cls) -> int:
+    def get_parameter_dim() -> int:
         """Dimensionality of underlying parameterization."""
 
     @staticmethod
@@ -30,10 +30,10 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
 
     @staticmethod
     @abc.abstractmethod
-    def add_local(
+    def manifold_retract(
         x: VariableValueType, local_delta: VariableValueType
     ) -> VariableValueType:
-        r"""Add local (on-manifold) perturbation.
+        r"""Retract local delta to manifold.
 
         Typically written as `x $\oplus$ local_delta` or `x $\boxplus$ local_delta`.
 
@@ -47,7 +47,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
 
     @staticmethod
     @abc.abstractmethod
-    def subtract_local(
+    def manifold_inverse_retract(
         x: VariableValueType, y: VariableValueType
     ) -> types.LocalVariableValue:
         """Compute the local difference between two variable values.
@@ -106,12 +106,12 @@ class AbstractRealVectorVariable(VariableBase[jnp.ndarray]):
 
     @staticmethod
     @overrides
-    def add_local(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
+    def manifold_retract(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
         return x + local_delta
 
     @staticmethod
     @overrides
-    def subtract_local(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+    def manifold_inverse_retract(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
         return x - y
 
     @staticmethod

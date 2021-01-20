@@ -26,8 +26,8 @@ class PreparedFactorGraph:
     stacked_factors: Tuple[FactorBase, ...]
     jacobian_coords: Tuple[jnp.ndarray, ...]
     value_indices: Tuple[
-        Tuple[jnp.ndarray, ...]
-    ]  # List index: factor #, tuple index: variable #
+        Tuple[jnp.ndarray, ...], ...
+    ]  # value_indices[factor #][variable #] -> int array
     local_storage_metadata: StorageMetadata
     residual_dim: int
 
@@ -41,7 +41,7 @@ class PreparedFactorGraph:
                 assert value_indices.shape == (N, variable.get_parameter_dim())
 
     @property
-    def variables(self) -> Tuple[VariableBase]:
+    def variables(self) -> Tuple[VariableBase, ...]:
         return self.local_storage_metadata.ordered_variables
 
     @staticmethod
@@ -117,10 +117,10 @@ class PreparedFactorGraph:
                     )
 
             # Stack: end result should be Tuple[array of shape (N, *parameter_shape), ...]
-            value_indices_stacked: Tuple[jnp.ndarray] = tuple(
+            value_indices_stacked: Tuple[jnp.ndarray, ...] = tuple(
                 jnp.array(indices) for indices in value_indices_list
             )
-            local_value_indices_stacked: Tuple[jnp.ndarray] = tuple(
+            local_value_indices_stacked: Tuple[jnp.ndarray, ...] = tuple(
                 jnp.array(indices) for indices in local_value_indices_list
             )
 

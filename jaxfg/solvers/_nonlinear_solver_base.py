@@ -7,10 +7,9 @@ from jax import numpy as jnp
 
 from .. import utils
 from ..core._variable_assignments import VariableAssignments
-from . import _linear_utils
 
 if TYPE_CHECKING:
-    from .._prepared_factor_graph import PreparedFactorGraph
+    from ..core._prepared_factor_graph import PreparedFactorGraph
 
 
 @utils.register_dataclass_pytree
