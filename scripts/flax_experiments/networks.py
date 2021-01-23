@@ -2,10 +2,11 @@ from typing import Tuple
 
 import flax
 import jax
-import jaxfg
 import numpy as onp
 from flax import linen as nn
 from jax import numpy as jnp
+
+import jaxfg
 
 
 class SimpleMLP(nn.Module):
@@ -28,35 +29,6 @@ class SimpleMLP(nn.Module):
 
         x = nn.Dense(self.output_dim)(x)
         return x
-
-
-class PositiveMLP(nn.Module):
-    """PositiveMLP."""
-
-    units: int
-    layers: int
-    output_dim: int
-
-    @staticmethod
-    def make(units: int, layers: int, output_dim: int):
-        """Dummy constructor for type-checking."""
-        return SimpleMLP(units=units, layers=layers, output_dim=output_dim)
-
-    @nn.compact
-    def __call__(self, inputs: jnp.ndarray):
-        """__call__.
-
-        Args:
-            inputs (jnp.ndarray): inputs
-        """
-        x = inputs
-
-        for i in range(self.layers):
-            x = nn.Dense(self.units)(x)
-            x = nn.relu(x)
-
-        x = nn.Dense(self.output_dim)(x)
-        return x ** 2
 
 
 class SimpleCNN(nn.Module):
@@ -122,7 +94,7 @@ def make_uncertainty_mlp(seed: int = 0) -> Tuple[SimpleMLP, flax.optim.Adam]:
     Returns:
         Tuple[SimpleMLP, flax.optim.Adam]:
     """
-    model = PositiveMLP.make(units=64, layers=4, output_dim=1)
+    model = SimpleMLP.make(units=64, layers=4, output_dim=1)
 
     prng_key = jax.random.PRNGKey(seed=seed)
     dummy_input = onp.zeros((1, 1))

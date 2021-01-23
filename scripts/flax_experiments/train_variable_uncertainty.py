@@ -178,7 +178,6 @@ def compute_smoother_mse(
     assert positions_label.shape == positions_predicted.shape == (N, 2)
 
     mse = jnp.mean((positions_predicted - positions_label) ** 2)
-    mse /= N
 
     return mse
 

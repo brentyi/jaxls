@@ -4,11 +4,12 @@ from typing import List, Optional
 
 import fannypack
 import jax
-import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
+
+import jaxfg
 
 # Download Google Drive files to same directory as this file
 fannypack.data.set_cache_path(pathlib.Path(__file__).parent.absolute() / ".cache/")
@@ -32,48 +33,53 @@ DATASET_STD_DEVS = {
 }
 
 
-@jax.partial(jaxfg.utils.register_dataclass_pytree, static_fields=("normalized",))
 @dataclasses.dataclass(frozen=True)
-class ToyDatasetStruct:
+class _ToyDatasetStruct:
     """Fields in our toy dataset. Holds an array or timestep."""
 
-    normalized: bool
     image: Optional[jnp.ndarray] = None
     visible_pixels_count: Optional[jnp.ndarray] = None
     position: Optional[jnp.ndarray] = None
     velocity: Optional[jnp.ndarray] = None
 
-    def normalize(self) -> "ToyDatasetStruct":
-        assert not self.normalized
-        # return self
 
-        # Data normalization
-        return dataclasses.replace(
-            self,
-            normalized=True,
-            **{
-                k: (self.__getattribute__(k) - DATASET_MEANS[k]) / DATASET_STD_DEVS[k]
-                for k in DATASET_MEANS.keys()
-                if self.__getattribute__(k) is not None
-            },
-        )
-
-    def unnormalize(self) -> "ToyDatasetStruct":
-        assert self.normalized
-
-        # Data normalization
-        return dataclasses.replace(
-            self,
-            normalized=False,
-            **{
-                k: (self.__getattribute__(k) * DATASET_STD_DEVS[k]) + DATASET_MEANS[k]
-                for k in DATASET_MEANS.keys()
-                if self.__getattribute__(k) is not None
-            },
+@jaxfg.utils.register_dataclass_pytree
+class ToyDatasetStructUnnormalized(_ToyDatasetStruct):
+    def normalize(self) -> "ToyDatasetStructNormalized":
+        return ToyDatasetStructNormalized(
+            **vars(
+                dataclasses.replace(
+                    self,
+                    **{
+                        k: (self.__getattribute__(k) - DATASET_MEANS[k])
+                        / DATASET_STD_DEVS[k]
+                        for k in DATASET_MEANS.keys()
+                        if self.__getattribute__(k) is not None
+                    },
+                )
+            )
         )
 
 
-def load_trajectories(train: bool) -> List[ToyDatasetStruct]:
+@jaxfg.utils.register_dataclass_pytree
+class ToyDatasetStructNormalized(_ToyDatasetStruct):
+    def unnormalize(self) -> "ToyDatasetStructUnnormalized":
+        return ToyDatasetStructUnnormalized(
+            **vars(
+                dataclasses.replace(
+                    self,
+                    **{
+                        k: (self.__getattribute__(k) * DATASET_STD_DEVS[k])
+                        + DATASET_MEANS[k]
+                        for k in DATASET_MEANS.keys()
+                        if self.__getattribute__(k) is not None
+                    },
+                )
+            )
+        )
+
+
+def load_trajectories(train: bool) -> List[ToyDatasetStructNormalized]:
     """Grabs a list of trajectories from a set of input files.
 
     Set `train` to False to load validation set.
@@ -85,14 +91,13 @@ def load_trajectories(train: bool) -> List[ToyDatasetStruct]:
 
     with fannypack.data.TrajectoriesFile(path) as traj_file:
         for trajectory in tqdm(traj_file):
-            trajectory["normalized"] = False
             trajectories.append(
-                ToyDatasetStruct(
+                ToyDatasetStructUnnormalized(
                     **{
                         # Assume all dataclass field names exist as string keys
                         # in our HDF5 file
                         field.name: trajectory[field.name]
-                        for field in dataclasses.fields(ToyDatasetStruct)
+                        for field in dataclasses.fields(ToyDatasetStructUnnormalized)
                     },
                 ).normalize()
             )
@@ -117,7 +122,7 @@ def load_trajectories(train: bool) -> List[ToyDatasetStruct]:
 
 class ToySubsequenceDataset(torch.utils.data.Dataset):
     def __init__(self, train: bool, subsequence_length: int = 5):
-        self.samples: List[ToyDatasetStruct] = []
+        self.samples: List[ToyDatasetStructNormalized] = []
 
         for trajectory in load_trajectories(train=train):
             timesteps = len(trajectory.image)
@@ -130,7 +135,7 @@ class ToySubsequenceDataset(torch.utils.data.Dataset):
                 )
                 index += subsequence_length // 2
 
-    def __getitem__(self, index: int) -> ToyDatasetStruct:
+    def __getitem__(self, index: int) -> ToyDatasetStructNormalized:
         return self.samples[index]
 
     def __len__(self) -> int:
@@ -139,7 +144,7 @@ class ToySubsequenceDataset(torch.utils.data.Dataset):
 
 class ToySingleStepDataset(torch.utils.data.Dataset):
     def __init__(self, train: bool):
-        self.samples: List[ToyDatasetStruct] = []
+        self.samples: List[ToyDatasetStructNormalized] = []
 
         for trajectory in load_trajectories(train=train):
             timesteps = len(trajectory.image)
@@ -148,7 +153,7 @@ class ToySingleStepDataset(torch.utils.data.Dataset):
                     jax.tree_util.tree_multimap(lambda x: x[t], trajectory)
                 )
 
-    def __getitem__(self, index: int) -> ToyDatasetStruct:
+    def __getitem__(self, index: int) -> ToyDatasetStructNormalized:
         return self.samples[index]
 
     def __len__(self) -> int:

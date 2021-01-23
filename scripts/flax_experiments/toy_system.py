@@ -1,10 +1,11 @@
 import dataclasses
 from typing import Type
 
-import jaxfg
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
+
+import jaxfg
 
 
 @jaxfg.utils.register_dataclass_pytree
@@ -55,7 +56,7 @@ class StateVariable(jaxfg.core.VariableBase):  # type: ignore
 
     @staticmethod
     @overrides
-    def get_default_value() -> onp.ndarray:
+    def get_default_value() -> State:
         return State(params=onp.zeros(4))
 
     @staticmethod
@@ -130,6 +131,18 @@ SCALE_TRIL_INV = onp.diag(
 )
 assert SCALE_TRIL_INV.shape == (4, 4)
 
+DYNAMICS_COVARIANCE = onp.linalg.inv(SCALE_TRIL_INV @ SCALE_TRIL_INV.T)
+
+
+def dynamics_forward(state: State) -> State:
+    # Predict the state after our dynamics update
+    spring_force = -SPRING_CONSTANT * state.position
+    drag_force = -DRAG_CONSTANT * jnp.sign(state.velocity) * (state.velocity ** 2)
+    return State.make(
+        position=state.position + state.velocity,
+        velocity=state.velocity + spring_force + drag_force,
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class DynamicsFactor(jaxfg.core.FactorBase):
@@ -145,17 +158,5 @@ class DynamicsFactor(jaxfg.core.FactorBase):
 
     @overrides
     def compute_residual_vector(self, before_value: State, after_value: State):
-        # Predict the state after our dynamics update
-        spring_force = -SPRING_CONSTANT * before_value.position
-        drag_force = (
-            -DRAG_CONSTANT
-            * jnp.sign(before_value.velocity)
-            * (before_value.velocity ** 2)
-        )
-        pred_value = State.make(
-            position=before_value.position + before_value.velocity,
-            velocity=before_value.velocity + spring_force + drag_force,
-        )
-
-        # Compare predicted update vs variable
+        pred_value = dynamics_forward(before_value)
         return pred_value.params - after_value.params
