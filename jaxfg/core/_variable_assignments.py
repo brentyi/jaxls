@@ -113,7 +113,7 @@ class VariableAssignments:
         )
 
     def get_stacked_value(
-        self, variable_type: Type[VariableBase[VariableValueType]]
+        self, variable_type: Type["VariableBase[VariableValueType]"]
     ) -> VariableValueType:
         """Get values of all variables corresponding to a specific type."""
         index = self.storage_metadata.index_from_variable_type[variable_type]
