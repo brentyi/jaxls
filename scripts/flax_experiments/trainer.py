@@ -43,7 +43,8 @@ class Trainer:
             step=step,
             prefix=f"{self.experiment_name}_",
         )
-        self.metadata = yaml.safe_load(checkpoint.metadata_yaml)
+        metadata = yaml.safe_load(checkpoint.metadata_yaml)
+        self.metadata = metadata if metadata is not None else {}
         self._print(
             f"Loaded checkpoint: was at step {optimizer_template.state.step}, now at {checkpoint.optimizer.state.step}"
         )

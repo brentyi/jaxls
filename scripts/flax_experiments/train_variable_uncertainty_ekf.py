@@ -30,7 +30,7 @@ args: Args = datargs.parse(Args)
 # Make model that we're going to be optimizing
 uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
 trainer = Trainer(experiment_name=args.experiment_name)
-uncertainty_optimizer = trainer.load_checkpoint(uncertainty_optimizer)
+# uncertainty_optimizer = trainer.load_checkpoint(uncertainty_optimizer)
 
 # Set up tensorboard
 summary_writer = torch.utils.tensorboard.SummaryWriter(
@@ -39,9 +39,10 @@ summary_writer = torch.utils.tensorboard.SummaryWriter(
 
 # Load up position CNN model
 position_model, position_optimizer = networks.make_position_cnn()
-position_optimizer = Trainer(experiment_name="overnight").load_checkpoint(
+position_optimizer = Trainer(experiment_name="position-cnn").load_checkpoint(
     position_optimizer
 )
+assert position_optimizer.state.step > 0
 
 
 def predict_positions(images: jnp.ndarray) -> jnp.ndarray:
@@ -85,8 +86,8 @@ def compute_ekf_mse(
     uncertainty_factor = uncertainty_model.apply(
         uncertainty_model_params,
         trajectory.visible_pixels_count.reshape((-1, 1)),
-    )
-    assert uncertainty_model.shape == (subsequence_length,)
+    ).flatten()
+    assert uncertainty_factor.shape == (subsequence_length,)
 
     # Run EKF
     belief = toy_ekf.Belief(
@@ -104,7 +105,7 @@ def compute_ekf_mse(
         belief = toy_ekf.update_step(
             belief,
             observation=predicted_positions[i, :],
-            observation_cov=uncertainty_factor[i] * jnp.eye(2),
+            observation_cov=jnp.eye(2) / (uncertainty_factor[i] ** 2),
         )
         # beliefs.append(belief)
         positions.append(belief.mean[:2])
