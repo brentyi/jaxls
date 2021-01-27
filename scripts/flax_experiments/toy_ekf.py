@@ -11,56 +11,7 @@ import networks
 import toy_system
 import trainer
 
-fannypack.utils.pdb_safety_net()
 
-eval_trajectories = data.load_trajectories(train=False)
-
-
-# Make model that we're going to be optimizing
-uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
-uncertainty_optimizer = trainer.Trainer(
-    experiment_name="initial-uncertainty"
-).load_checkpoint(uncertainty_optimizer)
-
-# Load up position CNN model
-position_model, position_optimizer = networks.make_position_cnn()
-position_optimizer = trainer.Trainer(experiment_name="overnight").load_checkpoint(
-    position_optimizer
-)
-
-
-trajectory_count = len(eval_trajectories)
-subsequence_length = eval_trajectories[0].image.shape[0]
-stacked_trajectories: data.ToyDatasetStructNormalized = jaxfg.utils.pytree_stack(
-    *eval_trajectories
-)
-
-# Get observations for EKF
-observations = (
-    data.ToyDatasetStructNormalized(
-        position=position_model.apply(
-            position_optimizer.target,
-            stacked_trajectories.image.reshape((-1, 120, 120, 3)),
-        ).reshape((trajectory_count, subsequence_length, 2))
-    )
-    .unnormalize()
-    .position
-)
-
-observation_covs = (
-    onp.eye(2)[onp.newaxis, onp.newaxis, :, :]
-    / (
-        uncertainty_model.apply(
-            uncertainty_optimizer.target,
-            stacked_trajectories.visible_pixels_count.reshape((-1, 1)),
-        ).reshape((trajectory_count, subsequence_length, 1, 1))
-        ** 2
-    )
-    # (0.11 ** 2)
-    # * onp.ones((trajectory_count, subsequence_length, 1, 1))
-)
-
-# Run Kalman filter
 @jaxfg.utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class Belief:
@@ -112,34 +63,86 @@ def update_step(belief: Belief, observation: jnp.ndarray, observation_cov: jnp.n
     return belief_updated
 
 
-belief = Belief(
-    mean=toy_system.State.make(
-        position=stacked_trajectories.unnormalize().position[:, 0, :],
-        velocity=stacked_trajectories.unnormalize().velocity[:, 0, :],
-    ).params,
-    cov=onp.zeros((trajectory_count, 4, 4)),
-)
-# positions_predicted_list = []
-# positions_predicted_list.append(toy_system.State(params=belief.mean).position)
-beliefs = [belief]
+__all__ = ["Belief", "predict_step", "update_step"]
 
-predict_step_batch = jax.jit(jax.vmap(predict_step))
-update_step_batch = jax.jit(jax.vmap(update_step))
+if __name__ == "__main__":
+    fannypack.utils.pdb_safety_net()
 
-for i in range(1, subsequence_length):
-    belief = predict_step_batch(belief)
-    belief = update_step_batch(
-        belief, observations[:, i, :], observation_covs[:, i, :, :]
+    eval_trajectories = data.load_trajectories(train=False)
+
+    # Make model that we're going to be optimizing
+    uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
+    uncertainty_optimizer = trainer.Trainer(
+        experiment_name="initial-uncertainty"
+    ).load_checkpoint(uncertainty_optimizer)
+
+    # Load up position CNN model
+    position_model, position_optimizer = networks.make_position_cnn()
+    position_optimizer = trainer.Trainer(experiment_name="overnight").load_checkpoint(
+        position_optimizer
     )
-    beliefs.append(belief)
 
+    trajectory_count = len(eval_trajectories)
+    subsequence_length = eval_trajectories[0].image.shape[0]
+    stacked_trajectories: data.ToyDatasetStructNormalized = jaxfg.utils.pytree_stack(
+        *eval_trajectories
+    )
 
-positions_predicted = onp.stack([b.mean[..., :2] for b in beliefs], axis=1)
-positions_label = stacked_trajectories.unnormalize().position[
-    :, : positions_predicted.shape[1]
-]
-assert positions_predicted.shape == positions_label.shape == observations.shape
-print("RMSE filter", onp.sqrt(onp.mean((positions_predicted - positions_label) ** 2)))
-print("RMSE vision", onp.sqrt(onp.mean((observations - positions_label) ** 2)))
-assert False
-# positions_predicted = onp.array(positions_predicted_list)
+    # Get observations for EKF
+    observations = (
+        data.ToyDatasetStructNormalized(
+            position=position_model.apply(
+                position_optimizer.target,
+                stacked_trajectories.image.reshape((-1, 120, 120, 3)),
+            ).reshape((trajectory_count, subsequence_length, 2))
+        )
+        .unnormalize()
+        .position
+    )
+
+    observation_covs = (
+        onp.eye(2)[onp.newaxis, onp.newaxis, :, :]
+        / (
+            uncertainty_model.apply(
+                uncertainty_optimizer.target,
+                stacked_trajectories.visible_pixels_count.reshape((-1, 1)),
+            ).reshape((trajectory_count, subsequence_length, 1, 1))
+            ** 2
+        )
+        # (0.11 ** 2)
+        # * onp.ones((trajectory_count, subsequence_length, 1, 1))
+    )
+
+    # Run Kalman filter
+    belief = Belief(
+        mean=toy_system.State.make(
+            position=stacked_trajectories.unnormalize().position[:, 0, :],
+            velocity=stacked_trajectories.unnormalize().velocity[:, 0, :],
+        ).params,
+        cov=onp.zeros((trajectory_count, 4, 4)),
+    )
+    # positions_predicted_list = []
+    # positions_predicted_list.append(toy_system.State(params=belief.mean).position)
+    beliefs = [belief]
+
+    predict_step_batch = jax.jit(jax.vmap(predict_step))
+    update_step_batch = jax.jit(jax.vmap(update_step))
+
+    for i in range(1, subsequence_length):
+        belief = predict_step_batch(belief)
+        belief = update_step_batch(
+            belief, observations[:, i, :], observation_covs[:, i, :, :]
+        )
+        beliefs.append(belief)
+
+    positions_predicted = onp.stack([b.mean[..., :2] for b in beliefs], axis=1)
+    positions_label = stacked_trajectories.unnormalize().position[
+        :, : positions_predicted.shape[1]
+    ]
+    assert positions_predicted.shape == positions_label.shape == observations.shape
+    print(
+        "RMSE filter", onp.sqrt(onp.mean((positions_predicted - positions_label) ** 2))
+    )
+    print("RMSE vision", onp.sqrt(onp.mean((observations - positions_label) ** 2)))
+    assert False
+    # positions_predicted = onp.array(positions_predicted_list)
