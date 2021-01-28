@@ -1,51 +1,20 @@
-import dataclasses
 import pathlib
-from typing import List, Optional
 
 import fannypack
 import numpy as onp
-from jax import numpy as jnp
 from PIL import Image
 from tqdm.auto import tqdm
 
-import jaxfg
+from data import KittiStructRaw
 
-# Dataset structs
+# Actual script
 
-
-@dataclasses.dataclass(frozen=True)
-class _KittiStruct:
-    image: Optional[jnp.ndarray] = None
-    image_diff: Optional[jnp.ndarray] = None
-    x: Optional[jnp.ndarray] = None
-    y: Optional[jnp.ndarray] = None
-    theta: Optional[jnp.ndarray] = None
-    linear_vel: Optional[jnp.ndarray] = None
-    angular_vel: Optional[jnp.ndarray] = None
-
-
-@jaxfg.utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)  # Doesn't do anything, just for jedi
-class KittiStructNormalized(_KittiStruct):
-    pass
-
-
-@jaxfg.utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)  # Doesn't do anything, just for jedi
-class KittiStructRaw(_KittiStruct):
-    pass
-
-
-# Helpers
+fannypack.utils.pdb_safety_net()
 
 
 def wrap_angle(thetas: onp.ndarray) -> onp.ndarray:
     return ((thetas - onp.pi) % (2 * onp.pi)) - onp.pi
 
-
-# Actual script
-
-fannypack.utils.pdb_safety_net()
 
 path: pathlib.Path
 directories = sorted(
@@ -151,21 +120,6 @@ def load_data(pose_txt: pathlib.Path, image_dir: pathlib.Path) -> KittiStructRaw
     return data
 
 
-## Was originally going to to mirroring here, but it makes more sense to do it when the data is loaded
-#
-# def mirror_data(data: KittiStructRaw) -> KittiStructRaw:
-#     """Data augmentation: mirror a sequence."""
-#     return KittiStructRaw(
-#         image=data.image[:, :, ::-1, :],  # (N, rows, columns, channels)
-#         image_diff=data.image_diff[:, :, ::-1, :],  # (N, rows, columns, channels)
-#         x=data.x,
-#         y=-data.y,
-#         theta=-data.theta,
-#         linear_vel=data.linear_vel,
-#         angular_vel=-data.angular_vel,
-#     )
-
-
 for directory in directories:
 
     dataset_id: str = directory.stem
@@ -175,16 +129,26 @@ for directory in directories:
 
     print("Handling", directory.stem)
 
-    data = load_data(
-        pose_txt=directory.parent / f"{dataset_id}_image1.txt",
-        image_dir=directory / "image_2",
-    )
-
     with fannypack.data.TrajectoriesFile(
-        str(pathlib.Path.cwd() / "data_out" / f"kitti_{dataset_id}.hdf5"), read_only=False
+        str(pathlib.Path.cwd() / "data_out" / f"kitti_{dataset_id}.hdf5"),
+        read_only=False,
     ) as traj_file:
-        traj_file.resize(1)
-        traj_file[0] = vars(data)
-        # traj_file[1] = vars(mirror_data(data))
+        traj_file.resize(2)
+
+        # Load data from first camera
+        traj_file[0] = vars(
+            load_data(
+                pose_txt=directory.parent / f"{dataset_id}_image1.txt",
+                image_dir=directory / "image_2",
+            )
+        )
+
+        # Load data from second camera
+        traj_file[1] = vars(
+            load_data(
+                pose_txt=directory.parent / f"{dataset_id}_image2.txt",
+                image_dir=directory / "image_3",
+            )
+        )
 
     # PIL.Image.open()
