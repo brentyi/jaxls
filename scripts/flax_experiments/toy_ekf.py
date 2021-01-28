@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # Make model that we're going to be optimizing
     uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
     uncertainty_optimizer = trainer.Trainer(
-        experiment_name="uncertainty-ekf"
+        experiment_name="uncertainty-fg"
     ).load_checkpoint(uncertainty_optimizer)
 
     # Load up position CNN model

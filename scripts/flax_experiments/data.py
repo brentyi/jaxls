@@ -90,7 +90,7 @@ def load_trajectories(train: bool) -> List[ToyDatasetStructNormalized]:
     path = fannypack.data.cached_drive_file(filename, DATASET_URLS[filename])
 
     with fannypack.data.TrajectoriesFile(path) as traj_file:
-        for trajectory in tqdm(traj_file):
+        for trajectory in tqdm(list(tqdm(traj_file))):
             trajectories.append(
                 ToyDatasetStructUnnormalized(
                     **{

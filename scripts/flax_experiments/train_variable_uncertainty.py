@@ -29,7 +29,7 @@ args: Args = datargs.parse(Args)
 # Make model that we're going to be optimizing
 uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
 trainer = Trainer(experiment_name=args.experiment_name)
-uncertainty_optimizer = trainer.load_checkpoint(uncertainty_optimizer)
+uncertainty_optimizer = Trainer(experiment_name="uncertainty-ekf").load_checkpoint(uncertainty_optimizer)
 
 # Set up tensorboard
 summary_writer = torch.utils.tensorboard.SummaryWriter(
@@ -38,7 +38,7 @@ summary_writer = torch.utils.tensorboard.SummaryWriter(
 
 # Load up position CNN model
 position_model, position_optimizer = networks.make_position_cnn()
-position_optimizer = Trainer(experiment_name="overnight").load_checkpoint(
+position_optimizer = Trainer(experiment_name="position-cnn").load_checkpoint(
     position_optimizer
 )
 
@@ -52,8 +52,7 @@ def predict_positions(images: jnp.ndarray):
     assert images.shape == (N, 120, 120, 3)
 
     return (
-        data.ToyDatasetStruct(
-            normalized=True,
+        data.ToyDatasetStructNormalized(
             position=jax.jit(position_model.apply)(position_optimizer.target, images),
         )
         .unnormalize()
@@ -106,7 +105,7 @@ def make_factor_graph(
 
 def update_factor_graph(
     graph_template: jaxfg.core.PreparedFactorGraph,
-    trajectory: data.ToyDatasetStruct,
+    trajectory: data.ToyDatasetStructNormalized,
     uncertainty_factor: float,
 ) -> Tuple[jaxfg.core.PreparedFactorGraph, jaxfg.core.VariableAssignments]:
     """Update factor graph, and produce guess of initial assignments."""
@@ -152,7 +151,7 @@ graph_template: jaxfg.core.PreparedFactorGraph = make_factor_graph(
 
 def compute_smoother_mse(
     uncertainty_model_params: float,
-    trajectory: data.ToyDatasetStruct,
+    trajectory: data.ToyDatasetStructNormalized,
 ):
 
     uncertainty_factor = uncertainty_model.apply(
@@ -185,7 +184,7 @@ def compute_smoother_mse(
 @jax.jit
 def mse_loss(
     uncertainty_model_params: float,
-    batched_trajectory: data.ToyDatasetStruct,
+    batched_trajectory: data.ToyDatasetStructNormalized,
 ):
     return jnp.mean(
         jax.vmap(compute_smoother_mse, in_axes=(None, 0))(
@@ -195,7 +194,7 @@ def mse_loss(
 
 
 @jax.jit
-def get_stats(minibatch: data.ToyDatasetStruct):
+def get_stats(minibatch: data.ToyDatasetStructNormalized):
     factors = uncertainty_model.apply(
         uncertainty_optimizer.target,
         minibatch.visible_pixels_count.reshape((-1, 1)),
@@ -205,11 +204,11 @@ def get_stats(minibatch: data.ToyDatasetStruct):
 
 loss_grad_fn = jax.jit(jax.value_and_grad(mse_loss, argnums=0))
 
-num_epochs = 30
+num_epochs = 60
 progress = tqdm(range(num_epochs))
 losses = []
 for epoch in progress:
-    minibatch: data.ToyDatasetStruct
+    minibatch: data.ToyDatasetStructNormalized
     for i, minibatch in enumerate(dataloader):
         loss_value, grad = loss_grad_fn(uncertainty_optimizer.target, minibatch)
         uncertainty_optimizer = uncertainty_optimizer.apply_gradient(
