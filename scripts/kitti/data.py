@@ -1,7 +1,10 @@
 import dataclasses
-from typing import List, Optional, Type, TypeVar
+from typing import List, Optional, TypeVar
 
 import fannypack
+import jax
+import numpy as onp
+import torch
 from jax import numpy as jnp
 
 import jaxfg
@@ -22,6 +25,20 @@ DATASET_URLS = {
     "kitti_10.hdf5": "https://drive.google.com/file/d/1HCKczAcknVZFSfbT4W5138EzLz3EaNeD/view?usp=sharing",
 }
 
+DATASET_MEANS = {
+    "image": onp.array([88.96255, 94.19366, 92.71602]),
+    "image_diff": onp.array([0.00186025, 0.00170155, 0.00212632]),
+    "linear_vel": 0.89916223,
+    "angular_vel": 2.0997644e-05,
+}
+
+DATASET_STD_DEVS = {
+    "image": onp.array([74.88909, 76.648285, 77.99241]),
+    "image_diff": onp.array([97.935776, 99.096855, 98.973915]),
+    "linear_vel": 0.3150884,
+    "angular_vel": 0.017592415,
+}
+
 
 @dataclasses.dataclass(frozen=True)
 class _KittiStruct:
@@ -33,8 +50,17 @@ class _KittiStruct:
     linear_vel: Optional[jnp.ndarray] = None
     angular_vel: Optional[jnp.ndarray] = None
 
-    @classmethod
-    def mirror_data(cls: Type[T], self: T) -> T:
+    def get_stacked_image(self) -> jnp.ndarray:
+        """Return 6-channel image for CNN."""
+        return jnp.concatenate([self.image, self.image_diff], axis=-1)
+
+    def get_stacked_velocity(self) -> jnp.ndarray:
+        """Return 2-channel velocity."""
+        out = jnp.stack([self.linear_vel, self.angular_vel], axis=-1)
+        assert out.shape[-1] == 2
+        return out
+
+    def mirror(self: T) -> T:
         """Data augmentation helper: mirror a sequence."""
 
         assert self.image is not None
@@ -45,9 +71,11 @@ class _KittiStruct:
         assert self.linear_vel is not None
         assert self.angular_vel is not None
 
-        return cls(
-            image=self.image[:, :, ::-1, :],  # (N, rows, columns, channels)
-            image_diff=self.image_diff[:, :, ::-1, :],  # (N, rows, columns, channels)
+        return type(self)(
+            image=self.image[..., :, ::-1, :],  # (N?, rows, columns, channels)
+            image_diff=self.image_diff[
+                ..., :, ::-1, :
+            ],  # (N?, rows, columns, channels)
             x=self.x,
             y=-self.y,
             theta=-self.theta,
@@ -59,14 +87,39 @@ class _KittiStruct:
 @jaxfg.utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)  # Doesn't do anything, just for jedi
 class KittiStructNormalized(_KittiStruct):
-    pass
+    def unnormalize(self) -> "KittiStructRaw":
+        return KittiStructRaw(
+            **vars(
+                dataclasses.replace(
+                    self,
+                    **{
+                        k: (self.__getattribute__(k) * DATASET_STD_DEVS[k])
+                        + DATASET_MEANS[k]
+                        for k in DATASET_MEANS.keys()
+                        if self.__getattribute__(k) is not None
+                    },
+                )
+            )
+        )
 
 
 @jaxfg.utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)  # Doesn't do anything, just for jedi
 class KittiStructRaw(_KittiStruct):
     def normalize(self) -> KittiStructNormalized:
-        return self
+        return KittiStructNormalized(
+            **vars(
+                dataclasses.replace(
+                    self,
+                    **{
+                        k: (self.__getattribute__(k) - DATASET_MEANS[k])
+                        / DATASET_STD_DEVS[k]
+                        for k in DATASET_MEANS.keys()
+                        if self.__getattribute__(k) is not None
+                    },
+                )
+            )
+        )
 
 
 def load_trajectories(train: bool) -> List[KittiStructNormalized]:
@@ -77,14 +130,14 @@ def load_trajectories(train: bool) -> List[KittiStructNormalized]:
     if train:
         files = [
             "kitti_00.hdf5",
-            "kitti_02.hdf5",
-            "kitti_03.hdf5",
-            "kitti_04.hdf5",
-            "kitti_05.hdf5",
-            "kitti_06.hdf5",
-            "kitti_07.hdf5",
-            "kitti_08.hdf5",
-            "kitti_09.hdf5",
+            # "kitti_02.hdf5",
+            # "kitti_03.hdf5",
+            # "kitti_04.hdf5",
+            # "kitti_05.hdf5",
+            # "kitti_06.hdf5",
+            # "kitti_07.hdf5",
+            # "kitti_08.hdf5",
+            # "kitti_09.hdf5",
         ]
     else:
         files = [
@@ -102,33 +155,81 @@ def load_trajectories(train: bool) -> List[KittiStructNormalized]:
                 assert len(trajectory.keys()) == len(dataclasses.fields(KittiStructRaw))
                 trajectories.append(KittiStructRaw(**trajectory).normalize())
 
-    print("Concatenating trajectories...")
-    concat: KittiStructNormalized = jaxfg.utils.pytree_concatenate(*trajectories)
-    print(
-        "Image moments:",
-        jnp.mean(concat.image.reshape((-1, 3)), axis=0),
-        jnp.std(concat.image.reshape((-1, 3)), axis=0),
-    )
-    print(
-        "Image diff moments:",
-        jnp.mean(concat.image_diff.reshape((-1, 3)), axis=0),
-        jnp.std(concat.image_diff.reshape((-1, 3)), axis=0),
-    )
-    print(
-        "Linear vel moments",
-        jnp.mean(concat.linear_vel),
-        jnp.std(concat.linear_vel),
-    )
-    print(
-        "Angular vel moments",
-        jnp.mean(concat.angular_vel),
-        jnp.std(concat.angular_vel),
-    )
+    # # Uncomment to print statistics
+    # print("Concatenating trajectories...")
+    # concat: KittiStructNormalized = jaxfg.utils.pytree_concatenate(*trajectories)
+    # print(
+    #     "Image moments:",
+    #     jnp.mean(concat.image.reshape((-1, 3)), axis=0),
+    #     jnp.std(concat.image.reshape((-1, 3)), axis=0),
+    # )
+    # print(
+    #     "Image diff moments:",
+    #     jnp.mean(concat.image_diff.reshape((-1, 3)), axis=0),
+    #     jnp.std(concat.image_diff.reshape((-1, 3)), axis=0),
+    # )
+    # print(
+    #     "Linear vel moments",
+    #     jnp.mean(concat.linear_vel),
+    #     jnp.std(concat.linear_vel),
+    # )
+    # print(
+    #     "Angular vel moments",
+    #     jnp.mean(concat.angular_vel),
+    #     jnp.std(concat.angular_vel),
+    # )
 
-    # image: Optional[jnp.ndarray] = None
-    # image_diff: Optional[jnp.ndarray] = None
-    # x: Optional[jnp.ndarray] = None
-    # y: Optional[jnp.ndarray] = None
-    # theta: Optional[jnp.ndarray] = None
-    # linear_vel: Optional[jnp.ndarray] = None
-    # angular_vel: Optional[jnp.ndarray] = None
+    return trajectories
+
+
+class KittiSubsequenceDataset(torch.utils.data.Dataset):
+    def __init__(self, train: bool, subsequence_length: int = 5):
+        self.samples: List[KittiStructNormalized] = []
+
+        for trajectory in load_trajectories(train=train):
+            assert trajectory.image is not None
+            timesteps = len(trajectory.image)
+            index = 0
+            while index + subsequence_length <= timesteps:
+                self.samples.append(
+                    jax.tree_util.tree_multimap(
+                        lambda x: x[index : index + subsequence_length], trajectory
+                    )
+                )
+                index += subsequence_length // 2
+
+    def __getitem__(self, index: int) -> KittiStructNormalized:
+        if index < len(self.samples):
+            return self.samples[index]
+        else:
+            return self.samples[index - len(self.samples)].mirror()
+
+    def __len__(self) -> int:
+        return len(self.samples) * 2
+
+
+class KittiSingleStepDataset(torch.utils.data.Dataset):
+    def __init__(self, train: bool):
+        self.samples: List[KittiStructNormalized] = []
+
+        for trajectory in load_trajectories(train=train):
+            assert trajectory.image is not None
+            timesteps = len(trajectory.image)
+            for t in range(timesteps):
+                self.samples.append(
+                    jax.tree_util.tree_multimap(lambda x: x[t], trajectory)
+                )
+
+    def __getitem__(self, index: int) -> KittiStructNormalized:
+        if index < len(self.samples):
+            return self.samples[index]
+        else:
+            return self.samples[index - len(self.samples)].mirror()
+
+    def __len__(self) -> int:
+        return len(self.samples) * 2
+
+
+#  @jax.jit
+def collate_fn(batch, axis=0):
+    return jaxfg.utils.pytree_stack(*batch, axis=axis)
