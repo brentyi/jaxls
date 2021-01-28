@@ -5,13 +5,13 @@ import datargs
 import fannypack
 import flax
 import jax
-import jaxfg
 import numpy as onp
 import torch
 from jax import numpy as jnp
 from tqdm.auto import tqdm
 
 import data
+import jaxfg
 import networks
 import toy_system
 from trainer import Trainer
@@ -48,8 +48,7 @@ def predict_positions(images: jnp.ndarray):
     assert images.shape == (N, 120, 120, 3)
 
     return (
-        data.ToyDatasetStruct(
-            normalized=True,
+        data.ToyDatasetStructNormalized(
             position=jax.jit(position_model.apply)(position_optimizer.target, images),
         )
         .unnormalize()
@@ -81,7 +80,7 @@ def make_factor_graph(
         factors.append(
             toy_system.VisionFactor.make(
                 state_variable=variables[-1],
-                predicted_position=onp.zeros(2) + 0.8,  # To be populated by network
+                predicted_position=onp.zeros(2),  # To be populated by network
                 scale_tril_inv=onp.identity(2),  # To be populated by network
             )
         )
@@ -102,7 +101,7 @@ def make_factor_graph(
 
 def update_factor_graph(
     graph_template: jaxfg.core.PreparedFactorGraph,
-    trajectory: data.ToyDatasetStruct,
+    trajectory: data.ToyDatasetStructNormalized,
     uncertainty_factor: float,
 ) -> Tuple[jaxfg.core.PreparedFactorGraph, jaxfg.core.VariableAssignments]:
     """Update factor graph, and produce guess of initial assignments."""
@@ -147,7 +146,7 @@ graph_template: jaxfg.core.PreparedFactorGraph = make_factor_graph(
 
 def compute_smoother_mse(
     uncertainty_factor: float,
-    trajectory: data.ToyDatasetStruct,
+    trajectory: data.ToyDatasetStructNormalized,
 ):
     graph, initial_assignments = update_factor_graph(
         graph_template,
@@ -171,7 +170,7 @@ def compute_smoother_mse(
     return mse
 
 
-optimizer = flax.optim.Adam().create(target=0.2)
+optimizer = flax.optim.Adam().create(target=0.05)
 
 print(optimizer.target)
 
@@ -179,7 +178,7 @@ print(optimizer.target)
 @jax.jit
 def mse_loss(
     uncertainty_factor: float,
-    batched_trajectory: data.ToyDatasetStruct,
+    batched_trajectory: data.ToyDatasetStructNormalized,
 ):
     return jnp.mean(
         jax.vmap(compute_smoother_mse, in_axes=(None, 0))(
@@ -194,7 +193,7 @@ num_epochs = 20
 progress = tqdm(range(num_epochs))
 losses = []
 for epoch in progress:
-    minibatch: data.ToyDatasetStruct
+    minibatch: data.ToyDatasetStructNormalized
     for i, minibatch in enumerate(dataloader):
         loss_value, grad = loss_grad_fn(optimizer.target, minibatch)
         optimizer = optimizer.apply_gradient(grad, learning_rate=1e-4)
@@ -207,7 +206,7 @@ for epoch in progress:
                 "train/loss", float(loss_value), global_step=optimizer.state.step
             )
 
-        if optimizer.state.step % 100 == 0:
+        if optimizer.state.step % 5 == 0:
             # trainer.metadata["loss"] = float(loss_value)
             # trainer.save_checkpoint(optimizer)
             print(f"Loss: {loss_value}, target: {optimizer.target}")

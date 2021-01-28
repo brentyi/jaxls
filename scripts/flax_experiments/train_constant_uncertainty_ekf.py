@@ -1,8 +1,8 @@
 import dataclasses
-from typing import Tuple
 
 import datargs
 import fannypack
+import flax
 import jax
 import numpy as onp
 import torch
@@ -10,7 +10,6 @@ from jax import numpy as jnp
 from tqdm.auto import tqdm
 
 import data
-import jaxfg
 import networks
 import toy_ekf
 import toy_system
@@ -28,17 +27,8 @@ class Args:
 args: Args = datargs.parse(Args)
 
 # Make model that we're going to be optimizing
-uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
-trainer = Trainer(experiment_name=args.experiment_name)
-uncertainty_optimizer = trainer.load_checkpoint(uncertainty_optimizer)
-# uncertainty_optimizer = Trainer(experiment_name="uncertainty-fg").load_checkpoint(
-#     uncertainty_optimizer
-# )
-
-# Set up tensorboard
-summary_writer = torch.utils.tensorboard.SummaryWriter(
-    log_dir=f"logs/{args.experiment_name}"
-)
+uncertainty_optimizer = flax.optim.Adam().create(target=0.1)
+# trainer = Trainer(experiment_name=args.experiment_name)
 
 # Load up position CNN model
 position_model, position_optimizer = networks.make_position_cnn()
@@ -76,7 +66,7 @@ dataloader = torch.utils.data.DataLoader(
 
 
 def compute_ekf_mse(
-    uncertainty_model_params: float,
+    uncertainty_factor: float,
     trajectory: data.ToyDatasetStructNormalized,
     seed: int,
 ):
@@ -86,13 +76,6 @@ def compute_ekf_mse(
 
     trajectory_unnormalized = trajectory.unnormalize()
     predicted_positions = predict_positions(trajectory.image)
-
-    # Neural network
-    uncertainty_factor = uncertainty_model.apply(
-        uncertainty_model_params,
-        trajectory.visible_pixels_count.reshape((-1, 1)),
-    ).flatten()
-    assert uncertainty_factor.shape == (subsequence_length,)
 
     # Run EKF
     belief = toy_ekf.Belief(
@@ -111,7 +94,7 @@ def compute_ekf_mse(
         belief = toy_ekf.update_step(
             belief,
             observation=predicted_positions[t, :],
-            observation_cov=jnp.eye(2) / (uncertainty_factor[t] ** 2),
+            observation_cov=jnp.eye(2) / (uncertainty_factor ** 2),
         )
         # beliefs.append(belief)
         positions.append(belief.mean[:2])
@@ -129,31 +112,20 @@ def compute_ekf_mse(
 
 @jax.jit
 def mse_loss(
-    uncertainty_model_params: float,
+    uncertainty_factor: float,
     batched_trajectory: data.ToyDatasetStructNormalized,
     seed: int,
 ):
     return jnp.mean(
         jax.vmap(compute_ekf_mse, in_axes=(None, 0, None))(
-            uncertainty_model_params,
-            batched_trajectory,
-            seed,
+            uncertainty_factor, batched_trajectory, seed
         )
     )
 
 
-@jax.jit
-def get_stats(minibatch: data.ToyDatasetStructNormalized):
-    factors = uncertainty_model.apply(
-        uncertainty_optimizer.target,
-        minibatch.visible_pixels_count.reshape((-1, 1)),
-    )
-    return jnp.mean(factors), jnp.std(factors)
-
-
 loss_grad_fn = jax.jit(jax.value_and_grad(mse_loss, argnums=0))
 
-num_epochs = 200
+num_epochs = 20
 progress = tqdm(range(num_epochs))
 losses = []
 for epoch in progress:
@@ -171,27 +143,6 @@ for epoch in progress:
 
         if (
             uncertainty_optimizer.state.step < 10
-            or uncertainty_optimizer.state.step % 10 == 0
+            or uncertainty_optimizer.state.step % 5 == 0
         ):
-            mean, std_dev = get_stats(minibatch)
-            # Log to Tensorboard
-            summary_writer.add_scalar(
-                "train/loss",
-                float(loss_value),
-                global_step=uncertainty_optimizer.state.step,
-            )
-            summary_writer.add_scalar(
-                "train/mean",
-                float(mean),
-                global_step=uncertainty_optimizer.state.step,
-            )
-            summary_writer.add_scalar(
-                "train/std_dev",
-                float(std_dev),
-                global_step=uncertainty_optimizer.state.step,
-            )
-            print(f"Loss: {loss_value}")
-
-        if uncertainty_optimizer.state.step % 100 == 0:
-            trainer.metadata["loss"] = float(loss_value)
-            trainer.save_checkpoint(uncertainty_optimizer)
+            print(f"Loss: {loss_value}, value: {uncertainty_optimizer.target}")

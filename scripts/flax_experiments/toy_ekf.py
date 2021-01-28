@@ -73,12 +73,12 @@ if __name__ == "__main__":
     # Make model that we're going to be optimizing
     uncertainty_model, uncertainty_optimizer = networks.make_uncertainty_mlp()
     uncertainty_optimizer = trainer.Trainer(
-        experiment_name="initial-uncertainty"
+        experiment_name="uncertainty-ekf"
     ).load_checkpoint(uncertainty_optimizer)
 
     # Load up position CNN model
     position_model, position_optimizer = networks.make_position_cnn()
-    position_optimizer = trainer.Trainer(experiment_name="overnight").load_checkpoint(
+    position_optimizer = trainer.Trainer(experiment_name="position-cnn").load_checkpoint(
         position_optimizer
     )
 
@@ -101,6 +101,7 @@ if __name__ == "__main__":
     )
 
     observation_covs = (
+        # Variable uncertainty
         onp.eye(2)[onp.newaxis, onp.newaxis, :, :]
         / (
             uncertainty_model.apply(
@@ -109,8 +110,13 @@ if __name__ == "__main__":
             ).reshape((trajectory_count, subsequence_length, 1, 1))
             ** 2
         )
-        # (0.11 ** 2)
-        # * onp.ones((trajectory_count, subsequence_length, 1, 1))
+
+        # Trained w/ EKF
+        # 1.0 / (0.14734569191932678 ** 2)
+
+        # Trained w/ differentiable filter attempt #2 (bigger batch size)
+        # 1.0 / (0.08585679531097412 ** 2)
+        * onp.ones((trajectory_count, subsequence_length, 1, 1))
     )
 
     # Run Kalman filter
