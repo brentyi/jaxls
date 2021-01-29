@@ -19,6 +19,9 @@ fannypack.utils.pdb_safety_net()
 @dataclasses.dataclass
 class Args:
     experiment_name: str = datargs.arg(help="Experiment name.")
+    learning_rate: float = datargs.arg(
+        help="Learning rate for ADAM optimizer.", default=1e-4
+    )
 
 
 args: Args = datargs.parse(Args)
@@ -33,11 +36,11 @@ dataloader = torch.utils.data.DataLoader(
     data.KittiSingleStepDataset(train=True),
     batch_size=32,
     collate_fn=data.collate_fn,
+    shuffle=True,
 )
 
 # Create our network
-model, optimizer = networks.make_observation_cnn(seed=0)
-
+model, optimizer = networks.make_observation_cnn(seed=1)
 trainer = Trainer(experiment_name=args.experiment_name)
 optimizer = trainer.load_checkpoint(optimizer)
 
@@ -48,35 +51,46 @@ def mse_loss(
     model_params: jaxfg.types.PyTree,
     batched_images: jnp.ndarray,
     batched_velocities: jnp.ndarray,
+    dropout_prng: jnp.ndarray,
 ):
-    pred_velocities = model.apply(model_params, batched_images)[..., :2]
+    pred_velocities = model.apply(
+        model_params, batched_images, rngs={"dropout": dropout_prng}
+    )[..., :2]
     assert pred_velocities.shape == batched_velocities.shape
     return jnp.mean((pred_velocities - batched_velocities) ** 2)
 
 
 @jax.jit
-def get_standard_deviations(minibatch: data.KittiStructNormalized):
+def get_standard_deviations(minibatch: data.KittiStructNormalized, dropout_prng):
     return (
-        jnp.std(model.apply(optimizer.target, minibatch.get_stacked_image()), axis=0),
+        jnp.std(
+            model.apply(
+                optimizer.target,
+                minibatch.get_stacked_image(),
+                rngs={"dropout": dropout_prng},
+            ),
+            axis=0,
+        ),
         jnp.std(minibatch.get_stacked_velocity(), axis=0),
     )
 
 
 loss_grad_fn = jax.jit(jax.value_and_grad(mse_loss, argnums=0))
 
-num_epochs = 30
+dropout_key = jax.random.PRNGKey(seed=0)
+num_epochs = 100
 progress = tqdm(range(num_epochs))
-losses = []
 for epoch in progress:
     minibatch: data.KittiStructNormalized
     for i, minibatch in enumerate(dataloader):
+        dropout_key, dropout_subkey = jax.random.split(dropout_key)
         loss_value, grad = loss_grad_fn(
             optimizer.target,
             minibatch.get_stacked_image(),
             minibatch.get_stacked_velocity(),
+            dropout_subkey,
         )
-        optimizer = optimizer.apply_gradient(grad, learning_rate=1e-4)
-        losses.append(loss_value)
+        optimizer = optimizer.apply_gradient(grad, learning_rate=args.learning_rate)
 
         if optimizer.state.step < 10 or optimizer.state.step % 10 == 0:
             # Log to Tensorboard
@@ -85,11 +99,13 @@ for epoch in progress:
             )
 
         if optimizer.state.step % 100 == 0:
+            print("Loss:", float(loss_value))
             trainer.metadata["loss"] = float(loss_value)
             trainer.save_checkpoint(optimizer)
 
-        if optimizer.state.step % 500 == 0:
-            standard_deviations = get_standard_deviations(minibatch)
+        if optimizer.state.step % 200 == 0:
+            dropout_key, dropout_subkey = jax.random.split(dropout_key)
+            standard_deviations = get_standard_deviations(minibatch, dropout_subkey)
             print(f"{optimizer.state.step} Standard deviations:", standard_deviations)
             summary_writer.add_scalar(
                 "train/std_pred_linear",

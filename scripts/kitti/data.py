@@ -1,4 +1,5 @@
 import dataclasses
+import pathlib
 from typing import List, Optional, TypeVar
 
 import fannypack
@@ -9,6 +10,7 @@ from jax import numpy as jnp
 
 import jaxfg
 
+fannypack.data.set_cache_path(str(pathlib.Path(__file__).parent.absolute() / ".cache/"))
 T = TypeVar("T", bound="_KittiStruct")
 
 DATASET_URLS = {
@@ -122,7 +124,9 @@ class KittiStructRaw(_KittiStruct):
         )
 
 
-def load_trajectories(train: bool) -> List[KittiStructNormalized]:
+def load_trajectories(
+    train: bool, subsequence_length: Optional[int] = None
+) -> List[KittiStructNormalized]:
 
     # We intentionally exclude 01 from all datasets, because it's very different
     # (highway driving)
@@ -130,18 +134,19 @@ def load_trajectories(train: bool) -> List[KittiStructNormalized]:
     if train:
         files = [
             "kitti_00.hdf5",
-            # "kitti_02.hdf5",
-            # "kitti_03.hdf5",
-            # "kitti_04.hdf5",
-            # "kitti_05.hdf5",
-            # "kitti_06.hdf5",
-            # "kitti_07.hdf5",
-            # "kitti_08.hdf5",
-            # "kitti_09.hdf5",
+            "kitti_02.hdf5",
+            "kitti_03.hdf5",
+            "kitti_04.hdf5",
+            "kitti_05.hdf5",
+            "kitti_06.hdf5",
+            "kitti_07.hdf5",
+            "kitti_08.hdf5",
+            "kitti_09.hdf5",
         ]
     else:
         files = [
-            "kitti_10.hdf5",
+            # "kitti_10.hdf5",
+            "kitti_00.hdf5",
         ]
 
     assert len(set(files) - set(DATASET_URLS.keys())) == 0
@@ -149,11 +154,33 @@ def load_trajectories(train: bool) -> List[KittiStructNormalized]:
     trajectories: List[KittiStructNormalized] = []
     for filename in files:
         with fannypack.data.TrajectoriesFile(
-            fannypack.data.cached_drive_file(filename, DATASET_URLS[filename])
+            fannypack.data.cached_drive_file(filename, DATASET_URLS[filename]),
+            verbose=False,
         ) as traj_file:
             for trajectory in traj_file:
                 assert len(trajectory.keys()) == len(dataclasses.fields(KittiStructRaw))
-                trajectories.append(KittiStructRaw(**trajectory).normalize())
+
+                traj = KittiStructRaw(**trajectory).normalize()
+
+                if subsequence_length is None:
+                    # Return full trajectories
+                    trajectories.append(traj)
+                else:
+                    # Split trajectory into overlapping subsequences
+                    timesteps = len(traj.image)
+                    index = 0
+                    while index + subsequence_length <= timesteps:
+                        trajectories.append(
+                            jax.tree_util.tree_multimap(
+                                lambda x: x[index : index + subsequence_length],
+                                traj,
+                            )
+                        )
+                        index += subsequence_length // 2
+
+        print(f"Loaded {filename}, total trajectories: {len(trajectories)}")
+
+    return trajectories
 
     # # Uncomment to print statistics
     # print("Concatenating trajectories...")
@@ -179,24 +206,12 @@ def load_trajectories(train: bool) -> List[KittiStructNormalized]:
     #     jnp.std(concat.angular_vel),
     # )
 
-    return trajectories
-
 
 class KittiSubsequenceDataset(torch.utils.data.Dataset):
     def __init__(self, train: bool, subsequence_length: int = 5):
-        self.samples: List[KittiStructNormalized] = []
-
-        for trajectory in load_trajectories(train=train):
-            assert trajectory.image is not None
-            timesteps = len(trajectory.image)
-            index = 0
-            while index + subsequence_length <= timesteps:
-                self.samples.append(
-                    jax.tree_util.tree_multimap(
-                        lambda x: x[index : index + subsequence_length], trajectory
-                    )
-                )
-                index += subsequence_length // 2
+        self.samples: List[KittiStructNormalized] = load_trajectories(
+            train=train, subsequence_length=subsequence_length
+        )
 
     def __getitem__(self, index: int) -> KittiStructNormalized:
         if index < len(self.samples):

@@ -66,6 +66,7 @@ dataloader = torch.utils.data.DataLoader(
     data.ToySubsequenceDataset(train=True, subsequence_length=subsequence_length),
     batch_size=32,
     collate_fn=data.collate_fn,
+    shuffle=True,
 )
 
 # Define loss, gradients, etc.

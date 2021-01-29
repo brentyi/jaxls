@@ -2,9 +2,10 @@ import dataclasses
 from typing import Any, Dict, Optional, TypeVar
 
 import flax
-import jaxfg
 import yaml
 from flax.training import checkpoints
+
+import jaxfg
 
 
 @jaxfg.utils.register_dataclass_pytree
@@ -46,7 +47,7 @@ class Trainer:
         metadata = yaml.safe_load(checkpoint.metadata_yaml)
         self.metadata = metadata if metadata is not None else {}
         self._print(
-            f"Loaded checkpoint: {self.experiment_name} was at step {optimizer_template.state.step}, now at {checkpoint.optimizer.state.step}"
+            f"Loaded checkpoint: was at step {optimizer_template.state.step}, now at {checkpoint.optimizer.state.step}"
         )
         return checkpoint.optimizer
 
@@ -62,9 +63,9 @@ class Trainer:
             prefix=f"{self.experiment_name}_",
             keep=keep,
         )
-        self._print(f"Saved {self.experiment_name} checkpoint at step {optimizer.state.step}")
+        self._print(f"Saved checkpoint at step {optimizer.state.step}")
 
     def _print(self, *args, **kwargs):
         """Prefixed printing helper. No-op if `verbose` is set to `False`."""
         if self.verbose:
-            print(f"[{type(self).__name__}]", *args, **kwargs)
+            print(f"[{type(self).__name__}-{self.experiment_name}]", *args, **kwargs)

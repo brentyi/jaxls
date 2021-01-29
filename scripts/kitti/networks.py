@@ -38,6 +38,8 @@ class SimpleCNN(nn.Module):
     Output is (N, 4). Linear, angular velocities, followed by covariances for each.
     """
 
+    train_mode: bool
+
     @nn.compact
     def __call__(self, inputs: jnp.ndarray):
         x = inputs
@@ -60,6 +62,9 @@ class SimpleCNN(nn.Module):
         x = nn.Conv(features=16, kernel_size=(5, 5), strides=(2, 2))(x)
         x = nn.relu(x)
 
+        # Dropout
+        x = nn.Dropout(0.3)(x, deterministic=not self.train_mode)
+
         # Validate shape
         # Kloss paper reports (N, 25, 18, 16), but this might be a typo from the even
         # stride/odd image dimensions. Or just a Tensorflow vs flax implementation
@@ -73,7 +78,9 @@ class SimpleCNN(nn.Module):
         return x
 
 
-def make_observation_cnn(seed: int = 0) -> Tuple[SimpleCNN, flax.optim.Adam]:
+def make_observation_cnn(
+    seed: int = 0, train_mode: bool = True
+) -> Tuple[SimpleCNN, flax.optim.Adam]:
     """Make CNN and ADAM optimizer for processing KITTI images.
 
     Args:
@@ -82,8 +89,11 @@ def make_observation_cnn(seed: int = 0) -> Tuple[SimpleCNN, flax.optim.Adam]:
     Returns:
         Tuple[SimpleCNN, jaxfg.types.PyTree]: Tuple of (model, model_parameters).
     """
-    model = SimpleCNN()
+    model = SimpleCNN(train_mode=train_mode)
 
-    prng_key = jax.random.PRNGKey(seed=seed)
+    prng_key, dropout_key = jax.random.split(jax.random.PRNGKey(seed=seed))
+
     dummy_image = onp.zeros((1, 50, 150, 6))
-    return model, flax.optim.Adam().create(model.init(prng_key, dummy_image))
+    return model, flax.optim.Adam().create(
+        model.init({"params": prng_key, "dropout": dropout_key}, dummy_image)
+    )

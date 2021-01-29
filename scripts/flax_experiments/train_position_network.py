@@ -34,6 +34,7 @@ dataloader = torch.utils.data.DataLoader(
     ToySingleStepDataset(train=True),
     batch_size=32,
     collate_fn=collate_fn,
+    shuffle=True,
 )
 
 # Create our network

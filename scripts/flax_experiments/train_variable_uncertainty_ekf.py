@@ -72,6 +72,7 @@ dataloader = torch.utils.data.DataLoader(
     batch_size=32,
     drop_last=True,
     collate_fn=data.collate_fn,
+    shuffle=True,
 )
 
 

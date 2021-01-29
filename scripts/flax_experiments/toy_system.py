@@ -42,7 +42,7 @@ class State:
 
 
 class StateVariable(jaxfg.core.VariableBase):  # type: ignore
-    """State of our system. A length-4 array: po"""
+    """State of our system. A length-4 array"""
 
     @staticmethod
     @overrides
