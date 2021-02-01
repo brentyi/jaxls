@@ -25,11 +25,11 @@ def pytree_concatenate(*trees: T, axis=0) -> T:
 def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     """Context manager for measuring runtime."""
     start_time = time.time()
-    print(f"\n========")
+    print("\n========")
     print(f"Running ({label})")
     yield
     print(f"{termcolor.colored(str(time.time() - start_time), attrs=['bold'])} seconds")
-    print(f"========")
+    print("========")
 
 
 def register_dataclass_pytree(

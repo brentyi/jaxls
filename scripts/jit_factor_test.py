@@ -1,9 +1,5 @@
-import dataclasses
-import time
-
 import jax
 import jaxlie
-import numpy as onp
 from jax import numpy as jnp
 
 import jaxfg

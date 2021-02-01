@@ -1,7 +1,7 @@
 import abc
-from typing import TYPE_CHECKING, Dict, Generic, Mapping, Tuple, Type, TypeVar
+from typing import Callable, Dict, Generic, Mapping, Type, TypeVar, cast
 
-import numpy as onp
+from jax import flatten_util
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -9,29 +9,62 @@ from .. import types
 
 VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
+VariableType = TypeVar("VariableType", bound="VariableBase")
+
+
+def concrete_example(
+    example: types.PyTree,
+) -> Callable[[Type[VariableType]], Type[VariableType]]:
+    """Decorator for providing a variable type with a concrete example.
+
+    Automatically defines static methods for `get_parameter_dim()` and `unflatten()`.
+    """
+
+    def wrap(cls: Type[VariableType]) -> Type[VariableType]:
+        flat, unflatten = flatten_util.ravel_pytree(example)
+        (parameter_dim,) = flat.shape
+
+        cls = type(
+            cls.__name__,
+            (cls,),
+            {
+                "get_parameter_dim": staticmethod(lambda: parameter_dim),
+                "unflatten": staticmethod(unflatten),
+            },
+        )
+
+        return cls
+
+    return wrap
+
 
 class VariableBase(abc.ABC, Generic[VariableValueType]):
+    """Base class for variable types. Also defines helpers for manifold optimization."""
+
     _parameter_dim: int
 
     @staticmethod
-    @abc.abstractmethod
+    # @abc.abstractmethod # <== hack for mypy
     def get_parameter_dim() -> int:
         """Dimensionality of underlying parameterization."""
+        raise NotImplementedError(
+            "Missing definition from the `concrete_example()` decorator!"
+        )
 
-    @staticmethod
-    @abc.abstractmethod
-    def get_local_parameter_dim() -> int:
+    @classmethod
+    def get_local_parameter_dim(cls) -> int:
         """Dimensionality of local parameterization."""
+        return cls.get_parameter_dim()
 
-    @staticmethod
+    @classmethod
     @abc.abstractmethod
-    def get_default_value() -> VariableValueType:
+    def get_default_value(cls) -> VariableValueType:
         """Get default (on-manifold) parameter value."""
+        return cls.unflatten(jnp.zeros(cls.get_parameter_dim()))
 
-    @staticmethod
-    @abc.abstractmethod
+    @classmethod
     def manifold_retract(
-        x: VariableValueType, local_delta: VariableValueType
+        cls, x: VariableValueType, local_delta: types.LocalVariableValue
     ) -> VariableValueType:
         r"""Retract local delta to manifold.
 
@@ -44,13 +77,13 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             jnp.ndarray: Updated parameterization.
         """
+        return cls.unflatten(cls.flatten(x) + local_delta)
 
-    @staticmethod
-    @abc.abstractmethod
+    @classmethod
     def manifold_inverse_retract(
-        x: VariableValueType, y: VariableValueType
+        cls, x: VariableValueType, y: VariableValueType
     ) -> types.LocalVariableValue:
-        """Compute the local difference between two variable values.
+        r"""Compute the local difference between two variable values.
 
         Typically written as `x $\ominus$ y` or `x $\boxminus$ y`.
 
@@ -61,9 +94,9 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             LocalVariableValue: Delta vector; dimension should match self.get_local_parameter_dim().
         """
+        return cls.unflatten(cls.flatten(x) - cls.flatten(y))
 
     @staticmethod
-    @abc.abstractmethod
     def flatten(x: VariableValueType) -> jnp.ndarray:
         """Flatten variable value to 1D array.
         Should be similar to `jax.flatten_util.ravel_pytree`.
@@ -74,9 +107,11 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             VariableValueType: Variable value.
         """
+        flat, _unflatten = flatten_util.ravel_pytree(x)
+        return flat
 
     @staticmethod
-    @abc.abstractmethod
+    # @abc.abstractmethod # <== hack for mypy
     def unflatten(flat: jnp.ndarray) -> VariableValueType:
         """Get variable value from flattened representation.
 
@@ -86,6 +121,9 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             VariableValueType: Variable value.
         """
+        raise NotImplementedError(
+            "Missing definition from the `concrete_example()` decorator!"
+        )
 
     @overrides
     def __lt__(self, other) -> bool:
@@ -101,61 +139,22 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
 
 
 # Fake templating; RealVectorVariable[N]
-class AbstractRealVectorVariable(VariableBase[jnp.ndarray]):
-    """Variable for an arbitrary vector of real numbers."""
-
-    @staticmethod
-    @overrides
-    def manifold_retract(x: jnp.ndarray, local_delta: jnp.ndarray) -> jnp.ndarray:
-        return x + local_delta
-
-    @staticmethod
-    @overrides
-    def manifold_inverse_retract(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
-        return x - y
-
-    @staticmethod
-    @overrides
-    def flatten(x: jnp.ndarray) -> jnp.ndarray:
-        return x
-
-    @staticmethod
-    @overrides
-    def unflatten(flat: jnp.ndarray) -> jnp.ndarray:
-        return flat
-
-
 class _RealVectorVariableTemplate:
     """Usage: `RealVectorVariable[N]`, where `N` is an integer dimension."""
 
-    _real_vector_variable_cache: Dict[int, Type[AbstractRealVectorVariable]] = {}
+    _real_vector_variable_cache: Dict[int, Type[VariableBase]] = {}
 
     @classmethod
-    def __getitem__(cls, dim: int) -> Type[AbstractRealVectorVariable]:
+    def __getitem__(cls, dim: int) -> Type[VariableBase]:
         assert isinstance(dim, int)
 
         if dim not in cls._real_vector_variable_cache:
-
-            class _NDimensionalRealVectorVariable(AbstractRealVectorVariable):
-                @staticmethod
-                @overrides
-                def get_parameter_dim() -> int:
-                    return dim
-
-                @staticmethod
-                @overrides
-                def get_local_parameter_dim() -> int:
-                    return dim
-
-                @staticmethod
-                @overrides
-                def get_default_value() -> onp.ndarray:
-                    return onp.zeros(dim)
-
-            cls._real_vector_variable_cache[dim] = _NDimensionalRealVectorVariable
+            cls._real_vector_variable_cache[dim] = cast(
+                Type[VariableBase], concrete_example(jnp.zeros(dim))(VariableBase)
+            )
 
         return cls._real_vector_variable_cache[dim]
 
 
-RealVectorVariable: Mapping[int, Type[AbstractRealVectorVariable]]
+RealVectorVariable: Mapping[int, Type[VariableBase]]
 RealVectorVariable = _RealVectorVariableTemplate()  # type: ignore

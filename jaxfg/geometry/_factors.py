@@ -1,5 +1,5 @@
 import dataclasses
-from typing import TYPE_CHECKING, Generic, NamedTuple, Tuple, Type, TypeVar
+from typing import Generic, NamedTuple, Tuple, Type, TypeVar
 
 import jax
 import jaxlie

@@ -1,15 +1,11 @@
 import dataclasses
-import time
 from typing import Dict, List
 
 import fannypack
-import jax
-import jax.profiler
 import jaxlie
 import matplotlib.pyplot as plt
 import numpy as onp
 from jax import numpy as jnp
-from jax.config import config
 from tqdm.auto import tqdm
 
 import jaxfg
@@ -21,7 +17,7 @@ with open("./data/parking-garage.g2o") as file:
     lines = [line.strip() for line in file.readlines()]
 
 pose_variables = []
-initial_poses_dict: Dict[str, jaxlie.SE3] = {}
+initial_poses_dict: Dict[jaxfg.geometry.SE3Variable, jaxlie.SE3] = {}
 
 factors: List[jaxfg.core.FactorBase] = []
 

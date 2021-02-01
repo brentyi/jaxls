@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 import jax
 from jax import numpy as jnp

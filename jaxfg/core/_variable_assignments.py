@@ -1,7 +1,6 @@
 import dataclasses
 from typing import (
     TYPE_CHECKING,
-    Any,
     DefaultDict,
     Dict,
     Iterable,
@@ -12,7 +11,6 @@ from typing import (
 )
 
 import jax
-import numpy as onp
 from jax import numpy as jnp
 
 from .. import types, utils

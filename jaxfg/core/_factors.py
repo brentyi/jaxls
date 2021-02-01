@@ -7,7 +7,7 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import types, utils
+from .. import types
 
 if TYPE_CHECKING:
     from ._variables import VariableBase
@@ -149,9 +149,9 @@ class LinearFactor(FactorBase):
     $$
     """
 
-    A_matrices: Tuple[onp.ndarray]
-    b: onp.ndarray
-    scale_tril_inv: onp.ndarray
+    A_matrices: Tuple[jnp.ndarray]
+    b: jnp.ndarray
+    scale_tril_inv: jnp.ndarray
 
     @overrides
     def compute_residual_vector(self, *variable_values: types.VariableValue):
