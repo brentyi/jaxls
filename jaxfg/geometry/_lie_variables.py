@@ -4,13 +4,13 @@ import jaxlie
 from overrides import overrides
 
 from .. import types
-from ..core._variables import VariableBase, concrete_example
+from ..core._variables import VariableBase
 
 T = TypeVar("T", bound=jaxlie.MatrixLieGroup)
 
 
 class LieVariableBase(VariableBase[T], Generic[T]):
-    MatrixLieGroupType: Type[T]
+    MatrixLieGroupType: Type[T] = jaxlie.MatrixLieGroup
     """Lie group type."""
 
     @classmethod
@@ -35,21 +35,17 @@ class LieVariableBase(VariableBase[T], Generic[T]):
         return jaxlie.manifold.rminus(x, y)
 
 
-@concrete_example(jaxlie.SO2.identity())
 class SO2Variable(LieVariableBase[jaxlie.SO2]):
     MatrixLieGroupType = jaxlie.SO2
 
 
-@concrete_example(jaxlie.SE2.identity())
 class SE2Variable(LieVariableBase[jaxlie.SE2]):
     MatrixLieGroupType = jaxlie.SE2
 
 
-@concrete_example(jaxlie.SO3.identity())
 class SO3Variable(LieVariableBase[jaxlie.SO3]):
     MatrixLieGroupType = jaxlie.SO3
 
 
-@concrete_example(jaxlie.SE3.identity())
 class SE3Variable(LieVariableBase[jaxlie.SE3]):
     MatrixLieGroupType = jaxlie.SE3

@@ -1,5 +1,5 @@
 import abc
-from typing import Callable, Dict, Generic, Mapping, Type, TypeVar, cast
+from typing import Dict, Generic, Mapping, Type, TypeVar
 
 from jax import flatten_util
 from jax import numpy as jnp
@@ -9,46 +9,26 @@ from .. import types
 
 VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
-VariableType = TypeVar("VariableType", bound="VariableBase")
-
-
-def concrete_example(
-    example: types.PyTree,
-) -> Callable[[Type[VariableType]], Type[VariableType]]:
-    """Decorator for providing a variable type with a concrete example.
-
-    Automatically defines static methods for `get_parameter_dim()` and `unflatten()`.
-    """
-
-    def wrap(cls: Type[VariableType]) -> Type[VariableType]:
-        flat, unflatten = flatten_util.ravel_pytree(example)
-        (parameter_dim,) = flat.shape
-
-        cls = type(
-            cls.__name__,
-            (cls,),
-            {
-                "get_parameter_dim": staticmethod(lambda: parameter_dim),
-                "unflatten": staticmethod(unflatten),
-            },
-        )
-
-        return cls
-
-    return wrap
-
 
 class VariableBase(abc.ABC, Generic[VariableValueType]):
     """Base class for variable types. Also defines helpers for manifold optimization."""
 
-    _parameter_dim: int
+    def __init_subclass__(cls):
+        """For subclasses, we determine the parameter dimensionality and unflattening
+        procedure from the example provided by `get_default_value()`."""
+        example = cls.get_default_value()
+        flat, unflatten = flatten_util.ravel_pytree(example)
+        (parameter_dim,) = flat.shape
+
+        cls.get_parameter_dim = staticmethod(lambda: parameter_dim)
+        cls.unflatten = staticmethod(unflatten)
 
     @staticmethod
     # @abc.abstractmethod # <== hack for mypy
     def get_parameter_dim() -> int:
         """Dimensionality of underlying parameterization."""
         raise NotImplementedError(
-            "Missing definition from the `concrete_example()` decorator!"
+            "Should be defined in VariableBase.__init_subclass__!"
         )
 
     @classmethod
@@ -60,7 +40,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
     @abc.abstractmethod
     def get_default_value(cls) -> VariableValueType:
         """Get default (on-manifold) parameter value."""
-        return cls.unflatten(jnp.zeros(cls.get_parameter_dim()))
+        raise NotImplementedError()
 
     @classmethod
     def manifold_retract(
@@ -122,7 +102,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
             VariableValueType: Variable value.
         """
         raise NotImplementedError(
-            "Missing definition from the `concrete_example()` decorator!"
+            "Should be defined in VariableBase.__init_subclass__!"
         )
 
     @overrides
@@ -149,9 +129,14 @@ class _RealVectorVariableTemplate:
         assert isinstance(dim, int)
 
         if dim not in cls._real_vector_variable_cache:
-            cls._real_vector_variable_cache[dim] = cast(
-                Type[VariableBase], concrete_example(jnp.zeros(dim))(VariableBase)
-            )
+
+            class _RealVectorVariable(VariableBase):
+                @staticmethod
+                @overrides
+                def get_default_value():
+                    return jnp.zeros(dim)
+
+            cls._real_vector_variable_cache[dim] = _RealVectorVariable
 
         return cls._real_vector_variable_cache[dim]
 
