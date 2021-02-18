@@ -24,6 +24,7 @@ class LieVariableBase(VariableBase[T], Generic[T]):
         return cast(T, cls.MatrixLieGroupType.identity())
 
     @staticmethod
+    @overrides
     def manifold_retract(x: T, local_delta: jaxlie.types.TangentVector) -> T:
         return jaxlie.manifold.rplus(x, local_delta)
 
