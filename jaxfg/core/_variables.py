@@ -74,7 +74,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Returns:
             LocalVariableValue: Delta vector; dimension should match self.get_local_parameter_dim().
         """
-        return cls.unflatten(cls.flatten(x) - cls.flatten(y))
+        return cls.flatten(x) - cls.flatten(y)
 
     @staticmethod
     def flatten(x: VariableValueType) -> jnp.ndarray:
