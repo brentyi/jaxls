@@ -14,9 +14,7 @@ import jax
 from jax import numpy as jnp
 
 from .. import types, utils
-
-if TYPE_CHECKING:
-    from ._variables import VariableBase
+from ._variables import VariableBase
 
 
 @dataclasses.dataclass(frozen=True)
@@ -31,36 +29,36 @@ class StorageMetadata:
     dim: int
     """Total dimension of storage vector."""
 
-    index_from_variable: Dict["VariableBase", int]
+    index_from_variable: Dict[VariableBase, int]
     """Start index of each stored variable."""
 
-    index_from_variable_type: Dict[Type["VariableBase"], int]
+    index_from_variable_type: Dict[Type[VariableBase], int]
     """Variable of the same type are stored together. Index to the first of a type."""
 
-    count_from_variable_type: Dict[Type["VariableBase"], int]
+    count_from_variable_type: Dict[Type[VariableBase], int]
     """Number of variables of each type."""
 
     @property
-    def ordered_variables(self) -> Tuple["VariableBase", ...]:
+    def ordered_variables(self) -> Tuple[VariableBase, ...]:
         # Dictionaries from Python 3.7 retain insertion order
         return tuple(self.index_from_variable.keys())
 
     @staticmethod
     def from_variables(
-        variables: Iterable["VariableBase"], local: bool = False
+        variables: Iterable[VariableBase], local: bool = False
     ) -> "StorageMetadata":
         """Determine storage indexing from variable list."""
 
         # Bucket variables by type
         variables_from_type: DefaultDict[
-            Type["VariableBase"], List["VariableBase"]
+            Type[VariableBase], List[VariableBase]
         ] = DefaultDict(list)
         for variable in variables:
             variables_from_type[type(variable)].append(variable)
 
         # Assign block of storage vector for each variable
-        index_from_variable: Dict["VariableBase", int] = {}
-        index_from_variable_type: Dict[Type["VariableBase"], int] = {}
+        index_from_variable: Dict[VariableBase, int] = {}
+        index_from_variable_type: Dict[Type[VariableBase], int] = {}
         storage_index = 0
         for variable_type, variables in variables_from_type.items():
             index_from_variable_type[variable_type] = storage_index
@@ -101,9 +99,7 @@ class VariableAssignments:
         """Helper for iterating over variables."""
         return self.storage_metadata.ordered_variables
 
-    def get_value(
-        self, variable: "VariableBase[VariableValueType]"
-    ) -> VariableValueType:
+    def get_value(self, variable: VariableBase[VariableValueType]) -> VariableValueType:
         """Get value corresponding to specific variable.  """
         index = self.storage_metadata.index_from_variable[variable]
         return type(variable).unflatten(
@@ -111,7 +107,7 @@ class VariableAssignments:
         )
 
     def get_stacked_value(
-        self, variable_type: Type["VariableBase[VariableValueType]"]
+        self, variable_type: Type[VariableBase[VariableValueType]]
     ) -> VariableValueType:
         """Get values of all variables corresponding to a specific type."""
         index = self.storage_metadata.index_from_variable_type[variable_type]
@@ -126,7 +122,7 @@ class VariableAssignments:
         value_from_variable = {
             variable: self.get_value(variable) for variable in self.variables
         }
-        k: "VariableBase"
+        k: VariableBase
 
         contents: str = "\n".join(
             [
@@ -138,7 +134,7 @@ class VariableAssignments:
 
     @staticmethod
     def from_dict(
-        assignments: Dict["VariableBase", types.VariableValue]
+        assignments: Dict[VariableBase, types.VariableValue]
     ) -> "VariableAssignments":
         # Figure out how variables are stored
         storage_metadata = StorageMetadata.from_variables(assignments.keys())
@@ -159,9 +155,9 @@ class VariableAssignments:
         )
 
     @staticmethod
-    def create_default(variables: Iterable["VariableBase"]) -> "VariableAssignments":
+    def create_default(variables: Iterable[VariableBase]) -> "VariableAssignments":
         """Create an assignments object with all parameters set to their defaults."""
-        variable: "VariableBase"
+        variable: VariableBase
         return VariableAssignments.from_dict(
             {variable: variable.get_default_value() for variable in variables}
         )
@@ -178,7 +174,7 @@ class VariableAssignments:
 
         # On-manifold retractions, one variable type at a time!
         new_storage = jnp.zeros_like(self.storage)
-        variable_type: Type["VariableBase"]
+        variable_type: Type[VariableBase]
         for variable_type in self.storage_metadata.index_from_variable_type.keys():
 
             # Get locations
