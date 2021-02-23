@@ -77,7 +77,8 @@ class PreparedFactorGraph:
         jacobian_coords = []
         value_indices: List[Tuple[jnp.ndarray, ...]] = []
 
-        # Create dummy assignments; these tell us how variables are stored
+        # Create storage metadata: this determines which parts of our storage object is
+        # allocated to each variable type
         storage_metadata = StorageMetadata.from_variables(variables, local=False)
         delta_storage_metadata = StorageMetadata.from_variables(variables, local=True)
 
@@ -272,8 +273,7 @@ class PreparedFactorGraph:
 
         TODO: hack for debugging, should revisit. This is currently inefficient for many
         reasons, including that we build out a dense slice of the (sparse) Jacobian and
-        square it to compute a much smaller block from the Hessian. Seems really
-        inefficient for big problems!
+        square it to compute a much smaller block from the Hessian.
         """
         local_dim = variable.get_local_parameter_dim()
         start_col_index = self.local_storage_metadata.index_from_variable[variable]

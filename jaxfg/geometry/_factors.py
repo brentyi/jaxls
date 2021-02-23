@@ -21,27 +21,25 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     """
 
     mu: jaxlie.MatrixLieGroup
-    variable_type: Type[LieVariableBase]
-    _static_fields = frozenset({"variable_type"})
 
     @staticmethod
     def make(
         variable: LieVariableBase,
         mu: jaxlie.MatrixLieGroup,
         scale_tril_inv: types.ScaleTrilInv,
-    ):
+    ) -> "PriorFactor":
         return PriorFactor(
             variables=(variable,),
             mu=mu,
             scale_tril_inv=scale_tril_inv,
-            variable_type=type(variable),
         )
 
     @overrides
     def compute_residual_vector(
         self, variable_value: jaxlie.MatrixLieGroup
     ) -> jnp.ndarray:
-        return (variable_value.inverse() @ self.mu).log()
+        # Equivalent to: return (variable_value.inverse() @ self.mu).log()
+        return jaxlie.manifold.rminus(variable_value, self.mu)
 
     @overrides
     def compute_residual_jacobians(
@@ -87,8 +85,6 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
 
     variables: _BeforeAfterTuple
     T_a_b: jaxlie.MatrixLieGroup
-    variable_type: Type[LieVariableBase]
-    _static_fields = frozenset({"variable_type"})
 
     @staticmethod
     def make(
@@ -96,7 +92,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         variable_T_world_b: LieVariableBase,
         T_a_b: jaxlie.MatrixLieGroup,
         scale_tril_inv: types.ScaleTrilInv,
-    ):
+    ) -> "BetweenFactor":
         assert type(variable_T_world_a) is type(variable_T_world_b)
         assert variable_T_world_a.MatrixLieGroupType is type(T_a_b)
 
@@ -107,7 +103,6 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
             ),
             T_a_b=T_a_b,
             scale_tril_inv=scale_tril_inv,
-            variable_type=type(variable_T_world_a),
         )
 
     @jax.jit
@@ -115,7 +110,8 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     def compute_residual_vector(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
     ) -> jnp.ndarray:
-        return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
+        # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
+        return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
 
     @overrides
     def compute_residual_jacobians(

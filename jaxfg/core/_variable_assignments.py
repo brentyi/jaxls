@@ -130,7 +130,7 @@ class VariableAssignments:
 
         contents: str = "\n".join(
             [
-                f"\t{i}.{k.__class__.__name__}: {v}"
+                f"    {i}.{k.__class__.__name__}: {v}"
                 for i, (k, v) in enumerate(value_from_variable.items())
             ]
         )
