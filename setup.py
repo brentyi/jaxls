@@ -18,5 +18,6 @@ setup(
         "termcolor",
         "tqdm",
         "matplotlib",
+        "fannypack",  # TODO: fannypack dep should be phased out
     ],
 )

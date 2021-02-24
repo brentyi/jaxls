@@ -44,7 +44,7 @@ graph = jaxfg.core.PreparedFactorGraph.make(factors)
 #
 # We just use each variables' default values here -- SE(2) identity -- but for bigger problems
 # bad initializations => no convergence when we run our nonlinear optimizer.
-initial_assignments = jaxfg.core.VariableAssignments.create_default(pose_variables)
+initial_assignments = jaxfg.core.VariableAssignments.make_default(pose_variables)
 
 print("Initial assignments:")
 print(initial_assignments)

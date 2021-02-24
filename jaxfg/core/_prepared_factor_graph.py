@@ -80,8 +80,8 @@ class PreparedFactorGraph:
 
         # Create storage metadata: this determines which parts of our storage object is
         # allocated to each variable type
-        storage_metadata = StorageMetadata.from_variables(variables, local=False)
-        delta_storage_metadata = StorageMetadata.from_variables(variables, local=True)
+        storage_metadata = StorageMetadata.make(variables, local=False)
+        delta_storage_metadata = StorageMetadata.make(variables, local=True)
 
         # Prepare each factor group
         residual_index = 0

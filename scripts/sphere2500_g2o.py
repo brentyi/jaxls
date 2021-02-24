@@ -97,7 +97,7 @@ print(f"Loaded {len(pose_variables)} poses and {len(factors)} factors")
 print("Initial cost")
 
 fannypack.utils.pdb_safety_net()
-initial_poses = jaxfg.core.VariableAssignments.from_dict(initial_poses_dict)
+initial_poses = jaxfg.core.VariableAssignments.make_from_dict(initial_poses_dict)
 graph = jaxfg.core.PreparedFactorGraph.make(factors)
 
 with jaxfg.utils.stopwatch("Compute residual"):

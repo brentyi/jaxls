@@ -10,6 +10,7 @@ from typing import (
     TypeVar,
 )
 
+import fannypack
 import jax
 from jax import numpy as jnp
 
@@ -44,7 +45,7 @@ class StorageMetadata:
         return tuple(self.index_from_variable.keys())
 
     @staticmethod
-    def from_variables(
+    def make(
         variables: Iterable[VariableBase], local: bool = False
     ) -> "StorageMetadata":
         """Determine storage indexing from variable list."""
@@ -133,11 +134,11 @@ class VariableAssignments:
         return f"VariableAssignments(\n{contents}\n)"
 
     @staticmethod
-    def from_dict(
+    def make_from_dict(
         assignments: Dict[VariableBase, types.VariableValue]
     ) -> "VariableAssignments":
         # Figure out how variables are stored
-        storage_metadata = StorageMetadata.from_variables(assignments.keys())
+        storage_metadata = StorageMetadata.make(assignments.keys())
 
         # Stack variable values in order
         storage = jnp.concatenate(
@@ -155,10 +156,10 @@ class VariableAssignments:
         )
 
     @staticmethod
-    def create_default(variables: Iterable[VariableBase]) -> "VariableAssignments":
+    def make_default(variables: Iterable[VariableBase]) -> "VariableAssignments":
         """Create an assignments object with all parameters set to their defaults."""
         variable: VariableBase
-        return VariableAssignments.from_dict(
+        return VariableAssignments.make_from_dict(
             {variable: variable.get_default_value() for variable in variables}
         )
 
@@ -209,3 +210,20 @@ class VariableAssignments:
                 ).flatten()
             )
         return dataclasses.replace(self, storage=new_storage)
+
+
+StorageMetadata.from_variables = fannypack.utils.new_name_wrapper(
+    old_name="from_variables",
+    new_name="make",
+    function_or_class=StorageMetadata.make,
+)
+VariableAssignments.from_dict = fannypack.utils.new_name_wrapper(
+    old_name="from_dict",
+    new_name="make_from_dict",
+    function_or_class=VariableAssignments.make_from_dict,
+)
+VariableAssignments.create_default = fannypack.utils.new_name_wrapper(
+    old_name="create_default",
+    new_name="make_default",
+    function_or_class=VariableAssignments.make_default,
+)
