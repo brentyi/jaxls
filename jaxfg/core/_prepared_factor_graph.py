@@ -185,7 +185,7 @@ class PreparedFactorGraph:
             self.stacked_factors,
             self.value_indices,
         ):
-            # Stack inputs to our factor
+            # Stack inputs to our factors
             variable: VariableBase
             values_stacked = tuple(
                 jax.vmap(type(variable).unflatten)(assignments.storage[indices])
@@ -238,7 +238,7 @@ class PreparedFactorGraph:
         ):
             # Stack inputs to our factors
             values_stacked = tuple(
-                variable.unflatten(assignments.storage[indices])
+                jax.vmap(variable.unflatten)(assignments.storage[indices])
                 for indices, variable in zip(value_indices, stacked_factors.variables)
             )
 

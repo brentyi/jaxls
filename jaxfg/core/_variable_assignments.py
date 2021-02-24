@@ -204,7 +204,7 @@ class VariableAssignments:
             ].set(
                 variable_type.flatten(
                     jax.vmap(variable_type.manifold_retract)(
-                        variable_type.unflatten(batched_xs), batched_deltas
+                        jax.vmap(variable_type.unflatten)(batched_xs), batched_deltas
                     )
                 ).flatten()
             )
