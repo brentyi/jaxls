@@ -203,7 +203,7 @@ class VariableAssignments:
             new_storage = new_storage.at[
                 storage_index : storage_index + dim * count
             ].set(
-                variable_type.flatten(
+                jax.vmap(variable_type.flatten)(
                     jax.vmap(variable_type.manifold_retract)(
                         jax.vmap(variable_type.unflatten)(batched_xs), batched_deltas
                     )
