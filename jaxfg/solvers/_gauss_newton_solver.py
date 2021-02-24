@@ -22,7 +22,9 @@ if TYPE_CHECKING:
 @utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class GaussNewtonSolver(
-    NonlinearSolverBase, _InexactStepSolverMixin, _TerminationCriteriaMixin
+    NonlinearSolverBase,
+    _InexactStepSolverMixin,
+    _TerminationCriteriaMixin,
 ):
     @overrides
     def solve(

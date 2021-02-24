@@ -36,7 +36,7 @@ factors = [
 # This goes through factors, and preprocesses them to enable vectorization of
 # computations. If we have 1000 PriorFactor objects, we can stack all of the associated
 # values and perform a batched operation that computes all 1000 residuals in one go.
-graph = jaxfg.core.PreparedFactorGraph.from_factors(factors)
+graph = jaxfg.core.PreparedFactorGraph.make(factors)
 
 
 # Create an assignments object, which you can think of as a (variable => value) mapping.

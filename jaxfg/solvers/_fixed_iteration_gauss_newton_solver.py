@@ -20,7 +20,10 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
-class FixedIterationGaussNewtonSolver(NonlinearSolverBase, _InexactStepSolverMixin):
+class FixedIterationGaussNewtonSolver(
+    NonlinearSolverBase,
+    _InexactStepSolverMixin,
+):
     @overrides
     def solve(
         self,

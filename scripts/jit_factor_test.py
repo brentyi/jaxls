@@ -37,7 +37,7 @@ jax.vmap(do_something_with_factor)(jaxlie.SO2.identity())
 #
 initial_assignments = jaxfg.core.VariableAssignments.create_default(variables.values())
 
-graph = jaxfg.core.PreparedFactorGraph.from_factors([f])
+graph = jaxfg.core.PreparedFactorGraph.make([f])
 jaxfg.geometry.PriorFactor.compute_residual_vector(
     f, jaxlie.SE2(xy_unit_complex=jnp.array([1.0, 1.0, 0.0, 1.0]))
 )

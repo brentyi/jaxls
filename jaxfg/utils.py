@@ -72,8 +72,18 @@ def register_dataclass_pytree(
         )
 
     def _unflatten(treedef, children):
-        return cls(
-            **dict(zip(children_fields, children)), **dict(zip(static_fields, treedef))
+        # Packing using constructor: this won't work with dataclasses that have their
+        # __init__ method overriden!
+        #
+        #     return cls(
+        #         **dict(zip(children_fields, children)), **dict(zip(static_fields, treedef))
+        #     )
+
+        # Instead, we create an empty object and then populate dataclass fields:
+        return dataclasses.replace(
+            cls.__new__(cls),
+            **dict(zip(children_fields, children)),
+            **dict(zip(static_fields, treedef)),
         )
 
     jax.tree_util.register_pytree_node(cls, _flatten, _unflatten)

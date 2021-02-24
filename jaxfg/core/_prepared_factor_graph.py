@@ -1,6 +1,7 @@
 import dataclasses
 from typing import Dict, Iterable, List, Tuple
 
+import fannypack
 import jax
 from jax import numpy as jnp
 
@@ -45,7 +46,7 @@ class PreparedFactorGraph:
         return self.local_storage_metadata.ordered_variables
 
     @staticmethod
-    def from_factors(factors: Iterable[FactorBase]) -> "PreparedFactorGraph":
+    def make(factors: Iterable[FactorBase]) -> "PreparedFactorGraph":
         """Create a factor graph from a set of factors.
 
         Args:
@@ -253,7 +254,7 @@ class PreparedFactorGraph:
                     ).flatten()
                 )
 
-        # Build full Jacobian
+        # Build Jacobian
         A = types.SparseMatrix(
             values=jnp.concatenate(A_values_list),
             coords=jnp.concatenate(self.jacobian_coords),
@@ -322,3 +323,10 @@ class PreparedFactorGraph:
     ) -> VariableAssignments:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)
+
+
+PreparedFactorGraph.from_factors = fannypack.utils.new_name_wrapper(
+    old_name="from_factors",
+    new_name="make",
+    function_or_class=PreparedFactorGraph.make,
+)

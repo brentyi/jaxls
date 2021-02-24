@@ -30,7 +30,9 @@ class _LevenbergMarqaurdtState(_NonlinearSolverState):
 @utils.register_dataclass_pytree
 @dataclasses.dataclass(frozen=True)
 class LevenbergMarquardtSolver(
-    NonlinearSolverBase, _InexactStepSolverMixin, _TerminationCriteriaMixin
+    NonlinearSolverBase,
+    _InexactStepSolverMixin,
+    _TerminationCriteriaMixin,
 ):
     """Simple damped least-squares implementation."""
 

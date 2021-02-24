@@ -15,7 +15,7 @@ class SparseMatrix:
     values: jnp.ndarray
     """Non-zero matrix values. Shape should be `(*, N)`."""
     coords: jnp.ndarray
-    """Row, value positions of non-zero entries. Shape should be `(*, N, 2)`."""
+    """Row, column positions of non-zero entries. Shape should be `(*, N, 2)`."""
     shape: Tuple[int, int]
     """Shape of matrix."""
 
