@@ -211,7 +211,7 @@ class PreparedFactorGraph:
     @jax.jit
     def compute_cost(
         self, assignments: VariableAssignments
-    ) -> Tuple[float, jnp.ndarray]:
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute the sum of squared residuals associated with a factor graph. Also
         returns intermediate residual vector.
 
@@ -219,11 +219,46 @@ class PreparedFactorGraph:
             assignments (VariableAssignments): Variable assignments.
 
         Returns:
-            Tuple[float, jnp.ndarray]: Scalar cost, residual vector.
+            Tuple[jnp.ndarray, jnp.ndarray]: Scalar cost, residual vector.
         """
         residual_vector = self.compute_residual_vector(assignments)
         cost = jnp.sum(residual_vector ** 2)
         return cost, residual_vector
+
+    @jax.jit
+    def compute_joint_nll(
+        self,
+        assignments: VariableAssignments,
+        include_constants: bool = False,
+    ) -> jnp.ndarray:
+        """Compute the joint negative log-likelihood associated with a set of variable assignments.
+
+        Args:
+            assignments (VariableAssignments): Variable assignments.
+
+        Returns:
+            jnp.ndarray: Scalar cost negative log-likelihood.
+        """
+
+        if include_constants:
+            raise NotImplementedError()
+
+        # Add Mahalanobis distance terms to NLL
+        joint_nll = jnp.sum(self.compute_residual_vector(assignments) ** 2)
+
+        # Add log-determinant terms
+        stacked_factor: FactorBase
+        for stacked_factor in self.stacked_factors:
+            N, dim, _dim = stacked_factor.scale_tril_inv.shape
+
+            cov_determinants = jnp.log(
+                jax.vmap(jnp.linalg.det)(stacked_factor.scale_tril_inv) ** (-2)
+            )
+            assert cov_determinants.shape == (N,)
+
+            joint_nll = joint_nll + jnp.sum(cov_determinants)
+
+        return joint_nll
 
     @jax.jit
     def compute_jacobian(self, assignments: VariableAssignments) -> types.SparseMatrix:
