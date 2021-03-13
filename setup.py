@@ -13,7 +13,7 @@ setup(
     install_requires=[
         "jax",
         "jaxlib",
-        "jaxlie",
+        "jaxlie>=1.0.0",
         "overrides",
         "termcolor",
         "tqdm",

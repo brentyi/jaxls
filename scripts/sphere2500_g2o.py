@@ -38,7 +38,7 @@ for line in tqdm(lines):
         variable = jaxfg.geometry.SE3Variable()
 
         initial_poses_dict[variable] = jaxlie.SE3(
-            xyz_wxyz=onp.array(list(map(float, [x, y, z, qw, qx, qy, qz])))
+            wxyz_xyz=onp.array(list(map(float, [qw, qx, qy, qz, x, y, z])))
         )
 
         pose_variables.append(variable)
@@ -128,12 +128,16 @@ ax.set_box_aspect((1, 1, 1))
 plt.title("Optimization on Sphere2500 dataset (Kaess et al, 2012)")
 
 ax.plot3D(
-    *(onp.array([initial_poses.get_value(v).translation for v in pose_variables]).T),
+    *(initial_poses.get_stacked_value(jaxfg.geometry.SE3Variable).translation().T),
+    # Equivalent:
+    # *(onp.array([initial_poses.get_value(v).translation() for v in pose_variables]).T),
     c="r",
     label="Dead-reckoned",
 )
 ax.plot3D(
-    *(onp.array([solution_poses.get_value(v).translation for v in pose_variables]).T),
+    *(solution_poses.get_stacked_value(jaxfg.geometry.SE3Variable).translation().T),
+    # Equivalent:
+    # *(onp.array([solution_poses.get_value(v).translation() for v in pose_variables]).T),
     c="b",
     label="Optimized",
 )

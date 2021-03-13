@@ -120,12 +120,16 @@ plt.figure()
 plt.title("Optimization on M3500 dataset, Olson et al. 2006")
 
 plt.plot(
-    *(onp.array([initial_poses.get_value(v).translation for v in pose_variables]).T),
+    *(initial_poses.get_stacked_value(jaxfg.geometry.SE2Variable).translation().T),
+    # Equivalent:
+    # *(onp.array([initial_poses.get_value(v).translation() for v in pose_variables]).T),
     c="r",
     label="Dead-reckoned",
 )
 plt.plot(
-    *(onp.array([solution_poses.get_value(v).translation for v in pose_variables]).T),
+    *(solution_poses.get_stacked_value(jaxfg.geometry.SE2Variable).translation().T),
+    # Equivalent:
+    # *(onp.array([solution_poses.get_value(v).translation() for v in pose_variables]).T),
     c="b",
     label="Optimized",
 )

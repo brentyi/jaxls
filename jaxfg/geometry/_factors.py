@@ -53,7 +53,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
 
         J_residual_wrt_value = jax.jacfwd(
             PriorFactor.compute_residual_vector, argnums=1
-        )(self, variable_value).parameters
+        )(self, variable_value).parameters()
         assert J_residual_wrt_value.shape == (
             variable_value.tangent_dim,
             variable_value.parameters_dim,
@@ -124,7 +124,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         # with this function commented out!
 
         J_residual_wrt_a, J_residual_wrt_b = (
-            J.parameters
+            J.parameters()
             for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=(1, 2))(
                 self, T_world_a, T_world_b
             )

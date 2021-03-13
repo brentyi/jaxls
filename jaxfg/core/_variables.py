@@ -68,11 +68,14 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         Typically written as `x $\ominus$ y` or `x $\boxminus$ y`.
 
         Args:
-            x (VariableValue): First parameter to compare. Shape should match `self.get_parameter_dim()`.
-            y (VariableValue): Second parameter to compare. Shape should match `self.get_parameter_dim()`.
+            x (VariableValue): First parameter to compare. Shape should match
+                `self.get_parameter_dim()`.
+            y (VariableValue): Second parameter to compare. Shape should match
+                `self.get_parameter_dim()`.
 
         Returns:
-            LocalVariableValue: Delta vector; dimension should match self.get_local_parameter_dim().
+            LocalVariableValue: Delta vector; dimension should match
+            `self.get_local_parameter_dim()`.
         """
         return cls.flatten(x) - cls.flatten(y)
 
