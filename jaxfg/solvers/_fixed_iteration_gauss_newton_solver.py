@@ -15,7 +15,7 @@ from ._nonlinear_solver_base import (
 )
 
 if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import PreparedFactorGraph
+    from ..core._prepared_factor_graph import StackedFactorGraph
 
 
 @utils.register_dataclass_pytree
@@ -33,12 +33,15 @@ class FixedIterationGaussNewtonSolver(
         # Initialize
         assignments = initial_assignments
         cost, residual_vector = graph.compute_cost(assignments)
+
         state = _NonlinearSolverState(
-            iterations=0,
+            # Using device arrays instead of native types helps avoid redundant JIT
+            # compilation
+            iterations=jnp.array(0),
             assignments=assignments,
             cost=cost,
             residual_vector=residual_vector,
-            done=False,
+            done=jnp.array(False),
         )
         self._print(f"Starting solve with {self}, initial cost={state.cost}")
 

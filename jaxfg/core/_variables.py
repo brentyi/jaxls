@@ -3,44 +3,30 @@ from typing import Dict, Generic, Mapping, Type, TypeVar
 
 from jax import flatten_util
 from jax import numpy as jnp
-from overrides import overrides
+from overrides import EnforceOverrides, final, overrides
 
 from .. import types
 
 VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
 
-class VariableBase(abc.ABC, Generic[VariableValueType]):
+class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     """Base class for variable types. Also defines helpers for manifold optimization."""
 
-    def __init_subclass__(cls):
-        """For subclasses, we determine the parameter dimensionality and unflattening
-        procedure from the example provided by `get_default_value()`."""
-        example = cls.get_default_value()
-        flat, unflatten = flatten_util.ravel_pytree(example)
-        (parameter_dim,) = flat.shape
-
-        cls.get_parameter_dim = staticmethod(lambda: parameter_dim)
-        cls.unflatten = staticmethod(unflatten)
-
-    @staticmethod
-    # @abc.abstractmethod # <== hack for mypy
-    def get_parameter_dim() -> int:
-        """Dimensionality of underlying parameterization."""
-        raise NotImplementedError(
-            "Should be defined in VariableBase.__init_subclass__!"
-        )
-
-    @classmethod
-    def get_local_parameter_dim(cls) -> int:
-        """Dimensionality of local parameterization."""
-        return cls.get_parameter_dim()
+    # (1) Functions that must be overriden in subclasses.
 
     @classmethod
     @abc.abstractmethod
     def get_default_value(cls) -> VariableValueType:
         """Get default (on-manifold) parameter value."""
         raise NotImplementedError()
+
+    # (2) Functions to override for custom manifolds / local parameterizations.
+
+    @classmethod
+    def get_local_parameter_dim(cls) -> int:
+        """Dimensionality of local parameterization."""
+        return cls.get_parameter_dim()
 
     @classmethod
     def manifold_retract(
@@ -52,7 +38,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
 
         Args:
             x (VariableValue): Absolute parameter to update.
-            local_delta (VariableValue): Delta value in local parameterizaiton.
+            local_delta (VariableValue): Delta value in local parameterizaton.
 
         Returns:
             jnp.ndarray: Updated parameterization.
@@ -79,7 +65,30 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         """
         return cls.flatten(x) - cls.flatten(y)
 
+    # (3) Shared implementation details.
+
+    @final
+    def __init_subclass__(cls):
+        """For subclasses, we determine the parameter dimensionality and unflattening
+        procedure from the example provided by `get_default_value()`."""
+
+        example = cls.get_default_value()
+        flat, unflatten = flatten_util.ravel_pytree(example)
+        (parameter_dim,) = flat.shape
+
+        cls.get_parameter_dim = staticmethod(lambda: parameter_dim)
+        cls.unflatten = staticmethod(unflatten)
+
     @staticmethod
+    @final  # Should not be overriden, see __init_subclass__
+    def get_parameter_dim() -> int:
+        """Dimensionality of underlying parameterization."""
+        raise NotImplementedError(
+            "Should be defined in VariableBase.__init_subclass__!"
+        )
+
+    @staticmethod
+    @final
     def flatten(x: VariableValueType) -> jnp.ndarray:
         """Flatten variable value to 1D array.
         Should be similar to `jax.flatten_util.ravel_pytree`.
@@ -94,7 +103,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         return flat
 
     @staticmethod
-    # @abc.abstractmethod # <== hack for mypy
+    @final  # Should not be overriden, see __init_subclass__
     def unflatten(flat: jnp.ndarray) -> VariableValueType:
         """Get variable value from flattened representation.
 
@@ -109,8 +118,9 @@ class VariableBase(abc.ABC, Generic[VariableValueType]):
         )
 
     @overrides
+    @final
     def __lt__(self, other) -> bool:
-        """Compare hashes between variables. Needed to use as pytree key. :shrug:
+        """Compare hashes between variables. Needed to use as PyTree key.
 
         Args:
             other: Other object to compare.

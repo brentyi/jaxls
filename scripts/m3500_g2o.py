@@ -92,7 +92,7 @@ print("Initial cost")
 
 fannypack.utils.pdb_safety_net()
 initial_poses = jaxfg.core.VariableAssignments.make_from_dict(initial_poses_dict)
-graph = jaxfg.core.PreparedFactorGraph.make(factors)
+graph = jaxfg.core.StackedFactorGraph.make(factors)
 
 with jaxfg.utils.stopwatch("Compute residual"):
     print(jnp.sum(graph.compute_residual_vector(initial_poses) ** 2) * 0.5)

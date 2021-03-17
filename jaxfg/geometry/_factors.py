@@ -4,7 +4,7 @@ from typing import Generic, NamedTuple, Tuple, Type, TypeVar
 import jax
 import jaxlie
 from jax import numpy as jnp
-from overrides import overrides
+from overrides import final, overrides
 
 from .. import types, utils
 from ..core._factors import FactorBase
@@ -34,6 +34,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
             scale_tril_inv=scale_tril_inv,
         )
 
+    @final
     @overrides
     def compute_residual_vector(
         self, variable_value: jaxlie.MatrixLieGroup
@@ -41,6 +42,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
         return jaxlie.manifold.rminus(variable_value, self.mu)
 
+    @final
     @overrides
     def compute_residual_jacobians(
         self, variable_value: jaxlie.MatrixLieGroup
@@ -94,7 +96,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         scale_tril_inv: types.ScaleTrilInv,
     ) -> "BetweenFactor":
         assert type(variable_T_world_a) is type(variable_T_world_b)
-        assert variable_T_world_a.MatrixLieGroupType is type(T_a_b)
+        assert variable_T_world_a.get_group_type() is type(T_a_b)
 
         return BetweenFactor(
             variables=_BeforeAfterTuple(
@@ -106,6 +108,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         )
 
     @jax.jit
+    @final
     @overrides
     def compute_residual_vector(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
@@ -113,6 +116,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
         return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
 
+    @final
     @overrides
     def compute_residual_jacobians(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup

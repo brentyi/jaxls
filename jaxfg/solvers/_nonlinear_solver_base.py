@@ -9,7 +9,7 @@ from .. import utils
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import PreparedFactorGraph
+    from ..core._prepared_factor_graph import StackedFactorGraph
 
 
 @utils.register_dataclass_pytree
@@ -36,7 +36,7 @@ class NonlinearSolverBase(_NonlinearSolverBase, abc.ABC):
     @abc.abstractmethod
     def solve(
         self,
-        graph: "PreparedFactorGraph",
+        graph: "StackedFactorGraph",
         initial_assignments: "VariableAssignments",
     ) -> "VariableAssignments":
         """Run MAP inference on a factor graph."""

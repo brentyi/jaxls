@@ -1,10 +1,12 @@
-from typing import Any
+from typing import Any, Union
 
+import numpy as onp
 from jax import numpy as jnp
 
-ScaleTril = jnp.ndarray
-ScaleTrilInv = jnp.ndarray
+Array = Union[jnp.ndarray, onp.ndarray]
 
+ScaleTril = Array
+ScaleTrilInv = Array
 
 PyTree = Any
 VariableValue = PyTree

@@ -15,7 +15,7 @@ pose_variables = [
 factors = [
     jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[0],
-        mu=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
+        mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
         scale_tril_inv=jnp.eye(3),
     ),
     jaxfg.geometry.PriorFactor.make(
@@ -31,19 +31,19 @@ factors = [
     ),
 ]
 
-# Create our "prepared" factor graph. (this is the only kind of factor graph)
+# Create our "stacked" factor graph. (this is the only kind of factor graph)
 #
 # This goes through factors, and preprocesses them to enable vectorization of
-# computations. If we have 1000 PriorFactor objects, we can stack all of the associated
-# values and perform a batched operation that computes all 1000 residuals in one go.
-graph = jaxfg.core.PreparedFactorGraph.make(factors)
+# computations. If we have 1000 PriorFactor objects, we stack all of the associated
+# values and perform a batched operation that computes all 1000 residuals.
+graph = jaxfg.core.StackedFactorGraph.make(factors)
 
 
 # Create an assignments object, which you can think of as a (variable => value) mapping.
 # These initial values will be used by our nonlinear optimizer.
 #
-# We just use each variables' default values here -- SE(2) identity -- but for bigger problems
-# bad initializations => no convergence when we run our nonlinear optimizer.
+# We just use each variables' default values here -- SE(2) identity -- but for bigger
+# problems bad initializations => no convergence when we run our nonlinear optimizer.
 initial_assignments = jaxfg.core.VariableAssignments.make_default(pose_variables)
 
 print("Initial assignments:")
@@ -60,6 +60,8 @@ print(initial_assignments)
 # Solve. Note that the first call to solve() will be much slower than subsequent calls.
 with jaxfg.utils.stopwatch("First solve (slower because of JIT compilation)"):
     solution_assignments = graph.solve(initial_assignments)
+
+exit()
 
 with jaxfg.utils.stopwatch("Solve after initial compilation"):
     solution_assignments = graph.solve(initial_assignments)

@@ -18,7 +18,7 @@ from ._variables import VariableBase
     static_fields=("local_storage_metadata", "residual_dim"),
 )
 @dataclasses.dataclass(frozen=True)
-class PreparedFactorGraph:
+class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 
     Improves runtime by stacking factors based on their group key.
@@ -46,14 +46,14 @@ class PreparedFactorGraph:
         return self.local_storage_metadata.ordered_variables
 
     @staticmethod
-    def make(factors: Iterable[FactorBase]) -> "PreparedFactorGraph":
+    def make(factors: Iterable[FactorBase]) -> "StackedFactorGraph":
         """Create a factor graph from a set of factors.
 
         Args:
             factors (Iterable[FactorBase]): Factors in our graph.
 
         Returns:
-            "PreparedFactorGraph":
+            "StackedFactorGraph":
         """
 
         # Start by grouping our factors and grabbing a list of (ordered!) variables
@@ -160,7 +160,7 @@ class PreparedFactorGraph:
 
                 jacobian_coords.append(coords)
 
-        return PreparedFactorGraph(
+        return StackedFactorGraph(
             stacked_factors=tuple(stacked_factors),
             jacobian_coords=tuple(jacobian_coords),
             value_indices=tuple(value_indices),
@@ -360,8 +360,8 @@ class PreparedFactorGraph:
         return solver.solve(graph=self, initial_assignments=initial_assignments)
 
 
-PreparedFactorGraph.from_factors = fannypack.utils.new_name_wrapper(
+StackedFactorGraph.from_factors = fannypack.utils.new_name_wrapper(
     old_name="from_factors",
     new_name="make",
-    function_or_class=PreparedFactorGraph.make,
+    function_or_class=StackedFactorGraph.make,
 )

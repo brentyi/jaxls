@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, FrozenSet, Tuple, Type, TypeVar
 import jax
 import numpy as onp
 from jax import numpy as jnp
-from overrides import overrides
+from overrides import EnforceOverrides, final, overrides
 
 from .. import types
 
@@ -19,7 +19,7 @@ FactorType = TypeVar("FactorType", bound="FactorBase")
 # Disable type-checking here
 # > https://github.com/python/mypy/issues/5374
 @dataclasses.dataclass(frozen=True)  # type: ignore
-class FactorBase(abc.ABC):
+class FactorBase(abc.ABC, EnforceOverrides):
     variables: Tuple["VariableBase", ...]
     """Variables connected to this factor."""
 
@@ -30,6 +30,7 @@ class FactorBase(abc.ABC):
     """Fields to ignore when stacking."""
 
     @property
+    @final
     def residual_dim(self) -> int:
         """Error dimensionality."""
         # We can't use [0] here, because (for stacked factors) there might be a batch dimension!
@@ -39,12 +40,13 @@ class FactorBase(abc.ABC):
         """Register all factors as hashable PyTree nodes."""
         super().__init_subclass__(**kwargs)
         jax.tree_util.register_pytree_node(
-            cls, flatten_func=cls.flatten, unflatten_func=cls.unflatten
+            cls, flatten_func=cls._flatten, unflatten_func=cls._unflatten
         )
         cls.__hash__ = object.__hash__
 
     @classmethod
-    def flatten(
+    @final
+    def _flatten(
         cls: Type[FactorType], v: FactorType
     ) -> Tuple[Tuple[types.PyTree, ...], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
@@ -64,7 +66,8 @@ class FactorBase(abc.ABC):
         )
 
     @classmethod
-    def unflatten(
+    @final
+    def _unflatten(
         cls: Type[FactorType], treedef: Tuple, children: Tuple[jnp.ndarray]
     ) -> FactorType:
         """Unflatten a factor for use as a PyTree/parameter stacking."""
@@ -80,6 +83,7 @@ class FactorBase(abc.ABC):
         out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
         return out
 
+    @final
     def group_key(self) -> types.GroupKey:
         """Get unique key for grouping factors.
 
@@ -153,6 +157,7 @@ class LinearFactor(FactorBase):
     b: jnp.ndarray
     scale_tril_inv: jnp.ndarray
 
+    @final
     @overrides
     def compute_residual_vector(self, *variable_values: types.VariableValue):
         linear_component = jnp.zeros_like(self.b)
