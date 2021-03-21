@@ -69,8 +69,8 @@ class GaussNewtonSolver(
         """Linearize, solve linear subproblem, and update on manifold."""
 
         # Linearize graph
-        A: types.SparseMatrix = graph.compute_jacobian(state_prev.assignments)
-        ATb = A.T @ -state_prev.residual_vector
+        A: types.SparseMatrix = graph.compute_residual_jacobian(state_prev.assignments)
+        ATb = -(A.T @ state_prev.residual_vector)
 
         # Solve linear subproblem
         local_delta_assignments = VariableAssignments(
@@ -85,7 +85,7 @@ class GaussNewtonSolver(
         )
 
         # On-manifold retraction
-        assignments = state_prev.assignments.apply_local_deltas(
+        assignments = state_prev.assignments.manifold_retract(
             local_delta_assignments=local_delta_assignments,
         )
 

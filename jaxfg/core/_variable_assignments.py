@@ -137,6 +137,20 @@ class VariableAssignments:
 
         return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
 
+    def __repr__(self):
+        value_from_variable = {
+            variable: self.get_value(variable) for variable in self.variables()
+        }
+        k: VariableBase
+
+        contents: str = "\n".join(
+            [
+                f"    {i}.{k.__class__.__name__}: {v}"
+                for i, (k, v) in enumerate(value_from_variable.items())
+            ]
+        )
+        return f"VariableAssignments(\n{contents}\n)"
+
     def variables(self) -> Iterable[VariableBase]:
         """Helper for iterating over variables."""
         return self.storage_metadata.ordered_variables()
@@ -160,22 +174,8 @@ class VariableAssignments:
             ].reshape((count, variable_type.get_parameter_dim()))
         )
 
-    def __repr__(self):
-        value_from_variable = {
-            variable: self.get_value(variable) for variable in self.variables()
-        }
-        k: VariableBase
-
-        contents: str = "\n".join(
-            [
-                f"    {i}.{k.__class__.__name__}: {v}"
-                for i, (k, v) in enumerate(value_from_variable.items())
-            ]
-        )
-        return f"VariableAssignments(\n{contents}\n)"
-
     @jax.jit
-    def apply_local_deltas(
+    def manifold_retract(
         self, local_delta_assignments: "VariableAssignments"
     ) -> "VariableAssignments":
         """Update variables on manifold."""
@@ -203,7 +203,7 @@ class VariableAssignments:
             local_dim = variable_type.get_local_parameter_dim()
 
             # Get batched variables
-            batched_xs = self.storage[
+            batched_values_flat = self.storage[
                 storage_index : storage_index + dim * count
             ].reshape((count, dim))
             batched_deltas = local_delta_assignments.storage[
@@ -216,7 +216,8 @@ class VariableAssignments:
             ].set(
                 jax.vmap(variable_type.flatten)(
                     jax.vmap(variable_type.manifold_retract)(
-                        jax.vmap(variable_type.unflatten)(batched_xs), batched_deltas
+                        jax.vmap(variable_type.unflatten)(batched_values_flat),
+                        batched_deltas,
                     )
                 ).flatten()
             )

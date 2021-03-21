@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import jax
 from jax import numpy as jnp
@@ -10,6 +10,9 @@ from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
+
+Int = Union[types.Array, int]
+Boolean = Union[types.Array, bool]
 
 
 @utils.register_dataclass_pytree
@@ -23,7 +26,7 @@ class _NonlinearSolverBase:
     max_iterations: int = 100
     """Maximum number of iterations."""
 
-    verbose: bool = True
+    verbose: Boolean = True
     """Set to `True` to enable printing."""
 
     def _print(self, *args, **kwargs):
@@ -47,11 +50,11 @@ class NonlinearSolverBase(_NonlinearSolverBase, abc.ABC):
 class _NonlinearSolverState:
     """Standard state passed between nonlinear solve iterations."""
 
-    iterations: int
+    iterations: Int
     assignments: "VariableAssignments"
     cost: types.Scalar
-    residual_vector: jnp.ndarray
-    done: bool
+    residual_vector: types.Array
+    done: Boolean
 
 
 @dataclasses.dataclass
@@ -66,7 +69,7 @@ class _InexactStepSolverMixin:
     LEAST SQUARES, Wright & Holt 1983."""
 
     @jax.jit
-    def inexact_step_forcing_sequence(self, iterations: int) -> float:
+    def inexact_step_forcing_sequence(self, iterations: Int) -> types.Scalar:
         """Get CGLS tolerance from zero-indexed iteration count."""
         return self.inexact_step_eta / (iterations + 1)
 
@@ -95,7 +98,8 @@ class _TerminationCriteriaMixin:
         cost_updated: types.Scalar,
         local_delta_assignments: VariableAssignments,
         negative_gradient: types.Array,
-    ):
+    ) -> bool:
+
         """Check for convergence!"""
         # Cost tolerance
         converged_cost = (
@@ -108,7 +112,7 @@ class _TerminationCriteriaMixin:
             state_prev.iterations >= self.gradient_tolerance_start_step,
             jnp.max(
                 state_prev.assignments.storage
-                - state_prev.assignments.apply_local_deltas(
+                - state_prev.assignments.manifold_retract(
                     VariableAssignments(
                         storage=negative_gradient,
                         storage_metadata=local_delta_assignments.storage_metadata,

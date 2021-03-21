@@ -1,8 +1,8 @@
 import dataclasses
 from typing import Dict, Iterable, List, Tuple
 
-import fannypack
 import jax
+import numpy as onp
 from jax import numpy as jnp
 
 from .. import types as types
@@ -25,9 +25,9 @@ class StackedFactorGraph:
     """
 
     stacked_factors: Tuple[FactorBase, ...]
-    jacobian_coords: Tuple[jnp.ndarray, ...]
+    jacobian_coords: Tuple[types.Array, ...]
     value_indices: Tuple[
-        Tuple[jnp.ndarray, ...], ...
+        Tuple[types.Array, ...], ...
     ]  # value_indices[factor #][variable #] -> int array
     local_storage_metadata: StorageMetadata
     residual_dim: int
@@ -75,7 +75,7 @@ class StackedFactorGraph:
         # Fields we want to populate
         stacked_factors: List[FactorBase] = []
         jacobian_coords = []
-        value_indices: List[Tuple[jnp.ndarray, ...]] = []
+        value_indices: List[Tuple[onp.ndarray, ...]] = []
 
         # Create storage metadata: this determines which parts of our storage object is
         # allocated to each variable type
@@ -84,7 +84,7 @@ class StackedFactorGraph:
 
         # Prepare each factor group
         residual_index = 0
-        residual_indices: List[jnp.ndarray] = []
+        residual_indices: List[onp.ndarray] = []
         for group_key, group in factors_from_group.items():
             # Stack factors in our group
             stacked_factor: FactorBase = jax.tree_multimap(
@@ -92,10 +92,10 @@ class StackedFactorGraph:
             )
 
             # Get indices for each variable
-            value_indices_list: Tuple[List[jnp.ndarray], ...] = tuple(
+            value_indices_list: Tuple[List[onp.ndarray], ...] = tuple(
                 [] for _ in range(len(stacked_factor.variables))
             )
-            local_value_indices_list: Tuple[List[jnp.ndarray], ...] = tuple(
+            local_value_indices_list: Tuple[List[onp.ndarray], ...] = tuple(
                 [] for _ in range(len(stacked_factor.variables))
             )
             for factor in group:
@@ -103,7 +103,7 @@ class StackedFactorGraph:
                     # Record variable parameterization indices
                     storage_pos = storage_metadata.index_from_variable[variable]
                     value_indices_list[i].append(
-                        jnp.arange(
+                        onp.arange(
                             storage_pos, storage_pos + variable.get_parameter_dim()
                         )
                     )
@@ -111,25 +111,25 @@ class StackedFactorGraph:
                     # Record local parameterization indices
                     storage_pos = delta_storage_metadata.index_from_variable[variable]
                     local_value_indices_list[i].append(
-                        jnp.arange(
+                        onp.arange(
                             storage_pos,
                             storage_pos + variable.get_local_parameter_dim(),
                         )
                     )
 
             # Stack: end result should be Tuple[array of shape (N, *parameter_shape), ...]
-            value_indices_stacked: Tuple[jnp.ndarray, ...] = tuple(
-                jnp.array(indices) for indices in value_indices_list
+            value_indices_stacked: Tuple[onp.ndarray, ...] = tuple(
+                onp.array(indices) for indices in value_indices_list
             )
-            local_value_indices_stacked: Tuple[jnp.ndarray, ...] = tuple(
-                jnp.array(indices) for indices in local_value_indices_list
+            local_value_indices_stacked: Tuple[onp.ndarray, ...] = tuple(
+                onp.array(indices) for indices in local_value_indices_list
             )
 
             # Record values
             stacked_factors.append(stacked_factor)
             value_indices.append(value_indices_stacked)
             residual_indices.append(
-                jnp.arange(
+                onp.arange(
                     residual_index, residual_index + len(group) * factor.residual_dim()
                 ).reshape((len(group), factor.residual_dim()))
             )
@@ -141,15 +141,15 @@ class StackedFactorGraph:
             for variable_index, variable in enumerate(stacked_factor.variables):
                 variable_dim = variable.get_local_parameter_dim()
 
-                coords = jnp.stack(
+                coords = onp.stack(
                     (
                         # Row indices
-                        jnp.broadcast_to(
+                        onp.broadcast_to(
                             residual_indices[-1][:, :, None],
                             (num_factors, residual_dim, variable_dim),
                         ),
                         # Column indices
-                        jnp.broadcast_to(
+                        onp.broadcast_to(
                             local_value_indices_stacked[variable_index][:, None, :],
                             (num_factors, residual_dim, variable_dim),
                         ),
@@ -260,7 +260,9 @@ class StackedFactorGraph:
         return joint_nll
 
     @jax.jit
-    def compute_jacobian(self, assignments: VariableAssignments) -> types.SparseMatrix:
+    def compute_residual_jacobian(
+        self, assignments: VariableAssignments
+    ) -> types.SparseMatrix:
         """Compute the Jacobian of a graph's residual vector with respect to the stacked
         local delta vectors. Shape should be `(residual_dim, local_delta_storage_dim)`."""
 
@@ -319,7 +321,7 @@ class StackedFactorGraph:
         # Unfortunately it's not possible to JIT compile normal boolean masking because
         # it results in dynamic shapes, so we resort to zeroing out the terms that we
         # don't care about...
-        A_all = self.compute_jacobian(assignments)
+        A_all = self.compute_residual_jacobian(assignments)
         mask = jnp.logical_and(
             A_all.coords[:, 1] >= start_col_index, A_all.coords[:, 1] < end_col_index
         )
