@@ -16,19 +16,19 @@ from ._nonlinear_solver_base import (
 )
 
 if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import StackedFactorGraph
+    from ..core._stacked_factor_graph import StackedFactorGraph
 
 
 @utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class _LevenbergMarqaurdtState(_NonlinearSolverState):
     """Helper for state passed between LM iterations."""
 
-    lambd: float
+    lambd: types.Scalar
 
 
 @utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class LevenbergMarquardtSolver(
     NonlinearSolverBase,
     _InexactStepSolverMixin,
@@ -36,10 +36,10 @@ class LevenbergMarquardtSolver(
 ):
     """Simple damped least-squares implementation."""
 
-    lambda_initial: float = 5e-4
-    lambda_factor: float = 2.0
-    lambda_min: float = 1e-6
-    lambda_max: float = 1e10
+    lambda_initial: types.Scalar = 5e-4
+    lambda_factor: types.Scalar = 2.0
+    lambda_min: types.Scalar = 1e-6
+    lambda_max: types.Scalar = 1e10
 
     @overrides
     def solve(

@@ -4,6 +4,7 @@ import numpy as onp
 from jax import numpy as jnp
 
 Array = Union[jnp.ndarray, onp.ndarray]
+Scalar = Union[Array, float]
 
 ScaleTril = Array
 ScaleTrilInv = Array

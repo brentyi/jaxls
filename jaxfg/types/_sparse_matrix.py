@@ -8,7 +8,7 @@ from .. import utils
 
 
 @jax.partial(utils.register_dataclass_pytree, static_fields=("shape",))
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class SparseMatrix:
     """Sparse matrix in COO form."""
 

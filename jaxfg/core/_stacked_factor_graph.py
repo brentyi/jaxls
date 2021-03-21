@@ -17,7 +17,7 @@ from ._variables import VariableBase
     utils.register_dataclass_pytree,
     static_fields=("local_storage_metadata", "residual_dim"),
 )
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 
@@ -41,9 +41,8 @@ class StackedFactorGraph:
             for value_indices, variable in zip(v, s.variables):
                 assert value_indices.shape == (N, variable.get_parameter_dim())
 
-    @property
     def variables(self) -> Tuple[VariableBase, ...]:
-        return self.local_storage_metadata.ordered_variables
+        return self.local_storage_metadata.ordered_variables()
 
     @staticmethod
     def make(factors: Iterable[FactorBase]) -> "StackedFactorGraph":
@@ -131,14 +130,14 @@ class StackedFactorGraph:
             value_indices.append(value_indices_stacked)
             residual_indices.append(
                 jnp.arange(
-                    residual_index, residual_index + len(group) * factor.residual_dim
-                ).reshape((len(group), factor.residual_dim))
+                    residual_index, residual_index + len(group) * factor.residual_dim()
+                ).reshape((len(group), factor.residual_dim()))
             )
-            residual_index += stacked_factor.residual_dim * len(group)
+            residual_index += stacked_factor.residual_dim() * len(group)
 
             # Get Jacobian coordinates
             num_factors = len(group)
-            residual_dim = stacked_factor.residual_dim
+            residual_dim = stacked_factor.residual_dim()
             for variable_index, variable in enumerate(stacked_factor.variables):
                 variable_dim = variable.get_local_parameter_dim()
 
@@ -358,10 +357,3 @@ class StackedFactorGraph:
     ) -> VariableAssignments:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)
-
-
-StackedFactorGraph.from_factors = fannypack.utils.new_name_wrapper(
-    old_name="from_factors",
-    new_name="make",
-    function_or_class=StackedFactorGraph.make,
-)

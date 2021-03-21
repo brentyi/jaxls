@@ -15,11 +15,11 @@ from ._nonlinear_solver_base import (
 )
 
 if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import StackedFactorGraph
+    from ..core._stacked_factor_graph import StackedFactorGraph
 
 
 @utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class FixedIterationGaussNewtonSolver(
     NonlinearSolverBase,
     _InexactStepSolverMixin,
@@ -27,7 +27,7 @@ class FixedIterationGaussNewtonSolver(
     @overrides
     def solve(
         self,
-        graph: "PreparedFactorGraph",
+        graph: "StackedFactorGraph",
         initial_assignments: "VariableAssignments",
     ) -> "VariableAssignments":
         # Initialize
@@ -56,7 +56,7 @@ class FixedIterationGaussNewtonSolver(
     @jax.jit
     def _step(
         self,
-        graph: "PreparedFactorGraph",
+        graph: "StackedFactorGraph",
         state_prev: _NonlinearSolverState,
     ) -> _NonlinearSolverState:
         """Linearize, solve linear subproblem, and update on manifold."""

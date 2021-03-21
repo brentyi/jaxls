@@ -18,7 +18,7 @@ FactorType = TypeVar("FactorType", bound="FactorBase")
 
 # Disable type-checking here
 # > https://github.com/python/mypy/issues/5374
-@dataclasses.dataclass(frozen=True)  # type: ignore
+@dataclasses.dataclass  # type: ignore
 class FactorBase(abc.ABC, EnforceOverrides):
     variables: Tuple["VariableBase", ...]
     """Variables connected to this factor."""
@@ -29,7 +29,6 @@ class FactorBase(abc.ABC, EnforceOverrides):
     _static_fields: FrozenSet[str] = dataclasses.field(default=frozenset(), init=False)
     """Fields to ignore when stacking."""
 
-    @property
     @final
     def residual_dim(self) -> int:
         """Error dimensionality."""
@@ -97,7 +96,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
             factor_type=self.__class__,
             secondary_key=(
                 tuple((type(v), v.get_parameter_dim()) for v in self.variables),
-                self.residual_dim,
+                self.residual_dim(),
             ),
         )
 
@@ -145,7 +144,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class LinearFactor(FactorBase):
     r"""Linearized factor, corresponding to the simple residual:
     $$

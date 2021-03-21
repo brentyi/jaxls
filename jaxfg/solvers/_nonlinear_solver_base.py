@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING
 import jax
 from jax import numpy as jnp
 
-from .. import utils
+from .. import types, utils
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import StackedFactorGraph
+    from ..core._stacked_factor_graph import StackedFactorGraph
 
 
 @utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
@@ -43,18 +43,18 @@ class NonlinearSolverBase(_NonlinearSolverBase, abc.ABC):
 
 
 @utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class _NonlinearSolverState:
     """Standard state passed between nonlinear solve iterations."""
 
     iterations: int
     assignments: "VariableAssignments"
-    cost: float
+    cost: types.Scalar
     residual_vector: jnp.ndarray
     done: bool
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class _InexactStepSolverMixin:
     """Mixin for inexact Newton steps. Currently used by all solvers."""
 
@@ -71,7 +71,7 @@ class _InexactStepSolverMixin:
         return self.inexact_step_eta / (iterations + 1)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class _TerminationCriteriaMixin:
     """Mixin for Ceres-style termination criteria."""
 
@@ -92,9 +92,9 @@ class _TerminationCriteriaMixin:
     def check_convergence(
         self,
         state_prev: _NonlinearSolverState,
-        cost_updated: float,
+        cost_updated: types.Scalar,
         local_delta_assignments: VariableAssignments,
-        negative_gradient: jnp.ndarray,
+        negative_gradient: types.Array,
     ):
         """Check for convergence!"""
         # Cost tolerance

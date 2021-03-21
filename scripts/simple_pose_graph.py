@@ -1,3 +1,5 @@
+from typing import List
+
 import jaxlie
 from jax import numpy as jnp
 
@@ -12,7 +14,7 @@ pose_variables = [
 
 # Create factors: each defines a conditional probability distribution over some
 # variables.
-factors = [
+factors: List[jaxfg.core.FactorBase] = [
     jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[0],
         mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
@@ -44,7 +46,7 @@ graph = jaxfg.core.StackedFactorGraph.make(factors)
 #
 # We just use each variables' default values here -- SE(2) identity -- but for bigger
 # problems bad initializations => no convergence when we run our nonlinear optimizer.
-initial_assignments = jaxfg.core.VariableAssignments.make_default(pose_variables)
+initial_assignments = jaxfg.core.VariableAssignments.make_from_defaults(pose_variables)
 
 print("Initial assignments:")
 print(initial_assignments)
@@ -60,8 +62,6 @@ print(initial_assignments)
 # Solve. Note that the first call to solve() will be much slower than subsequent calls.
 with jaxfg.utils.stopwatch("First solve (slower because of JIT compilation)"):
     solution_assignments = graph.solve(initial_assignments)
-
-exit()
 
 with jaxfg.utils.stopwatch("Solve after initial compilation"):
     solution_assignments = graph.solve(initial_assignments)

@@ -18,7 +18,8 @@ from .. import types, utils
 from ._variables import VariableBase
 
 
-@dataclasses.dataclass(frozen=True)
+@utils.register_dataclass_pytree
+@dataclasses.dataclass
 class StorageMetadata:
     """Contains information about where the values of each variable are in a flattened
     storage vector.
@@ -39,7 +40,6 @@ class StorageMetadata:
     count_from_variable_type: Dict[Type[VariableBase], int]
     """Number of variables of each type."""
 
-    @property
     def ordered_variables(self) -> Tuple[VariableBase, ...]:
         # Dictionaries from Python 3.7 retain insertion order
         return tuple(self.index_from_variable.keys())
@@ -48,7 +48,7 @@ class StorageMetadata:
     def make(
         variables: Iterable[VariableBase], local: bool = False
     ) -> "StorageMetadata":
-        """Determine storage indexing from variable list."""
+        """Determine storage indexing from a list of variables."""
 
         # Bucket variables by type
         variables_from_type: DefaultDict[
@@ -86,19 +86,60 @@ VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
 
 @jax.partial(utils.register_dataclass_pytree, static_fields=("storage_metadata",))
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class VariableAssignments:
-    storage: jnp.ndarray
+    storage: types.Array
     """Values of variables stacked. Can either be local or global parameterizations,
     depending on the value of `.storage_metadata.local_flag`."""
 
     storage_metadata: StorageMetadata
     """Metadata for how variables are stored."""
 
-    @property
-    def variables(self):
+    @staticmethod
+    def make_from_defaults(variables: Iterable[VariableBase]) -> "VariableAssignments":
+        """Create an assignment object from the default values corresponding to each variable."""
+        return VariableAssignments.make_from_partial_dict(variables, {})
+
+    @staticmethod
+    def make_from_dict(
+        assignments: Dict[VariableBase, types.VariableValue],
+    ) -> "VariableAssignments":
+        """Create an assignment object from a full set of assignments."""
+
+        return VariableAssignments.make_from_partial_dict(
+            assignments.keys(), assignments
+        )
+
+    @staticmethod
+    def make_from_partial_dict(
+        variables: Iterable[VariableBase],
+        assignments: Dict[VariableBase, types.VariableValue],
+    ) -> "VariableAssignments":
+        """Create an assignment object from a variables and assignments. Missing
+        assignments are assigned the default variable values."""
+
+        # Figure out how variables are stored
+        storage_metadata = StorageMetadata.make(variables, local=False)
+
+        # Stack variable values in order
+        storage = jnp.concatenate(
+            [
+                variable.flatten(
+                    assignments[variable]
+                    if assignments is not None and variable in assignments
+                    else variable.get_default_value()
+                )
+                for variable in storage_metadata.ordered_variables()
+            ],
+            axis=0,
+        )
+        assert storage.shape == (storage_metadata.dim,)
+
+        return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
+
+    def variables(self) -> Iterable[VariableBase]:
         """Helper for iterating over variables."""
-        return self.storage_metadata.ordered_variables
+        return self.storage_metadata.ordered_variables()
 
     def get_value(self, variable: VariableBase[VariableValueType]) -> VariableValueType:
         """Get value corresponding to specific variable.  """
@@ -121,7 +162,7 @@ class VariableAssignments:
 
     def __repr__(self):
         value_from_variable = {
-            variable: self.get_value(variable) for variable in self.variables
+            variable: self.get_value(variable) for variable in self.variables()
         }
         k: VariableBase
 
@@ -132,36 +173,6 @@ class VariableAssignments:
             ]
         )
         return f"VariableAssignments(\n{contents}\n)"
-
-    @staticmethod
-    def make_from_dict(
-        assignments: Dict[VariableBase, types.VariableValue]
-    ) -> "VariableAssignments":
-        # Figure out how variables are stored
-        storage_metadata = StorageMetadata.make(assignments.keys())
-
-        # Stack variable values in order
-        storage = jnp.concatenate(
-            [
-                variable.flatten(assignments[variable])
-                for variable in storage_metadata.ordered_variables
-            ],
-            axis=0,
-        )
-        assert storage.shape == (storage_metadata.dim,)
-
-        return VariableAssignments(
-            storage=storage,
-            storage_metadata=storage_metadata,
-        )
-
-    @staticmethod
-    def make_default(variables: Iterable[VariableBase]) -> "VariableAssignments":
-        """Create an assignments object with all parameters set to their defaults."""
-        variable: VariableBase
-        return VariableAssignments.make_from_dict(
-            {variable: variable.get_default_value() for variable in variables}
-        )
 
     @jax.jit
     def apply_local_deltas(
@@ -210,20 +221,3 @@ class VariableAssignments:
                 ).flatten()
             )
         return dataclasses.replace(self, storage=new_storage)
-
-
-StorageMetadata.from_variables = fannypack.utils.new_name_wrapper(
-    old_name="from_variables",
-    new_name="make",
-    function_or_class=StorageMetadata.make,
-)
-VariableAssignments.from_dict = fannypack.utils.new_name_wrapper(
-    old_name="from_dict",
-    new_name="make_from_dict",
-    function_or_class=VariableAssignments.make_from_dict,
-)
-VariableAssignments.create_default = fannypack.utils.new_name_wrapper(
-    old_name="create_default",
-    new_name="make_default",
-    function_or_class=VariableAssignments.make_default,
-)

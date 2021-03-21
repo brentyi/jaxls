@@ -7,11 +7,11 @@ from .. import types
 @jax.jit
 def sparse_linear_solve(
     A: types.SparseMatrix,
-    ATb: jnp.ndarray,
-    initial_x: jnp.ndarray,
-    tol: float,
-    lambd: float,
-) -> jnp.ndarray:
+    ATb: types.Array,
+    initial_x: types.Array,
+    tol: types.Scalar,
+    lambd: types.Scalar,
+) -> types.Array:
     """Solves a block-sparse `Ax = b` least squares problem via CGLS.
 
     More specifically: solves `(A^TA + lambd * diag(A^TA)) x = b` if `diagonal_damping`

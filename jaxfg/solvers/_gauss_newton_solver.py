@@ -16,11 +16,11 @@ from ._nonlinear_solver_base import (
 )
 
 if TYPE_CHECKING:
-    from ..core._prepared_factor_graph import StackedFactorGraph
+    from ..core._stacked_factor_graph import StackedFactorGraph
 
 
 @utils.register_dataclass_pytree
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class GaussNewtonSolver(
     NonlinearSolverBase,
     _InexactStepSolverMixin,

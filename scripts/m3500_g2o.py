@@ -134,24 +134,5 @@ plt.plot(
     label="Optimized",
 )
 
-
-# for i, v in enumerate(tqdm(pose_variables)):
-#     x, y, cos, sin = initial_poses.get_value(v)
-#     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="r")
-#     # plt.annotate(str(i), (x, y))
-# for i, v in enumerate(tqdm(pose_variables)):
-#     x, y, cos, sin = solution_poses.get_value(v)
-#     plt.arrow(x, y, cos * 0.1, sin * 0.1, width=0.05, head_width=0.1, color="b")
-# plt.annotate(str(i), (x, y))
-# plt.plot(
-#     [initial_poses[v][0] for v in pose_variables],
-#     [initial_poses[v][1] for v in pose_variables],
-#     label="Initial poses",
-# )
-# plt.plot(
-#     [solution_poses[v][0] for v in pose_variables],
-#     [solution_poses[v][1] for v in pose_variables],
-#     label="Solution poses",
-# )
 plt.legend()
 plt.show()

@@ -33,7 +33,9 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
 
 
 def register_dataclass_pytree(
-    cls: Type[T], static_fields: Tuple[str, ...] = tuple()
+    cls: Type[T],
+    static_fields: Tuple[str, ...] = tuple(),
+    make_immutable: bool = True,
 ) -> Type[T]:
     """Register a dataclass as a flax-serializable PyTree.
 
@@ -43,7 +45,7 @@ def register_dataclass_pytree(
     decorator enables dataclasses to be used as valid PyTree nodes.
 
     Very similar to `flax.struct.dataclass`, but (a) adds support for static fields and
-    (b) works better with non-Google tooling (mypy, jedi, etc).
+    (b) works better with non-Googly tooling (mypy, jedi, etc).
 
     Args:
         cls (Type[T]): Dataclass to wrap.
@@ -117,5 +119,25 @@ def register_dataclass_pytree(
         return dataclasses.replace(x, **updates)
 
     serialization.register_serialization_state(cls, _to_state_dict, _from_state_dict)
+
+    # Make dataclass immutable after __init__ is called
+    # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
+    # __init__ functions
+    if make_immutable:
+        original_init = cls.__init__ if hasattr(cls, "__init__") else None
+
+        def disabled_setattr(*args, **kwargs):
+            raise dataclasses.FrozenInstanceError(
+                "Dataclass registered as PyTrees is immutable!"
+            )
+
+        def new_init(self, *args, **kwargs):
+            cls.__setattr__ = object.__setattr__
+            if original_init is not None:
+                original_init(self, *args, **kwargs)
+            cls.__setattr__ = disabled_setattr
+
+        cls.__setattr__ = disabled_setattr  # type: ignore
+        cls.__init__ = new_init  # type: ignore
 
     return cls

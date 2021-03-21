@@ -3,7 +3,6 @@ from typing import Generic, NamedTuple, Tuple, Type, TypeVar
 
 import jax
 import jaxlie
-from jax import numpy as jnp
 from overrides import final, overrides
 
 from .. import types, utils
@@ -13,7 +12,7 @@ from ._lie_variables import LieVariableBase
 LieGroupType = TypeVar("LieGroupType", bound=jaxlie.MatrixLieGroup)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class PriorFactor(FactorBase, Generic[LieGroupType]):
     """Factor for defining a fixed prior on a frame.
 
@@ -38,7 +37,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_vector(
         self, variable_value: jaxlie.MatrixLieGroup
-    ) -> jnp.ndarray:
+    ) -> types.Array:
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
         return jaxlie.manifold.rminus(variable_value, self.mu)
 
@@ -46,7 +45,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_jacobians(
         self, variable_value: jaxlie.MatrixLieGroup
-    ) -> Tuple[jnp.ndarray]:
+    ) -> Tuple[types.Array]:
 
         # Helper for using analytical `rplus` Jacobians
         #
@@ -78,7 +77,7 @@ class _BeforeAfterTuple(NamedTuple):
     variable_T_world_b: LieVariableBase
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class BetweenFactor(FactorBase, Generic[LieGroupType]):
     """Factor for defining a geometric relationship between frames `a` and `b`.
 
@@ -112,7 +111,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_vector(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
-    ) -> jnp.ndarray:
+    ) -> types.Array:
         # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
         return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
 
@@ -120,7 +119,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_jacobians(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> Tuple[types.Array, types.Array]:
 
         # Helper for using analytical `rplus` Jacobians
         #
