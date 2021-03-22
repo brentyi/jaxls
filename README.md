@@ -1,22 +1,44 @@
 # jaxfg
 
-Library for solving factor graph-based least squares problems with JAX. Heavily
-influenced by [minisam](https://github.com/dongjing3309/minisam),
-[GTSAM](https://gtsam.org/), and [g2o](https://github.com/RainerKuemmerle/g2o).
+Factor graph-based nonlinear optimization library for JAX.
 
-Applications include sensor fusion, optimal control, planning, SLAM, etc.
+Applications include sensor fusion, control, planning, SLAM. _Heavily_ inspired
+by a wide set of existing libraries, including:
+[Ceres Solver](http://ceres-solver.org/),
+[g2o](https://github.com/RainerKuemmerle/g2o), [GTSAM](https://gtsam.org/),
+[minisam](https://github.com/dongjing3309/minisam), and
+[SwiftFusion](https://github.com/borglab/SwiftFusion).
+
+Features:
+
+- Autodiff-powered Jacobians.
+- Automatic batching of factor computations.
+- Out-of-the-box support for optimization on SO(2), SO(3), SE(2), and SE(3).
+- 100% implemented in Python!
+
+Areas that could use improvement:
+
+- Linear solves are restricted to a preconditioned conjugate gradient approach.
+  Can be much slower than direct methods when problems are ill-conditioned.
+- JIT compilation adds startup overhead. This is mostly unavoidable with
+  JAX/XLA.
+- Support for robust losses.
 
 ---
 
-### Example scripts:
+### Example scripts
 
-`scripts/m3500_g2o.py`:
+Toy pose graph optimization:
 
-![m3500 results](scripts/data/optimized_m3500.png)
+```
+scripts/pose_graph_simple.py
+```
 
-`scripts/sphere2500_g2o.py`:
+Pose graph optimization from `.g2o` files:
 
-![sphere2500 results](scripts/data/optimized_sphere2500.png)
+```bash
+scripts/pose_graph_g2o.py --help
+```
 
 ---
 
