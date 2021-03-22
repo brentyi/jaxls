@@ -2,9 +2,9 @@
 
 For a summary of options:
 
+    python pose_graph_g2o.py --help
 
 """
-
 import argparse
 import dataclasses
 import enum
@@ -22,10 +22,11 @@ class SolverType(enum.Enum):
     LEVENBERG_MARQUARDT = jaxfg.solvers.LevenbergMarquardtSolver()
 
     @property
-    def instance(self) -> jaxfg.solvers.NonlinearSolverBase:
-        """Typed alias for `enum.value`."""
-        assert isinstance(self.value, jaxfg.solvers.NonlinearSolverBase)
-        return self.value
+    def value(self) -> jaxfg.solvers.NonlinearSolverBase:
+        """Typed override for `enum.value`."""
+        value = super().value
+        assert isinstance(value, jaxfg.solvers.NonlinearSolverBase)
+        return value
 
 
 @datargs.argsclass(
@@ -33,17 +34,20 @@ class SolverType(enum.Enum):
 )
 @dataclasses.dataclass
 class CliArgs:
-    solver_type: SolverType = datargs.arg(
-        default=SolverType.GAUSS_NEWTON,
-        help="Nonlinear solver to use.",
-    )
     g2o_path: pathlib.Path = datargs.arg(
         default=pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
         help="Path to g2o file.",
     )
+    solver_type: SolverType = datargs.arg(
+        default=SolverType.GAUSS_NEWTON,
+        help="Nonlinear solver to use.",
+    )
 
 
-def main(cli_args: CliArgs):
+def main():
+    # Parse CLI args
+    cli_args = datargs.parse(CliArgs)
+
     # Read graph
     with jaxfg.utils.stopwatch("Reading g2o file"):
         g2o: _g2o_utils.G2OData = _g2o_utils.parse_g2o(cli_args.g2o_path)
@@ -55,21 +59,26 @@ def main(cli_args: CliArgs):
     with jaxfg.utils.stopwatch("Making initial poses"):
         initial_poses = jaxfg.core.VariableAssignments.make_from_dict(g2o.initial_poses)
 
-    with jaxfg.utils.stopwatch("Solve"):
+    with jaxfg.utils.stopwatch("Single-step JIT compile + solve"):
         solution_poses = graph.solve(
-            initial_poses, solver=cli_args.solver_type.instance
+            initial_poses,
+            solver=dataclasses.replace(cli_args.solver_type.value, max_iterations=1),
         )
 
-    with jaxfg.utils.stopwatch("Solve (again)"):
+    with jaxfg.utils.stopwatch("Single-step solve (already compiled)"):
         solution_poses = graph.solve(
-            initial_poses, solver=cli_args.solver_type.instance
+            initial_poses,
+            solver=dataclasses.replace(cli_args.solver_type.value, max_iterations=1),
         )
+
+    with jaxfg.utils.stopwatch("Full solve"):
+        solution_poses = graph.solve(initial_poses, solver=cli_args.solver_type.value)
 
     # Plot
     plt.figure()
 
+    # Visualize 2D poses
     if isinstance(next(iter(solution_poses.variables())), jaxfg.geometry.SE2Variable):
-        # Visualize 2D poses
         plt.plot(
             *(
                 initial_poses.get_stacked_value(jaxfg.geometry.SE2Variable)
@@ -92,8 +101,9 @@ def main(cli_args: CliArgs):
             c="b",
             label="Optimized",
         )
+
+    # Visualize 3D poses
     elif isinstance(next(iter(solution_poses.variables())), jaxfg.geometry.SE3Variable):
-        # Visualize 3D poses
         ax = plt.axes(projection="3d")
         ax.set_box_aspect((1, 1, 1))
         ax.plot3D(
@@ -124,4 +134,4 @@ def main(cli_args: CliArgs):
 
 
 if __name__ == "__main__":
-    main(datargs.parse(CliArgs))
+    main()

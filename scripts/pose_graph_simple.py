@@ -1,3 +1,5 @@
+"""Simple pose graph example with two variables."""
+
 from typing import List
 
 import jaxlie
@@ -74,7 +76,8 @@ with jaxfg.utils.stopwatch("Solve after initial compilation"):
 #         solver=jaxfg.solvers.LevenbergMarquardtSolver(),
 #     )
 #
-# Both have a ton of optional parameters for specifying convergence criteria, etc.
+# Both have optional parameters for specifying convergence criteria, forcing sequences,
+# etc.
 
 # Print all solved variable values.
 print("Solutions (jaxfg.core.VariableAssignments):")
