@@ -19,7 +19,6 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     @abc.abstractmethod
     def get_default_value(cls) -> VariableValueType:
         """Get default (on-manifold) parameter value."""
-        raise NotImplementedError()
 
     # (2) Functions to override for custom manifolds / local parameterizations.
 
