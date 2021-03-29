@@ -11,6 +11,7 @@ setup(
     packages=find_packages(),
     package_data={"jaxlie": ["py.typed"]},
     install_requires=[
+        "datargs",
         "jax",
         "jaxlib",
         "jaxlie>=1.0.0",
@@ -18,6 +19,13 @@ setup(
         "termcolor",
         "tqdm",
         "matplotlib",
-        "fannypack",  # TODO: fannypack dep should be phased out
     ],
+    extras_require={
+        "testing": [
+            "pytest",
+            # "pytest-cov",
+            # "hypothesis",
+            # "hypothesis[numpy]",
+        ]
+    },
 )
