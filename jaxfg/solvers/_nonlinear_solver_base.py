@@ -99,8 +99,8 @@ class _TerminationCriteriaMixin:
         local_delta_assignments: VariableAssignments,
         negative_gradient: types.Array,
     ) -> bool:
-
         """Check for convergence!"""
+
         # Cost tolerance
         converged_cost = (
             jnp.abs(cost_updated - state_prev.cost) / state_prev.cost

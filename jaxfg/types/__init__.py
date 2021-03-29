@@ -7,7 +7,6 @@ from ._aliases import (
     ScaleTrilInv,
     VariableValue,
 )
-from ._group_key import GroupKey
 from ._sparse_matrix import SparseMatrix
 
 __all__ = [
@@ -19,5 +18,4 @@ __all__ = [
     "ScaleTrilInv",
     "VariableValue",
     "SparseMatrix",
-    "GroupKey",
 ]

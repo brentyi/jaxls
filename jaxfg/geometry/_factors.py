@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Generic, NamedTuple, Tuple, Type, TypeVar
+from typing import Generic, NamedTuple, Sequence, Tuple, TypeVar
 
 import jax
 import jaxlie
@@ -45,7 +45,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_jacobians(
         self, variable_value: jaxlie.MatrixLieGroup
-    ) -> Tuple[types.Array]:
+    ) -> Sequence[types.Array]:
 
         # Helper for using analytical `rplus` Jacobians
         #

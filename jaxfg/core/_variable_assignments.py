@@ -10,7 +10,6 @@ from typing import (
     TypeVar,
 )
 
-import fannypack
 import jax
 from jax import numpy as jnp
 
@@ -40,9 +39,9 @@ class StorageMetadata:
     count_from_variable_type: Dict[Type[VariableBase], int]
     """Number of variables of each type."""
 
-    def ordered_variables(self) -> Tuple[VariableBase, ...]:
+    def ordered_variables(self) -> Iterable[VariableBase]:
         # Dictionaries from Python 3.7 retain insertion order
-        return tuple(self.index_from_variable.keys())
+        return self.index_from_variable.keys()
 
     @staticmethod
     def make(
@@ -124,7 +123,7 @@ class VariableAssignments:
         # Stack variable values in order
         storage = jnp.concatenate(
             [
-                variable.flatten(
+                jax.jit(variable.flatten)(
                     assignments[variable]
                     if assignments is not None and variable in assignments
                     else variable.get_default_value()

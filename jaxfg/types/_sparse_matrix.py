@@ -5,6 +5,7 @@ import jax
 from jax import numpy as jnp
 
 from .. import utils
+from ._aliases import Array
 
 
 @jax.partial(utils.register_dataclass_pytree, static_fields=("shape",))
@@ -12,9 +13,9 @@ from .. import utils
 class SparseMatrix:
     """Sparse matrix in COO form."""
 
-    values: jnp.ndarray
+    values: Array
     """Non-zero matrix values. Shape should be `(*, N)`."""
-    coords: jnp.ndarray
+    coords: Array
     """Row, column positions of non-zero entries. Shape should be `(*, N, 2)`."""
     shape: Tuple[int, int]
     """Shape of matrix."""
@@ -23,7 +24,7 @@ class SparseMatrix:
         assert self.coords.shape == self.values.shape + (2,)
         assert len(self.shape) == 2
 
-    def __matmul__(self, other: jnp.ndarray):
+    def __matmul__(self, other: Array):
         """Compute `Ax`, where `x` is a 1D vector."""
         assert other.shape == (
             self.shape[1],

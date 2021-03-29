@@ -18,26 +18,22 @@ class LieVariableBase(VariableBase[T], Generic[T]):
         return jaxlie.MatrixLieGroup
 
     @classmethod
+    @final
     @overrides
     def get_local_parameter_dim(cls) -> int:
         return cls.get_group_type().tangent_dim
 
     @classmethod
+    @final
     @overrides
     def get_default_value(cls) -> T:
         return cast(T, cls.get_group_type().identity())
 
     @staticmethod
+    @final
     @overrides
     def manifold_retract(x: T, local_delta: jaxlie.types.TangentVector) -> T:
         return jaxlie.manifold.rplus(x, local_delta)
-
-    @staticmethod
-    @overrides
-    def manifold_inverse_retract(x: T, y: T) -> types.LocalVariableValue:
-        # x = world<-A, y = world<-B
-        # Difference = A<-B
-        return jaxlie.manifold.rminus(x, y)
 
 
 class SO2Variable(LieVariableBase[jaxlie.SO2]):

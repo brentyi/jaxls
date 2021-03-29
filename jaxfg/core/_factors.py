@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import TYPE_CHECKING, FrozenSet, Tuple, Type, TypeVar
+from typing import FrozenSet, Sequence, Tuple, Type, TypeVar
 
 import jax
 import numpy as onp
@@ -8,10 +8,7 @@ from jax import numpy as jnp
 from overrides import EnforceOverrides, final, overrides
 
 from .. import types
-
-if TYPE_CHECKING:
-    from ._variables import VariableBase
-
+from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
@@ -20,7 +17,7 @@ FactorType = TypeVar("FactorType", bound="FactorBase")
 # > https://github.com/python/mypy/issues/5374
 @dataclasses.dataclass  # type: ignore
 class FactorBase(abc.ABC, EnforceOverrides):
-    variables: Tuple["VariableBase", ...]
+    variables: Sequence[VariableBase]  # Preferred over `Tuple[VariableBase, ...]`
     """Variables connected to this factor."""
 
     scale_tril_inv: types.ScaleTrilInv
@@ -30,7 +27,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
     """Fields to ignore when stacking."""
 
     @final
-    def residual_dim(self) -> int:
+    def get_residual_dim(self) -> int:
         """Error dimensionality."""
         # We can't use [0] here, because (for stacked factors) there might be a batch dimension!
         return self.scale_tril_inv.shape[-1]
@@ -82,24 +79,6 @@ class FactorBase(abc.ABC, EnforceOverrides):
         out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
         return out
 
-    @final
-    def group_key(self) -> types.GroupKey:
-        """Get unique key for grouping factors.
-
-        Args:
-
-        Returns:
-            types.GroupKey:
-        """
-        v: "VariableBase"
-        return types.GroupKey(
-            factor_type=self.__class__,
-            secondary_key=(
-                tuple((type(v), v.get_parameter_dim()) for v in self.variables),
-                self.residual_dim(),
-            ),
-        )
-
     @abc.abstractmethod
     def compute_residual_vector(
         self, *variable_values: types.VariableValue
@@ -122,7 +101,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
         """
 
         def compute_cost_with_local_delta(
-            local_deltas: Tuple[jnp.ndarray, ...]
+            local_deltas: Sequence[jnp.ndarray],
         ) -> jnp.ndarray:
             perturbed_values = [
                 variable.manifold_retract(

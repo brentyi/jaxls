@@ -6,23 +6,24 @@ Applications include sensor fusion, control, planning, SLAM. _Heavily_ inspired
 by a wide set of existing libraries, including:
 [Ceres Solver](http://ceres-solver.org/),
 [g2o](https://github.com/RainerKuemmerle/g2o), [GTSAM](https://gtsam.org/),
-[minisam](https://github.com/dongjing3309/minisam), and
+[minisam](https://github.com/dongjing3309/minisam),
 [SwiftFusion](https://github.com/borglab/SwiftFusion).
 
 Features:
 
-- Autodiff-powered Jacobians.
+- Autodiff-powered (sparse) Jacobians.
 - Automatic batching of factor computations.
 - Out-of-the-box support for optimization on SO(2), SO(3), SE(2), and SE(3).
+- Differentiable nonlinear optimizers.
 - 100% implemented in Python!
 
-Areas that could use improvement:
+Current limitations:
 
 - Linear solves are restricted to a preconditioned conjugate gradient approach.
-  Can be much slower than direct methods when problems are ill-conditioned.
+  Much slower than direct methods (eg sparse Cholesky) when problems are
+  ill-conditioned.
 - JIT compilation adds startup overhead. This is mostly unavoidable with
   JAX/XLA.
-- Support for robust losses.
 
 ---
 
@@ -47,17 +48,16 @@ scripts/pose_graph_g2o.py --help
 - [x] Preliminary graph, variable, factor interfaces
 - [x] Real vector variable types
 - [x] Refactor into package
-- [x] Linear factor graph
-- [x] Non-linear factor graph
+- [x] Non-linear optimization
   - [x] Very basic Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
   - [x] Inexact Newton steps
   - [x] Revisit termination criteria
   - [ ] Reduce redundant code
+  - [ ] Robust losses
 - [x] MAP inference
-- [x] Compare g2o example
-  - [x] Validate against minisam
+- [x] Validate g2o example
 - [x] Performance
   - [x] More intentional JIT compilation
   - [x] Re-implement parallel factor computation

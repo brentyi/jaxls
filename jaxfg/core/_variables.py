@@ -1,5 +1,5 @@
 import abc
-from typing import Dict, Generic, Mapping, Type, TypeVar
+from typing import Dict, Generic, Mapping, Tuple, Type, TypeVar
 
 from jax import flatten_util
 from jax import numpy as jnp
@@ -43,26 +43,6 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
             jnp.ndarray: Updated parameterization.
         """
         return cls.unflatten(cls.flatten(x) + local_delta)
-
-    @classmethod
-    def manifold_inverse_retract(
-        cls, x: VariableValueType, y: VariableValueType
-    ) -> types.LocalVariableValue:
-        r"""Compute the local difference between two variable values.
-
-        Typically written as `x $\ominus$ y` or `x $\boxminus$ y`.
-
-        Args:
-            x (VariableValue): First parameter to compare. Shape should match
-                `self.get_parameter_dim()`.
-            y (VariableValue): Second parameter to compare. Shape should match
-                `self.get_parameter_dim()`.
-
-        Returns:
-            LocalVariableValue: Delta vector; dimension should match
-            `self.get_local_parameter_dim()`.
-        """
-        return cls.flatten(x) - cls.flatten(y)
 
     # (3) Shared implementation details.
 
@@ -142,10 +122,11 @@ class _RealVectorVariableTemplate:
 
         if dim not in cls._real_vector_variable_cache:
 
-            class _RealVectorVariable(VariableBase):
+            class _RealVectorVariable(VariableBase[jnp.ndarray]):
                 @staticmethod
                 @overrides
-                def get_default_value():
+                @final
+                def get_default_value() -> jnp.ndarray:
                     return jnp.zeros(dim)
 
             cls._real_vector_variable_cache[dim] = _RealVectorVariable
@@ -153,5 +134,5 @@ class _RealVectorVariableTemplate:
         return cls._real_vector_variable_cache[dim]
 
 
-RealVectorVariable: Mapping[int, Type[VariableBase]]
+RealVectorVariable: Mapping[int, Type[VariableBase[jnp.ndarray]]]
 RealVectorVariable = _RealVectorVariableTemplate()  # type: ignore

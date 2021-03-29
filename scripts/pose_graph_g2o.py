@@ -10,10 +10,10 @@ import dataclasses
 import enum
 import pathlib
 
+import _g2o_utils
 import datargs
 import matplotlib.pyplot as plt
 
-import _g2o_utils
 import jaxfg
 
 
@@ -35,6 +35,8 @@ class SolverType(enum.Enum):
 @dataclasses.dataclass
 class CliArgs:
     g2o_path: pathlib.Path = datargs.arg(
+        positional=True,
+        nargs="?",
         default=pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
         help="Path to g2o file.",
     )
@@ -52,13 +54,14 @@ def main():
     with jaxfg.utils.stopwatch("Reading g2o file"):
         g2o: _g2o_utils.G2OData = _g2o_utils.parse_g2o(cli_args.g2o_path)
 
-    # Make factor graph and solve (twice!)
+    # Make factor graph
     with jaxfg.utils.stopwatch("Making factor graph"):
         graph = jaxfg.core.StackedFactorGraph.make(g2o.factors)
 
     with jaxfg.utils.stopwatch("Making initial poses"):
         initial_poses = jaxfg.core.VariableAssignments.make_from_dict(g2o.initial_poses)
 
+    # Time solver
     with jaxfg.utils.stopwatch("Single-step JIT compile + solve"):
         solution_poses = graph.solve(
             initial_poses,

@@ -1,7 +1,7 @@
 import contextlib
 import dataclasses
 import time
-from typing import Dict, Generator, Tuple, Type, TypeVar
+from typing import Dict, Generator, Sequence, Type, TypeVar
 
 import jax
 import termcolor
@@ -34,7 +34,7 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
 
 def register_dataclass_pytree(
     cls: Type[T],
-    static_fields: Tuple[str, ...] = tuple(),
+    static_fields: Sequence[str] = tuple(),
     make_immutable: bool = True,
 ) -> Type[T]:
     """Register a dataclass as a flax-serializable PyTree.
@@ -49,7 +49,7 @@ def register_dataclass_pytree(
 
     Args:
         cls (Type[T]): Dataclass to wrap.
-        static_fields (Tuple[str, ...]): Any static field names as strings. Rather than
+        static_fields (Sequence[str]): Any static field names as strings. Rather than
             including these fields as "children" of our dataclass, their values must be
             hashable and are considered part of the treedef.  Pass in using
             `@jax.partial()`.
@@ -64,7 +64,9 @@ def register_dataclass_pytree(
     field: dataclasses.Field
     field_names = [field.name for field in dataclasses.fields(cls)]
     children_fields = [name for name in field_names if name not in static_fields]
-    assert set(field_names) == set(children_fields) | set(static_fields)
+    assert set(field_names) == set(children_fields) | set(
+        static_fields
+    ), "Field name anomoly; check static fields list!"
 
     # Define flatten, unflatten operations: this simple converts our dataclass to a list
     # of fields.
