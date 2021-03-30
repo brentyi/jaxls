@@ -11,7 +11,7 @@ from ._variables import VariableBase
 VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 
 
-@jax.partial(utils.register_dataclass_pytree, static_fields=("storage_metadata",))
+@utils.register_dataclass_pytree(static_fields=("storage_metadata",))
 @dataclasses.dataclass
 class VariableAssignments:
     """Storage class that maps variables to values."""

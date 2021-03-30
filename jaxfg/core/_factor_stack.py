@@ -14,7 +14,7 @@ from ._variables import VariableBase
 FactorType = TypeVar("FactorType", bound=FactorBase)
 
 
-@jax.partial(utils.register_dataclass_pytree, static_fields=("num_factors",))
+@utils.register_dataclass_pytree(static_fields=("num_factors",))
 @dataclasses.dataclass
 class FactorStack(Generic[FactorType]):
     """A set of factors, with their parameters stacked."""

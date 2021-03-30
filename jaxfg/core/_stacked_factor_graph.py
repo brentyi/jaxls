@@ -18,9 +18,8 @@ from ._variables import VariableBase
 GroupKey = Hashable
 
 
-@jax.partial(
-    utils.register_dataclass_pytree,
-    static_fields=("local_storage_metadata", "residual_dim"),
+@utils.register_dataclass_pytree(
+    static_fields=("local_storage_metadata", "residual_dim")
 )
 @dataclasses.dataclass
 class StackedFactorGraph:

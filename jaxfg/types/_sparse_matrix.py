@@ -1,14 +1,13 @@
 import dataclasses
 from typing import Tuple
 
-import jax
 from jax import numpy as jnp
 
 from .. import utils
 from ._aliases import Array
 
 
-@jax.partial(utils.register_dataclass_pytree, static_fields=("shape",))
+@utils.register_dataclass_pytree(static_fields=("shape",))
 @dataclasses.dataclass
 class SparseMatrix:
     """Sparse matrix in COO form."""
