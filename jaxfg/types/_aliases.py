@@ -10,5 +10,6 @@ ScaleTril = Array
 ScaleTrilInv = Array
 
 PyTree = Any
+
 VariableValue = PyTree
-LocalVariableValue = PyTree
+LocalVariableValue = Array

@@ -24,6 +24,7 @@ Current limitations:
   ill-conditioned.
 - JIT compilation adds startup overhead. This is mostly unavoidable with
   JAX/XLA.
+- Python >=3.7 only; we rely heavily on generic types.
 
 ---
 
@@ -76,10 +77,12 @@ scripts/pose_graph_g2o.py --help
     - [x] Separate out utils, lie group helpers
     - [x] Put things in folders
   - [x] Resolve typing errors
-  - [ ] Cleanup/refactor (more)
-  - [ ] Package cleanup: dependencies, etc
-  - [ ] Add CI:
+  - [x] Cleanup/refactor (more)
+  - [x] Package cleanup: dependencies, etc
+  - [x] Add CI:
     - [x] mypy
     - [x] lint
-    - [ ] build
-  - [ ] Tests
+    - [x] build
+    - [ ] coverage
+  - [ ] More comprehensive tests
+  - [ ] Clean up docstrings

@@ -4,7 +4,6 @@ from typing import Generic, Type, TypeVar, cast
 import jaxlie
 from overrides import final, overrides
 
-from .. import types
 from ..core._variables import VariableBase
 
 T = TypeVar("T", bound=jaxlie.MatrixLieGroup)

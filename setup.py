@@ -9,7 +9,8 @@ setup(
     author_email="brentyi@berkeley.edu",
     license="BSD",
     packages=find_packages(),
-    package_data={"jaxlie": ["py.typed"]},
+    package_data={"jaxfg": ["py.typed"]},
+    python_requires=">=3.7",
     install_requires=[
         "datargs",
         "jax",

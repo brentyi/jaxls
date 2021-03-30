@@ -81,7 +81,9 @@ def main():
     plt.figure()
 
     # Visualize 2D poses
-    if isinstance(next(iter(solution_poses.variables())), jaxfg.geometry.SE2Variable):
+    if isinstance(
+        next(iter(solution_poses.get_variables())), jaxfg.geometry.SE2Variable
+    ):
         plt.plot(
             *(
                 initial_poses.get_stacked_value(jaxfg.geometry.SE2Variable)
@@ -106,7 +108,9 @@ def main():
         )
 
     # Visualize 3D poses
-    elif isinstance(next(iter(solution_poses.variables())), jaxfg.geometry.SE3Variable):
+    elif isinstance(
+        next(iter(solution_poses.get_variables())), jaxfg.geometry.SE3Variable
+    ):
         ax = plt.axes(projection="3d")
         ax.set_box_aspect((1, 1, 1))
         ax.plot3D(

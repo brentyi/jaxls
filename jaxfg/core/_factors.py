@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import FrozenSet, Sequence, Tuple, Type, TypeVar
+from typing import Sequence, Tuple, Type, TypeVar
 
 import jax
 import numpy as onp
@@ -23,18 +23,16 @@ class FactorBase(abc.ABC, EnforceOverrides):
     scale_tril_inv: types.ScaleTrilInv
     """Inverse square root of covariance matrix."""
 
-    _static_fields: FrozenSet[str] = dataclasses.field(default=frozenset(), init=False)
-    """Fields to ignore when stacking."""
-
     @final
     def get_residual_dim(self) -> int:
         """Error dimensionality."""
         # We can't use [0] here, because (for stacked factors) there might be a batch dimension!
         return self.scale_tril_inv.shape[-1]
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, *args, **kwargs):
         """Register all factors as hashable PyTree nodes."""
-        super().__init_subclass__(**kwargs)
+        super().__init_subclass__(*args, **kwargs)
+
         jax.tree_util.register_pytree_node(
             cls, flatten_func=cls._flatten, unflatten_func=cls._unflatten
         )
@@ -47,10 +45,10 @@ class FactorBase(abc.ABC, EnforceOverrides):
     ) -> Tuple[Tuple[types.PyTree, ...], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
         v_dict = vars(v)
-        array_data = {k: v for k, v in v_dict.items() if k not in cls._static_fields}
+        array_data = {k: v for k, v in v_dict.items()}
 
         # Store variable types to make sure treedef hashes match
-        aux_dict = {k: v for k, v in v_dict.items() if k not in array_data}
+        aux_dict = {}
         aux_dict["variabletypes"] = tuple(type(variable) for variable in v.variables)
         array_data.pop("variables")
 

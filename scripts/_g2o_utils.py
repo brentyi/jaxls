@@ -1,7 +1,6 @@
 import pathlib
 from typing import Dict, List, NamedTuple
 
-import jax
 import jaxlie
 import numpy as onp
 from jax import numpy as jnp

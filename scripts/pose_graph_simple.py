@@ -9,7 +9,7 @@ import jaxfg
 
 # Create variables: each variable object represents something that we want to solve for.
 # They don't intrinsically hold any values.
-pose_variables = [
+pose_variables: List[jaxfg.geometry.SE2Variable] = [
     jaxfg.geometry.SE2Variable(),
     jaxfg.geometry.SE2Variable(),
 ]
@@ -55,7 +55,7 @@ print(initial_assignments)
 
 # A more flexible API for creating initial assignments also exists. Equivalently:
 #
-#     initial_assignments = jaxfg.core.VariableAssignments.from_dict({
+#     initial_assignments = jaxfg.core.VariableAssignments.make_from_dict({
 #         pose_variables[0]: jaxlie.SE2.identity(),
 #         pose_variables[1]: jaxlie.SE2.identity(),
 #     })

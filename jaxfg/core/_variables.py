@@ -1,5 +1,5 @@
 import abc
-from typing import Dict, Generic, Mapping, Tuple, Type, TypeVar
+from typing import Dict, Generic, Mapping, Type, TypeVar
 
 from jax import flatten_util
 from jax import numpy as jnp
