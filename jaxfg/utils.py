@@ -5,6 +5,7 @@ from typing import (
     Callable,
     Dict,
     Generator,
+    List,
     Optional,
     Sequence,
     Type,
@@ -39,6 +40,9 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     yield
     print(f"{termcolor.colored(str(time.time() - start_time), attrs=['bold'])} seconds")
     print("========")
+
+
+_registered_static_fields: Dict[Type, List[str]] = {}
 
 
 @overload
@@ -83,97 +87,119 @@ def register_dataclass_pytree(
         make_immutable (bool): Set to `True` to make dataclass immutable.
     """
 
-    def _wrap(cls: Type[T]):
-        assert dataclasses.is_dataclass(cls)
-
-        # Get a list of fields in our dataclass
-        field: dataclasses.Field
-        field_names = [field.name for field in dataclasses.fields(cls)]
-        children_fields = [name for name in field_names if name not in static_fields]
-        assert set(field_names) == set(children_fields) | set(
-            static_fields
-        ), "Field name anomoly; check static fields list!"
-
-        # Define flatten, unflatten operations: this simple converts our dataclass to a list
-        # of fields.
-        def _flatten(obj):
-            return [getattr(obj, key) for key in children_fields], tuple(
-                getattr(obj, key) for key in static_fields
-            )
-
-        def _unflatten(treedef, children):
-            # Packing using constructor: this won't work with dataclasses that have their
-            # __init__ method overriden!
-            #
-            #     return cls(
-            #         **dict(zip(children_fields, children)), **dict(zip(static_fields, treedef))
-            #     )
-
-            # Instead, we create an empty object and then populate dataclass fields:
-            return dataclasses.replace(
-                cls.__new__(cls),
-                **dict(zip(children_fields, children)),
-                **dict(zip(static_fields, treedef)),
-            )
-
-        jax.tree_util.register_pytree_node(cls, _flatten, _unflatten)
-
-        # Serialization: this is mostly copied from `flax.struct.dataclass`
-        def _to_state_dict(x: T):
-            state_dict = {
-                name: serialization.to_state_dict(getattr(x, name))
-                for name in field_names
-            }
-            return state_dict
-
-        def _from_state_dict(x: T, state: Dict):
-            """Restore the state of a data class."""
-            state = state.copy()  # copy the state so we can pop the restored fields.
-            updates = {}
-            for name in field_names:
-                if name not in state:
-                    raise ValueError(
-                        f"Missing field {name} in state dict while restoring"
-                        f" an instance of {cls.__name__}"
-                    )
-                value = getattr(x, name)
-                value_state = state.pop(name)
-                updates[name] = serialization.from_state_dict(value, value_state)
-            if state:
-                names = ",".join(state.keys())
-                raise ValueError(
-                    f'Unknown field(s) "{names}" in state dict while'
-                    f" restoring an instance of {cls.__name__}"
-                )
-            return dataclasses.replace(x, **updates)
-
-        serialization.register_serialization_state(
-            cls, _to_state_dict, _from_state_dict
+    if cls is None:
+        return jax.partial(
+            _register_dataclass_pytree,
+            static_fields=static_fields,
+            make_immutable=make_immutable,
+        )
+    else:
+        return _register_dataclass_pytree(
+            cls,
+            static_fields=static_fields,
+            make_immutable=make_immutable,
         )
 
-        # Make dataclass immutable after __init__ is called
-        # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
-        # __init__ functions
-        if make_immutable:
-            original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
-            def disabled_setattr(*args, **kwargs):
-                raise dataclasses.FrozenInstanceError(
-                    "Dataclass registered as PyTrees is immutable!"
+def _register_dataclass_pytree(
+    cls: Type[T],
+    static_fields: Sequence[str] = [],
+    make_immutable: bool = True,
+) -> Type[T]:
+
+    assert dataclasses.is_dataclass(cls)
+
+    # Respect static field registration from superclasses
+    static_fields_list = list(static_fields)
+    for parent_class in filter(lambda x: x in _registered_static_fields, cls.mro()):
+        static_fields_list.extend(_registered_static_fields[parent_class])
+
+    assert len(set(static_fields_list)) == len(
+        static_fields_list
+    ), "Found repeated field names!"
+
+    _registered_static_fields[cls] = static_fields_list
+
+    # Get a list of fields in our dataclass
+    field: dataclasses.Field
+    field_names = [field.name for field in dataclasses.fields(cls)]
+    children_fields = [name for name in field_names if name not in static_fields_list]
+    assert set(field_names) == set(children_fields) | set(
+        static_fields_list
+    ), "Field name anomoly; check static fields list!"
+
+    # Define flatten, unflatten operations: this simple converts our dataclass to a list
+    # of fields.
+    def _flatten(obj):
+        return [getattr(obj, key) for key in children_fields], tuple(
+            getattr(obj, key) for key in static_fields_list
+        )
+
+    def _unflatten(treedef, children):
+        # Packing using constructor: this won't work with dataclasses that have their
+        # __init__ method overriden!
+        #
+        #     return cls(
+        #         **dict(zip(children_fields, children)), **dict(zip(static_fields, treedef))
+        #     )
+
+        # Instead, we create an empty object and then populate dataclass fields:
+        return dataclasses.replace(
+            cls.__new__(cls),
+            **dict(zip(children_fields, children)),
+            **dict(zip(static_fields_list, treedef)),
+        )
+
+    jax.tree_util.register_pytree_node(cls, _flatten, _unflatten)
+
+    # Serialization: this is mostly copied from `flax.struct.dataclass`
+    def _to_state_dict(x: T):
+        state_dict = {
+            name: serialization.to_state_dict(getattr(x, name)) for name in field_names
+        }
+        return state_dict
+
+    def _from_state_dict(x: T, state: Dict):
+        """Restore the state of a data class."""
+        state = state.copy()  # copy the state so we can pop the restored fields.
+        updates = {}
+        for name in field_names:
+            if name not in state:
+                raise ValueError(
+                    f"Missing field {name} in state dict while restoring"
+                    f" an instance of {cls.__name__}"
                 )
+            value = getattr(x, name)
+            value_state = state.pop(name)
+            updates[name] = serialization.from_state_dict(value, value_state)
+        if state:
+            names = ",".join(state.keys())
+            raise ValueError(
+                f'Unknown field(s) "{names}" in state dict while'
+                f" restoring an instance of {cls.__name__}"
+            )
+        return dataclasses.replace(x, **updates)
 
-            def new_init(self, *args, **kwargs):
-                cls.__setattr__ = object.__setattr__
-                if original_init is not None:
-                    original_init(self, *args, **kwargs)
-                cls.__setattr__ = disabled_setattr
+    serialization.register_serialization_state(cls, _to_state_dict, _from_state_dict)
 
-            cls.__setattr__ = disabled_setattr  # type: ignore
-            cls.__init__ = new_init  # type: ignore
+    # Make dataclass immutable after __init__ is called
+    # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
+    # __init__ functions
+    if make_immutable:
+        original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
-        return cls
+        def disabled_setattr(*args, **kwargs):
+            raise dataclasses.FrozenInstanceError(
+                "Dataclass registered as PyTrees is immutable!"
+            )
 
-    if cls is None:
-        return _wrap
-    else:
-        return _wrap(cls)
+        def new_init(self, *args, **kwargs):
+            cls.__setattr__ = object.__setattr__
+            if original_init is not None:
+                original_init(self, *args, **kwargs)
+            cls.__setattr__ = disabled_setattr
+
+        cls.__setattr__ = disabled_setattr  # type: ignore
+        cls.__init__ = new_init  # type: ignore
+
+    return cls

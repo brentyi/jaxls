@@ -24,7 +24,7 @@ class FactorStack(Generic[FactorType]):
     value_indices: Tuple[types.Array, ...]
 
     def __post_init__(self):
-        # There should be on set of indices for each variable type
+        # There should be one set of indices for each variable type
         assert len(self.value_indices) == len(self.factor.variables)
 
         # Check that shapes make sense

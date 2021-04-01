@@ -110,7 +110,7 @@ class LevenbergMarquardtSolver(
         # > pg. 27, Algorithm 3.16
         lambd = jnp.where(
             accept_flag,
-            # If accept, decrease damping... note that we *don't* enforce any bounds here
+            # If accept, decrease damping: note that we *don't* enforce any bounds here
             state_prev.lambd / self.lambda_factor,
             # If reject: increase lambda and enforce bounds
             jnp.maximum(

@@ -1,5 +1,5 @@
 import abc
-from typing import Dict, Generic, Mapping, Type, TypeVar
+from typing import Callable, Dict, Generic, Mapping, Type, TypeVar
 
 from jax import flatten_util
 from jax import numpy as jnp
@@ -46,25 +46,29 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 
     # (3) Shared implementation details.
 
-    @final
+    _parameter_dim: int
+    """Parameter dimensionality. Set automatically in `__init_subclass__`."""
+
+    _unflatten: Callable[[types.Array], VariableValueType]
+    """Helper for unflattening variable values. Set in `__init_subclass__`."""
+
     def __init_subclass__(cls):
         """For subclasses, we determine the parameter dimensionality and unflattening
         procedure from the example provided by `get_default_value()`."""
 
         example = cls.get_default_value()
+
         flat, unflatten = flatten_util.ravel_pytree(example)
         (parameter_dim,) = flat.shape
 
-        cls.get_parameter_dim = staticmethod(lambda: parameter_dim)
-        cls.unflatten = staticmethod(unflatten)
+        cls._parameter_dim = parameter_dim
+        cls._unflatten = unflatten
 
-    @staticmethod
-    @final  # Should not be overriden, see __init_subclass__
-    def get_parameter_dim() -> int:
+    @classmethod
+    @final
+    def get_parameter_dim(cls) -> int:
         """Dimensionality of underlying parameterization."""
-        raise NotImplementedError(
-            "Should be defined in VariableBase.__init_subclass__!"
-        )
+        return cls._parameter_dim
 
     @staticmethod
     @final
@@ -81,9 +85,9 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         flat, _unflatten = flatten_util.ravel_pytree(x)
         return flat
 
-    @staticmethod
-    @final  # Should not be overriden, see __init_subclass__
-    def unflatten(flat: jnp.ndarray) -> VariableValueType:
+    @classmethod
+    @final
+    def unflatten(cls, flat: types.Array) -> VariableValueType:
         """Get variable value from flattened representation.
 
         Args:
@@ -92,9 +96,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         Returns:
             VariableValueType: Variable value.
         """
-        raise NotImplementedError(
-            "Should be defined in VariableBase.__init_subclass__!"
-        )
+        return cls._unflatten(flat)
 
     @overrides
     @final

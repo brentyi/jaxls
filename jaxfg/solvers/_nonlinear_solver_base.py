@@ -15,7 +15,7 @@ Int = Union[types.Array, int]
 Boolean = Union[types.Array, bool]
 
 
-@utils.register_dataclass_pytree
+@utils.register_dataclass_pytree(static_fields=("verbose",))
 @dataclasses.dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
