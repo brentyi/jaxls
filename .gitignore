@@ -3,6 +3,7 @@
 *.egg-info
 __pycache__
 .mypy_cache
+.dmypy.json
 .pytype
 .hypothesis
 .ipynb_checkpoints

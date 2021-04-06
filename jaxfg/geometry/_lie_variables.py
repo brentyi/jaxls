@@ -31,7 +31,7 @@ class LieVariableBase(VariableBase[T], Generic[T]):
     @staticmethod
     @final
     @overrides
-    def manifold_retract(x: T, local_delta: jaxlie.types.TangentVector) -> T:
+    def manifold_retract(x: T, local_delta: jaxlie.hints.TangentVector) -> T:
         return jaxlie.manifold.rplus(x, local_delta)
 
 

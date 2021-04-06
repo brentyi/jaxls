@@ -7,7 +7,7 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final, overrides
 
-from .. import types
+from .. import hints
 from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
@@ -20,7 +20,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
     variables: Sequence[VariableBase]  # Preferred over `Tuple[VariableBase, ...]`
     """Variables connected to this factor."""
 
-    scale_tril_inv: types.ScaleTrilInv
+    scale_tril_inv: hints.ScaleTrilInv
     """Inverse square root of covariance matrix."""
 
     @final
@@ -42,7 +42,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
     @final
     def _flatten(
         cls: Type[FactorType], v: FactorType
-    ) -> Tuple[Tuple[types.PyTree, ...], Tuple]:
+    ) -> Tuple[Tuple[hints.PyTree, ...], Tuple]:
         """Flatten a factor for use as a PyTree/parameter stacking."""
         v_dict = vars(v)
         array_data = {k: v for k, v in v_dict.items()}
@@ -79,7 +79,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
 
     @abc.abstractmethod
     def compute_residual_vector(
-        self, *variable_values: types.VariableValue
+        self, *variable_values: hints.VariableValue
     ) -> jnp.ndarray:
         """Compute factor error.
 
@@ -88,7 +88,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
         """
 
     def compute_residual_jacobians(
-        self, *variable_values: types.VariableValue
+        self, *variable_values: hints.VariableValue
     ) -> Tuple[jnp.ndarray, ...]:
         """Compute Jacobian of residual with respect to local parameterization.
 
@@ -135,7 +135,7 @@ class LinearFactor(FactorBase):
 
     @final
     @overrides
-    def compute_residual_vector(self, *variable_values: types.VariableValue):
+    def compute_residual_vector(self, *variable_values: hints.VariableValue):
         linear_component = jnp.zeros_like(self.b)
         for A_matrix, value in zip(self.A_matrices, variable_values):
             linear_component = linear_component + A_matrix @ value

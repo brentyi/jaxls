@@ -7,7 +7,6 @@ from ._aliases import (
     ScaleTrilInv,
     VariableValue,
 )
-from ._sparse_matrix import SparseMatrix
 
 __all__ = [
     "Array",
@@ -17,5 +16,4 @@ __all__ = [
     "ScaleTril",
     "ScaleTrilInv",
     "VariableValue",
-    "SparseMatrix",
 ]

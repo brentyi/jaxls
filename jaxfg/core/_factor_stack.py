@@ -5,8 +5,7 @@ import jax
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import types as types
-from .. import utils
+from .. import hints, sparse, utils
 from ._factors import FactorBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
@@ -21,7 +20,7 @@ class FactorStack(Generic[FactorType]):
 
     num_factors: int
     factor: FactorType
-    value_indices: Tuple[types.Array, ...]
+    value_indices: Tuple[hints.Array, ...]
 
     def __post_init__(self):
         # There should be one set of indices for each variable type
@@ -79,7 +78,8 @@ class FactorStack(Generic[FactorType]):
     def compute_jacobian_coords(
         factors: Sequence[FactorType],
         local_storage_metadata: StorageMetadata,
-    ) -> List[onp.ndarray]:
+        row_offset: int,
+    ) -> List[sparse.SparseCooCoordinates]:
         """Computes Jacobian coordinates for a factor stack. One array of indices per
         variable."""
         variable_types: List[Type[VariableBase]] = [
@@ -114,7 +114,7 @@ class FactorStack(Generic[FactorType]):
         )
 
         # Get Jacobian coordinates
-        jacobian_coords: List[types.Array] = []
+        jacobian_coords: List[sparse.SparseCooCoordinates] = []
         for variable_index, variable_type in enumerate(variable_types):
             variable_dim = variable_type.get_local_parameter_dim()
 
@@ -124,7 +124,8 @@ class FactorStack(Generic[FactorType]):
                     onp.broadcast_to(
                         residual_indices[:, :, None],
                         (num_factors, residual_dim, variable_dim),
-                    ),
+                    )
+                    + row_offset,
                     # Column indices
                     onp.broadcast_to(
                         local_value_indices_stacked[variable_index][:, None, :],
@@ -134,7 +135,12 @@ class FactorStack(Generic[FactorType]):
                 axis=-1,
             ).reshape((num_factors * residual_dim * variable_dim, 2))
 
-            jacobian_coords.append(coords)
+            jacobian_coords.append(
+                sparse.SparseCooCoordinates(
+                    rows=coords[:, 0],
+                    cols=coords[:, 1],
+                )
+            )
 
         return jacobian_coords
 

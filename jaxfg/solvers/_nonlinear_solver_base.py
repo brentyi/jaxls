@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING, Union
 import jax
 from jax import numpy as jnp
 
-from .. import types, utils
+from .. import hints, utils
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
-Int = Union[types.Array, int]
-Boolean = Union[types.Array, bool]
+Int = Union[hints.Array, int]
+Boolean = Union[hints.Array, bool]
 
 
 @utils.register_dataclass_pytree(static_fields=("verbose",))
@@ -52,8 +52,8 @@ class _NonlinearSolverState:
 
     iterations: Int
     assignments: "VariableAssignments"
-    cost: types.Scalar
-    residual_vector: types.Array
+    cost: hints.Scalar
+    residual_vector: hints.Array
     done: Boolean
 
 
@@ -69,7 +69,7 @@ class _InexactStepSolverMixin:
     LEAST SQUARES, Wright & Holt 1983."""
 
     @jax.jit
-    def inexact_step_forcing_sequence(self, iterations: Int) -> types.Scalar:
+    def inexact_step_forcing_sequence(self, iterations: Int) -> hints.Scalar:
         """Get CGLS tolerance from zero-indexed iteration count."""
         return self.inexact_step_eta / (iterations + 1)
 
@@ -95,9 +95,9 @@ class _TerminationCriteriaMixin:
     def check_convergence(
         self,
         state_prev: _NonlinearSolverState,
-        cost_updated: types.Scalar,
+        cost_updated: hints.Scalar,
         local_delta_assignments: VariableAssignments,
-        negative_gradient: types.Array,
+        negative_gradient: hints.Array,
     ) -> bool:
         """Check for convergence!"""
 

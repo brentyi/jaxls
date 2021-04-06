@@ -5,9 +5,9 @@ from jax import flatten_util
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final, overrides
 
-from .. import types
+from .. import hints
 
-VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
+VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
 class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
@@ -29,7 +29,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 
     @classmethod
     def manifold_retract(
-        cls, x: VariableValueType, local_delta: types.LocalVariableValue
+        cls, x: VariableValueType, local_delta: hints.LocalVariableValue
     ) -> VariableValueType:
         r"""Retract local delta to manifold.
 
@@ -49,7 +49,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     _parameter_dim: int
     """Parameter dimensionality. Set automatically in `__init_subclass__`."""
 
-    _unflatten: Callable[[types.Array], VariableValueType]
+    _unflatten: Callable[[hints.Array], VariableValueType]
     """Helper for unflattening variable values. Set in `__init_subclass__`."""
 
     def __init_subclass__(cls):
@@ -87,7 +87,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 
     @classmethod
     @final
-    def unflatten(cls, flat: types.Array) -> VariableValueType:
+    def unflatten(cls, flat: hints.Array) -> VariableValueType:
         """Get variable value from flattened representation.
 
         Args:

@@ -5,9 +5,8 @@ import jax
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import types, utils
+from .. import sparse, utils
 from ..core._variable_assignments import VariableAssignments
-from . import _linear_utils
 from ._nonlinear_solver_base import (
     NonlinearSolverBase,
     _InexactStepSolverMixin,
@@ -62,12 +61,14 @@ class FixedIterationGaussNewtonSolver(
         """Linearize, solve linear subproblem, and update on manifold."""
 
         # Linearize graph
-        A: types.SparseMatrix = graph.compute_residual_jacobian(state_prev.assignments)
+        A: sparse.SparseCooMatrix = graph.compute_residual_jacobian(
+            state_prev.assignments
+        )
         ATb = A.T @ -state_prev.residual_vector
 
         # Solve linear subproblem
         local_delta_assignments = VariableAssignments(
-            storage=_linear_utils.sparse_linear_solve(
+            storage=sparse.linear_solve(
                 A=A,
                 ATb=ATb,
                 initial_x=jnp.zeros(graph.local_storage_metadata.dim),

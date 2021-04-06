@@ -5,7 +5,7 @@ import jax
 import jaxlie
 from overrides import final, overrides
 
-from .. import types, utils
+from .. import hints, utils
 from ..core._factors import FactorBase
 from ._lie_variables import LieVariableBase
 
@@ -25,7 +25,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     def make(
         variable: LieVariableBase,
         mu: jaxlie.MatrixLieGroup,
-        scale_tril_inv: types.ScaleTrilInv,
+        scale_tril_inv: hints.ScaleTrilInv,
     ) -> "PriorFactor":
         return PriorFactor(
             variables=(variable,),
@@ -37,7 +37,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_vector(
         self, variable_value: jaxlie.MatrixLieGroup
-    ) -> types.Array:
+    ) -> hints.Array:
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
         return jaxlie.manifold.rminus(variable_value, self.mu)
 
@@ -45,7 +45,7 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_jacobians(
         self, variable_value: jaxlie.MatrixLieGroup
-    ) -> Sequence[types.Array]:
+    ) -> Sequence[hints.Array]:
 
         # Helper for using analytical `rplus` Jacobians
         #
@@ -92,7 +92,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         variable_T_world_a: LieVariableBase,
         variable_T_world_b: LieVariableBase,
         T_a_b: jaxlie.MatrixLieGroup,
-        scale_tril_inv: types.ScaleTrilInv,
+        scale_tril_inv: hints.ScaleTrilInv,
     ) -> "BetweenFactor":
         assert type(variable_T_world_a) is type(variable_T_world_b)
         assert variable_T_world_a.get_group_type() is type(T_a_b)
@@ -111,7 +111,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_vector(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
-    ) -> types.Array:
+    ) -> hints.Array:
         # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
         return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
 
@@ -119,7 +119,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     @overrides
     def compute_residual_jacobians(
         self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
-    ) -> Tuple[types.Array, types.Array]:
+    ) -> Tuple[hints.Array, hints.Array]:
 
         # Helper for using analytical `rplus` Jacobians
         #

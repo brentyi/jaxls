@@ -4,11 +4,11 @@ from typing import Dict, Iterable, Type, TypeVar
 import jax
 from jax import numpy as jnp
 
-from .. import types, utils
+from .. import hints, utils
 from ._storage_metadata import StorageMetadata
 from ._variables import VariableBase
 
-VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
+VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
 @utils.register_dataclass_pytree(static_fields=("storage_metadata",))
@@ -16,7 +16,7 @@ VariableValueType = TypeVar("VariableValueType", bound=types.VariableValue)
 class VariableAssignments:
     """Storage class that maps variables to values."""
 
-    storage: types.Array
+    storage: hints.Array
     """Values of variables stacked and flattened. Can either be local or global
     parameterizations, depending on the value of `.storage_metadata.local_flag`."""
 
@@ -30,7 +30,7 @@ class VariableAssignments:
 
     @staticmethod
     def make_from_dict(
-        assignments: Dict[VariableBase, types.VariableValue],
+        assignments: Dict[VariableBase, hints.VariableValue],
     ) -> "VariableAssignments":
         """Create an assignment object from a full set of assignments."""
 
@@ -41,7 +41,7 @@ class VariableAssignments:
     @staticmethod
     def make_from_partial_dict(
         variables: Iterable[VariableBase],
-        assignments: Dict[VariableBase, types.VariableValue],
+        assignments: Dict[VariableBase, hints.VariableValue],
     ) -> "VariableAssignments":
         """Create an assignment object from a variables and assignments. Missing
         assignments are assigned the default variable values."""

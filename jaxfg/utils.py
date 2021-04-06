@@ -5,9 +5,9 @@ from typing import (
     Callable,
     Dict,
     Generator,
-    List,
     Optional,
     Sequence,
+    Set,
     Type,
     TypeVar,
     overload,
@@ -42,7 +42,7 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     print("========")
 
 
-_registered_static_fields: Dict[Type, List[str]] = {}
+_registered_static_fields: Dict[Type, Set[str]] = {}
 
 
 @overload
@@ -78,6 +78,8 @@ def register_dataclass_pytree(
     Very similar to `flax.struct.dataclass`, but (a) adds support for static fields and
     (b) works better with non-Googly tooling (mypy, jedi, etc).
 
+    We assume all registered classes retain the default dataclass constructor.
+
     Args:
         cls (Type[T]): Dataclass to wrap.
         static_fields (Sequence[str]): Any static field names as strings. Rather than
@@ -111,44 +113,45 @@ def _register_dataclass_pytree(
 
     # Respect static field registration from superclasses
     static_fields_list = list(static_fields)
+    del static_fields
+
     for parent_class in filter(lambda x: x in _registered_static_fields, cls.mro()):
         static_fields_list.extend(_registered_static_fields[parent_class])
 
-    assert len(set(static_fields_list)) == len(
-        static_fields_list
+    static_fields_set = set(static_fields_list)
+    assert len(static_fields_list) == len(
+        static_fields_set
     ), "Found repeated field names!"
 
-    _registered_static_fields[cls] = static_fields_list
+    _registered_static_fields[cls] = static_fields_set
 
     # Get a list of fields in our dataclass
     field: dataclasses.Field
     field_names = [field.name for field in dataclasses.fields(cls)]
-    children_fields = [name for name in field_names if name not in static_fields_list]
+    children_fields = [name for name in field_names if name not in static_fields_set]
     assert set(field_names) == set(children_fields) | set(
-        static_fields_list
+        static_fields_set
     ), "Field name anomoly; check static fields list!"
 
     # Define flatten, unflatten operations: this simple converts our dataclass to a list
     # of fields.
     def _flatten(obj):
         return [getattr(obj, key) for key in children_fields], tuple(
-            getattr(obj, key) for key in static_fields_list
+            getattr(obj, key) for key in static_fields_set
         )
 
     def _unflatten(treedef, children):
-        # Packing using constructor: this won't work with dataclasses that have their
-        # __init__ method overriden!
-        #
-        #     return cls(
-        #         **dict(zip(children_fields, children)), **dict(zip(static_fields, treedef))
-        #     )
-
-        # Instead, we create an empty object and then populate dataclass fields:
-        return dataclasses.replace(
-            cls.__new__(cls),
+        return cls(
             **dict(zip(children_fields, children)),
-            **dict(zip(static_fields_list, treedef)),
+            **dict(zip(static_fields_set, treedef)),
         )
+
+        # Alternative:
+        #     return dataclasses.replace(
+        #         cls.__new__(cls),
+        #         **dict(zip(children_fields, children)),
+        #         **dict(zip(static_fields_set, treedef)),
+        #     )
 
     jax.tree_util.register_pytree_node(cls, _flatten, _unflatten)
 
@@ -160,7 +163,6 @@ def _register_dataclass_pytree(
         return state_dict
 
     def _from_state_dict(x: T, state: Dict):
-        """Restore the state of a data class."""
         state = state.copy()  # copy the state so we can pop the restored fields.
         updates = {}
         for name in field_names:

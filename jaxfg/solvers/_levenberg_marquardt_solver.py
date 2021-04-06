@@ -5,9 +5,8 @@ import jax
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import types, utils
+from .. import hints, sparse, utils
 from ..core._variable_assignments import VariableAssignments
-from . import _linear_utils
 from ._nonlinear_solver_base import (
     NonlinearSolverBase,
     _InexactStepSolverMixin,
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
 class _LevenbergMarqaurdtState(_NonlinearSolverState):
     """Helper for state passed between LM iterations."""
 
-    lambd: types.Scalar
+    lambd: hints.Scalar
 
 
 @utils.register_dataclass_pytree
@@ -36,10 +35,10 @@ class LevenbergMarquardtSolver(
 ):
     """Simple damped least-squares implementation."""
 
-    lambda_initial: types.Scalar = 5e-4
-    lambda_factor: types.Scalar = 2.0
-    lambda_min: types.Scalar = 1e-6
-    lambda_max: types.Scalar = 1e10
+    lambda_initial: hints.Scalar = 5e-4
+    lambda_factor: hints.Scalar = 2.0
+    lambda_min: hints.Scalar = 1e-6
+    lambda_max: hints.Scalar = 1e10
 
     @overrides
     def solve(
@@ -84,10 +83,12 @@ class LevenbergMarquardtSolver(
         """Linearize, solve linear subproblem, and accept or reject update."""
         # There's currently some redundancy here: we only need to re-linearize when
         # updates are accepted.
-        A: types.SparseMatrix = graph.compute_residual_jacobian(state_prev.assignments)
+        A: sparse.SparseCooMatrix = graph.compute_residual_jacobian(
+            state_prev.assignments
+        )
         ATb = A.T @ -state_prev.residual_vector
         local_delta_assignments = VariableAssignments(
-            storage=_linear_utils.sparse_linear_solve(
+            storage=sparse.linear_solve(
                 A=A,
                 ATb=ATb,
                 initial_x=jnp.zeros(graph.local_storage_metadata.dim),

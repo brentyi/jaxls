@@ -6,8 +6,7 @@ import jax
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import types as types
-from .. import utils
+from .. import hints, sparse, utils
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factor_stack import FactorStack
 from ._factors import FactorBase
@@ -29,7 +28,7 @@ class StackedFactorGraph:
     """
 
     factor_stacks: List[FactorStack]
-    jacobian_coords: types.Array
+    jacobian_coords: sparse.SparseCooCoordinates
     local_storage_metadata: StorageMetadata
     residual_dim: int
 
@@ -80,7 +79,7 @@ class StackedFactorGraph:
 
         # Fields we want to populate
         stacked_factors: List[FactorStack] = []
-        jacobian_coords: List[types.Array] = []
+        jacobian_coords: List[sparse.SparseCooCoordinates] = []
 
         # Create storage metadata: this determines which parts of our storage object is
         # allocated to each variable type
@@ -104,18 +103,20 @@ class StackedFactorGraph:
             # These should be N pairs of (row, col) indices, where rows correspond to
             # residual indices and columns correspond to local parameter indices
             jacobian_coords.extend(
-                [
-                    coords + onp.array([[residual_offset, 0]])
-                    for coords in FactorStack.compute_jacobian_coords(
-                        group, local_storage_metadata
-                    )
-                ]
+                FactorStack.compute_jacobian_coords(
+                    factors=group,
+                    local_storage_metadata=local_storage_metadata,
+                    row_offset=residual_offset,
+                )
             )
             residual_offset += stacked_factors[-1].get_residual_dim()
 
+        jacobian_coords_concat = jax.tree_multimap(
+            lambda *arrays: jnp.concatenate(arrays, axis=0), *jacobian_coords
+        )
         return StackedFactorGraph(
             factor_stacks=stacked_factors,
-            jacobian_coords=jnp.concatenate(jacobian_coords, axis=0),
+            jacobian_coords=jacobian_coords_concat,
             local_storage_metadata=local_storage_metadata,
             residual_dim=residual_offset,
         )
@@ -198,7 +199,7 @@ class StackedFactorGraph:
     @jax.jit
     def compute_residual_jacobian(
         self, assignments: VariableAssignments
-    ) -> types.SparseMatrix:
+    ) -> sparse.SparseCooMatrix:
         """Compute the Jacobian of a graph's residual vector with respect to the stacked
         local delta vectors. Shape should be `(residual_dim, local_delta_storage_dim)`."""
 
@@ -208,7 +209,7 @@ class StackedFactorGraph:
             A_values_list.extend(stacked_factor.compute_residual_jacobian(assignments))
 
         # Build Jacobian
-        A = types.SparseMatrix(
+        A = sparse.SparseCooMatrix(
             values=jnp.concatenate([A.flatten() for A in A_values_list]),
             coords=self.jacobian_coords,
             shape=(self.residual_dim, self.local_storage_metadata.dim),
@@ -240,9 +241,9 @@ class StackedFactorGraph:
         # don't care about...
         A_all = self.compute_residual_jacobian(assignments)
         mask = jnp.logical_and(
-            A_all.coords[:, 1] >= start_col_index, A_all.coords[:, 1] < end_col_index
+            A_all.coords.cols >= start_col_index, A_all.coords.cols < end_col_index
         )
-        A_sliced = types.SparseMatrix(
+        A_sliced = sparse.SparseCooMatrix(
             values=jnp.where(
                 mask,
                 A_all.values,
@@ -261,7 +262,7 @@ class StackedFactorGraph:
         # our results
         A_sliced_dense = (
             jnp.zeros(A_sliced.shape)
-            .at[A_sliced.coords[:, 0], A_sliced.coords[:, 1]]
+            .at[A_sliced.coords.rows, A_sliced.coords.cols]
             .add(A_sliced.values)
         )
         hessian_block = A_sliced_dense.T @ A_sliced_dense
@@ -276,3 +277,19 @@ class StackedFactorGraph:
     ) -> VariableAssignments:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)
+
+    def compute_marginal_covariance(self, variable: VariableBase) -> jnp.ndarray:
+        assert variable in self.get_variables()
+        covariance: jnp.ndarray
+
+        raise NotImplementedError()
+
+        parameter_dim = variable.get_parameter_dim()
+        assert covariance.shape == (parameter_dim, parameter_dim)
+
+        return covariance
+
+    def compute_joint_marginal_covariance(
+        self, *variables: VariableBase
+    ) -> jnp.ndarray:
+        raise NotImplementedError()

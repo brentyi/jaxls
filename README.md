@@ -22,9 +22,10 @@ Current limitations:
 - Linear solves are restricted to a preconditioned conjugate gradient approach.
   Much slower than direct methods (eg sparse Cholesky) when problems are
   ill-conditioned.
-- JIT compilation adds startup overhead. This is mostly unavoidable with
-  JAX/XLA.
-- Python >=3.7 only; we rely heavily on generic types.
+- JIT compilation adds significant startup overhead. This could likely be
+  optimized (for example, by specifying more analytical Jacobians) but is mostly
+  unavoidable with JAX/XLA. Currently limits online applications.
+- Python >=3.7 only, due to features needed for generic types.
 
 ---
 
@@ -33,13 +34,13 @@ Current limitations:
 Toy pose graph optimization:
 
 ```
-scripts/pose_graph_simple.py
+python scripts/pose_graph_simple.py
 ```
 
 Pose graph optimization from `.g2o` files:
 
 ```bash
-scripts/pose_graph_g2o.py --help
+python scripts/pose_graph_g2o.py --help
 ```
 
 ---
@@ -58,6 +59,7 @@ scripts/pose_graph_g2o.py --help
   - [ ] Reduce redundant code
   - [ ] Robust losses
 - [x] MAP inference
+- [ ] Marginalization
 - [x] Validate g2o example
 - [x] Performance
   - [x] More intentional JIT compilation
