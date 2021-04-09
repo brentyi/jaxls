@@ -277,19 +277,3 @@ class StackedFactorGraph:
     ) -> VariableAssignments:
         """Solve MAP inference problem."""
         return solver.solve(graph=self, initial_assignments=initial_assignments)
-
-    def compute_marginal_covariance(self, variable: VariableBase) -> jnp.ndarray:
-        assert variable in self.get_variables()
-        covariance: jnp.ndarray
-
-        raise NotImplementedError()
-
-        parameter_dim = variable.get_parameter_dim()
-        assert covariance.shape == (parameter_dim, parameter_dim)
-
-        return covariance
-
-    def compute_joint_marginal_covariance(
-        self, *variables: VariableBase
-    ) -> jnp.ndarray:
-        raise NotImplementedError()

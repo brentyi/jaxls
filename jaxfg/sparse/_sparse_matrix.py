@@ -1,6 +1,7 @@
 import dataclasses
 from typing import Tuple
 
+import scipy
 from jax import numpy as jnp
 
 from .. import hints, utils
@@ -40,6 +41,21 @@ class SparseCooMatrix:
             jnp.zeros(self.shape[0], dtype=other.dtype)
             .at[self.coords.rows]
             .add(self.values * other[self.coords.cols])
+        )
+
+    def as_dense(self) -> jnp.ndarray:
+        """Convert to a dense JAX array."""
+        # TODO: untested
+        return (
+            jnp.zeros(self.shape)
+            .at[self.coords.rows, self.coords.cols]
+            .set(self.values)
+        )
+
+    def as_scipy_coo_matrix(self) -> scipy.sparse.coo_matrix:
+        """Convert to a sparse scipy matrix."""
+        return scipy.sparse.coo_matrix(
+            (self.values, (self.coords.rows, self.coords.cols)), shape=self.shape
         )
 
     @property

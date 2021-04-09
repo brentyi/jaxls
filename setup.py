@@ -17,6 +17,7 @@ setup(
         "jaxlib",
         "jaxlie>=1.0.0",
         "overrides",
+        "scikit-sparse",
         "termcolor",
         "tqdm",
         "matplotlib",
