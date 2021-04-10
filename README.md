@@ -28,6 +28,23 @@ Current limitations:
 
 ---
 
+### Installation
+
+`scikit-sparse` require SuiteSparse:
+```bash
+sudo apt update
+sudo apt install -y libsuitesparse-dev
+```
+
+Then, from your environment of choice:
+```bash
+git clone https://github.com/brentyi/jaxfg.git
+cd jaxfg
+pip install -e .
+```
+
+---
+
 ### Example scripts
 
 Toy pose graph optimization:
