@@ -18,12 +18,10 @@ Features:
 
 Current limitations:
 
-- Linear solves are restricted to a preconditioned conjugate gradient approach.
-  Much slower than direct methods (eg sparse Cholesky) when problems are
-  ill-conditioned.
 - JIT compilation adds significant startup overhead. This could likely be
   optimized (for example, by specifying more analytical Jacobians) but is mostly
-  unavoidable with JAX/XLA. Currently limits online applications.
+  unavoidable with JAX/XLA. Limits applications for systems that are online or
+  require dynamic graph alterations.
 - Python >=3.7 only, due to features needed for generic types.
 
 ---
@@ -31,12 +29,14 @@ Current limitations:
 ### Installation
 
 `scikit-sparse` require SuiteSparse:
+
 ```bash
 sudo apt update
 sudo apt install -y libsuitesparse-dev
 ```
 
 Then, from your environment of choice:
+
 ```bash
 git clone https://github.com/brentyi/jaxfg.git
 cd jaxfg
@@ -66,16 +66,22 @@ python scripts/pose_graph_g2o.py --help
 - [x] Preliminary graph, variable, factor interfaces
 - [x] Real vector variable types
 - [x] Refactor into package
-- [x] Non-linear optimization
-  - [x] Very basic Gauss-Newton implementation
+- [x] Nonlinear optimization for MAP inference
+  - [x] Conjugate gradient linear solver
+  - [ ] CHOLMOD linear solver
+    - [x] Basic implementation
+    - [ ] Batch axis support
+    - [ ] Autodiff support
+  - [x] Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
   - [x] Inexact Newton steps
   - [x] Revisit termination criteria
   - [ ] Reduce redundant code
   - [ ] Robust losses
-- [x] MAP inference
-- [ ] Marginalization
+- [x] Marginalization
+  - [x] Working prototype using sksparse/CHOLMOD
+  - [ ] JAX implementation?
 - [x] Validate g2o example
 - [x] Performance
   - [x] More intentional JIT compilation

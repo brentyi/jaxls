@@ -15,6 +15,9 @@ class SparseCooCoordinates:
     cols: hints.Array
     """Column indices of non-zero entries. Shape should be `(*, N)`."""
 
+    def __post_init__(self):
+        assert self.rows.shape == self.cols.shape
+
 
 @utils.register_dataclass_pytree(static_fields=("shape",))
 @dataclasses.dataclass

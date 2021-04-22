@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Union
 import jax
 from jax import numpy as jnp
 
-from .. import hints, utils
+from .. import hints, sparse, utils
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
@@ -28,6 +28,9 @@ class _NonlinearSolverBase:
 
     verbose: Boolean = True
     """Set to `True` to enable printing."""
+
+    linear_solver: sparse.LinearSubproblemSolverBase = sparse.CholmodSolver()
+    """Solver to use for linear subproblems."""
 
     def _print(self, *args, **kwargs):
         """Prefixed printing helper. No-op if `verbose` is set to `False`."""
@@ -55,23 +58,6 @@ class _NonlinearSolverState:
     cost: hints.Scalar
     residual_vector: hints.Array
     done: Boolean
-
-
-@dataclasses.dataclass
-class _InexactStepSolverMixin:
-    """Mixin for inexact Newton steps. Currently used by all solvers."""
-
-    inexact_step_eta: float = 1e-1
-    """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
-    `eta / iteration #`.
-
-    For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
-    LEAST SQUARES, Wright & Holt 1983."""
-
-    @jax.jit
-    def inexact_step_forcing_sequence(self, iterations: Int) -> hints.Scalar:
-        """Get CGLS tolerance from zero-indexed iteration count."""
-        return self.inexact_step_eta / (iterations + 1)
 
 
 @dataclasses.dataclass

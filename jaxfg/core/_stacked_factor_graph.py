@@ -6,7 +6,7 @@ import jax
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import hints, sparse, utils
+from .. import sparse, utils
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factor_stack import FactorStack
 from ._factors import FactorBase
@@ -114,6 +114,11 @@ class StackedFactorGraph:
         jacobian_coords_concat = jax.tree_multimap(
             lambda *arrays: jnp.concatenate(arrays, axis=0), *jacobian_coords
         )
+        # jacobian_coords_concat = sparse.SparseCooCoordinates(
+        #     rows=onp.concatenate([c.rows for c in jacobian_coords]),
+        #     cols=onp.concatenate([c.cols for c in jacobian_coords]),
+        # )
+
         return StackedFactorGraph(
             factor_stacks=stacked_factors,
             jacobian_coords=jacobian_coords_concat,

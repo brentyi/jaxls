@@ -1,3 +1,6 @@
+# TODO: this is almost entirely copy and pasted from the vanilla Gauss Newton solver.
+# Should be removed or refactored.
+
 import dataclasses
 from typing import TYPE_CHECKING
 
@@ -7,11 +10,7 @@ from overrides import overrides
 
 from .. import sparse, utils
 from ..core._variable_assignments import VariableAssignments
-from ._nonlinear_solver_base import (
-    NonlinearSolverBase,
-    _InexactStepSolverMixin,
-    _NonlinearSolverState,
-)
+from ._nonlinear_solver_base import NonlinearSolverBase, _NonlinearSolverState
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
@@ -19,10 +18,7 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
-class FixedIterationGaussNewtonSolver(
-    NonlinearSolverBase,
-    _InexactStepSolverMixin,
-):
+class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
     @overrides
     def solve(
         self,
@@ -68,12 +64,11 @@ class FixedIterationGaussNewtonSolver(
 
         # Solve linear subproblem
         local_delta_assignments = VariableAssignments(
-            storage=sparse.linear_solve(
+            storage=self.linear_solver.solve_subproblem(
                 A=A,
                 ATb=ATb,
-                initial_x=jnp.zeros(graph.local_storage_metadata.dim),
-                tol=self.inexact_step_forcing_sequence(state_prev.iterations),
                 lambd=0.0,
+                iteration=state_prev.iterations,
             ),
             storage_metadata=graph.local_storage_metadata,
         )

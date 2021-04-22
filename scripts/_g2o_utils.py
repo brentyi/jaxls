@@ -14,13 +14,13 @@ class G2OData(NamedTuple):
     initial_poses: Dict[jaxfg.geometry.LieVariableBase, jaxlie.MatrixLieGroup]
 
 
-def parse_g2o(path: pathlib.Path) -> G2OData:
+def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
     """Parse a G2O file. Creates a list of factors and dictionary of initial poses."""
 
     with open(path) as file:
         lines = [line.strip() for line in file.readlines()]
 
-    pose_variables = []
+    pose_variables: List[jaxfg.geometry.LieVariableBase] = []
     initial_poses: Dict[jaxfg.geometry.LieVariableBase, jaxlie.MatrixLieGroup] = {}
 
     factors: List[jaxfg.core.FactorBase] = []
@@ -28,6 +28,9 @@ def parse_g2o(path: pathlib.Path) -> G2OData:
     for line in tqdm(lines):
         parts = [part for part in line.split(" ") if part != ""]
         if parts[0] == "VERTEX_SE2":
+            if len(pose_variables) > pose_count_limit:
+                continue
+
             # Create SE(2) variable
             _, index, x, y, theta = parts
             index = int(index)
@@ -41,6 +44,9 @@ def parse_g2o(path: pathlib.Path) -> G2OData:
             # Create relative offset between pair of SE(2) variables
             before_index = int(parts[1])
             after_index = int(parts[2])
+
+            if before_index > pose_count_limit or after_index > pose_count_limit:
+                continue
 
             between = jaxlie.SE2.from_xy_theta(*(float(p) for p in parts[3:6]))
 

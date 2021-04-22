@@ -1,3 +1,5 @@
+from typing import List
+
 import jaxlie
 import numpy as onp
 

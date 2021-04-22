@@ -9,7 +9,6 @@ from .. import sparse, utils
 from ..core._variable_assignments import VariableAssignments
 from ._nonlinear_solver_base import (
     NonlinearSolverBase,
-    _InexactStepSolverMixin,
     _NonlinearSolverState,
     _TerminationCriteriaMixin,
 )
@@ -22,7 +21,6 @@ if TYPE_CHECKING:
 @dataclasses.dataclass
 class GaussNewtonSolver(
     NonlinearSolverBase,
-    _InexactStepSolverMixin,
     _TerminationCriteriaMixin,
 ):
     @overrides
@@ -75,12 +73,11 @@ class GaussNewtonSolver(
 
         # Solve linear subproblem
         local_delta_assignments = VariableAssignments(
-            storage=sparse.linear_solve(
+            storage=self.linear_solver.solve_subproblem(
                 A=A,
                 ATb=ATb,
-                initial_x=jnp.zeros(graph.local_storage_metadata.dim),
-                tol=self.inexact_step_forcing_sequence(state_prev.iterations),
                 lambd=0.0,
+                iteration=state_prev.iterations,
             ),
             storage_metadata=graph.local_storage_metadata,
         )

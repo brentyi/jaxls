@@ -1,8 +1,14 @@
-from ._linear_solve import linear_solve
+from ._linear_solve import (
+    CholmodSolver,
+    ConjugateGradientSolver,
+    LinearSubproblemSolverBase,
+)
 from ._sparse_matrix import SparseCooCoordinates, SparseCooMatrix
 
 __all__ = [
-    "linear_solve",
-    "SparseMatrixCoordinates",
-    "SparseMatrix",
+    "CholmodSolver",
+    "ConjugateGradientSolver",
+    "LinearSubproblemSolverBase",
+    "SparseCooCoordinates",
+    "SparseCooMatrix",
 ]

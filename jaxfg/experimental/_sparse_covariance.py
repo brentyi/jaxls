@@ -5,14 +5,7 @@ import numpy as onp
 import scipy
 import sksparse
 
-from .. import core, hints
-
-# sksparse.cholmod.CholmodError
-# print(sksparse.cholmod.CholmodError)
-# print(sksparse.cholmod.CholmodError)
-# print(sksparse.cholmod.CholmodError)
-# print(sksparse.cholmod.CholmodError)
-# print(sksparse.cholmod.CholmodError)
+from .. import core
 
 
 @dataclasses.dataclass

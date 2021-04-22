@@ -9,7 +9,6 @@ from .. import hints, sparse, utils
 from ..core._variable_assignments import VariableAssignments
 from ._nonlinear_solver_base import (
     NonlinearSolverBase,
-    _InexactStepSolverMixin,
     _NonlinearSolverState,
     _TerminationCriteriaMixin,
 )
@@ -30,7 +29,6 @@ class _LevenbergMarqaurdtState(_NonlinearSolverState):
 @dataclasses.dataclass
 class LevenbergMarquardtSolver(
     NonlinearSolverBase,
-    _InexactStepSolverMixin,
     _TerminationCriteriaMixin,
 ):
     """Simple damped least-squares implementation."""
@@ -88,12 +86,11 @@ class LevenbergMarquardtSolver(
         )
         ATb = A.T @ -state_prev.residual_vector
         local_delta_assignments = VariableAssignments(
-            storage=sparse.linear_solve(
+            storage=self.linear_solver.solve_subproblem(
                 A=A,
                 ATb=ATb,
-                initial_x=jnp.zeros(graph.local_storage_metadata.dim),
-                tol=self.inexact_step_forcing_sequence(state_prev.iterations),
-                lambd=state_prev.lambd,
+                lambd=0.0,
+                iteration=state_prev.iterations,
             ),
             storage_metadata=graph.local_storage_metadata,
         )
