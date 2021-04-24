@@ -68,10 +68,8 @@ python scripts/pose_graph_g2o.py --help
 - [x] Refactor into package
 - [x] Nonlinear optimization for MAP inference
   - [x] Conjugate gradient linear solver
-  - [ ] CHOLMOD linear solver
-    - [x] Basic implementation
-    - [ ] Batch axis support
-    - [ ] Autodiff support
+  - [x] CHOLMOD linear solver
+    - [x] Basic implementation. JIT-able, but no vmap, pmap, or autodiff support.
   - [x] Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares

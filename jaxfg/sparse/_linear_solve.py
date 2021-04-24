@@ -40,13 +40,20 @@ _cholmod_analyze_cache: Dict[Hashable, sksparse.cholmod.Factor] = {}
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
 class CholmodSolver(LinearSubproblemSolverBase):
-    """CHOLMOD-based sparse linear solver.
+    r"""CHOLMOD-based sparse linear solver.
 
-    Under development. TODOs:
-    - Caching is currently sketchy. Assumes that a given solver is not reused for
+    Runs via an XLA host callback, and has some usage caveats:
+    - Caching is a little bit sketchy. Assumes that a given solver is not reused for
       systems with different sparsity patterns.
-    - Batch axis support.
-    - Autodiff support.
+    - Does not support function transforms, due to current limitations of `hcb.call()`.
+    - Does not support autodiff. A custom JVP or VJP definition should be easy to
+      implement, but not super useful without batch axis support.
+    - Regularization consistency. We use a vanilla $$\lambda I$$ regularization term
+      here, but the conjugate gradient solver uses a scale invariant $$\lambda
+      diag(A^TA)$$ term.
+
+    For applications where JAX transformations are necessary, ConjugateGradientSolver
+    is written in vanilla JAX should be less caveat-y.
     """
 
     def __post_init__(self):
@@ -73,7 +80,6 @@ class CholmodSolver(LinearSubproblemSolverBase):
         # Cache sparsity pattern analysis
         self_hash = object.__hash__(self)
         if self_hash not in _cholmod_analyze_cache:
-            print("Analyzing")
             _cholmod_analyze_cache[self_hash] = sksparse.cholmod.analyze_AAt(A_scipy)
 
         # Factorize and solve

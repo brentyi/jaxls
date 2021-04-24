@@ -15,8 +15,9 @@ class SparseCooCoordinates:
     cols: hints.Array
     """Column indices of non-zero entries. Shape should be `(*, N)`."""
 
-    def __post_init__(self):
-        assert self.rows.shape == self.cols.shape
+    # Shape checks seem to break under vmap
+    # def __post_init__(self):
+    #     assert self.rows.shape == self.cols.shape
 
 
 @utils.register_dataclass_pytree(static_fields=("shape",))
@@ -31,9 +32,11 @@ class SparseCooMatrix:
     shape: Tuple[int, int]
     """Shape of matrix."""
 
-    def __post_init__(self):
-        assert self.coords.rows.shape == self.coords.cols.shape == self.values.shape
-        assert len(self.shape) == 2
+    # Shape checks seem to break under vmap
+    # def __post_init__(self):
+    #     print(self)
+    #     assert self.coords.rows.shape == self.coords.cols.shape == self.values.shape
+    #     assert len(self.shape) == 2
 
     def __matmul__(self, other: hints.Array):
         """Compute `Ax`, where `x` is a 1D vector."""
@@ -53,6 +56,18 @@ class SparseCooMatrix:
             jnp.zeros(self.shape)
             .at[self.coords.rows, self.coords.cols]
             .set(self.values)
+        )
+
+    @staticmethod
+    def from_scipy_coo_matrix(matrix: scipy.sparse.coo_matrix) -> "SparseCooMatrix":
+        """Build from a sparse scipy matrix."""
+        return SparseCooMatrix(
+            values=matrix.data,
+            coords=SparseCooCoordinates(
+                rows=matrix.row,
+                cols=matrix.col,
+            ),
+            shape=matrix.shape,
         )
 
     def as_scipy_coo_matrix(self) -> scipy.sparse.coo_matrix:
