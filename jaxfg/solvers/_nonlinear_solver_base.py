@@ -21,7 +21,7 @@ class _NonlinearSolverBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
 
-    """Nonlinear solver interface. """
+    """Nonlinear solver interface."""
 
     max_iterations: int = 100
     """Maximum number of iterations."""

@@ -1,4 +1,5 @@
 import abc
+import inspect
 from typing import Callable, Dict, Generic, Mapping, Type, TypeVar
 
 from jax import flatten_util
@@ -53,8 +54,11 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     """Helper for unflattening variable values. Set in `__init_subclass__`."""
 
     def __init_subclass__(cls):
-        """For subclasses, we determine the parameter dimensionality and unflattening
-        procedure from the example provided by `get_default_value()`."""
+        """For non-abstract subclasses, we determine the parameter dimensionality and
+        unflattening procedure from the example provided by `get_default_value()`."""
+
+        if inspect.isabstract(cls):
+            return
 
         example = cls.get_default_value()
 

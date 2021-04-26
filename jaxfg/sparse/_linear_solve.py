@@ -67,7 +67,7 @@ class CholmodSolver(LinearSubproblemSolverBase):
         A: SparseCooMatrix,
         ATb: hints.Array,
         lambd: hints.Scalar,
-        iteration: int,  # Unused
+        iteration: hints.Scalar,  # Unused
     ) -> jnp.ndarray:
         # JAX-compatible sparse Cholesky factorization with a host callback. Similar to:
         #     self._solve(_LinearSolverArgs(A, ATb, lambd))
@@ -103,7 +103,7 @@ class ConjugateGradientSolver(LinearSubproblemSolverBase):
         A: SparseCooMatrix,
         ATb: hints.Array,
         lambd: hints.Scalar,
-        iteration: int,  # Unused
+        iteration: hints.Scalar,  # Unused
     ) -> jnp.ndarray:
         assert len(A.values.shape) == 1, "A.values should be 1D"
         assert len(ATb.shape) == 1, "ATb should be 1D!"

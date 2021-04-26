@@ -14,7 +14,7 @@ class LieVariableBase(VariableBase[T], Generic[T]):
     @abc.abstractmethod
     def get_group_type() -> Type[T]:
         """Helper for defining Lie group types."""
-        return jaxlie.MatrixLieGroup
+        # return jaxlie.MatrixLieGroup  # type: ignore
 
     @classmethod
     @final

@@ -84,7 +84,7 @@ class VariableAssignments:
         return self.storage_metadata.get_variables()
 
     def get_value(self, variable: VariableBase[VariableValueType]) -> VariableValueType:
-        """Get value corresponding to specific variable.  """
+        """Get value corresponding to specific variable."""
         index = self.storage_metadata.index_from_variable[variable]
         return type(variable).unflatten(
             self.storage[index : index + variable.get_parameter_dim()]
