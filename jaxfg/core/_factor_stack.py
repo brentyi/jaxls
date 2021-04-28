@@ -160,11 +160,12 @@ class FactorStack(Generic[FactorType]):
         )
 
         # Vectorized residual computation
+        # The type of `values_stacked` should match `FactorVariableValues`
         residual_vector = jnp.einsum(
             "nij,nj->ni",
             self.factor.scale_tril_inv,
             jax.vmap(type(self.factor).compute_residual_vector)(
-                self.factor, *values_stacked
+                self.factor, values_stacked  # type: ignore
             ),
         )
 
@@ -189,8 +190,9 @@ class FactorStack(Generic[FactorType]):
         )
 
         # Compute Jacobians wrt local parameterizations
+        # The type of `values_stacked` should match `FactorVariableValues`
         jacobians = jax.vmap(type(self.factor).compute_residual_jacobians)(
-            self.factor, *values_stacked
+            self.factor, values_stacked  # type: ignore
         )
 
         # Whiten Jacobians

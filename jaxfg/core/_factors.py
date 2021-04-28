@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import Sequence, Tuple, Type, TypeVar
+from typing import Generic, Sequence, Tuple, Type, TypeVar, cast
 
 import jax
 import numpy as onp
@@ -12,11 +12,18 @@ from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
+# If Python had better support for variadic generics we could write
+# `FactorBase[ValueType1, ValueType2, ...]`, but in the absence of this we will just use
+# `FactorBase[Tuple[ValueType1, ValueType2, ...]]`.
+#
+# Whenever a factor computation is done, the factor should be passed in a tuple of
+# values.
+FactorVariableValues = TypeVar("FactorVariableValues", bound=Tuple)
 
 # Disable type-checking here
 # > https://github.com/python/mypy/issues/5374
 @dataclasses.dataclass  # type: ignore
-class FactorBase(abc.ABC, EnforceOverrides):
+class FactorBase(Generic[FactorVariableValues], abc.ABC, EnforceOverrides):
     variables: Sequence[VariableBase]  # Preferred over `Tuple[VariableBase, ...]`
     """Variables connected to this factor."""
 
@@ -62,7 +69,7 @@ class FactorBase(abc.ABC, EnforceOverrides):
     @classmethod
     @final
     def _unflatten(
-        cls: Type[FactorType], treedef: Tuple, children: Tuple[jnp.ndarray]
+        cls: Type[FactorType], treedef: Tuple, children: Tuple[hints.Array]
     ) -> FactorType:
         """Unflatten a factor for use as a PyTree/parameter stacking."""
         array_keys = treedef[: len(children)]
@@ -79,29 +86,30 @@ class FactorBase(abc.ABC, EnforceOverrides):
 
     @abc.abstractmethod
     def compute_residual_vector(
-        self, *variable_values: hints.VariableValue
-    ) -> jnp.ndarray:
+        self, variable_values: FactorVariableValues
+    ) -> hints.Array:
         """Compute factor error.
 
         Args:
-            variable_values (types.VariableValue): Values of self.variables
+            variable_values: Values of self.variables
         """
 
     def compute_residual_jacobians(
-        self, *variable_values: hints.VariableValue
-    ) -> Tuple[jnp.ndarray, ...]:
+        self, variable_values: FactorVariableValues
+    ) -> Sequence[hints.Array]:
         """Compute Jacobian of residual with respect to local parameterization.
 
         Uses `jax.jacfwd` by default, but can optionally be overriden.
 
         Args:
-            variable_values (types.VariableValue): Values of variables to linearize around.
+            variable_values: Values of variables to linearize around.
         """
 
         def compute_cost_with_local_delta(
-            local_deltas: Sequence[jnp.ndarray],
-        ) -> jnp.ndarray:
-            perturbed_values = [
+            local_deltas: Sequence[hints.Array],
+        ) -> hints.Array:
+            # Suppressing: Need type annotation for 'variable_value'
+            perturbed_values = tuple(  # type: ignore
                 variable.manifold_retract(
                     x=variable_value,
                     local_delta=local_delta,
@@ -109,8 +117,11 @@ class FactorBase(abc.ABC, EnforceOverrides):
                 for variable, variable_value, local_delta in zip(
                     self.variables, variable_values, local_deltas
                 )
-            ]
-            return self.compute_residual_vector(*perturbed_values)
+            )
+
+            return self.compute_residual_vector(
+                cast(FactorVariableValues, perturbed_values)
+            )
 
         # Evaluate Jacobian when deltas are zero
         return jax.jacfwd(compute_cost_with_local_delta)(
@@ -129,9 +140,9 @@ class LinearFactor(FactorBase):
     $$
     """
 
-    A_matrices: Tuple[jnp.ndarray]
-    b: jnp.ndarray
-    scale_tril_inv: jnp.ndarray
+    A_matrices: Tuple[hints.Array]
+    b: hints.Array
+    scale_tril_inv: hints.Array
 
     @final
     @overrides

@@ -29,7 +29,9 @@ class _NonlinearSolverBase:
     verbose: Boolean = True
     """Set to `True` to enable printing."""
 
-    linear_solver: sparse.LinearSubproblemSolverBase = sparse.CholmodSolver()
+    linear_solver: sparse.LinearSubproblemSolverBase = dataclasses.field(
+        default_factory=lambda: sparse.CholmodSolver()
+    )
     """Solver to use for linear subproblems."""
 
     def _print(self, *args, **kwargs):

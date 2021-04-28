@@ -27,6 +27,10 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
     for line in tqdm(lines):
         parts = [part for part in line.split(" ") if part != ""]
+
+        variable: jaxfg.geometry.LieVariableBase
+        between: jaxlie.MatrixLieGroup
+
         if parts[0] == "VERTEX_SE2":
             if len(pose_variables) > pose_count_limit:
                 continue

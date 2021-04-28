@@ -58,7 +58,8 @@ class CholmodSolver(LinearSubproblemSolverBase):
 
     def __post_init__(self):
         warnings.warn(
-            "CholmodSolver is still under development. See docstring for known issues."
+            "CholmodSolver is still under development. See docstring for known issues.",
+            stacklevel=3,
         )
 
     @overrides

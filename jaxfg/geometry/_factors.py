@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Generic, NamedTuple, Sequence, Tuple, TypeVar
+from typing import Generic, NamedTuple, Tuple, TypeVar
 
 import jax
 import jaxlie
@@ -11,15 +11,17 @@ from ._lie_variables import LieVariableBase
 
 LieGroupType = TypeVar("LieGroupType", bound=jaxlie.MatrixLieGroup)
 
+PriorValueTuple = Tuple[LieGroupType]
+
 
 @dataclasses.dataclass
-class PriorFactor(FactorBase, Generic[LieGroupType]):
+class PriorFactor(FactorBase[PriorValueTuple], Generic[LieGroupType]):
     """Factor for defining a fixed prior on a frame.
 
     Residuals are computed as `(variable.inverse() @ mu).log()`.
     """
 
-    mu: jaxlie.MatrixLieGroup
+    mu: LieGroupType
 
     @staticmethod
     def make(
@@ -35,17 +37,21 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
 
     @final
     @overrides
-    def compute_residual_vector(
-        self, variable_value: jaxlie.MatrixLieGroup
-    ) -> hints.Array:
+    def compute_residual_vector(self, variable_values: PriorValueTuple) -> hints.Array:
+
+        value: LieGroupType
+        (value,) = variable_values
+
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
-        return jaxlie.manifold.rminus(variable_value, self.mu)
+        return jaxlie.manifold.rminus(value, self.mu)
 
     @final
     @overrides
     def compute_residual_jacobians(
-        self, variable_value: jaxlie.MatrixLieGroup
-    ) -> Sequence[hints.Array]:
+        self, variable_values: PriorValueTuple
+    ) -> Tuple[hints.Array]:
+
+        (value,) = variable_values
 
         # Helper for using analytical `rplus` Jacobians
         #
@@ -54,18 +60,18 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
 
         J_residual_wrt_value = jax.jacfwd(
             PriorFactor.compute_residual_vector, argnums=1
-        )(self, variable_value).parameters()
+        )(self, (value,))[0].parameters()
         assert J_residual_wrt_value.shape == (
-            variable_value.tangent_dim,
-            variable_value.parameters_dim,
+            value.tangent_dim,
+            value.parameters_dim,
         )
 
         J_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
-            transform=variable_value
+            transform=value
         )
         assert J_value_wrt_delta.shape == (
-            variable_value.parameters_dim,
-            variable_value.tangent_dim,
+            value.parameters_dim,
+            value.tangent_dim,
         )
 
         J_residual_wrt_delta = J_residual_wrt_value @ J_value_wrt_delta
@@ -77,8 +83,11 @@ class _BeforeAfterTuple(NamedTuple):
     variable_T_world_b: LieVariableBase
 
 
+BetweenValueTuple = Tuple[LieGroupType, LieGroupType]
+
+
 @dataclasses.dataclass
-class BetweenFactor(FactorBase, Generic[LieGroupType]):
+class BetweenFactor(FactorBase[BetweenValueTuple], Generic[LieGroupType]):
     """Factor for defining a geometric relationship between frames `a` and `b`.
 
     Residuals are computed as `((T_world_a @ T_a_b).inverse() @ T_world_b).log()`.
@@ -110,16 +119,18 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
     @final
     @overrides
     def compute_residual_vector(
-        self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
+        self, variable_values: BetweenValueTuple
     ) -> hints.Array:
+        T_world_a, T_world_b = variable_values
         # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
         return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
 
     @final
     @overrides
     def compute_residual_jacobians(
-        self, T_world_a: jaxlie.MatrixLieGroup, T_world_b: jaxlie.MatrixLieGroup
+        self, variable_values: BetweenValueTuple
     ) -> Tuple[hints.Array, hints.Array]:
+        T_world_a, T_world_b = variable_values
 
         # Helper for using analytical `rplus` Jacobians
         #
@@ -128,8 +139,8 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
 
         J_residual_wrt_a, J_residual_wrt_b = (
             J.parameters()
-            for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=(1, 2))(
-                self, T_world_a, T_world_b
+            for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=1)(
+                self, (T_world_a, T_world_b)
             )
         )
 
