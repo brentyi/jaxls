@@ -10,12 +10,11 @@ from ..core._factors import FactorBase
 from ._lie_variables import LieVariableBase
 
 LieGroupType = TypeVar("LieGroupType", bound=jaxlie.MatrixLieGroup)
-
 PriorValueTuple = Tuple[LieGroupType]
 
 
 @dataclasses.dataclass
-class PriorFactor(FactorBase[PriorValueTuple], Generic[LieGroupType]):
+class PriorFactor(FactorBase, Generic[LieGroupType]):
     """Factor for defining a fixed prior on a frame.
 
     Residuals are computed as `(variable.inverse() @ mu).log()`.
@@ -25,10 +24,10 @@ class PriorFactor(FactorBase[PriorValueTuple], Generic[LieGroupType]):
 
     @staticmethod
     def make(
-        variable: LieVariableBase,
-        mu: jaxlie.MatrixLieGroup,
+        variable: LieVariableBase[LieGroupType],
+        mu: LieGroupType,
         scale_tril_inv: hints.ScaleTrilInv,
-    ) -> "PriorFactor":
+    ) -> "PriorFactor[LieGroupType]":
         return PriorFactor(
             variables=(variable,),
             mu=mu,
@@ -78,7 +77,7 @@ class PriorFactor(FactorBase[PriorValueTuple], Generic[LieGroupType]):
         return (J_residual_wrt_delta,)
 
 
-class _BeforeAfterTuple(NamedTuple):
+class BetweenVariableTuple(NamedTuple):
     variable_T_world_a: LieVariableBase
     variable_T_world_b: LieVariableBase
 
@@ -87,27 +86,27 @@ BetweenValueTuple = Tuple[LieGroupType, LieGroupType]
 
 
 @dataclasses.dataclass
-class BetweenFactor(FactorBase[BetweenValueTuple], Generic[LieGroupType]):
+class BetweenFactor(FactorBase, Generic[LieGroupType]):
     """Factor for defining a geometric relationship between frames `a` and `b`.
 
     Residuals are computed as `((T_world_a @ T_a_b).inverse() @ T_world_b).log()`.
     """
 
-    variables: _BeforeAfterTuple
-    T_a_b: jaxlie.MatrixLieGroup
+    variables: BetweenVariableTuple
+    T_a_b: LieGroupType
 
     @staticmethod
     def make(
-        variable_T_world_a: LieVariableBase,
-        variable_T_world_b: LieVariableBase,
-        T_a_b: jaxlie.MatrixLieGroup,
+        variable_T_world_a: LieVariableBase[LieGroupType],
+        variable_T_world_b: LieVariableBase[LieGroupType],
+        T_a_b: LieGroupType,
         scale_tril_inv: hints.ScaleTrilInv,
-    ) -> "BetweenFactor":
+    ) -> "BetweenFactor[LieGroupType]":
         assert type(variable_T_world_a) is type(variable_T_world_b)
         assert variable_T_world_a.get_group_type() is type(T_a_b)
 
         return BetweenFactor(
-            variables=_BeforeAfterTuple(
+            variables=BetweenVariableTuple(
                 variable_T_world_a=variable_T_world_a,
                 variable_T_world_b=variable_T_world_b,
             ),

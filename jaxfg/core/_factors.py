@@ -12,19 +12,28 @@ from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
-# If Python had better support for variadic generics we could write
-# `FactorBase[ValueType1, ValueType2, ...]`, but in the absence of this we will just use
-# `FactorBase[Tuple[ValueType1, ValueType2, ...]]`.
+# If Python had better support for variadic generics, higher-kinded types we could write
+# `FactorBase[VariableType1, VariableType2, ...]`, but in the absence of this we will just use
+# `FactorBase[Tuple[VariableType1, ...], Tuple[ValueType1, ...]]`.
 #
-# Whenever a factor computation is done, the factor should be passed in a tuple of
-# values.
-FactorVariableValues = TypeVar("FactorVariableValues", bound=Tuple)
+# Note that these TypeVars can generally be inferred implicitly from hinted methods.
+FactorVariableTypes = TypeVar(
+    "FactorVariableTypes",
+    bound=Tuple[VariableBase, ...],
+)
+FactorVariableValues = TypeVar(
+    "FactorVariableValues", bound=Tuple[hints.VariableValue, ...]
+)
 
 # Disable type-checking here
 # > https://github.com/python/mypy/issues/5374
 @dataclasses.dataclass  # type: ignore
-class FactorBase(Generic[FactorVariableValues], abc.ABC, EnforceOverrides):
-    variables: Sequence[VariableBase]  # Preferred over `Tuple[VariableBase, ...]`
+class FactorBase(
+    Generic[FactorVariableTypes, FactorVariableValues],
+    abc.ABC,
+    EnforceOverrides,
+):
+    variables: FactorVariableTypes
     """Variables connected to this factor."""
 
     scale_tril_inv: hints.ScaleTrilInv
@@ -108,14 +117,16 @@ class FactorBase(Generic[FactorVariableValues], abc.ABC, EnforceOverrides):
         def compute_cost_with_local_delta(
             local_deltas: Sequence[hints.Array],
         ) -> hints.Array:
-            # Suppressing: Need type annotation for 'variable_value'
+            # Suppressing:
+            # - Need type annotation for 'variable_value'
+            # - Argument 1 to "zip" has incompatible type "FactorVariableTypes"; expected "Iterable[<nothing>]
             perturbed_values = tuple(  # type: ignore
                 variable.manifold_retract(
                     x=variable_value,
                     local_delta=local_delta,
                 )
                 for variable, variable_value, local_delta in zip(
-                    self.variables, variable_values, local_deltas
+                    self.variables, variable_values, local_deltas  # type: ignore
                 )
             )
 
@@ -146,7 +157,9 @@ class LinearFactor(FactorBase):
 
     @final
     @overrides
-    def compute_residual_vector(self, *variable_values: hints.VariableValue):
+    def compute_residual_vector(
+        self, variable_values: Tuple[hints.VariableValue]
+    ) -> hints.Array:
         linear_component = jnp.zeros_like(self.b)
         for A_matrix, value in zip(self.A_matrices, variable_values):
             linear_component = linear_component + A_matrix @ value
