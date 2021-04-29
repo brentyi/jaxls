@@ -101,10 +101,10 @@ class FactorStack(Generic[FactorType]):
                     )
                 )
 
-            # Stack: end result should be Tuple[array of shape (N, parameter_dim), ...]
-            local_value_indices_stacked: Tuple[onp.ndarray, ...] = tuple(
-                onp.array(indices) for indices in local_value_indices_list
-            )
+        # Stack: end result should be Tuple[array of shape (N, parameter_dim), ...]
+        local_value_indices_stacked: Tuple[onp.ndarray, ...] = tuple(
+            onp.array(indices) for indices in local_value_indices_list
+        )
 
         # Get residual indices
         num_factors = len(factors)
