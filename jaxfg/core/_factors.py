@@ -105,7 +105,7 @@ class FactorBase(
 
     def compute_residual_jacobians(
         self, variable_values: FactorVariableValues
-    ) -> Sequence[hints.Array]:
+    ) -> Tuple[hints.Array, ...]:
         """Compute Jacobian of residual with respect to local parameterization.
 
         Uses `jax.jacfwd` by default, but can optionally be overriden.
