@@ -1,48 +1,53 @@
 import abc
 import dataclasses
-from typing import Generic, Sequence, Tuple, Type, TypeVar, cast
+from typing import Generic, Sequence, Tuple, Type, TypeVar, cast, get_type_hints
 
 import jax
 import numpy as onp
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final, overrides
+from typing_utils import get_args, issubtype
 
 from .. import hints
 from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
-# If Python had better support for variadic generics, higher-kinded types we could write
-# `FactorBase[VariableType1, VariableType2, ...]`, but in the absence of this we will just use
-# `FactorBase[Tuple[VariableType1, ...], Tuple[ValueType1, ...]]`.
-#
-# Note that these TypeVars can generally be inferred implicitly from hinted methods.
-FactorVariableTypes = TypeVar(
-    "FactorVariableTypes",
-    bound=Tuple[VariableBase, ...],
-)
-FactorVariableValues = TypeVar(
-    "FactorVariableValues", bound=Tuple[hints.VariableValue, ...]
+VariableValueTypes = TypeVar(
+    "VariableValueTypes",
+    bound=Tuple[hints.VariableValue, ...],
 )
 
 # Disable type-checking here
 # > https://github.com/python/mypy/issues/5374
 @dataclasses.dataclass  # type: ignore
 class FactorBase(
-    Generic[FactorVariableTypes, FactorVariableValues],
+    Generic[VariableValueTypes],
     abc.ABC,
     EnforceOverrides,
 ):
-    variables: FactorVariableTypes
-    """Variables connected to this factor."""
+    variables: Tuple[VariableBase, ...]
+    """Variables connected to this factor. 1-to-1, in-order correspondence with
+    `VariableValueTypes`."""
 
     scale_tril_inv: hints.ScaleTrilInv
     """Inverse square root of covariance matrix."""
 
+    @abc.abstractmethod
+    def compute_residual_vector(
+        self, variable_values: VariableValueTypes
+    ) -> hints.Array:
+        """Compute factor error.
+
+        Args:
+            variable_values: Values of self.variables
+        """
+
     @final
     def get_residual_dim(self) -> int:
         """Error dimensionality."""
-        # We can't use [0] here, because (for stacked factors) there might be a batch dimension!
+        # We can't use [0] here, because (for stacked factors) there might be a batch
+        # dimension!
         return self.scale_tril_inv.shape[-1]
 
     def __init_subclass__(cls, *args, **kwargs):
@@ -93,18 +98,8 @@ class FactorBase(
         out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
         return out
 
-    @abc.abstractmethod
-    def compute_residual_vector(
-        self, variable_values: FactorVariableValues
-    ) -> hints.Array:
-        """Compute factor error.
-
-        Args:
-            variable_values: Values of self.variables
-        """
-
     def compute_residual_jacobians(
-        self, variable_values: FactorVariableValues
+        self, variable_values: VariableValueTypes
     ) -> Tuple[hints.Array, ...]:
         """Compute Jacobian of residual with respect to local parameterization.
 
@@ -131,7 +126,7 @@ class FactorBase(
             )
 
             return self.compute_residual_vector(
-                cast(FactorVariableValues, perturbed_values)
+                self.build_variable_value_tuple(perturbed_values)
             )
 
         # Evaluate Jacobian when deltas are zero
@@ -142,25 +137,52 @@ class FactorBase(
             )
         )
 
+    def build_variable_value_tuple(
+        self, variable_values: Tuple[hints.VariableValue, ...]
+    ) -> VariableValueTypes:
+        """Prepares and validates a raw tuple of variable values to be passed into
+        `compute_residual_vector` or `compute_residual_jacobians`.
 
-@dataclasses.dataclass
-class LinearFactor(FactorBase):
-    r"""Linearized factor, corresponding to the simple residual:
-    $$
-    r = ( \Sum_i A_i x_i ) - b_i
-    $$
-    """
+        Slightly sketchy: checks the type hinting on `compute_residual_vector` and if
+        the user expects a named tuple, we wrap the input accordingly. Otherwise, we
+        just cast and return the input."""
 
-    A_matrices: Tuple[hints.Array]
-    b: hints.Array
-    scale_tril_inv: hints.Array
+        assert isinstance(variable_values, tuple)
 
-    @final
-    @overrides
-    def compute_residual_vector(
-        self, variable_values: Tuple[hints.VariableValue]
-    ) -> hints.Array:
-        linear_component = jnp.zeros_like(self.b)
-        for A_matrix, value in zip(self.A_matrices, variable_values):
-            linear_component = linear_component + A_matrix @ value
-        return linear_component - self.b
+        output: VariableValueTypes
+
+        try:
+            value_type: Type[VariableValueTypes] = get_type_hints(
+                self.compute_residual_vector
+            )["variable_values"]
+        except KeyError as e:
+            raise NotImplementedError(
+                f"Missing type hints for {type(self).__name__}.compute_residual_vector"
+            ) from e
+
+        # Function should be hinted with a tuple of some kind, but not `tuple` itself
+        assert issubtype(value_type, tuple), value_type is not tuple
+
+        # Heuristic: evaluates to `True` for NamedTuple types but `False` for
+        # `Tuple[...]` types. Note that standard superclass checking approaches don't
+        # work for NamedTuple types.
+        if type(value_type) is type:
+            # Hint is `NamedTuple`
+            tuple_content_types = get_type_hints(value_type).values()
+            output = value_type(*variable_values)
+        else:
+            # Hint is `typing.Tuple` annotation
+            tuple_content_types = get_args(value_type)
+            output = cast(VariableValueTypes, variable_values)
+
+        # Validate type annotations
+        assert len(variable_values) == len(tuple_content_types)
+        for i, (value, expected_type) in enumerate(
+            zip(variable_values, tuple_content_types)
+        ):
+            assert isinstance(value, expected_type), (
+                f"Variable value type hint inconsistency: expected {expected_type} at, "
+                f"position {i} but got {type(value)}."
+            )
+
+        return output

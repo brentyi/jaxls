@@ -8,8 +8,8 @@ from jax import numpy as jnp
 
 from .. import sparse, utils
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
+from ._factor_base import FactorBase
 from ._factor_stack import FactorStack
-from ._factors import FactorBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
 

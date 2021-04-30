@@ -6,7 +6,7 @@ import numpy as onp
 from jax import numpy as jnp
 
 from .. import hints, sparse, utils
-from ._factors import FactorBase
+from ._factor_base import FactorBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
 
@@ -165,7 +165,8 @@ class FactorStack(Generic[FactorType]):
             "nij,nj->ni",
             self.factor.scale_tril_inv,
             jax.vmap(type(self.factor).compute_residual_vector)(
-                self.factor, values_stacked  # type: ignore
+                self.factor,
+                self.factor.build_variable_value_tuple(values_stacked),
             ),
         )
 
@@ -192,7 +193,7 @@ class FactorStack(Generic[FactorType]):
         # Compute Jacobians wrt local parameterizations
         # The type of `values_stacked` should match `FactorVariableValues`
         jacobians = jax.vmap(type(self.factor).compute_residual_jacobians)(
-            self.factor, values_stacked  # type: ignore
+            self.factor, self.factor.build_variable_value_tuple(values_stacked)
         )
 
         # Whiten Jacobians

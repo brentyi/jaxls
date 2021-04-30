@@ -1,55 +1,52 @@
 import dataclasses
-from typing import Generic, NamedTuple, Tuple, TypeVar
+from typing import NamedTuple, Tuple
 
 import jax
 import jaxlie
-from overrides import final, overrides
+from overrides import overrides
 
 from .. import hints, utils
-from ..core._factors import FactorBase
+from ..core._factor_base import FactorBase
 from ._lie_variables import LieVariableBase
 
-LieGroupType = TypeVar("LieGroupType", bound=jaxlie.MatrixLieGroup)
-PriorValueTuple = Tuple[LieGroupType]
+# jaxlie.MatrixLieGroup = TypeVar("jaxlie.MatrixLieGroup", bound=jaxlie.MatrixLieGroup)
+PriorValueTuple = Tuple[jaxlie.MatrixLieGroup]
 
 
 @dataclasses.dataclass
-class PriorFactor(FactorBase, Generic[LieGroupType]):
+class PriorFactor(FactorBase[PriorValueTuple]):
     """Factor for defining a fixed prior on a frame.
 
     Residuals are computed as `(variable.inverse() @ mu).log()`.
     """
 
-    mu: LieGroupType
+    mu: jaxlie.MatrixLieGroup
 
     @staticmethod
     def make(
-        variable: LieVariableBase[LieGroupType],
-        mu: LieGroupType,
+        variable: LieVariableBase,
+        mu: jaxlie.MatrixLieGroup,
         scale_tril_inv: hints.ScaleTrilInv,
-    ) -> "PriorFactor[LieGroupType]":
+    ) -> "PriorFactor":
         return PriorFactor(
             variables=(variable,),
             mu=mu,
             scale_tril_inv=scale_tril_inv,
         )
 
-    @final
     @overrides
     def compute_residual_vector(self, variable_values: PriorValueTuple) -> hints.Array:
 
-        value: LieGroupType
+        value: jaxlie.MatrixLieGroup
         (value,) = variable_values
 
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
         return jaxlie.manifold.rminus(value, self.mu)
 
-    @final
     @overrides
     def compute_residual_jacobians(
         self, variable_values: PriorValueTuple
     ) -> Tuple[hints.Array]:
-
         (value,) = variable_values
 
         # Helper for using analytical `rplus` Jacobians
@@ -77,59 +74,56 @@ class PriorFactor(FactorBase, Generic[LieGroupType]):
         return (J_residual_wrt_delta,)
 
 
-class BetweenVariableTuple(NamedTuple):
-    variable_T_world_a: LieVariableBase
-    variable_T_world_b: LieVariableBase
-
-
-BetweenValueTuple = Tuple[LieGroupType, LieGroupType]
+class BetweenValueTuple(NamedTuple):
+    T_world_a: jaxlie.MatrixLieGroup
+    T_world_b: jaxlie.MatrixLieGroup
 
 
 @dataclasses.dataclass
-class BetweenFactor(FactorBase, Generic[LieGroupType]):
+class BetweenFactor(FactorBase[BetweenValueTuple]):
     """Factor for defining a geometric relationship between frames `a` and `b`.
 
     Residuals are computed as `((T_world_a @ T_a_b).inverse() @ T_world_b).log()`.
     """
 
-    variables: BetweenVariableTuple
-    T_a_b: LieGroupType
+    T_a_b: jaxlie.MatrixLieGroup
 
     @staticmethod
     def make(
-        variable_T_world_a: LieVariableBase[LieGroupType],
-        variable_T_world_b: LieVariableBase[LieGroupType],
-        T_a_b: LieGroupType,
+        variable_T_world_a: LieVariableBase,
+        variable_T_world_b: LieVariableBase,
+        T_a_b: jaxlie.MatrixLieGroup,
         scale_tril_inv: hints.ScaleTrilInv,
-    ) -> "BetweenFactor[LieGroupType]":
+    ) -> "BetweenFactor":
         assert type(variable_T_world_a) is type(variable_T_world_b)
         assert variable_T_world_a.get_group_type() is type(T_a_b)
 
         return BetweenFactor(
-            variables=BetweenVariableTuple(
-                variable_T_world_a=variable_T_world_a,
-                variable_T_world_b=variable_T_world_b,
+            variables=(
+                variable_T_world_a,
+                variable_T_world_b,
             ),
             T_a_b=T_a_b,
             scale_tril_inv=scale_tril_inv,
         )
 
     @jax.jit
-    @final
     @overrides
     def compute_residual_vector(
         self, variable_values: BetweenValueTuple
     ) -> hints.Array:
-        T_world_a, T_world_b = variable_values
+        T_world_a = variable_values.T_world_a
+        T_world_b = variable_values.T_world_b
+
         # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
         return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
 
-    @final
     @overrides
     def compute_residual_jacobians(
         self, variable_values: BetweenValueTuple
     ) -> Tuple[hints.Array, hints.Array]:
-        T_world_a, T_world_b = variable_values
+        T_world_a = variable_values.T_world_a
+        T_world_b = variable_values.T_world_b
 
         # Helper for using analytical `rplus` Jacobians
         #
@@ -139,7 +133,7 @@ class BetweenFactor(FactorBase, Generic[LieGroupType]):
         J_residual_wrt_a, J_residual_wrt_b = (
             J.parameters()
             for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=1)(
-                self, (T_world_a, T_world_b)
+                self, BetweenValueTuple(T_world_a, T_world_b)
             )
         )
 
