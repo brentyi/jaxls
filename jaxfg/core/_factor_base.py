@@ -168,14 +168,18 @@ class FactorBase(
         # work for NamedTuple types.
         if type(value_type) is type:
             # Hint is `NamedTuple`
-            tuple_content_types = get_type_hints(value_type).values()
+            tuple_content_types = tuple(get_type_hints(value_type).values())
             output = value_type(*variable_values)
         else:
             # Hint is `typing.Tuple` annotation
             tuple_content_types = get_args(value_type)
             output = cast(VariableValueTypes, variable_values)
 
-        # Validate type annotations
+        # Handle Ellipsis in type hints, eg `Tuple[SomeType, ...]`
+        if len(tuple_content_types) == 2 and tuple_content_types[1] is Ellipsis:
+            tuple_content_types = tuple_content_types[0:1] * len(variable_values)
+
+        # Validate expected and received types
         assert len(variable_values) == len(tuple_content_types)
         for i, (value, expected_type) in enumerate(
             zip(variable_values, tuple_content_types)

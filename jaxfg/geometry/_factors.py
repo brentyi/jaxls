@@ -107,7 +107,6 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
             scale_tril_inv=scale_tril_inv,
         )
 
-    @jax.jit
     @overrides
     def compute_residual_vector(
         self, variable_values: BetweenValueTuple
