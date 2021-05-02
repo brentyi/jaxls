@@ -65,6 +65,10 @@ class VariableAssignments:
 
         return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
 
+    def as_dict(self) -> Dict[VariableBase, VariableValueType]:
+        """Grab assignments as a variable -> value dictionary."""
+        return {v: self.get_value(v) for v in self.get_variables()}
+
     def __repr__(self):
         value_from_variable = {
             variable: self.get_value(variable) for variable in self.get_variables()

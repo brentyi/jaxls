@@ -81,7 +81,7 @@ class SparseCovariance:
         return marginal_covariance
 
     def __getitem__(self, indices: Tuple[int, int]) -> float:
-        """Get a single value in our sparse Covariance matrix."""
+        """Get a single value in our sparse covariance matrix."""
 
         # Enforce symmetry
         if indices[0] > indices[1]:

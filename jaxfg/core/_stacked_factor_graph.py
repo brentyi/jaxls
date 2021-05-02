@@ -51,20 +51,20 @@ class StackedFactorGraph:
     ) -> "StackedFactorGraph":
         """Create a factor graph from a set of factors."""
 
+        # For one-off operations, onp has much less overhead than jnp
         jnp = onp if use_onp else globals()["jnp"]
 
         # Start by grouping our factors and grabbing a list of (ordered!) variables
         factors_from_group: DefaultDict[GroupKey, List[FactorBase]] = defaultdict(list)
         variables_ordered_set: Dict[VariableBase, None] = {}
         for factor in factors:
-            # In order to batch factor computations...
+            # Each factor is ultimately just a PyTree node; in order for a set of
+            # factors to be batchable, they must share the same:
             group_key: GroupKey = (
-                # (1) Factor types should match
-                factor.__class__,
-                # (2) Variable types and parameter dimensions should match
-                tuple((type(v), v.get_parameter_dim()) for v in factor.variables),
-                # (3) Residual dimension should match
-                factor.get_residual_dim(),
+                # (1) Tree structure: this encompasses the factor class, variable types
+                jax.tree_structure(factor),
+                # (2) Leaf shapes: array shapes must match in order to be stacked
+                tuple(leaf.shape for leaf in jax.tree_leaves(factor)),
             )
 
             # Record factor and variables

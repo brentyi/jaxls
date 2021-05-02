@@ -40,12 +40,14 @@ _cholmod_analyze_cache: Dict[Hashable, sksparse.cholmod.Factor] = {}
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
 class CholmodSolver(LinearSubproblemSolverBase):
-    r"""CHOLMOD-based sparse linear solver.
+    r"""CHOLMOD-based sparse linear solver. This is the default solver for performance
+    reasons, but also less stable than `ConjugateGradientSolver`.
 
     Runs via an XLA host callback, and has some usage caveats:
     - Caching is a little bit sketchy. Assumes that a given solver is not reused for
       systems with different sparsity patterns.
-    - Does not support function transforms, due to current limitations of `hcb.call()`.
+    - Does not support function transforms (`vmap`, `pmap`, etc), due to current
+      limitations of `hcb.call()`.
     - Does not support autodiff. A custom JVP or VJP definition should be easy to
       implement, but not super useful without batch axis support.
     - Regularization consistency. We use a vanilla $$\lambda I$$ regularization term
@@ -55,12 +57,6 @@ class CholmodSolver(LinearSubproblemSolverBase):
     For applications where JAX transformations are necessary, ConjugateGradientSolver
     is written in vanilla JAX should be less caveat-y.
     """
-
-    def __post_init__(self):
-        warnings.warn(
-            "CholmodSolver is still under development. See docstring for known issues.",
-            stacklevel=3,
-        )
 
     @overrides
     def solve_subproblem(
@@ -75,17 +71,19 @@ class CholmodSolver(LinearSubproblemSolverBase):
         return hcb.call(self._solve, _LinearSolverArgs(A, ATb, lambd), result_shape=ATb)
 
     def _solve(self, args: _LinearSolverArgs) -> jnp.ndarray:
+        # Convert our custom sparse matrix format to a scipy CSC matrix
+        # This could likely be optimized!
         A_T = args.A.T
-        A_scipy = A_T.as_scipy_coo_matrix().tocsc(copy=False)
+        A_T_scipy = A_T.as_scipy_coo_matrix().tocsc(copy=False)
 
         # Cache sparsity pattern analysis
         self_hash = object.__hash__(self)
         if self_hash not in _cholmod_analyze_cache:
-            _cholmod_analyze_cache[self_hash] = sksparse.cholmod.analyze_AAt(A_scipy)
+            _cholmod_analyze_cache[self_hash] = sksparse.cholmod.analyze_AAt(A_T_scipy)
 
         # Factorize and solve
         _cholmod_analyze_cache[self_hash].cholesky_AAt_inplace(
-            A_scipy,
+            A_T_scipy,
             beta=args.lambd
             + 1e-5,  # Some simple linear problems blow up without this 1e-5 term
         )
