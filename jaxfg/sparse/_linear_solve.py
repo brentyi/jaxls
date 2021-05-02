@@ -84,7 +84,11 @@ class CholmodSolver(LinearSubproblemSolverBase):
             _cholmod_analyze_cache[self_hash] = sksparse.cholmod.analyze_AAt(A_scipy)
 
         # Factorize and solve
-        _cholmod_analyze_cache[self_hash].cholesky_AAt_inplace(A_scipy, beta=args.lambd)
+        _cholmod_analyze_cache[self_hash].cholesky_AAt_inplace(
+            A_scipy,
+            beta=args.lambd
+            + 1e-5,  # Some simple linear problems blow up without this 1e-5 term
+        )
         return _cholmod_analyze_cache[self_hash].solve_A(args.ATb)
 
 
