@@ -9,11 +9,12 @@ from overrides import EnforceOverrides, final, overrides
 from typing_utils import get_args, issubtype
 
 from .. import hints
+from ._variable_assignments import VariableAssignments
 from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
-VariableValueTypes = TypeVar(
+VariableValueTuple = TypeVar(
     "VariableValueTypes",
     bound=Tuple[hints.VariableValue, ...],
 )
@@ -22,7 +23,7 @@ VariableValueTypes = TypeVar(
 # > https://github.com/python/mypy/issues/5374
 @dataclasses.dataclass  # type: ignore
 class FactorBase(
-    Generic[VariableValueTypes],
+    Generic[VariableValueTuple],
     abc.ABC,
     EnforceOverrides,
 ):
@@ -35,7 +36,7 @@ class FactorBase(
 
     @abc.abstractmethod
     def compute_residual_vector(
-        self, variable_values: VariableValueTypes
+        self, variable_values: VariableValueTuple
     ) -> hints.Array:
         """Compute factor error.
 
@@ -99,7 +100,7 @@ class FactorBase(
         return out
 
     def compute_residual_jacobians(
-        self, variable_values: VariableValueTypes
+        self, variable_values: VariableValueTuple
     ) -> Tuple[hints.Array, ...]:
         """Compute Jacobian of residual with respect to local parameterization.
 
@@ -137,9 +138,19 @@ class FactorBase(
             )
         )
 
+    def get_variable_values_from_assignments(
+        self, assignments: VariableAssignments
+    ) -> VariableValueTuple:
+        """Prepare a set of variable values corresponding to this factor, for use in
+        `compute_residual_vector` or `compute_residual_jacobians`."""
+
+        return self.build_variable_value_tuple(
+            tuple(assignments.get_value(v) for v in self.variables)
+        )
+
     def build_variable_value_tuple(
         self, variable_values: Tuple[hints.VariableValue, ...]
-    ) -> VariableValueTypes:
+    ) -> VariableValueTuple:
         """Prepares and validates a raw tuple of variable values to be passed into
         `compute_residual_vector` or `compute_residual_jacobians`.
 
@@ -149,10 +160,10 @@ class FactorBase(
 
         assert isinstance(variable_values, tuple)
 
-        output: VariableValueTypes
+        output: VariableValueTuple
 
         try:
-            value_type: Type[VariableValueTypes] = get_type_hints(
+            value_type: Type[VariableValueTuple] = get_type_hints(
                 self.compute_residual_vector
             )["variable_values"]
         except KeyError as e:
@@ -173,7 +184,7 @@ class FactorBase(
         else:
             # Hint is `typing.Tuple` annotation
             tuple_content_types = get_args(value_type)
-            output = cast(VariableValueTypes, variable_values)
+            output = cast(VariableValueTuple, variable_values)
 
         # Handle Ellipsis in type hints, eg `Tuple[SomeType, ...]`
         if len(tuple_content_types) == 2 and tuple_content_types[1] is Ellipsis:

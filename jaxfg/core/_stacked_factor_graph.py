@@ -188,8 +188,8 @@ class StackedFactorGraph:
         for stacked_factor in self.factor_stacks:
             N, dim, _dim = stacked_factor.factor.scale_tril_inv.shape
 
-            cov_determinants = jnp.log(
-                jnp.linalg.det(stacked_factor.factor.scale_tril_inv) ** (-2)
+            cov_determinants = -2.0 * jnp.log(
+                jnp.linalg.det(stacked_factor.factor.scale_tril_inv)
             )
             assert cov_determinants.shape == (N,)
 

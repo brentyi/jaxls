@@ -52,7 +52,7 @@ class GaussNewtonSolver(
 
             # Exit if either cost threshold is met
             if state.done:
-                print("Terminating early!")
+                self._print("Terminating early!")
                 break
 
         return state.assignments
