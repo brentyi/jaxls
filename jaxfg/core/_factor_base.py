@@ -15,7 +15,7 @@ from ._variables import VariableBase
 FactorType = TypeVar("FactorType", bound="FactorBase")
 
 VariableValueTuple = TypeVar(
-    "VariableValueTypes",
+    "VariableValueTuple",
     bound=Tuple[hints.VariableValue, ...],
 )
 
@@ -29,7 +29,7 @@ class FactorBase(
 ):
     variables: Tuple[VariableBase, ...]
     """Variables connected to this factor. 1-to-1, in-order correspondence with
-    `VariableValueTypes`."""
+    `VariableValueTuple`."""
 
     scale_tril_inv: hints.ScaleTrilInv
     """Inverse square root of covariance matrix."""
