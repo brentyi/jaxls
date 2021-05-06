@@ -123,8 +123,10 @@ class StackedFactorGraph:
         )
 
     @jax.jit
-    def compute_residual_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
-        """Computes flattened residual vector associated with our factor graph.
+    def compute_whitened_residual_vector(
+        self, assignments: VariableAssignments
+    ) -> jnp.ndarray:
+        """Computes flattened+whitened residual vector associated with our factor graph.
 
         Args:
             assignments (VariableAssignments): Variable assignments.
@@ -134,9 +136,15 @@ class StackedFactorGraph:
         """
 
         # Flatten and concatenate residuals from all groups
+        stacked_factor: FactorStack
         residual_vector = jnp.concatenate(
             [
-                stacked_factor.compute_residual_vector(assignments).flatten()
+                jax.vmap(
+                    type(stacked_factor.factor.noise_model).whiten_residual_vector
+                )(
+                    stacked_factor.factor.noise_model,
+                    stacked_factor.compute_residual_vector(assignments),
+                ).flatten()
                 for stacked_factor in self.factor_stacks
             ],
             axis=0,
@@ -149,7 +157,7 @@ class StackedFactorGraph:
         self, assignments: VariableAssignments
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """Compute the sum of squared residuals associated with a factor graph. Also
-        returns intermediate residual vector.
+        returns intermediate (whitened) residual vector.
 
         Args:
             assignments (VariableAssignments): Variable assignments.
@@ -157,7 +165,7 @@ class StackedFactorGraph:
         Returns:
             Tuple[jnp.ndarray, jnp.ndarray]: Scalar cost, residual vector.
         """
-        residual_vector = self.compute_residual_vector(assignments)
+        residual_vector = self.compute_whitened_residual_vector(assignments)
         cost = jnp.sum(residual_vector ** 2)
         return cost, residual_vector
 
@@ -182,7 +190,7 @@ class StackedFactorGraph:
             raise NotImplementedError()
 
         # Add Mahalanobis distance terms to NLL
-        joint_nll = jnp.sum(self.compute_residual_vector(assignments) ** 2)
+        joint_nll = jnp.sum(self.compute_whitened_residual_vector(assignments) ** 2)
 
         # Add log-determinant terms
         for stacked_factor in self.factor_stacks:
@@ -198,7 +206,7 @@ class StackedFactorGraph:
         return joint_nll
 
     @jax.jit
-    def compute_residual_jacobian(
+    def compute_whitened_residual_jacobian(
         self,
         assignments: VariableAssignments,
         residual_vector: hints.Array,
@@ -211,12 +219,24 @@ class StackedFactorGraph:
         residual_start = 0
         for stacked_factor in self.factor_stacks:
             residual_end = residual_start + stacked_factor.get_residual_dim()
-            A_values_list.extend(
-                stacked_factor.compute_residual_jacobian(
-                    assignments,
-                    residual_vector=residual_vector[residual_start:residual_end],
+            stacked_residual_vector = residual_vector[
+                residual_start:residual_end
+            ].reshape(
+                (
+                    stacked_factor.num_factors,
+                    stacked_factor.factor.get_residual_dim(),
                 )
             )
+
+            # Compute all Jacobians and whiten
+            for jacobian in stacked_factor.compute_residual_jacobian(assignments):
+                A_values_list.append(
+                    jax.vmap(type(stacked_factor.factor.noise_model).whiten_jacobian)(
+                        stacked_factor.factor.noise_model,
+                        jacobian,
+                        residual_vector=stacked_residual_vector,
+                    )
+                )
             residual_start = residual_end
         assert residual_end == self.residual_dim
 
@@ -231,7 +251,7 @@ class StackedFactorGraph:
     # @jax.partial(jax.jit, static_argnums=2)
     # def _compute_variable_hessian_block(
     #     self, assignments: VariableAssignments, variable: VariableBase
-    # ) -> jnp.ndarray:
+    # ) -> hints.Array:
     #     """Extract a Hessian block associated with a specific variable, given a set of
     #     assignments. Should be equivalent to an inverse covariance conditioned on the
     #     rest of the variables.

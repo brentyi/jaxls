@@ -12,7 +12,7 @@ class NoiseModelBase(abc.ABC, EnforceOverrides):
         pass
 
     @abc.abstractmethod
-    def whiten_residual_vector(self, residual_vector: hints.Array) -> jnp.ndarray:
+    def whiten_residual_vector(self, residual_vector: hints.Array) -> hints.Array:
         pass
 
     @abc.abstractmethod
@@ -20,5 +20,5 @@ class NoiseModelBase(abc.ABC, EnforceOverrides):
         self,
         jacobian: hints.Array,
         residual_vector: hints.Array,
-    ) -> jnp.ndarray:
+    ) -> hints.Array:
         pass

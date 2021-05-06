@@ -117,7 +117,7 @@ class ConjugateGradientSolver(LinearSubproblemSolverBase):
         ATA_diagonals = jnp.zeros_like(initial_x).at[A.coords.cols].add(A.values ** 2)
 
         # Form normal equation
-        def ATA_function(x: jnp.ndarray):
+        def ATA_function(x: hints.Array):
             # Compute ATAx
             ATAx = A.T @ (A @ x)
 

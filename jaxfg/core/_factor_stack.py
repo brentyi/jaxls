@@ -147,7 +147,7 @@ class FactorStack(Generic[FactorType]):
         return self.factor.get_residual_dim() * self.num_factors
 
     def compute_residual_vector(self, assignments: VariableAssignments) -> jnp.ndarray:
-        """Compute a stacked residual vector.
+        """Compute stacked residual vectors.
 
         Shape of output should be `(N, stacked_factor.factor.get_residual_dim())`.
         """
@@ -160,24 +160,17 @@ class FactorStack(Generic[FactorType]):
 
         # Vectorized residual computation
         # The type of `values_stacked` should match `FactorVariableValues`
-        residual_vector = jax.vmap(
-            type(self.factor.noise_model).whiten_residual_vector
-        )(
-            self.factor.noise_model,
-            jax.vmap(type(self.factor).compute_residual_vector)(
-                self.factor,
-                self.factor.build_variable_value_tuple(values_stacked),
-            ),
+        residual_vector = jax.vmap(type(self.factor).compute_residual_vector)(
+            self.factor,
+            self.factor.build_variable_value_tuple(values_stacked),
         )
-
         return residual_vector
 
     def compute_residual_jacobian(
         self,
         assignments: VariableAssignments,
-        residual_vector: hints.Array,
-    ) -> List[jnp.ndarray]:
-        """Compute stacked and whitened Jacobian matrices, one for each variable.
+    ) -> Tuple[jnp.ndarray, ...]:
+        """Compute stacked Jacobian matrices, one for each variable.
 
         Shape of each Jacobian array should be `(N, local parameter dim, residual dim)`.
         """
@@ -194,16 +187,4 @@ class FactorStack(Generic[FactorType]):
             self.factor,
             self.factor.build_variable_value_tuple(values_stacked),
         )
-
-        # Whiten Jacobians
-        residual_vector = residual_vector.reshape(
-            (self.num_factors, self.factor.get_residual_dim())
-        )
-        return [
-            jax.vmap(type(self.factor.noise_model).whiten_jacobian)(
-                self=self.factor.noise_model,
-                jacobian=jacobian,
-                residual_vector=residual_vector,
-            )
-            for jacobian in jacobians
-        ]
+        return jacobians

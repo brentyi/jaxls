@@ -105,9 +105,9 @@ def test_marginalization_as_dense():
         graph, solution_assignments
     )
 
-    sqrt_information_matrix = graph.compute_residual_jacobian(
+    sqrt_information_matrix = graph.compute_whitened_residual_jacobian(
         assignments=solution_assignments,
-        residual_vector=graph.compute_residual_vector(solution_assignments),
+        residual_vector=graph.compute_whitened_residual_vector(solution_assignments),
     ).as_dense()
 
     covariance0 = onp.linalg.inv(sqrt_information_matrix.T @ sqrt_information_matrix)

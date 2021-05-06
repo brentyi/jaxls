@@ -41,7 +41,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
             local_delta (VariableValue): Delta value in local parameterizaton.
 
         Returns:
-            jnp.ndarray: Updated parameterization.
+            hints.Array: Updated parameterization.
         """
         return cls.unflatten(cls.flatten(x) + local_delta)
 
@@ -81,7 +81,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         Should be similar to `jax.flatten_util.ravel_pytree`.
 
         Args:
-            flat (jnp.ndarray): 1D vector.
+            flat (hints.Array): 1D vector.
 
         Returns:
             VariableValueType: Variable value.
@@ -95,7 +95,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         """Get variable value from flattened representation.
 
         Args:
-            flat (jnp.ndarray): 1D vector.
+            flat (hints.Array): 1D vector.
 
         Returns:
             VariableValueType: Variable value.
@@ -128,11 +128,11 @@ class _RealVectorVariableTemplate:
 
         if dim not in cls._real_vector_variable_cache:
 
-            class _RealVectorVariable(VariableBase[jnp.ndarray]):
+            class _RealVectorVariable(VariableBase[hints.Array]):
                 @staticmethod
                 @overrides
                 @final
-                def get_default_value() -> jnp.ndarray:
+                def get_default_value() -> hints.Array:
                     return jnp.zeros(dim)
 
             cls._real_vector_variable_cache[dim] = _RealVectorVariable
@@ -140,5 +140,5 @@ class _RealVectorVariableTemplate:
         return cls._real_vector_variable_cache[dim]
 
 
-RealVectorVariable: Mapping[int, Type[VariableBase[jnp.ndarray]]]
+RealVectorVariable: Mapping[int, Type[VariableBase[hints.Array]]]
 RealVectorVariable = _RealVectorVariableTemplate()  # type: ignore

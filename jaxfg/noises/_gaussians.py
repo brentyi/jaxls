@@ -12,7 +12,7 @@ from ._noise_model_base import NoiseModelBase
 @register_dataclass_pytree
 @dataclasses.dataclass
 class Gaussian(NoiseModelBase):
-    sqrt_precision_matrix: jnp.ndarray
+    sqrt_precision_matrix: hints.Array
     """Lower-triangular square root precision matrix."""
 
     @staticmethod
@@ -29,7 +29,7 @@ class Gaussian(NoiseModelBase):
         return self.sqrt_precision_matrix.shape[-1]
 
     @overrides
-    def whiten_residual_vector(self, residual_vector: hints.Array) -> jnp.ndarray:
+    def whiten_residual_vector(self, residual_vector: hints.Array) -> hints.Array:
         return jnp.einsum("ij,j->i", self.sqrt_precision_matrix, residual_vector)
 
     @overrides
@@ -37,14 +37,14 @@ class Gaussian(NoiseModelBase):
         self,
         jacobian: hints.Array,
         residual_vector: hints.Array,  # Unused
-    ) -> jnp.ndarray:
+    ) -> hints.Array:
         return jnp.einsum("ij,jk->ik", self.sqrt_precision_matrix, jacobian)
 
 
 @register_dataclass_pytree
 @dataclasses.dataclass
 class DiagonalGaussian(NoiseModelBase):
-    sqrt_precision_diagonal: jnp.ndarray
+    sqrt_precision_diagonal: hints.Array
     """Diagonal elements of square root precision matrix."""
 
     @staticmethod
@@ -60,7 +60,7 @@ class DiagonalGaussian(NoiseModelBase):
         return self.sqrt_precision_diagonal.shape[-1]
 
     @overrides
-    def whiten_residual_vector(self, residual_vector: hints.Array) -> jnp.ndarray:
+    def whiten_residual_vector(self, residual_vector: hints.Array) -> hints.Array:
         assert residual_vector.shape == self.sqrt_precision_diagonal.shape
         return self.sqrt_precision_diagonal * residual_vector
 
@@ -69,7 +69,7 @@ class DiagonalGaussian(NoiseModelBase):
         self,
         jacobian: hints.Array,
         residual_vector: hints.Array,  # Unused
-    ) -> jnp.ndarray:
+    ) -> hints.Array:
         assert len(jacobian.shape) == 2
         assert (
             residual_vector.shape

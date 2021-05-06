@@ -37,7 +37,7 @@ class FactorBase(
     @abc.abstractmethod
     def compute_residual_vector(
         self, variable_values: VariableValueTuple
-    ) -> hints.Array:
+    ) -> jnp.ndarray:
         """Compute factor error.
 
         Args:
@@ -46,7 +46,7 @@ class FactorBase(
 
     def compute_residual_jacobians(
         self, variable_values: VariableValueTuple
-    ) -> Tuple[hints.Array, ...]:
+    ) -> Tuple[jnp.ndarray, ...]:
         """Compute Jacobian of residual with respect to local parameterization.
 
         Uses `jax.jacfwd` by default, but can optionally be overriden.
@@ -56,8 +56,8 @@ class FactorBase(
         """
 
         def compute_cost_with_local_delta(
-            local_deltas: Sequence[hints.Array],
-        ) -> hints.Array:
+            local_deltas: Sequence[jnp.ndarray],
+        ) -> jnp.ndarray:
             # Suppressing:
             # - Need type annotation for 'variable_value'
             # - Argument 1 to "zip" has incompatible type "FactorVariableTypes"; expected "Iterable[<nothing>]

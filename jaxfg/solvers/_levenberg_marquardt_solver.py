@@ -81,7 +81,7 @@ class LevenbergMarquardtSolver(
         """Linearize, solve linear subproblem, and accept or reject update."""
         # There's currently some redundancy here: we only need to re-linearize when
         # updates are accepted.
-        A: sparse.SparseCooMatrix = graph.compute_residual_jacobian(
+        A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(
             assignments=state_prev.assignments,
             residual_vector=state_prev.residual_vector,
         )

@@ -3,6 +3,7 @@ from typing import NamedTuple, Tuple
 
 import jax
 import jaxlie
+from jax import numpy as jnp
 from overrides import overrides
 
 from .. import hints, noises, utils
@@ -35,7 +36,7 @@ class PriorFactor(FactorBase[PriorValueTuple]):
         )
 
     @overrides
-    def compute_residual_vector(self, variable_values: PriorValueTuple) -> hints.Array:
+    def compute_residual_vector(self, variable_values: PriorValueTuple) -> jnp.ndarray:
 
         value: jaxlie.MatrixLieGroup
         (value,) = variable_values
@@ -46,7 +47,7 @@ class PriorFactor(FactorBase[PriorValueTuple]):
     @overrides
     def compute_residual_jacobians(
         self, variable_values: PriorValueTuple
-    ) -> Tuple[hints.Array]:
+    ) -> Tuple[jnp.ndarray]:
         (value,) = variable_values
 
         # Helper for using analytical `rplus` Jacobians
@@ -110,7 +111,7 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
     @overrides
     def compute_residual_vector(
         self, variable_values: BetweenValueTuple
-    ) -> hints.Array:
+    ) -> jnp.ndarray:
         T_world_a = variable_values.T_world_a
         T_world_b = variable_values.T_world_b
 
@@ -120,7 +121,7 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
     @overrides
     def compute_residual_jacobians(
         self, variable_values: BetweenValueTuple
-    ) -> Tuple[hints.Array, hints.Array]:
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         T_world_a = variable_values.T_world_a
         T_world_b = variable_values.T_world_b
 
