@@ -58,7 +58,8 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
 
         # Linearize graph
         A: sparse.SparseCooMatrix = graph.compute_residual_jacobian(
-            state_prev.assignments
+            assignments=state_prev.assignments,
+            residual_vector=state_prev.residual_vector,
         )
         ATb = A.T @ -state_prev.residual_vector
 

@@ -14,12 +14,13 @@ def test_marginalization():
     sqrt_cov = onp.random.randn(3, 3)
     # sqrt_cov = onp.diag(onp.random.randn(3))
     cov = sqrt_cov @ sqrt_cov.T
-    scale_tril_inv = onp.linalg.inv(onp.linalg.cholesky(cov))
 
     graph = jaxfg.core.StackedFactorGraph.make(
         factors=[
             jaxfg.geometry.PriorFactor.make(
-                variable=pose_variable, mu=pose_value, scale_tril_inv=scale_tril_inv
+                variable=pose_variable,
+                mu=pose_value,
+                noise_model=jaxfg.noises.Gaussian.make_from_covariance(covariance=cov),
             )
         ]
     )
@@ -41,15 +42,18 @@ def test_marginalization_double():
 
     sqrt_cov = onp.random.randn(3, 3)
     cov = sqrt_cov @ sqrt_cov.T
-    scale_tril_inv = onp.linalg.inv(onp.linalg.cholesky(cov))
 
     graph = jaxfg.core.StackedFactorGraph.make(
         factors=[
             jaxfg.geometry.PriorFactor.make(
-                variable=pose_variable, mu=pose_value, scale_tril_inv=scale_tril_inv
+                variable=pose_variable,
+                mu=pose_value,
+                noise_model=jaxfg.noises.Gaussian.make_from_covariance(covariance=cov),
             ),
             jaxfg.geometry.PriorFactor.make(
-                variable=pose_variable, mu=pose_value, scale_tril_inv=scale_tril_inv
+                variable=pose_variable,
+                mu=pose_value,
+                noise_model=jaxfg.noises.Gaussian.make_from_covariance(covariance=cov),
             ),
         ]
     )
@@ -75,18 +79,18 @@ def test_marginalization_as_dense():
         jaxfg.geometry.PriorFactor.make(
             variable=pose_variables[0],
             mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
-            scale_tril_inv=onp.eye(3),
+            noise_model=jaxfg.noises.Gaussian(onp.eye(3)),
         ),
         jaxfg.geometry.PriorFactor.make(
             variable=pose_variables[1],
             mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0),
-            scale_tril_inv=onp.eye(3),
+            noise_model=jaxfg.noises.Gaussian(onp.eye(3)),
         ),
         jaxfg.geometry.BetweenFactor.make(
             variable_T_world_a=pose_variables[0],
             variable_T_world_b=pose_variables[1],
             T_a_b=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
-            scale_tril_inv=onp.eye(3),
+            noise_model=jaxfg.noises.Gaussian(onp.eye(3)),
         ),
     ]
 
@@ -102,7 +106,8 @@ def test_marginalization_as_dense():
     )
 
     sqrt_information_matrix = graph.compute_residual_jacobian(
-        solution_assignments
+        assignments=solution_assignments,
+        residual_vector=graph.compute_residual_vector(solution_assignments),
     ).as_dense()
 
     covariance0 = onp.linalg.inv(sqrt_information_matrix.T @ sqrt_information_matrix)

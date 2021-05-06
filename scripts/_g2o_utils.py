@@ -54,19 +54,21 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
             between = jaxlie.SE2.from_xy_theta(*(float(p) for p in parts[3:6]))
 
-            information_matrix_components = onp.array(list(map(float, parts[6:])))
-            information_matrix = onp.zeros((3, 3))
-            information_matrix[onp.triu_indices(3)] = information_matrix_components
-            information_matrix = information_matrix.T
-            information_matrix[onp.triu_indices(3)] = information_matrix_components
-            scale_tril_inv = onp.linalg.cholesky(information_matrix).T
+            precision_matrix_components = onp.array(list(map(float, parts[6:])))
+            precision_matrix = onp.zeros((3, 3))
+            precision_matrix[onp.triu_indices(3)] = precision_matrix_components
+            precision_matrix = precision_matrix.T
+            precision_matrix[onp.triu_indices(3)] = precision_matrix_components
+            sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
             factors.append(
                 jaxfg.geometry.BetweenFactor.make(
                     variable_T_world_a=pose_variables[before_index],
                     variable_T_world_b=pose_variables[after_index],
                     T_a_b=between,
-                    scale_tril_inv=scale_tril_inv,
+                    noise_model=jaxfg.noises.Gaussian(
+                        sqrt_precision_matrix=sqrt_precision_matrix
+                    ),
                 )
             )
 
@@ -98,19 +100,21 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                 translation=onp.array(xyz),
             )
 
-            information_matrix = onp.zeros((6, 6))
-            information_matrix[onp.triu_indices(6)] = numerical_parts[7:]
-            information_matrix = information_matrix.T
-            information_matrix[onp.triu_indices(6)] = numerical_parts[7:]
+            precision_matrix = onp.zeros((6, 6))
+            precision_matrix[onp.triu_indices(6)] = numerical_parts[7:]
+            precision_matrix = precision_matrix.T
+            precision_matrix[onp.triu_indices(6)] = numerical_parts[7:]
 
-            scale_tril_inv = onp.linalg.cholesky(information_matrix).T
+            sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
             factors.append(
                 jaxfg.geometry.BetweenFactor.make(
                     variable_T_world_a=pose_variables[before_index],
                     variable_T_world_b=pose_variables[after_index],
                     T_a_b=between,
-                    scale_tril_inv=scale_tril_inv,
+                    noise_model=jaxfg.noises.Gaussian(
+                        sqrt_precision_matrix=sqrt_precision_matrix
+                    ),
                 )
             )
         else:
@@ -121,7 +125,9 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
         jaxfg.geometry.PriorFactor.make(
             variable=pose_variables[0],
             mu=initial_poses[pose_variables[0]],
-            scale_tril_inv=jnp.eye(pose_variables[0].get_local_parameter_dim()) * 100,
+            noise_model=jaxfg.noises.DiagonalGaussian(
+                jnp.ones(pose_variables[0].get_local_parameter_dim()) * 100.0
+            ),
         )
     )
 

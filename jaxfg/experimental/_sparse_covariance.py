@@ -31,7 +31,10 @@ class SparseCovariance:
         computing a square-root information matrix."""
 
         A: scipy.sparse.csc_matrix = (
-            graph.compute_residual_jacobian(assignments)
+            graph.compute_residual_jacobian(
+                assignments=assignments,
+                residual_vector=graph.compute_residual_vector(assignments),
+            )
             .T.as_scipy_coo_matrix()
             .tocsc(copy=False)
         )

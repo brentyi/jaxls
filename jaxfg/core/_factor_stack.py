@@ -28,13 +28,12 @@ class FactorStack(Generic[FactorType]):
 
         # Check that shapes make sense
         for variable, indices in zip(self.factor.variables, self.value_indices):
-            N, res_dim0, res_dim1 = self.factor.scale_tril_inv.shape
-            assert N == self.num_factors
+            residual_dim = self.factor.noise_model.get_residual_dim()
             assert indices.shape == (
-                N,
+                self.num_factors,
                 variable.get_parameter_dim(),
             )
-            assert res_dim0 == res_dim1 == self.factor.get_residual_dim()
+            assert residual_dim == self.factor.get_residual_dim()
 
     @staticmethod
     def make(
@@ -161,23 +160,22 @@ class FactorStack(Generic[FactorType]):
 
         # Vectorized residual computation
         # The type of `values_stacked` should match `FactorVariableValues`
-        residual_vector = jnp.einsum(
-            "nij,nj->ni",
-            self.factor.scale_tril_inv,
+        residual_vector = jax.vmap(
+            type(self.factor.noise_model).whiten_residual_vector
+        )(
+            self.factor.noise_model,
             jax.vmap(type(self.factor).compute_residual_vector)(
                 self.factor,
                 self.factor.build_variable_value_tuple(values_stacked),
             ),
         )
 
-        assert residual_vector.shape == (
-            self.factor.scale_tril_inv.shape[0],
-            self.factor.get_residual_dim(),
-        )
         return residual_vector
 
     def compute_residual_jacobian(
-        self, assignments: VariableAssignments
+        self,
+        assignments: VariableAssignments,
+        residual_vector: hints.Array,
     ) -> List[jnp.ndarray]:
         """Compute stacked and whitened Jacobian matrices, one for each variable.
 
@@ -193,11 +191,19 @@ class FactorStack(Generic[FactorType]):
         # Compute Jacobians wrt local parameterizations
         # The type of `values_stacked` should match `FactorVariableValues`
         jacobians = jax.vmap(type(self.factor).compute_residual_jacobians)(
-            self.factor, self.factor.build_variable_value_tuple(values_stacked)
+            self.factor,
+            self.factor.build_variable_value_tuple(values_stacked),
         )
 
         # Whiten Jacobians
+        residual_vector = residual_vector.reshape(
+            (self.num_factors, self.factor.get_residual_dim())
+        )
         return [
-            jnp.einsum("nij,njk->nik", self.factor.scale_tril_inv, jacobian)
+            jax.vmap(type(self.factor.noise_model).whiten_jacobian)(
+                self=self.factor.noise_model,
+                jacobian=jacobian,
+                residual_vector=residual_vector,
+            )
             for jacobian in jacobians
         ]

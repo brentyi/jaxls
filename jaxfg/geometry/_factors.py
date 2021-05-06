@@ -5,7 +5,7 @@ import jax
 import jaxlie
 from overrides import overrides
 
-from .. import hints, utils
+from .. import hints, noises, utils
 from ..core._factor_base import FactorBase
 from ._lie_variables import LieVariableBase
 
@@ -26,12 +26,12 @@ class PriorFactor(FactorBase[PriorValueTuple]):
     def make(
         variable: LieVariableBase,
         mu: jaxlie.MatrixLieGroup,
-        scale_tril_inv: hints.ScaleTrilInv,
+        noise_model: noises.NoiseModelBase,
     ) -> "PriorFactor":
         return PriorFactor(
             variables=(variable,),
             mu=mu,
-            scale_tril_inv=scale_tril_inv,
+            noise_model=noise_model,
         )
 
     @overrides
@@ -93,7 +93,7 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
         variable_T_world_a: LieVariableBase,
         variable_T_world_b: LieVariableBase,
         T_a_b: jaxlie.MatrixLieGroup,
-        scale_tril_inv: hints.ScaleTrilInv,
+        noise_model: noises.NoiseModelBase,
     ) -> "BetweenFactor":
         assert type(variable_T_world_a) is type(variable_T_world_b)
         assert variable_T_world_a.get_group_type() is type(T_a_b)
@@ -104,7 +104,7 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
                 variable_T_world_b,
             ),
             T_a_b=T_a_b,
-            scale_tril_inv=scale_tril_inv,
+            noise_model=noise_model,
         )
 
     @overrides

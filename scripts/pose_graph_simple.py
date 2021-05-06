@@ -20,18 +20,18 @@ factors: List[jaxfg.core.FactorBase] = [
     jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[0],
         mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
-        scale_tril_inv=jnp.eye(3),
+        noise_model=jaxfg.noises.DiagonalGaussian(jnp.ones(3)),
     ),
     jaxfg.geometry.PriorFactor.make(
         variable=pose_variables[1],
         mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0),
-        scale_tril_inv=jnp.eye(3),
+        noise_model=jaxfg.noises.DiagonalGaussian(jnp.ones(3)),
     ),
     jaxfg.geometry.BetweenFactor.make(
         variable_T_world_a=pose_variables[0],
         variable_T_world_b=pose_variables[1],
         T_a_b=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
-        scale_tril_inv=jnp.eye(3),
+        noise_model=jaxfg.noises.DiagonalGaussian(jnp.ones(3)),
     ),
 ]
 

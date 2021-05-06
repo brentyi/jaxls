@@ -8,7 +8,7 @@ from jax import numpy as jnp
 from overrides import EnforceOverrides, final, overrides
 from typing_utils import get_args, issubtype
 
-from .. import hints
+from .. import hints, noises
 from ._variable_assignments import VariableAssignments
 from ._variables import VariableBase
 
@@ -31,8 +31,8 @@ class FactorBase(
     """Variables connected to this factor. 1-to-1, in-order correspondence with
     `VariableValueTuple`."""
 
-    scale_tril_inv: hints.ScaleTrilInv
-    """Inverse square root of covariance matrix."""
+    noise_model: noises.NoiseModelBase
+    """Noise model."""
 
     @abc.abstractmethod
     def compute_residual_vector(
@@ -43,61 +43,6 @@ class FactorBase(
         Args:
             variable_values: Values of self.variables
         """
-
-    @final
-    def get_residual_dim(self) -> int:
-        """Error dimensionality."""
-        # We can't use [0] here, because (for stacked factors) there might be a batch
-        # dimension!
-        return self.scale_tril_inv.shape[-1]
-
-    def __init_subclass__(cls, *args, **kwargs):
-        """Register all factors as hashable PyTree nodes."""
-        super().__init_subclass__(*args, **kwargs)
-
-        jax.tree_util.register_pytree_node(
-            cls, flatten_func=cls._flatten, unflatten_func=cls._unflatten
-        )
-        cls.__hash__ = object.__hash__
-
-    @classmethod
-    @final
-    def _flatten(
-        cls: Type[FactorType], v: FactorType
-    ) -> Tuple[Tuple[hints.PyTree, ...], Tuple]:
-        """Flatten a factor for use as a PyTree/parameter stacking."""
-        v_dict = vars(v)
-        array_data = {k: v for k, v in v_dict.items()}
-
-        # Store variable types to make sure treedef hashes match
-        aux_dict = {}
-        aux_dict["variabletypes"] = tuple(type(variable) for variable in v.variables)
-        array_data.pop("variables")
-
-        return (
-            tuple(array_data.values()),
-            tuple(array_data.keys())
-            + tuple(aux_dict.keys())
-            + tuple(aux_dict.values()),
-        )
-
-    @classmethod
-    @final
-    def _unflatten(
-        cls: Type[FactorType], treedef: Tuple, children: Tuple[hints.Array]
-    ) -> FactorType:
-        """Unflatten a factor for use as a PyTree/parameter stacking."""
-        array_keys = treedef[: len(children)]
-        aux = treedef[len(children) :]
-        aux_keys = aux[: len(aux) // 2]
-        aux_values = aux[len(aux) // 2 :]
-
-        # Create new dummy variables
-        aux_dict = dict(zip(aux_keys, aux_values))
-        aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variabletypes"))
-
-        out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
-        return out
 
     def compute_residual_jacobians(
         self, variable_values: VariableValueTuple
@@ -138,6 +83,70 @@ class FactorBase(
             )
         )
 
+    def compute_whitened_residual_vector(self, variable_values: VariableValueTuple):
+        pass
+
+    def compute_whitened_residual_jacobians(
+        self,
+        variable_values: VariableValueTuple,
+        residual_vector: hints.Array,
+    ):
+        pass
+
+    def __init_subclass__(cls, *args, **kwargs):
+        """Register all factors as hashable PyTree nodes."""
+        super().__init_subclass__(*args, **kwargs)
+
+        jax.tree_util.register_pytree_node(
+            cls, flatten_func=cls._flatten, unflatten_func=cls._unflatten
+        )
+        cls.__hash__ = object.__hash__
+
+    @final
+    def get_residual_dim(self) -> int:
+        """Error dimensionality."""
+        return self.noise_model.get_residual_dim()
+
+    @classmethod
+    @final
+    def _flatten(
+        cls: Type[FactorType], v: FactorType
+    ) -> Tuple[Tuple[hints.PyTree, ...], Tuple]:
+        """Flatten a factor for use as a PyTree/parameter stacking."""
+        v_dict = vars(v)
+        array_data = {k: v for k, v in v_dict.items()}
+
+        # Store variable types to make sure treedef hashes match
+        aux_dict = {}
+        aux_dict["variabletypes"] = tuple(type(variable) for variable in v.variables)
+        array_data.pop("variables")
+
+        return (
+            tuple(array_data.values()),
+            tuple(array_data.keys())
+            + tuple(aux_dict.keys())
+            + tuple(aux_dict.values()),
+        )
+
+    @classmethod
+    @final
+    def _unflatten(
+        cls: Type[FactorType], treedef: Tuple, children: Tuple[hints.Array]
+    ) -> FactorType:
+        """Unflatten a factor for use as a PyTree/parameter stacking."""
+        array_keys = treedef[: len(children)]
+        aux = treedef[len(children) :]
+        aux_keys = aux[: len(aux) // 2]
+        aux_values = aux[len(aux) // 2 :]
+
+        # Create new dummy variables
+        aux_dict = dict(zip(aux_keys, aux_values))
+        aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variabletypes"))
+
+        out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
+        return out
+
+    @final
     def get_variable_values_from_assignments(
         self, assignments: VariableAssignments
     ) -> VariableValueTuple:
@@ -148,6 +157,7 @@ class FactorBase(
             tuple(assignments.get_value(v) for v in self.variables)
         )
 
+    @final
     def build_variable_value_tuple(
         self, variable_values: Tuple[hints.VariableValue, ...]
     ) -> VariableValueTuple:

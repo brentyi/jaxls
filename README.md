@@ -2,8 +2,8 @@
 
 Factor graph-based nonlinear optimization library for JAX.
 
-Applications include sensor fusion, control, planning, SLAM. _Heavily_ inspired
-by a wide set of existing libraries, including:
+Applications include sensor fusion, control, planning, SLAM. Borrows _heavily_
+from a wide set of existing libraries, including:
 [Ceres Solver](http://ceres-solver.org/),
 [g2o](https://github.com/RainerKuemmerle/g2o), [GTSAM](https://gtsam.org/),
 [minisam](https://github.com/dongjing3309/minisam),
@@ -69,7 +69,8 @@ python scripts/pose_graph_g2o.py --help
 - [x] Nonlinear optimization for MAP inference
   - [x] Conjugate gradient linear solver
   - [x] CHOLMOD linear solver
-    - [x] Basic implementation. JIT-able, but no vmap, pmap, or autodiff support.
+    - [x] Basic implementation. JIT-able, but no vmap, pmap, or autodiff
+          support.
   - [x] Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
