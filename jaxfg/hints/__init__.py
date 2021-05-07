@@ -3,8 +3,6 @@ from ._aliases import (
     LocalVariableValue,
     PyTree,
     Scalar,
-    ScaleTril,
-    ScaleTrilInv,
     VariableValue,
 )
 
@@ -13,7 +11,5 @@ __all__ = [
     "LocalVariableValue",
     "PyTree",
     "Scalar",
-    "ScaleTril",
-    "ScaleTrilInv",
     "VariableValue",
 ]
