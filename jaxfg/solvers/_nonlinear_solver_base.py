@@ -63,6 +63,28 @@ class _NonlinearSolverState:
 
 
 @dataclasses.dataclass
+class _TrustRegionMixin:
+    """Mixin that implements a step quality check for trust region solvers."""
+
+    step_quality_threshold: hints.Scalar = 1e-3
+
+    def check_accept_step(
+        self,
+        A: sparse.SparseCooMatrix,
+        proposed_cost: hints.Scalar,
+        state_prev: _NonlinearSolverState,
+        step_vector: jnp.ndarray,
+    ) -> bool:
+        # Compute step quality ratio, often denoted $$\rho$$
+        # This will be 1 when the cost drops linearly wrt the update step
+        step_quality_ratio = (proposed_cost - state_prev.cost) / (
+            jnp.sum((A @ step_vector + state_prev.residual_vector) ** 2)
+            - state_prev.cost
+        )
+        return step_quality_ratio >= self.step_quality_threshold
+
+
+@dataclasses.dataclass
 class _TerminationCriteriaMixin:
     """Mixin for Ceres-style termination criteria."""
 

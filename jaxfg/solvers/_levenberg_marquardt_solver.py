@@ -11,6 +11,7 @@ from ._nonlinear_solver_base import (
     NonlinearSolverBase,
     _NonlinearSolverState,
     _TerminationCriteriaMixin,
+    _TrustRegionMixin,
 )
 
 if TYPE_CHECKING:
@@ -19,8 +20,8 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
-class _LevenbergMarqaurdtState(_NonlinearSolverState):
-    """Helper for state passed between LM iterations."""
+class _LevenbergMarquardtState(_NonlinearSolverState):
+    """State passed between LM iterations."""
 
     lambd: hints.Scalar
 
@@ -30,12 +31,13 @@ class _LevenbergMarqaurdtState(_NonlinearSolverState):
 class LevenbergMarquardtSolver(
     NonlinearSolverBase,
     _TerminationCriteriaMixin,
+    _TrustRegionMixin,
 ):
     """Simple damped least-squares implementation."""
 
     lambda_initial: hints.Scalar = 5e-4
     lambda_factor: hints.Scalar = 2.0
-    lambda_min: hints.Scalar = 1e-6
+    lambda_min: hints.Scalar = 1e-5
     lambda_max: hints.Scalar = 1e10
 
     @overrides
@@ -48,7 +50,7 @@ class LevenbergMarquardtSolver(
         cost_prev, residual_vector = graph.compute_cost(initial_assignments)
         self._print(f"Starting solve with {self}, initial cost={cost_prev}")
 
-        state = _LevenbergMarqaurdtState(
+        state = _LevenbergMarquardtState(
             # Using device arrays instead of native types helps avoid redundant JIT
             # compilation
             iterations=jnp.array(0),
@@ -76,32 +78,38 @@ class LevenbergMarquardtSolver(
     def _step(
         self,
         graph: "StackedFactorGraph",
-        state_prev: _LevenbergMarqaurdtState,
-    ) -> _LevenbergMarqaurdtState:
+        state_prev: _LevenbergMarquardtState,
+    ) -> _LevenbergMarquardtState:
         """Linearize, solve linear subproblem, and accept or reject update."""
         # There's currently some redundancy here: we only need to re-linearize when
-        # updates are accepted.
+        # updates are accepted. Fixing this unfortunately requires a branch.
         A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(
             assignments=state_prev.assignments,
             residual_vector=state_prev.residual_vector,
         )
         ATb = A.T @ -state_prev.residual_vector
+
+        step_vector: jnp.ndarray = self.linear_solver.solve_subproblem(
+            A=A,
+            ATb=ATb,
+            lambd=state_prev.lambd,
+            iteration=state_prev.iterations,
+        )
         local_delta_assignments = VariableAssignments(
-            storage=self.linear_solver.solve_subproblem(
-                A=A,
-                ATb=ATb,
-                lambd=0.0,
-                iteration=state_prev.iterations,
-            ),
+            storage=step_vector,
             storage_metadata=graph.local_storage_metadata,
         )
         assignments_proposed = state_prev.assignments.manifold_retract(
             local_delta_assignments=local_delta_assignments
         )
-        cost, residual_vector = graph.compute_cost(assignments_proposed)
 
-        # Check if cost dropped
-        accept_flag = cost <= state_prev.cost
+        proposed_cost, residual_vector = graph.compute_cost(assignments_proposed)
+        accept_flag = self.check_accept_step(
+            A=A,
+            proposed_cost=proposed_cost,
+            state_prev=state_prev,
+            step_vector=step_vector,
+        )
 
         # Update damping
         # In the future, we may consider more sophisticated lambda updates, eg:
@@ -133,18 +141,18 @@ class LevenbergMarquardtSolver(
             accept_flag,
             self.check_convergence(
                 state_prev=state_prev,
-                cost_updated=cost,
+                cost_updated=proposed_cost,
                 local_delta_assignments=local_delta_assignments,
                 negative_gradient=ATb,
             ),
         )
 
-        return _LevenbergMarqaurdtState(
+        return _LevenbergMarquardtState(
             iterations=state_prev.iterations + 1,
             assignments=assignments,
             lambd=lambd,
             cost=jnp.where(
-                accept_flag, cost, state_prev.cost
+                accept_flag, proposed_cost, state_prev.cost
             ),  # Use old cost if update is rejected
             residual_vector=residual_vector,
             done=done,
