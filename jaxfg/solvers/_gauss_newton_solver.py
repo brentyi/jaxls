@@ -2,7 +2,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import jax
-from jax import numpy as jnp
+import numpy as onp
 from overrides import overrides
 
 from .. import sparse, utils
@@ -36,11 +36,11 @@ class GaussNewtonSolver(
         state = _NonlinearSolverState(
             # Using device arrays instead of native types helps avoid redundant JIT
             # compilation
-            iterations=jnp.array(0),
+            iterations=onp.array(0),
             assignments=assignments,
             cost=cost,
             residual_vector=residual_vector,
-            done=jnp.array(False),
+            done=onp.array(False),
         )
         self._print(f"Starting solve with {self}, initial cost={state.cost}")
 

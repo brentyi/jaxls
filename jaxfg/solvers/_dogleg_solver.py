@@ -2,6 +2,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import jax
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -48,19 +49,18 @@ class DoglegSolver(
         self._print(f"Starting solve with {self}, initial cost={cost_prev}")
 
         state = _DoglegState(
-            # Using device arrays instead of native types helps avoid redundant JIT
-            # compilation
-            iterations=jnp.array(0),
+            # Using arrays instead of native types helps avoid redundant JIT compilation
+            iterations=onp.array(0),
             assignments=initial_assignments,
-            radius=jnp.array(self.radius_initial),
+            radius=onp.array(self.radius_initial, dtype=onp.float32),
             cost=cost_prev,
             residual_vector=residual_vector,
-            done=jnp.array(False),
+            done=onp.array(False, dtype=onp.bool_),
         )
 
         # Optimization
         for i in range(self.max_iterations):
-            # LM step
+            # Dogleg step
             state = self._step(graph, state)
             self._print(
                 f"Iteration #{i}: cost={str(state.cost).ljust(15)}"

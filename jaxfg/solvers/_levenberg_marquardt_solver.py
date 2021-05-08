@@ -2,6 +2,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import jax
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -51,14 +52,13 @@ class LevenbergMarquardtSolver(
         self._print(f"Starting solve with {self}, initial cost={cost_prev}")
 
         state = _LevenbergMarquardtState(
-            # Using device arrays instead of native types helps avoid redundant JIT
-            # compilation
-            iterations=jnp.array(0),
+            # Using arrays instead of native types helps avoid redundant JIT compilation
+            iterations=onp.array(0),
             assignments=initial_assignments,
             lambd=self.lambda_initial,
             cost=cost_prev,
             residual_vector=residual_vector,
-            done=jnp.array(False),
+            done=onp.array(False),
         )
 
         # Optimization

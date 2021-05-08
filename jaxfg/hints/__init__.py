@@ -1,10 +1,4 @@
-from ._aliases import (
-    Array,
-    LocalVariableValue,
-    PyTree,
-    Scalar,
-    VariableValue,
-)
+from ._aliases import Array, LocalVariableValue, PyTree, Scalar, VariableValue
 
 __all__ = [
     "Array",
