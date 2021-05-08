@@ -43,6 +43,7 @@ class FactorStack(Generic[FactorType]):
     ) -> "FactorStack[FactorType]":
         """Make a stacked factor."""
 
+        # For one-off computations, onp has much less overhead than jnp
         jnp = onp if use_onp else globals()["jnp"]
 
         # Stack factors in our group

@@ -5,7 +5,7 @@ from typing import Generic, Sequence, Tuple, Type, TypeVar, cast, get_type_hints
 import jax
 import numpy as onp
 from jax import numpy as jnp
-from overrides import EnforceOverrides, final, overrides
+from overrides import EnforceOverrides, final
 from typing_utils import get_args, issubtype
 
 from .. import hints, noises
@@ -18,6 +18,7 @@ VariableValueTuple = TypeVar(
     "VariableValueTuple",
     bound=Tuple[hints.VariableValue, ...],
 )
+
 
 # Disable type-checking here
 # > https://github.com/python/mypy/issues/5374

@@ -74,6 +74,7 @@ python scripts/pose_graph_g2o.py --help
   - [x] Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
+  - [x] Dogleg
   - [x] Inexact Newton steps
   - [x] Revisit termination criteria
   - [ ] Reduce redundant code

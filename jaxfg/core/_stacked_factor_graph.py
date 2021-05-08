@@ -51,9 +51,6 @@ class StackedFactorGraph:
     ) -> "StackedFactorGraph":
         """Create a factor graph from a set of factors."""
 
-        # For one-off operations, onp has much less overhead than jnp
-        jnp = onp if use_onp else globals()["jnp"]
-
         # Start by grouping our factors and grabbing a list of (ordered!) variables
         factors_from_group: DefaultDict[GroupKey, List[FactorBase]] = defaultdict(list)
         variables_ordered_set: Dict[VariableBase, None] = {}

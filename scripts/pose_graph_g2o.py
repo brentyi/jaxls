@@ -20,6 +20,7 @@ import jaxfg
 class SolverType(enum.Enum):
     GAUSS_NEWTON = jaxfg.solvers.GaussNewtonSolver()
     LEVENBERG_MARQUARDT = jaxfg.solvers.LevenbergMarquardtSolver()
+    DOGLEG = jaxfg.solvers.DoglegSolver()
 
     @property
     def value(self) -> jaxfg.solvers.NonlinearSolverBase:

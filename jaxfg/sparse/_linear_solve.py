@@ -1,6 +1,5 @@
 import abc
 import dataclasses
-import warnings
 from typing import Dict, Hashable, NamedTuple
 
 import jax

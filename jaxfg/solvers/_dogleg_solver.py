@@ -20,25 +20,22 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
-class _LevenbergMarquardtState(_NonlinearSolverState):
-    """State passed between LM iterations."""
+class _DoglegState(_NonlinearSolverState):
+    """State passed between dogleg iterations."""
 
-    lambd: hints.Scalar
+    radius: hints.Scalar
 
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
-class LevenbergMarquardtSolver(
+class DoglegSolver(
     NonlinearSolverBase,
     _TerminationCriteriaMixin,
     _TrustRegionMixin,
 ):
-    """Simple damped least-squares implementation."""
+    """Traditional dogleg algorithm."""
 
-    lambda_initial: hints.Scalar = 5e-4
-    lambda_factor: hints.Scalar = 2.0
-    lambda_min: hints.Scalar = 1e-5
-    lambda_max: hints.Scalar = 1e10
+    radius_initial: hints.Scalar = 1.0
 
     @overrides
     def solve(
@@ -50,12 +47,12 @@ class LevenbergMarquardtSolver(
         cost_prev, residual_vector = graph.compute_cost(initial_assignments)
         self._print(f"Starting solve with {self}, initial cost={cost_prev}")
 
-        state = _LevenbergMarquardtState(
+        state = _DoglegState(
             # Using device arrays instead of native types helps avoid redundant JIT
             # compilation
             iterations=jnp.array(0),
             assignments=initial_assignments,
-            lambd=self.lambda_initial,
+            radius=jnp.array(self.radius_initial),
             cost=cost_prev,
             residual_vector=residual_vector,
             done=jnp.array(False),
@@ -66,7 +63,8 @@ class LevenbergMarquardtSolver(
             # LM step
             state = self._step(graph, state)
             self._print(
-                f"Iteration #{i}: cost={str(state.cost).ljust(15)} lambda={str(state.lambd)}"
+                f"Iteration #{i}: cost={str(state.cost).ljust(15)}"
+                f" radius={str(state.radius)}"
             )
             if state.done:
                 self._print("Terminating early!")
@@ -78,10 +76,10 @@ class LevenbergMarquardtSolver(
     def _step(
         self,
         graph: "StackedFactorGraph",
-        state_prev: _LevenbergMarquardtState,
-    ) -> _LevenbergMarquardtState:
-        # There's currently some redundancy here: we only need to re-linearize when
-        # updates are accepted
+        state_prev: _DoglegState,
+    ) -> _DoglegState:
+        # There's currently some redundancy here: we only need to re-linearize and
+        # compute new GN/SD update steps when updates are actually accepted
 
         # Linearize graph
         A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(
@@ -90,13 +88,57 @@ class LevenbergMarquardtSolver(
         )
         ATb = A.T @ -state_prev.residual_vector
 
-        # Solve linear subproblem
-        step_vector: jnp.ndarray = self.linear_solver.solve_subproblem(
-            A=A,
-            ATb=ATb,
-            lambd=state_prev.lambd,
-            iteration=state_prev.iterations,
-        )
+        def compute_dogleg_step() -> jnp.ndarray:
+            # Gauss-Newton step
+            step_vector_gn: jnp.ndarray = self.linear_solver.solve_subproblem(
+                A=A,
+                ATb=ATb,
+                lambd=0.0,
+                iteration=state_prev.iterations,
+            )
+
+            # Steepest descent step
+            step_vector_sd: jnp.ndarray = ATb
+
+            # Blending parameters
+            # Reference:
+            # > METHODS FOR NON-LINEAR LEAST SQUARES PROBLEM, Madsen et al 2004.
+            # > pg. 30~32
+            alpha = jnp.sum(step_vector_sd ** 2) / jnp.sum((A @ step_vector_sd) ** 2)
+            a = alpha * step_vector_sd
+            b = step_vector_gn
+
+            c = jnp.sum(a * (b - a))
+            a_norm_sq = jnp.sum(a ** 2)
+            b_minus_a_norm_sq = jnp.sum((b - a) ** 2)
+            radius_sq = state_prev.radius ** 2
+            radius_sq_minus_a_norm_sq = radius_sq - a_norm_sq
+            sqrt_c_sq_plus = jnp.sqrt(
+                c ** 2 + b_minus_a_norm_sq * radius_sq_minus_a_norm_sq
+            )
+            beta = jnp.where(
+                c <= 0,
+                (-c + sqrt_c_sq_plus) / b_minus_a_norm_sq,
+                radius_sq_minus_a_norm_sq / (c + sqrt_c_sq_plus),
+            )
+
+            # Compute update step
+            norm_gn = jnp.linalg.norm(step_vector_gn)
+            norm_sd = jnp.linalg.norm(a)
+            return jnp.where(
+                # Use GN if it's within trust region
+                norm_gn <= state_prev.radius,
+                step_vector_gn,
+                jnp.where(
+                    # Use normed SD if neither are within trust region
+                    norm_sd >= state_prev.radius,
+                    state_prev.radius / norm_sd * a,
+                    a + beta * (step_vector_gn - a),
+                ),
+            )
+
+        step_vector = compute_dogleg_step()
+
         local_delta_assignments = VariableAssignments(
             storage=step_vector,
             storage_metadata=graph.local_storage_metadata,
@@ -107,28 +149,24 @@ class LevenbergMarquardtSolver(
             local_delta_assignments=local_delta_assignments
         )
         proposed_cost, residual_vector = graph.compute_cost(assignments_proposed)
-        accept_flag = (
-            self.compute_step_quality(
-                A=A,
-                proposed_cost=proposed_cost,
-                state_prev=state_prev,
-                step_vector=step_vector,
-            )
-            >= self.step_quality_min
+        step_quality = self.compute_step_quality(
+            A=A,
+            proposed_cost=proposed_cost,
+            state_prev=state_prev,
+            step_vector=step_vector,
         )
+        accept_flag = step_quality >= self.step_quality_min
 
-        # Update damping
-        # In the future, we may consider more sophisticated lambda updates, eg:
-        # > METHODS FOR NON-LINEAR LEAST SQUARES PROBLEM, Madsen et al 2004.
-        # > pg. 27, Algorithm 3.16
-        lambd = jnp.where(
-            accept_flag,
-            # If accept, decrease damping: note that we *don't* enforce any bounds here
-            state_prev.lambd / self.lambda_factor,
-            # If reject: increase lambda and enforce bounds
-            jnp.maximum(
-                self.lambda_min,
-                jnp.minimum(state_prev.lambd * self.lambda_factor, self.lambda_max),
+        # Update trust region
+        radius = jnp.where(
+            step_quality < 0.25,
+            state_prev.radius / 2.0,
+            jnp.where(
+                step_quality > 0.75,
+                jnp.max(
+                    jnp.array([state_prev.radius, 3.0 * jnp.linalg.norm(step_vector)])
+                ),
+                state_prev.radius,
             ),
         )
 
@@ -153,10 +191,10 @@ class LevenbergMarquardtSolver(
             ),
         )
 
-        return _LevenbergMarquardtState(
+        return _DoglegState(
             iterations=state_prev.iterations + 1,
             assignments=assignments,
-            lambd=lambd,
+            radius=radius,
             cost=jnp.where(
                 accept_flag, proposed_cost, state_prev.cost
             ),  # Use old cost if update is rejected

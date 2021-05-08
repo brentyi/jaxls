@@ -6,7 +6,7 @@ import jaxlie
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import hints, noises, utils
+from .. import noises, utils
 from ..core._factor_base import FactorBase
 from ._lie_variables import LieVariableBase
 

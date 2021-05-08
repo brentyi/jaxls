@@ -1,6 +1,5 @@
 import abc
 
-from jax import numpy as jnp
 from overrides import EnforceOverrides
 
 from .. import hints
