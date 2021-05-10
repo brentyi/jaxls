@@ -2,7 +2,9 @@ import contextlib
 import dataclasses
 import time
 from typing import (
+    Any,
     Callable,
+    ContextManager,
     Dict,
     Generator,
     Optional,
@@ -135,7 +137,7 @@ def _register_dataclass_pytree(
 
     # Define flatten, unflatten operations: this simple converts our dataclass to a list
     # of fields.
-    def _flatten(obj):
+    def _flatten(obj: T):
         return [getattr(obj, key) for key in children_fields], tuple(
             getattr(obj, key) for key in static_fields_set
         )
@@ -184,24 +186,122 @@ def _register_dataclass_pytree(
 
     serialization.register_serialization_state(cls, _to_state_dict, _from_state_dict)
 
+    cls.__is_update_buffer__ = False  # type: ignore
+
     # Make dataclass immutable after __init__ is called
     # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
     # __init__ functions
     if make_immutable:
         original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
-        def disabled_setattr(*args, **kwargs):
-            raise dataclasses.FrozenInstanceError(
-                "Dataclass registered as PyTrees is immutable!"
-            )
-
         def new_init(self, *args, **kwargs):
             cls.__setattr__ = object.__setattr__
             if original_init is not None:
                 original_init(self, *args, **kwargs)
-            cls.__setattr__ = disabled_setattr
+            cls.__setattr__ = _new_setattr
 
-        cls.__setattr__ = disabled_setattr  # type: ignore
+        cls.__setattr__ = _new_setattr  # type: ignore
         cls.__init__ = new_init  # type: ignore
 
     return cls
+
+
+def _new_setattr(self, name: str, value: Any):
+    if self.__is_update_buffer__:
+        current_value = getattr(self, name)
+        assert jax.tree_structure(value) == jax.tree_structure(
+            current_value
+        ), "Mismatched tree structure!"
+
+        new_shape_types = tuple(
+            (leaf.shape, leaf.dtype) for leaf in jax.tree_leaves(value)
+        )
+        cur_shape_types = tuple(
+            (leaf.shape, leaf.dtype) for leaf in jax.tree_leaves(current_value)
+        )
+        assert (
+            new_shape_types == cur_shape_types
+        ), f"Shape/type error: {new_shape_types} does not match {cur_shape_types}!"
+        object.__setattr__(self, name, value)
+    else:
+        raise dataclasses.FrozenInstanceError(
+            "Dataclass registered as PyTrees is immutable!"
+        )
+
+
+# Notes
+# =====
+# Thinking about functional (or almost functional) approaches for mutating nested
+# dataclasses, when said dataclasses are frozen for safety reasons.
+#
+# Currently this requires nesting a bunch of calls to `dataclasses.replace()`.
+# Two options for more succinctly performing this operation -- with extra validation for
+# array shapes and types -- are included below.
+#
+# For usage, see ../tests/test_update_buffer.py
+
+
+# OPTION 1. Explicit update buffer object.
+#   Pros: more intuitive.
+#   Cons: weird to have two objects with the same type serving different purposes.
+
+
+def make_update_buffer(obj: T) -> T:
+    """Make a mutable update buffer."""
+    assert dataclasses.is_dataclass(obj)
+
+    new_values: Dict[str, Any] = {}
+    for k, v in vars(obj).items():
+        new_values[k] = (
+            make_update_buffer(v)
+            if dataclasses.is_dataclass(v)
+            else jax.tree_map(lambda leaf: leaf, v)
+        )
+
+    buffer_obj = dataclasses.replace(obj, **new_values)
+    object.__setattr__(buffer_obj, "__is_update_buffer__", True)
+
+    return buffer_obj
+
+
+def apply_updates(target: T, updates: T) -> T:
+    """Apply an update buffer to a target."""
+    assert not target.__is_update_buffer__  # type: ignore
+    assert updates.__is_update_buffer__  # type: ignore
+
+    return jax.tree_multimap(
+        lambda target_leaf, update_leaf: target_leaf
+        if isinstance(update_leaf, jax.ShapeDtypeStruct)
+        else update_leaf,
+        target,
+        updates,
+    )
+
+
+# OPTION 2. Context manager.
+#   Pros: 1 less line of code when used. possibly simpler; no extra objects.
+#   Cons: naming is more confusing, less intuitive. adds more indentation.
+
+
+def replace_context(obj: T) -> ContextManager[T]:
+    """Context manager that creates a copy a dataclass and allows for temporary mutations."""
+
+    # Inner function helps with static typing
+
+    def _replace_context(obj: T):
+        # Create a mutable update buffer
+        update_buffer = make_update_buffer(obj)
+
+        # Yield
+        yield update_buffer
+
+        # When done, convert update buffer back into an immutable dataclass
+        def _unmark(obj: Any) -> None:
+            for value in vars(obj).values():
+                if dataclasses.is_dataclass(value):
+                    _unmark(value)
+            object.__setattr__(obj, "__is_update_buffer__", False)
+
+        _unmark(update_buffer)
+
+    return contextlib.contextmanager(_replace_context)(obj)
