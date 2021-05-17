@@ -1,12 +1,12 @@
 import dataclasses
 from collections import defaultdict
-from typing import DefaultDict, Dict, Hashable, Iterable, List, Tuple
+from typing import DefaultDict, Dict, Hashable, Iterable, List, Tuple, cast
 
 import jax
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import hints, sparse, utils
+from .. import hints, noises, sparse, utils
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factor_base import FactorBase
 from ._factor_stack import FactorStack
@@ -173,7 +173,7 @@ class StackedFactorGraph:
         include_constants: bool = False,
     ) -> jnp.ndarray:
         """Compute the joint negative log-likelihood density associated with a set of
-        variable assignments.
+        variable assignments. Assumes Gaussian noise models.
 
         Args:
             assignments (VariableAssignments): Variable assignments.
@@ -191,12 +191,27 @@ class StackedFactorGraph:
 
         # Add log-determinant terms
         for stacked_factor in self.factor_stacks:
-            N, dim, _dim = stacked_factor.factor.scale_tril_inv.shape
+            # N, dim, _dim = stacked_factor.factor.scale_tril_inv.shape
 
-            cov_determinants = -2.0 * jnp.log(
-                jnp.linalg.det(stacked_factor.factor.scale_tril_inv)
-            )
-            assert cov_determinants.shape == (N,)
+            noise_model = stacked_factor.factor.noise_model
+            if isinstance(noise_model, noises.Gaussian):
+                cov_determinants = -2.0 * jnp.log(
+                    jnp.linalg.det(
+                        cast(noises.Gaussian, noise_model).sqrt_precision_matrix
+                    )
+                )
+            elif isinstance(noise_model, noises.DiagonalGaussian):
+                cov_determinants = -2.0 * jnp.log(
+                    jnp.prod(
+                        cast(
+                            noises.DiagonalGaussian, noise_model
+                        ).sqrt_precision_diagonal,
+                        axis=-1,
+                    )
+                )
+            else:
+                assert False, f"Joint NLL not supported  for {type(noise_model)}"
+            assert cov_determinants.shape == (stacked_factor.num_factors,)
 
             joint_nll = joint_nll + jnp.sum(cov_determinants)
 

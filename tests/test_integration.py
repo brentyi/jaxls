@@ -50,6 +50,9 @@ def test_pose_graph_gauss_newton():
             linear_solver=jaxfg.sparse.CholmodSolver()
         ),
     )
+    assert graph.compute_joint_nll(initial_assignments) > graph.compute_joint_nll(
+        solution_assignments
+    )
 
     assert type(repr(solution_assignments)) == str
     assert isinstance(solution_assignments.get_value(pose_variables[0]), jaxlie.SE2)
@@ -112,6 +115,9 @@ def test_pose_graph_levenberg_marquardt():
             linear_solver=jaxfg.sparse.ConjugateGradientSolver()
         ),
     )
+    assert graph.compute_joint_nll(initial_assignments) > graph.compute_joint_nll(
+        solution_assignments
+    )
 
     assert type(repr(solution_assignments)) == str
     assert isinstance(solution_assignments.get_value(pose_variables[0]), jaxlie.SE2)
@@ -171,6 +177,9 @@ def test_pose_graph_dogleg():
     solution_assignments = graph.solve(
         initial_assignments,
         solver=jaxfg.solvers.DoglegSolver(),
+    )
+    assert graph.compute_joint_nll(initial_assignments) > graph.compute_joint_nll(
+        solution_assignments
     )
 
     assert type(repr(solution_assignments)) == str
