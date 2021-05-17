@@ -196,17 +196,21 @@ class StackedFactorGraph:
             noise_model = stacked_factor.factor.noise_model
             if isinstance(noise_model, noises.Gaussian):
                 cov_determinants = -2.0 * jnp.log(
-                    jnp.linalg.det(
-                        cast(noises.Gaussian, noise_model).sqrt_precision_matrix
+                    jnp.abs(
+                        jnp.linalg.det(
+                            cast(noises.Gaussian, noise_model).sqrt_precision_matrix
+                        )
                     )
                 )
             elif isinstance(noise_model, noises.DiagonalGaussian):
                 cov_determinants = -2.0 * jnp.log(
-                    jnp.prod(
-                        cast(
-                            noises.DiagonalGaussian, noise_model
-                        ).sqrt_precision_diagonal,
-                        axis=-1,
+                    jnp.abs(
+                        jnp.prod(
+                            cast(
+                                noises.DiagonalGaussian, noise_model
+                            ).sqrt_precision_diagonal,
+                            axis=-1,
+                        )
                     )
                 )
             else:
