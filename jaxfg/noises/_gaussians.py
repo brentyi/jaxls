@@ -3,6 +3,7 @@ from typing import Sequence, Union
 
 from jax import numpy as jnp
 from overrides import overrides
+from jaxlie.utils import get_epsilon
 
 from .. import hints
 from ..utils import register_dataclass_pytree
@@ -49,10 +50,23 @@ class DiagonalGaussian(NoiseModelBase):
 
     @staticmethod
     def make_from_covariance(
-        diagonal: Union[hints.Array, Sequence[float]]
+        diagonal: Union[hints.Array, Sequence[float]],
+        penalty: Union[hints.Array, Sequence[float], float] = 1000.0,
     ) -> "DiagonalGaussian":
+        diagonal_ = jnp.asarray(diagonal)
+
+        if type(penalty) is float:
+            penalty_ = penalty * jnp.ones(diagonal_.shape)
+        else:
+            penalty_ = jnp.asarray(penalty)
+            assert diagonal_.shape == penalty_.shape
+
         return DiagonalGaussian(
-            sqrt_precision_diagonal=1.0 / jnp.sqrt(jnp.asarray(diagonal))
+            sqrt_precision_diagonal=jnp.where(
+                diagonal_ > get_epsilon(diagonal_.dtype),
+                1.0 / jnp.sqrt(diagonal_),
+                penalty_,
+            )
         )
 
     @overrides
