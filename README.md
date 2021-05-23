@@ -77,7 +77,7 @@ python scripts/pose_graph_g2o.py --help
   - [x] Dogleg
   - [x] Inexact Newton steps
   - [x] Revisit termination criteria
-  - [ ] Reduce redundant code
+  - [x] Reduce redundant code
   - [ ] Robust losses
 - [x] Marginalization
   - [x] Working prototype using sksparse/CHOLMOD

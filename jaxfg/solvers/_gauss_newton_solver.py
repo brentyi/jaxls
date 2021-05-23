@@ -1,17 +1,13 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-import jax
 import numpy as onp
 from overrides import overrides
 
 from .. import sparse, utils
 from ..core._variable_assignments import VariableAssignments
-from ._nonlinear_solver_base import (
-    NonlinearSolverBase,
-    _NonlinearSolverState,
-    _TerminationCriteriaMixin,
-)
+from ._mixins import _TerminationCriteriaMixin
+from ._nonlinear_solver_base import NonlinearSolverBase, NonlinearSolverState
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
@@ -20,50 +16,39 @@ if TYPE_CHECKING:
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
 class GaussNewtonSolver(
-    NonlinearSolverBase,
+    NonlinearSolverBase[NonlinearSolverState],
     _TerminationCriteriaMixin,
 ):
     @overrides
-    def solve(
+    def _initialize_state(
         self,
         graph: "StackedFactorGraph",
-        initial_assignments: "VariableAssignments",
-    ) -> "VariableAssignments":
+        initial_assignments: VariableAssignments,
+    ) -> NonlinearSolverState:
         # Initialize
-        assignments = initial_assignments
-        cost, residual_vector = graph.compute_cost(assignments)
-
-        state = _NonlinearSolverState(
-            # Using device arrays instead of native types helps avoid redundant JIT
-            # compilation
+        cost, residual_vector = graph.compute_cost(initial_assignments)
+        return NonlinearSolverState(
+            # Using arrays instead of native types helps avoid redundant JIT compilation
             iterations=onp.array(0),
-            assignments=assignments,
+            assignments=initial_assignments,
             cost=cost,
             residual_vector=residual_vector,
             done=onp.array(False),
         )
-        self._print(f"Starting solve with {self}, initial cost={state.cost}")
 
-        # Optimization
-        for i in range(self.max_iterations):
-            # Gauss-newton step
-            state = self._step(graph, state)
-            self._print(f"Iteration #{i}: cost={str(state.cost).ljust(15)}")
-
-            # Exit if either cost threshold is met
-            if state.done:
-                self._print("Terminating early!")
-                break
-
-        return state.assignments
-
-    @jax.jit
+    @overrides
     def _step(
         self,
         graph: "StackedFactorGraph",
-        state_prev: _NonlinearSolverState,
-    ) -> _NonlinearSolverState:
+        state_prev: NonlinearSolverState,
+    ) -> NonlinearSolverState:
         """Linearize, solve linear subproblem, and update on manifold."""
+
+        self._hcb_print(
+            lambda i, cost: f"Iteration #{i}: cost={str(cost)}",
+            i=state_prev.iterations,
+            cost=state_prev.cost,
+        )
 
         # Linearize graph
         A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(
@@ -97,7 +82,7 @@ class GaussNewtonSolver(
             negative_gradient=ATb,
         )
 
-        return _NonlinearSolverState(
+        return NonlinearSolverState(
             iterations=state_prev.iterations + 1,
             assignments=assignments,
             cost=cost,

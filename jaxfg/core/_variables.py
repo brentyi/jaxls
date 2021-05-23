@@ -1,6 +1,6 @@
 import abc
 import inspect
-from typing import Callable, Dict, Generic, Mapping, Type, TypeVar
+from typing import Callable, ClassVar, Dict, Generic, Mapping, Type, TypeVar
 
 from jax import flatten_util
 from jax import numpy as jnp
@@ -47,10 +47,10 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 
     # (3) Shared implementation details.
 
-    _parameter_dim: int
+    _parameter_dim: ClassVar[int]
     """Parameter dimensionality. Set automatically in `__init_subclass__`."""
 
-    _unflatten: Callable[[hints.Array], VariableValueType]
+    _unflatten: ClassVar[Callable[[hints.Array], VariableValueType]]
     """Helper for unflattening variable values. Set in `__init_subclass__`."""
 
     def __init_subclass__(cls):

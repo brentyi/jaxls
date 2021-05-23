@@ -5,88 +5,58 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import jax
-from jax import numpy as jnp
 from overrides import overrides
 
-from .. import sparse, utils
+from .. import utils
 from ..core._variable_assignments import VariableAssignments
-from ._nonlinear_solver_base import NonlinearSolverBase, _NonlinearSolverState
+from ._gauss_newton_solver import GaussNewtonSolver
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@utils.register_dataclass_pytree
+@utils.register_dataclass_pytree(
+    # Unrolling a fixed number of steps is generally faster than a loop construct, and
+    # requires that `max_iterations` is a static/concrete value.
+    static_fields=("max_iterations", "unroll")
+)
 @dataclasses.dataclass
-class FixedIterationGaussNewtonSolver(NonlinearSolverBase):
+class FixedIterationGaussNewtonSolver(GaussNewtonSolver):
+    """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
+
+    unroll: bool = True
+
+    @jax.jit
     @overrides
     def solve(
         self,
         graph: "StackedFactorGraph",
-        initial_assignments: "VariableAssignments",
-    ) -> "VariableAssignments":
+        initial_assignments: VariableAssignments,
+    ) -> VariableAssignments:
+        """Run MAP inference on a factor graph."""
+
         # Initialize
         assignments = initial_assignments
         cost, residual_vector = graph.compute_cost(assignments)
-
-        state = _NonlinearSolverState(
-            # Using device arrays instead of native types helps avoid redundant JIT
-            # compilation
-            iterations=jnp.array(0),
-            assignments=assignments,
-            cost=cost,
-            residual_vector=residual_vector,
-            done=jnp.array(False),
-        )
-        self._print(f"Starting solve with {self}, initial cost={state.cost}")
+        state = self._initialize_state(graph, initial_assignments)
 
         # Optimization
-        for i in range(self.max_iterations):
-            # Gauss-newton step
-            state = self._step(graph, state)
-            self._print(f"Iteration #{i}: cost={str(state.cost).ljust(15)}")
+        if self.unroll:
+            for i in range(self.max_iterations):
+                state = self._step(graph, state)
+        else:
+            state = jax.lax.fori_loop(
+                lower=0,
+                upper=self.max_iterations,
+                body_fun=lambda _unused_i, state: self._step(graph, state),
+                init_val=state,
+            )
+
+        self._hcb_print(
+            lambda i, max_i, cost: f"Terminated @ iteration #{i}/{max_i}: cost={str(cost).ljust(15)}",
+            i=state.iterations,
+            max_i=self.max_iterations,
+            cost=state.cost,
+        )
 
         return state.assignments
-
-    @jax.jit
-    def _step(
-        self,
-        graph: "StackedFactorGraph",
-        state_prev: _NonlinearSolverState,
-    ) -> _NonlinearSolverState:
-        """Linearize, solve linear subproblem, and update on manifold."""
-
-        # Linearize graph
-        A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(
-            assignments=state_prev.assignments,
-            residual_vector=state_prev.residual_vector,
-        )
-        ATb = A.T @ -state_prev.residual_vector
-
-        # Solve linear subproblem
-        local_delta_assignments = VariableAssignments(
-            storage=self.linear_solver.solve_subproblem(
-                A=A,
-                ATb=ATb,
-                lambd=0.0,
-                iteration=state_prev.iterations,
-            ),
-            storage_metadata=graph.local_storage_metadata,
-        )
-
-        # On-manifold retraction
-        assignments = state_prev.assignments.manifold_retract(
-            local_delta_assignments=local_delta_assignments
-        )
-
-        # Re-compute cost / residual
-        cost, residual_vector = graph.compute_cost(assignments)
-        done = False
-
-        return _NonlinearSolverState(
-            iterations=state_prev.iterations + 1,
-            assignments=assignments,
-            cost=cost,
-            residual_vector=residual_vector,
-            done=done,
-        )

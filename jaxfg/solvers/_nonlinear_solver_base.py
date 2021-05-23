@@ -1,9 +1,11 @@
 import abc
 import dataclasses
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Callable, Generic, TypeVar, Union
 
 import jax
 from jax import numpy as jnp
+from jax.experimental import host_callback as hcb
+from overrides import EnforceOverrides
 
 from .. import hints, sparse, utils
 from ..core._variable_assignments import VariableAssignments
@@ -13,6 +15,23 @@ if TYPE_CHECKING:
 
 Int = Union[hints.Array, int]
 Boolean = Union[hints.Array, bool]
+
+
+@utils.register_dataclass_pytree
+@dataclasses.dataclass
+class NonlinearSolverState:
+    """Standard state passed between nonlinear solve iterations."""
+
+    iterations: Int
+    assignments: "VariableAssignments"
+    cost: hints.Scalar
+    residual_vector: hints.Array
+    done: Boolean
+
+
+NonlinearSolverStateType = TypeVar(
+    "NonlinearSolverStateType", bound=NonlinearSolverState
+)
 
 
 @utils.register_dataclass_pytree(static_fields=("verbose",))
@@ -34,118 +53,77 @@ class _NonlinearSolverBase:
     )
     """Solver to use for linear subproblems."""
 
-    def _print(self, *args, **kwargs):
-        """Prefixed printing helper. No-op if `verbose` is set to `False`."""
-        if self.verbose:
-            print(f"[{type(self).__name__}]", *args, **kwargs)
+    def _hcb_print(
+        self,
+        string_from_args: Callable[..., str],
+        *args: hints.PyTree,
+        **kwargs: hints.PyTree,
+    ) -> None:
+        """Helper for printer optimizer messages via host callbacks. No-op if `verbose`
+        is set to `False`."""
+
+        if not self.verbose:
+            return
+
+        hcb.id_tap(
+            lambda args_kwargs, _unused_transforms: print(
+                f"[{type(self).__name__}]",
+                string_from_args(*args_kwargs[0], **args_kwargs[1]),
+            ),
+            (args, kwargs),
+        )
 
 
-class NonlinearSolverBase(_NonlinearSolverBase, abc.ABC):
+class NonlinearSolverBase(
+    _NonlinearSolverBase, Generic[NonlinearSolverStateType], abc.ABC, EnforceOverrides
+):
+    # To be overriden by subclasses
+
     @abc.abstractmethod
+    def _initialize_state(
+        self,
+        graph: "StackedFactorGraph",
+        initial_assignments: VariableAssignments,
+    ) -> NonlinearSolverStateType:
+        ...
+
+    @abc.abstractmethod
+    def _step(
+        self,
+        graph: "StackedFactorGraph",
+        state_prev: NonlinearSolverStateType,
+    ) -> NonlinearSolverStateType:
+        """Single nonlinear optimization step."""
+
+    # Shared
+
+    @jax.jit
     def solve(
         self,
         graph: "StackedFactorGraph",
-        initial_assignments: "VariableAssignments",
-    ) -> "VariableAssignments":
+        initial_assignments: VariableAssignments,
+    ) -> VariableAssignments:
         """Run MAP inference on a factor graph."""
 
+        # Initialize
+        assignments = initial_assignments
+        cost, residual_vector = graph.compute_cost(assignments)
+        state = self._initialize_state(graph, initial_assignments)
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
-class _NonlinearSolverState:
-    """Standard state passed between nonlinear solve iterations."""
-
-    iterations: Int
-    assignments: "VariableAssignments"
-    cost: hints.Scalar
-    residual_vector: hints.Array
-    done: Boolean
-
-
-@dataclasses.dataclass
-class _TrustRegionMixin:
-    """Mixin that implements a step quality check for trust region solvers."""
-
-    step_quality_min: hints.Scalar = 1e-3
-
-    def compute_step_quality(
-        self,
-        A: sparse.SparseCooMatrix,
-        proposed_cost: hints.Scalar,
-        state_prev: _NonlinearSolverState,
-        step_vector: jnp.ndarray,
-    ) -> bool:
-        """Compute step quality ratio, often denoted $$\rho$$.
-        This will be 1 when the cost drops linearly wrt the update step."""
-        return (proposed_cost - state_prev.cost) / (
-            jnp.sum((A @ step_vector + state_prev.residual_vector) ** 2)
-            - state_prev.cost
-        )
-
-
-@dataclasses.dataclass
-class _TerminationCriteriaMixin:
-    """Mixin for Ceres-style termination criteria."""
-
-    cost_tolerance: float = 1e-5
-    """We terminate if `|cost change| / cost < cost_tolerance`."""
-
-    gradient_tolerance: float = 1e-9
-    """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
-
-    gradient_tolerance_start_step: int = 10
-    """When to start checking the gradient tolerance condition. Helps solve precision
-    issues caused by inexact Newton steps."""
-
-    parameter_tolerance: float = 1e-7
-    """We terminate if `norm_2(linear delta) < (norm2(x) + parameter_tolerance) * parameter_tolerance`."""
-
-    @jax.jit
-    def check_convergence(
-        self,
-        state_prev: _NonlinearSolverState,
-        cost_updated: hints.Scalar,
-        local_delta_assignments: VariableAssignments,
-        negative_gradient: hints.Array,
-    ) -> bool:
-        """Check for convergence!"""
-
-        # Cost tolerance
-        converged_cost = (
-            jnp.abs(cost_updated - state_prev.cost) / state_prev.cost
-            < self.cost_tolerance
-        )
-
-        # Gradient tolerance
-        converged_gradient = jnp.where(
-            state_prev.iterations >= self.gradient_tolerance_start_step,
-            jnp.max(
-                state_prev.assignments.storage
-                - state_prev.assignments.manifold_retract(
-                    VariableAssignments(
-                        storage=negative_gradient,
-                        storage_metadata=local_delta_assignments.storage_metadata,
-                    ),
-                ).storage
-            )
-            < self.gradient_tolerance,
-            False,
-        )
-
-        # Parameter tolerance
-        converged_parameters = (
-            jnp.linalg.norm(jnp.abs(local_delta_assignments.storage))
-            < (
-                jnp.linalg.norm(state_prev.assignments.storage)
-                + self.parameter_tolerance
-            )
-            * self.parameter_tolerance
-        )
-
-        return jnp.logical_or(
-            converged_cost,
-            jnp.logical_or(
-                converged_gradient,
-                converged_parameters,
+        # Optimization
+        state = jax.lax.while_loop(
+            cond_fun=lambda state: jnp.logical_and(
+                jnp.logical_not(state.done), state.iterations < self.max_iterations
             ),
+            body_fun=jax.partial(self._step, graph),
+            init_val=state,
         )
+
+        self._hcb_print(
+            lambda i, max_i, cost: f"Terminated @ iteration #{i}/{max_i}: cost={str(cost).ljust(15)}",
+            i=state.iterations,
+            max_i=self.max_iterations,
+            cost=state.cost,
+        )
+
+        return state.assignments

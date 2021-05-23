@@ -1,19 +1,14 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-import jax
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
 from .. import hints, sparse, utils
 from ..core._variable_assignments import VariableAssignments
-from ._nonlinear_solver_base import (
-    NonlinearSolverBase,
-    _NonlinearSolverState,
-    _TerminationCriteriaMixin,
-    _TrustRegionMixin,
-)
+from ._mixins import _TerminationCriteriaMixin, _TrustRegionMixin
+from ._nonlinear_solver_base import NonlinearSolverBase, NonlinearSolverState
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
@@ -21,7 +16,7 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
-class _DoglegState(_NonlinearSolverState):
+class _DoglegState(NonlinearSolverState):
     """State passed between dogleg iterations."""
 
     radius: hints.Scalar
@@ -30,7 +25,7 @@ class _DoglegState(_NonlinearSolverState):
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
 class DoglegSolver(
-    NonlinearSolverBase,
+    NonlinearSolverBase[_DoglegState],
     _TerminationCriteriaMixin,
     _TrustRegionMixin,
 ):
@@ -39,40 +34,27 @@ class DoglegSolver(
     radius_initial: hints.Scalar = 1.0
 
     @overrides
-    def solve(
+    def _initialize_state(
         self,
         graph: "StackedFactorGraph",
-        initial_assignments: "VariableAssignments",
-    ) -> "VariableAssignments":
+        initial_assignments: VariableAssignments,
+    ) -> _DoglegState:
         # Initialize
-        cost_prev, residual_vector = graph.compute_cost(initial_assignments)
-        self._print(f"Starting solve with {self}, initial cost={cost_prev}")
-
-        state = _DoglegState(
+        cost, residual_vector = graph.compute_cost(initial_assignments)
+        return _DoglegState(
             # Using arrays instead of native types helps avoid redundant JIT compilation
+            # TODO: for floats, we may not always want 32-bit
             iterations=onp.array(0),
             assignments=initial_assignments,
-            radius=onp.array(self.radius_initial, dtype=onp.float32),
-            cost=cost_prev,
+            cost=cost,
             residual_vector=residual_vector,
-            done=onp.array(False, dtype=onp.bool_),
+            done=onp.array(False),
+            radius=jnp.array(
+                self.radius_initial, dtype=jnp.float32
+            ),  # We use jnp here because lambda_initial will be traced!
         )
 
-        # Optimization
-        for i in range(self.max_iterations):
-            # Dogleg step
-            state = self._step(graph, state)
-            self._print(
-                f"Iteration #{i}: cost={str(state.cost).ljust(15)}"
-                f" radius={str(state.radius)}"
-            )
-            if state.done:
-                self._print("Terminating early!")
-                break
-
-        return state.assignments
-
-    @jax.jit
+    @overrides
     def _step(
         self,
         graph: "StackedFactorGraph",
@@ -80,6 +62,12 @@ class DoglegSolver(
     ) -> _DoglegState:
         # There's currently some redundancy here: we only need to re-linearize and
         # compute new GN/SD update steps when updates are actually accepted
+        self._hcb_print(
+            lambda i, cost, radius: f"Iteration #{i}: cost={str(cost).ljust(15)} radius={str(radius)}",
+            i=state_prev.iterations,
+            cost=state_prev.cost,
+            radius=state_prev.radius,
+        )
 
         # Linearize graph
         A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(

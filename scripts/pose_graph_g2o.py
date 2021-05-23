@@ -68,15 +68,18 @@ def main():
             initial_poses,
             solver=dataclasses.replace(cli_args.solver_type.value, max_iterations=1),
         )
+        solution_poses.storage.block_until_ready()
 
     with jaxfg.utils.stopwatch("Single-step solve (already compiled)"):
         solution_poses = graph.solve(
             initial_poses,
             solver=dataclasses.replace(cli_args.solver_type.value, max_iterations=1),
         )
+        solution_poses.storage.block_until_ready()
 
     with jaxfg.utils.stopwatch("Full solve"):
         solution_poses = graph.solve(initial_poses, solver=cli_args.solver_type.value)
+        solution_poses.storage.block_until_ready()
 
     # Plot
     plt.figure()

@@ -1,19 +1,14 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-import jax
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
 from .. import hints, sparse, utils
 from ..core._variable_assignments import VariableAssignments
-from ._nonlinear_solver_base import (
-    NonlinearSolverBase,
-    _NonlinearSolverState,
-    _TerminationCriteriaMixin,
-    _TrustRegionMixin,
-)
+from ._mixins import _TerminationCriteriaMixin, _TrustRegionMixin
+from ._nonlinear_solver_base import NonlinearSolverBase, NonlinearSolverState
 
 if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
@@ -21,7 +16,7 @@ if TYPE_CHECKING:
 
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
-class _LevenbergMarquardtState(_NonlinearSolverState):
+class _LevenbergMarquardtState(NonlinearSolverState):
     """State passed between LM iterations."""
 
     lambd: hints.Scalar
@@ -30,7 +25,7 @@ class _LevenbergMarquardtState(_NonlinearSolverState):
 @utils.register_dataclass_pytree
 @dataclasses.dataclass
 class LevenbergMarquardtSolver(
-    NonlinearSolverBase,
+    NonlinearSolverBase[_LevenbergMarquardtState],
     _TerminationCriteriaMixin,
     _TrustRegionMixin,
 ):
@@ -42,39 +37,27 @@ class LevenbergMarquardtSolver(
     lambda_max: hints.Scalar = 1e10
 
     @overrides
-    def solve(
+    def _initialize_state(
         self,
         graph: "StackedFactorGraph",
-        initial_assignments: "VariableAssignments",
-    ) -> "VariableAssignments":
+        initial_assignments: VariableAssignments,
+    ) -> _LevenbergMarquardtState:
         # Initialize
-        cost_prev, residual_vector = graph.compute_cost(initial_assignments)
-        self._print(f"Starting solve with {self}, initial cost={cost_prev}")
-
-        state = _LevenbergMarquardtState(
+        cost, residual_vector = graph.compute_cost(initial_assignments)
+        return _LevenbergMarquardtState(
             # Using arrays instead of native types helps avoid redundant JIT compilation
+            # TODO: for floats, we may not always want 32-bit
             iterations=onp.array(0),
             assignments=initial_assignments,
-            lambd=self.lambda_initial,
-            cost=cost_prev,
+            cost=cost,
             residual_vector=residual_vector,
             done=onp.array(False),
+            lambd=jnp.array(
+                self.lambda_initial, dtype=jnp.float32
+            ),  # We use jnp here because lambda_initial will be traced!
         )
 
-        # Optimization
-        for i in range(self.max_iterations):
-            # LM step
-            state = self._step(graph, state)
-            self._print(
-                f"Iteration #{i}: cost={str(state.cost).ljust(15)} lambda={str(state.lambd)}"
-            )
-            if state.done:
-                self._print("Terminating early!")
-                break
-
-        return state.assignments
-
-    @jax.jit
+    @overrides
     def _step(
         self,
         graph: "StackedFactorGraph",
@@ -82,6 +65,13 @@ class LevenbergMarquardtSolver(
     ) -> _LevenbergMarquardtState:
         # There's currently some redundancy here: we only need to re-linearize when
         # updates are accepted
+
+        self._hcb_print(
+            lambda i, cost, lambd: f"Iteration #{i}: cost={str(cost).ljust(15)} lambda={str(lambd)}",
+            i=state_prev.iterations,
+            cost=state_prev.cost,
+            lambd=state_prev.lambd,
+        )
 
         # Linearize graph
         A: sparse.SparseCooMatrix = graph.compute_whitened_residual_jacobian(

@@ -76,7 +76,10 @@ def register_dataclass_pytree(
     decorator enables dataclasses to be used as valid PyTree nodes.
 
     Very similar to `flax.struct.dataclass`, but (a) adds support for static fields and
-    (b) works better with non-Googly tooling (mypy, jedi, etc).
+    (b) expects an external, explicit for @dataclass decorator for better static
+    analysis support. The latter may change if
+    [dataclass_transform](https://github.com/microsoft/pyright/blob/main/specs/dataclass_transforms.md)
+    gains traction.
 
     We assume all registered classes retain the default dataclass constructor.
 
@@ -112,38 +115,41 @@ def _register_dataclass_pytree(
     assert dataclasses.is_dataclass(cls)
 
     # Respect static field registration from superclasses
-    static_fields_list = list(static_fields)
+    all_static_fields_list = list(static_fields)
+    _registered_static_fields[cls] = set(static_fields)
     del static_fields
 
-    for parent_class in filter(lambda x: x in _registered_static_fields, cls.mro()):
-        static_fields_list.extend(_registered_static_fields[parent_class])
+    for parent_class in filter(lambda x: x in _registered_static_fields, cls.mro()[1:]):
+        all_static_fields_list.extend(_registered_static_fields[parent_class])
 
-    static_fields_set = set(static_fields_list)
-    assert len(static_fields_list) == len(
-        static_fields_set
+    all_static_fields_set = set(all_static_fields_list)
+    assert len(all_static_fields_list) == len(
+        all_static_fields_set
     ), "Found repeated field names!"
 
-    _registered_static_fields[cls] = static_fields_set
+    # print(list(_registered_static_fields))
 
     # Get a list of fields in our dataclass
     field: dataclasses.Field
     field_names = [field.name for field in dataclasses.fields(cls)]
-    children_fields = [name for name in field_names if name not in static_fields_set]
+    children_fields = [
+        name for name in field_names if name not in all_static_fields_set
+    ]
     assert set(field_names) == set(children_fields) | set(
-        static_fields_set
+        all_static_fields_set
     ), "Field name anomoly; check static fields list!"
 
     # Define flatten, unflatten operations: this simple converts our dataclass to a list
     # of fields.
     def _flatten(obj):
         return [getattr(obj, key) for key in children_fields], tuple(
-            getattr(obj, key) for key in static_fields_set
+            getattr(obj, key) for key in all_static_fields_set
         )
 
     def _unflatten(treedef, children):
         return cls(
             **dict(zip(children_fields, children)),
-            **dict(zip(static_fields_set, treedef)),
+            **dict(zip(all_static_fields_set, treedef)),
         )
 
         # Alternative:
