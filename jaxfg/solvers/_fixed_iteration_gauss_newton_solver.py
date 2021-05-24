@@ -19,6 +19,9 @@ class FixedIterationGaussNewtonSolver(GaussNewtonSolver):
 
     unroll: bool = dataclasses.field(default=True, metadata=utils.static_field())
 
+    # To unroll the optimizer loop, we must have a concrete (static) iteration count
+    max_iterations: int = dataclasses.field(default=10, metadata=utils.static_field())
+
     @jax.jit
     @overrides
     def solve(

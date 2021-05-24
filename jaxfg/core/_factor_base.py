@@ -23,7 +23,9 @@ T = TypeVar("T")
 
 
 def _make_unhashable(x: T) -> T:
-    """Helper for making an object unhashable."""
+    """Helper for making sure variables with meaningless hashes are not hashed. Should
+    be called on all variables that are restored from a treedef; see explanation
+    below."""
 
     def new_hash() -> int:
         assert False
@@ -49,10 +51,9 @@ class FactorBase(
             # different variables.
             #
             # To get around this, we erase the individual identities of the variables
-            # before flattening each factor. Factors that have been flattened and then
-            # restored at a JAX API boundary will therefore become unhashable. For
-            # stacked factors, however, the specific variables connected to each factor
-            # are retained implicitly in `FactorStack.value_indices`.
+            # before flattening each factor. For stacked factors, however, the specific
+            # variables connected to each factor are retained implicitly in
+            # `FactorStack.value_indices`.
             treedef_from_value=lambda values: tuple(
                 type(v) for v in cast(tuple, values)
             ),
