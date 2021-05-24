@@ -34,7 +34,6 @@ NonlinearSolverStateType = TypeVar(
 )
 
 
-@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
