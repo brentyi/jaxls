@@ -34,7 +34,7 @@ NonlinearSolverStateType = TypeVar(
 )
 
 
-@utils.register_dataclass_pytree(static_fields=("verbose",))
+@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
@@ -45,33 +45,13 @@ class _NonlinearSolverBase:
     max_iterations: int = 100
     """Maximum number of iterations."""
 
-    verbose: Boolean = True
+    verbose: Boolean = dataclasses.field(default=True, metadata=utils.static_field())
     """Set to `True` to enable printing."""
 
     linear_solver: sparse.LinearSubproblemSolverBase = dataclasses.field(
         default_factory=lambda: sparse.CholmodSolver()
     )
     """Solver to use for linear subproblems."""
-
-    def _hcb_print(
-        self,
-        string_from_args: Callable[..., str],
-        *args: hints.PyTree,
-        **kwargs: hints.PyTree,
-    ) -> None:
-        """Helper for printer optimizer messages via host callbacks. No-op if `verbose`
-        is set to `False`."""
-
-        if not self.verbose:
-            return
-
-        hcb.id_tap(
-            lambda args_kwargs, _unused_transforms: print(
-                f"[{type(self).__name__}]",
-                string_from_args(*args_kwargs[0], **args_kwargs[1]),
-            ),
-            (args, kwargs),
-        )
 
 
 class NonlinearSolverBase(
@@ -127,3 +107,23 @@ class NonlinearSolverBase(
         )
 
         return state.assignments
+
+    def _hcb_print(
+        self,
+        string_from_args: Callable[..., str],
+        *args: hints.PyTree,
+        **kwargs: hints.PyTree,
+    ) -> None:
+        """Helper for printer optimizer messages via host callbacks. No-op if `verbose`
+        is set to `False`."""
+
+        if not self.verbose:
+            return
+
+        hcb.id_tap(
+            lambda args_kwargs, _unused_transforms: print(
+                f"[{type(self).__name__}]",
+                string_from_args(*args_kwargs[0], **args_kwargs[1]),
+            ),
+            (args, kwargs),
+        )

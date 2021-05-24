@@ -13,12 +13,12 @@ from ._variables import VariableBase
 FactorType = TypeVar("FactorType", bound=FactorBase)
 
 
-@utils.register_dataclass_pytree(static_fields=("num_factors",))
+@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class FactorStack(Generic[FactorType]):
     """A set of factors, with their parameters stacked."""
 
-    num_factors: int
+    num_factors: int = dataclasses.field(metadata=utils.static_field())
     factor: FactorType
     value_indices: Tuple[hints.Array, ...]
 

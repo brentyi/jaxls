@@ -8,7 +8,7 @@ from jax import numpy as jnp
 from overrides import EnforceOverrides, final
 from typing_utils import get_args, issubtype
 
-from .. import hints, noises
+from .. import hints, noises, utils
 from ._variable_assignments import VariableAssignments
 from ._variables import VariableBase
 
@@ -19,16 +19,48 @@ VariableValueTuple = TypeVar(
     bound=Tuple[hints.VariableValue, ...],
 )
 
+T = TypeVar("T")
 
-# Disable type-checking here
+
+def _make_unhashable(x: T) -> T:
+    """Helper for making an object unhashable."""
+
+    def new_hash() -> int:
+        assert False
+
+    x.__hash__ = new_hash  # type: ignore
+    return x
+
+
+# Disable type-checking because of abstract class issues
 # > https://github.com/python/mypy/issues/5374
+@utils.register_dataclass_pytree
 @dataclasses.dataclass  # type: ignore
 class FactorBase(
     Generic[VariableValueTuple],
     abc.ABC,
     EnforceOverrides,
 ):
-    variables: Tuple[VariableBase, ...]
+    variables: Tuple[VariableBase, ...] = dataclasses.field(
+        metadata=utils.static_field(
+            # To enable batch computations, we want to be able to stack many factors of
+            # the same type. In order to do this, their treedefs must match: this is by
+            # default not possible, as every factor will of course be attached to
+            # different variables.
+            #
+            # To get around this, we erase the individual identities of the variables
+            # before flattening each factor. Factors that have been flattened and then
+            # restored at a JAX API boundary will therefore become unhashable. For
+            # stacked factors, however, the specific variables connected to each factor
+            # are retained implicitly in `FactorStack.value_indices`.
+            treedef_from_value=lambda values: tuple(
+                type(v) for v in cast(tuple, values)
+            ),
+            value_from_treedef=lambda treedef: tuple(
+                _make_unhashable(t.__new__(t)) for t in treedef
+            ),
+        )
+    )
     """Variables connected to this factor. 1-to-1, in-order correspondence with
     `VariableValueTuple`."""
 
@@ -97,55 +129,12 @@ class FactorBase(
     def __init_subclass__(cls, *args, **kwargs):
         """Register all factors as hashable PyTree nodes."""
         super().__init_subclass__(*args, **kwargs)
-
-        jax.tree_util.register_pytree_node(
-            cls, flatten_func=cls._flatten, unflatten_func=cls._unflatten
-        )
         cls.__hash__ = object.__hash__
 
     @final
     def get_residual_dim(self) -> int:
         """Error dimensionality."""
         return self.noise_model.get_residual_dim()
-
-    @classmethod
-    @final
-    def _flatten(
-        cls: Type[FactorType], v: FactorType
-    ) -> Tuple[Tuple[hints.PyTree, ...], Tuple]:
-        """Flatten a factor for use as a PyTree/parameter stacking."""
-        v_dict = vars(v)
-        array_data = {k: v for k, v in v_dict.items()}
-
-        # Store variable types to make sure treedef hashes match
-        aux_dict = {}
-        aux_dict["variabletypes"] = tuple(type(variable) for variable in v.variables)
-        array_data.pop("variables")
-
-        return (
-            tuple(array_data.values()),
-            tuple(array_data.keys())
-            + tuple(aux_dict.keys())
-            + tuple(aux_dict.values()),
-        )
-
-    @classmethod
-    @final
-    def _unflatten(
-        cls: Type[FactorType], treedef: Tuple, children: Tuple[hints.Array]
-    ) -> FactorType:
-        """Unflatten a factor for use as a PyTree/parameter stacking."""
-        array_keys = treedef[: len(children)]
-        aux = treedef[len(children) :]
-        aux_keys = aux[: len(aux) // 2]
-        aux_values = aux[len(aux) // 2 :]
-
-        # Create new dummy variables
-        aux_dict = dict(zip(aux_keys, aux_values))
-        aux_dict["variables"] = tuple(V() for V in aux_dict.pop("variabletypes"))
-
-        out = cls(**dict(zip(array_keys, children)), **aux_dict)  # type: ignore
-        return out
 
     @final
     def get_variable_values_from_assignments(

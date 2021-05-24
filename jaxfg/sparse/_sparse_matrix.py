@@ -20,7 +20,7 @@ class SparseCooCoordinates:
     #     assert self.rows.shape == self.cols.shape
 
 
-@utils.register_dataclass_pytree(static_fields=("shape",))
+@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class SparseCooMatrix:
     """Sparse matrix in COO form."""
@@ -29,7 +29,7 @@ class SparseCooMatrix:
     """Non-zero matrix values. Shape should be `(*, N)`."""
     coords: SparseCooCoordinates
     """Row and column indices of non-zero entries. Shapes should be `(*, N)`."""
-    shape: Tuple[int, int]
+    shape: Tuple[int, int] = dataclasses.field(metadata=utils.static_field())
     """Shape of matrix."""
 
     # Shape checks seem to break under vmap

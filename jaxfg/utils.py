@@ -1,17 +1,7 @@
 import contextlib
 import dataclasses
 import time
-from typing import (
-    Callable,
-    Dict,
-    Generator,
-    Optional,
-    Sequence,
-    Set,
-    Type,
-    TypeVar,
-    overload,
-)
+from typing import Any, Callable, Dict, Generator, List, Type, TypeVar
 
 import jax
 import termcolor
@@ -42,32 +32,34 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
     print("========")
 
 
-_registered_static_fields: Dict[Type, Set[str]] = {}
+def _identity(x: T) -> T:
+    return x
 
 
-@overload
-def register_dataclass_pytree(
-    cls: None = None,
-    static_fields: Sequence[str] = [],
-    make_immutable: bool = True,
-) -> Callable[[Type[T]], Type[T]]:
-    ...
+def static_field(
+    treedef_from_value: Callable[[T], Any] = _identity,
+    value_from_treedef: Callable[[Any], T] = _identity,
+) -> Dict[str, Any]:
+    """Returns metadata dictionary for `dataclasses.field(metadata=...)`, which
+    marks that a field should be treated as static and part of the treedef.
+
+    This is often useful for fields that contain anything that's not a standard
+    container of arrays, such as boolean flags used in non-JITable control flow.
+
+    Optionally, we can specify a mapping from the value held by the field to its
+    representation in the treedef. This can be helpful for unhashable types, or in cases
+    where the specific identity of the field value doesn't matter. (for example: store
+    only the type in the flattened treedef, and reconstruct the object when
+    unflattening)
+    """
+    return {
+        "pytree_static_value": True,
+        "treedef_from_value": treedef_from_value,
+        "value_from_treedef": value_from_treedef,
+    }
 
 
-@overload
-def register_dataclass_pytree(
-    cls: Type[T],
-    static_fields: Sequence[str] = [],
-    make_immutable: bool = True,
-) -> Type[T]:
-    ...
-
-
-def register_dataclass_pytree(
-    cls: Optional[Type[T]] = None,
-    static_fields: Sequence[str] = [],
-    make_immutable: bool = True,
-):
+def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
     """Register a dataclass as a flax-serializable PyTree.
 
     For compatibility with function transformations in JAX (jit, grad, vmap, etc),
@@ -85,71 +77,38 @@ def register_dataclass_pytree(
 
     Args:
         cls (Type[T]): Dataclass to wrap.
-        static_fields (Sequence[str]): Any static field names as strings. Rather than
-            including these fields as "children" of our dataclass, their values must be
-            hashable and are considered part of the treedef.  Pass in using
-            `@jax.partial()`.
         make_immutable (bool): Set to `True` to make dataclass immutable.
     """
 
-    if cls is None:
-        return jax.partial(
-            _register_dataclass_pytree,
-            static_fields=static_fields,
-            make_immutable=make_immutable,
-        )
-    else:
-        return _register_dataclass_pytree(
-            cls,
-            static_fields=static_fields,
-            make_immutable=make_immutable,
-        )
-
-
-def _register_dataclass_pytree(
-    cls: Type[T],
-    static_fields: Sequence[str] = [],
-    make_immutable: bool = True,
-) -> Type[T]:
-
     assert dataclasses.is_dataclass(cls)
 
-    # Respect static field registration from superclasses
-    all_static_fields_list = list(static_fields)
-    _registered_static_fields[cls] = set(static_fields)
-    del static_fields
-
-    for parent_class in filter(lambda x: x in _registered_static_fields, cls.mro()[1:]):
-        all_static_fields_list.extend(_registered_static_fields[parent_class])
-
-    all_static_fields_set = set(all_static_fields_list)
-    assert len(all_static_fields_list) == len(
-        all_static_fields_set
-    ), "Found repeated field names!"
-
-    # print(list(_registered_static_fields))
-
-    # Get a list of fields in our dataclass
-    field: dataclasses.Field
-    field_names = [field.name for field in dataclasses.fields(cls)]
-    children_fields = [
-        name for name in field_names if name not in all_static_fields_set
-    ]
-    assert set(field_names) == set(children_fields) | set(
-        all_static_fields_set
-    ), "Field name anomoly; check static fields list!"
+    # Determine which fields are static and part of the treedef, and which should be
+    # registered as child nodes
+    child_node_field_names: List[str] = []
+    static_fields: List[dataclasses.Field] = []
+    for field in dataclasses.fields(cls):
+        if "pytree_static_value" in field.metadata:
+            static_fields.append(field)
+        else:
+            child_node_field_names.append(field.name)
 
     # Define flatten, unflatten operations: this simple converts our dataclass to a list
     # of fields.
     def _flatten(obj):
-        return [getattr(obj, key) for key in children_fields], tuple(
-            getattr(obj, key) for key in all_static_fields_set
+        children = tuple(getattr(obj, key) for key in child_node_field_names)
+        treedef = tuple(
+            field.metadata["treedef_from_value"](getattr(obj, field.name))
+            for field in static_fields
         )
+        return children, treedef
 
     def _unflatten(treedef, children):
         return cls(
-            **dict(zip(children_fields, children)),
-            **dict(zip(all_static_fields_set, treedef)),
+            **dict(zip(child_node_field_names, children)),
+            **{
+                field.name: field.metadata["value_from_treedef"](tdef)
+                for field, tdef in zip(static_fields, treedef)
+            },
         )
 
         # Alternative:
@@ -164,14 +123,15 @@ def _register_dataclass_pytree(
     # Serialization: this is mostly copied from `flax.struct.dataclass`
     def _to_state_dict(x: T):
         state_dict = {
-            name: serialization.to_state_dict(getattr(x, name)) for name in field_names
+            name: serialization.to_state_dict(getattr(x, name))
+            for name in child_node_field_names
         }
         return state_dict
 
     def _from_state_dict(x: T, state: Dict):
         state = state.copy()  # copy the state so we can pop the restored fields.
         updates = {}
-        for name in field_names:
+        for name in child_node_field_names:
             if name not in state:
                 raise ValueError(
                     f"Missing field {name} in state dict while restoring"
@@ -192,13 +152,13 @@ def _register_dataclass_pytree(
 
     # Make dataclass immutable after __init__ is called
     # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
-    # __init__ functions
-    if make_immutable:
+    # __init__ methods
+    def _mark_immutable():
         original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
         def disabled_setattr(*args, **kwargs):
             raise dataclasses.FrozenInstanceError(
-                "Dataclass registered as PyTrees is immutable!"
+                "Dataclass registered as PyTree is immutable!"
             )
 
         def new_init(self, *args, **kwargs):
@@ -209,5 +169,7 @@ def _register_dataclass_pytree(
 
         cls.__setattr__ = disabled_setattr  # type: ignore
         cls.__init__ = new_init  # type: ignore
+
+    _mark_immutable()
 
     return cls

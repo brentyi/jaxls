@@ -1,6 +1,3 @@
-# TODO: this is almost entirely copy and pasted from the vanilla Gauss Newton solver.
-# Should be removed or refactored.
-
 import dataclasses
 from typing import TYPE_CHECKING
 
@@ -15,16 +12,12 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@utils.register_dataclass_pytree(
-    # Unrolling a fixed number of steps is generally faster than a loop construct, and
-    # requires that `max_iterations` is a static/concrete value.
-    static_fields=("max_iterations", "unroll")
-)
+@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class FixedIterationGaussNewtonSolver(GaussNewtonSolver):
     """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
 
-    unroll: bool = True
+    unroll: bool = dataclasses.field(default=True, metadata=utils.static_field())
 
     @jax.jit
     @overrides

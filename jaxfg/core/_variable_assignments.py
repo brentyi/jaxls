@@ -11,7 +11,7 @@ from ._variables import VariableBase
 VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
-@utils.register_dataclass_pytree(static_fields=("storage_metadata",))
+@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class VariableAssignments:
     """Storage class that maps variables to values."""
@@ -20,7 +20,7 @@ class VariableAssignments:
     """Values of variables stacked and flattened. Can either be local or global
     parameterizations, depending on the value of `.storage_metadata.local_flag`."""
 
-    storage_metadata: StorageMetadata
+    storage_metadata: StorageMetadata = dataclasses.field(metadata=utils.static_field())
     """Metadata for how variables are stored."""
 
     @staticmethod

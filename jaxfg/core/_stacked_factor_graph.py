@@ -17,9 +17,7 @@ from ._variables import VariableBase
 GroupKey = Hashable
 
 
-@utils.register_dataclass_pytree(
-    static_fields=("local_storage_metadata", "residual_dim")
-)
+@utils.register_dataclass_pytree
 @dataclasses.dataclass
 class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
@@ -29,15 +27,18 @@ class StackedFactorGraph:
 
     factor_stacks: List[FactorStack]
     jacobian_coords: sparse.SparseCooCoordinates
-    local_storage_metadata: StorageMetadata
-    residual_dim: int
+    local_storage_metadata: StorageMetadata = dataclasses.field(
+        metadata=utils.static_field()
+    )
+    residual_dim: int = dataclasses.field(metadata=utils.static_field())
 
     def __post_init__(self):
         """Check that inputs make sense!"""
         for stacked_factor in self.factor_stacks:
             N = stacked_factor.num_factors
             for value_indices, variable in zip(
-                stacked_factor.value_indices, stacked_factor.factor.variables
+                stacked_factor.value_indices,
+                stacked_factor.factor.variables,
             ):
                 assert value_indices.shape == (N, variable.get_parameter_dim())
 
