@@ -36,26 +36,15 @@ def _identity(x: T) -> T:
     return x
 
 
-def static_field(
-    treedef_from_value: Callable[[T], Any] = _identity,
-    value_from_treedef: Callable[[Any], T] = _identity,
-) -> Dict[str, Any]:
+def static_field() -> Dict[str, Any]:
     """Returns metadata dictionary for `dataclasses.field(metadata=...)`, which
     marks that a field should be treated as static and part of the treedef.
 
     This is often useful for fields that contain anything that's not a standard
     container of arrays, such as boolean flags used in non-JITable control flow.
-
-    Optionally, we can specify a mapping from the value held by the field to its
-    representation in the treedef. This can be helpful for unhashable types, or in cases
-    where the specific identity of the field value doesn't matter. (for example: store
-    only the type in the flattened treedef, and reconstruct the object when
-    unflattening)
     """
     return {
         "pytree_static_value": True,
-        "treedef_from_value": treedef_from_value,
-        "value_from_treedef": value_from_treedef,
     }
 
 
@@ -67,9 +56,8 @@ def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
     [PyTree](https://jax.readthedocs.io/en/latest/pytrees.html) containers; this
     decorator enables dataclasses to be used as valid PyTree nodes.
 
-    Very similar to `flax.struct.dataclass`, but (a) adds support for static fields and
-    (b) expects an external, explicit for @dataclass decorator for better static
-    analysis support. The latter may change if
+    Similar to `flax.struct.dataclass`, but expects an explicit @dataclass decorator for
+    better static analysis support. The latter may change if
     [dataclass_transform](https://github.com/microsoft/pyright/blob/main/specs/dataclass_transforms.md)
     gains traction.
 
@@ -77,7 +65,6 @@ def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
 
     Args:
         cls (Type[T]): Dataclass to wrap.
-        make_immutable (bool): Set to `True` to make dataclass immutable.
     """
 
     assert dataclasses.is_dataclass(cls)
@@ -96,19 +83,13 @@ def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
     # of fields.
     def _flatten(obj):
         children = tuple(getattr(obj, key) for key in child_node_field_names)
-        treedef = tuple(
-            field.metadata["treedef_from_value"](getattr(obj, field.name))
-            for field in static_fields
-        )
+        treedef = tuple(getattr(obj, field.name) for field in static_fields)
         return children, treedef
 
     def _unflatten(treedef, children):
         return cls(
             **dict(zip(child_node_field_names, children)),
-            **{
-                field.name: field.metadata["value_from_treedef"](tdef)
-                for field, tdef in zip(static_fields, treedef)
-            },
+            **{field.name: tdef for field, tdef in zip(static_fields, treedef)},
         )
 
         # Alternative:
@@ -153,8 +134,6 @@ def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
     cls.__is_update_buffer__ = False  # type: ignore
 
     # Make dataclass immutable after __init__ is called
-    # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
-    # __init__ methods
     def _mark_immutable():
         original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
@@ -208,6 +187,8 @@ def _new_setattr(self, name: str, value: Any):
 
 
 def _mark_mutable(obj: Any, mutable: bool) -> None:
+    """Recursively freeze or unfreeze dataclasses in a structure.
+    Currently only supports tuples, lists, dictionaries, dataclasses."""
     if isinstance(obj, (tuple, list)):
         for child in obj:
             _mark_mutable(child, mutable)
@@ -221,7 +202,8 @@ def _mark_mutable(obj: Any, mutable: bool) -> None:
 
 
 def replace_context(obj: T) -> ContextManager[T]:
-    """Context manager that creates a copy a dataclass and allows for temporary mutations."""
+    """Context manager that copies a dataclass-containing PyTree and allows for
+    temporary mutations."""
 
     # Inner function helps with static typing
     def _replace_context(obj: T):

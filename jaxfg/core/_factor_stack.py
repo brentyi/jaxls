@@ -42,13 +42,19 @@ class FactorStack(Generic[FactorType]):
         use_onp: bool,
     ) -> "FactorStack[FactorType]":
         """Make a stacked factor."""
+        print(len(factors))
 
         # For one-off computations, onp has much less overhead than jnp
         jnp = onp if use_onp else globals()["jnp"]
 
         # Stack factors in our group
+        # This requires that the treedefs of each factor match, which won't be
+        # the case when factors are connected to different variables!
+        anonymized_factors = [
+            dataclasses.replace(f, variables=factors[0].variables) for f in factors
+        ]
         stacked_factor: FactorType = jax.tree_multimap(
-            lambda *arrays: jnp.stack(arrays, axis=0), *factors
+            lambda *arrays: jnp.stack(arrays, axis=0), *anonymized_factors
         )
 
         # Get indices for each variable of each factor
@@ -57,6 +63,9 @@ class FactorStack(Generic[FactorType]):
         )
         for factor in factors:
             for i, variable in enumerate(factor.variables):
+                assert type(variable) == type(
+                    factors[0].variables[i]
+                ), "Variable types of stacked factors must match"
                 storage_pos = storage_metadata.index_from_variable[variable]
                 value_indices_list[i].append(
                     onp.arange(storage_pos, storage_pos + variable.get_parameter_dim())

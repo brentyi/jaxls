@@ -7,7 +7,10 @@ import jaxfg
 
 
 @jaxfg.utils.register_dataclass_pytree
-@dataclasses.dataclass
+@dataclasses.dataclass(
+    # frozen=True will do nothing for registered dataclasses
+    frozen=True
+)
 class Foo:
     array: jaxfg.hints.Array
 
@@ -20,38 +23,6 @@ class Bar:
     array_unchanged: jaxfg.hints.Array
 
 
-# API option number 1
-def test_update_buffer():
-    obj = Bar(
-        child=Foo(array=onp.zeros(3)), array=onp.ones(3), array_unchanged=onp.ones(3)
-    )
-
-    # Registered dataclasses are generally immutable!
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        obj.array = onp.zeros(3)
-
-    # But we can make a temporary buffer object to write changes to...
-    obj_buffer = jaxfg.utils.make_update_buffer(obj)
-    obj_buffer.array = onp.zeros(3)
-    obj_buffer.child.array = onp.ones(3)
-
-    # Which validates shape:
-    with pytest.raises(AssertionError):
-        obj_buffer.child.array = onp.ones(1)
-
-    # And dtype:
-    with pytest.raises(AssertionError):
-        obj_buffer.child.array = onp.ones(3, dtype=onp.int32)
-
-    # Buffered updates can then be applied in a functional way:
-    obj = jaxfg.utils.apply_updates(target=obj, updates=obj_buffer)
-
-    onp.testing.assert_allclose(obj.array, onp.zeros(3))
-    onp.testing.assert_allclose(obj.array_unchanged, onp.ones(3))
-    onp.testing.assert_allclose(obj.child.array, onp.ones(3))
-
-
-# API option number 2
 def test_replace_context():
     obj = Bar(
         child=Foo(array=onp.zeros(3)), array=onp.ones(3), array_unchanged=onp.ones(3)

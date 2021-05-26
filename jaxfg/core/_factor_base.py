@@ -34,20 +34,7 @@ def _make_unhashable(x: T) -> T:
     return x
 
 
-# To enable batch computations, we want to be able to stack many factors of
-# the same type. In order to do this, their treedefs must match: this is by
-# default not possible, as every factor will be attached to different variables.
-#
-# To get around this, we erase the individual identities of the variables
-# before flattening each factor. For stacked factors, however, the specific
-# variables connected to each factor are retained implicitly in
-# `FactorStack.value_indices`.
-_variables_metadata = utils.static_field(
-    treedef_from_value=lambda values: tuple(type(v) for v in cast(tuple, values)),
-    value_from_treedef=lambda treedef: tuple(
-        _make_unhashable(t.__new__(t)) for t in treedef
-    ),
-)
+import functools
 
 
 @dataclasses.dataclass
@@ -56,7 +43,7 @@ class _FactorBase:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
 
     variables: Tuple[VariableBase, ...] = dataclasses.field(
-        metadata=_variables_metadata
+        metadata=utils.static_field()
     )
     """Variables connected to this factor. 1-to-1, in-order correspondence with
     `VariableValueTuple`."""
