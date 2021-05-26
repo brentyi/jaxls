@@ -1,7 +1,7 @@
 import contextlib
 import dataclasses
 import time
-from typing import Any, Callable, Dict, Generator, List, Type, TypeVar
+from typing import Any, Callable, ContextManager, Dict, Generator, List, Type, TypeVar
 
 import jax
 import termcolor
@@ -150,26 +150,91 @@ def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
 
     serialization.register_serialization_state(cls, _to_state_dict, _from_state_dict)
 
+    cls.__is_update_buffer__ = False  # type: ignore
+
     # Make dataclass immutable after __init__ is called
     # Similar to dataclasses.dataclass(frozen=True), but a bit friendlier for custom
     # __init__ methods
     def _mark_immutable():
         original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
-        def disabled_setattr(*args, **kwargs):
-            raise dataclasses.FrozenInstanceError(
-                "Dataclass registered as PyTree is immutable!"
-            )
-
         def new_init(self, *args, **kwargs):
             cls.__setattr__ = object.__setattr__
             if original_init is not None:
                 original_init(self, *args, **kwargs)
-            cls.__setattr__ = disabled_setattr
+            cls.__setattr__ = _new_setattr
 
-        cls.__setattr__ = disabled_setattr  # type: ignore
+        cls.__setattr__ = _new_setattr  # type: ignore
         cls.__init__ = new_init  # type: ignore
 
     _mark_immutable()
 
     return cls
+
+
+def _new_setattr(self, name: str, value: Any):
+    if self.__is_update_buffer__:
+        current_value = getattr(self, name)
+        assert jax.tree_structure(value) == jax.tree_structure(
+            current_value
+        ), "Mismatched tree structure!"
+
+        new_shape_types = tuple(
+            (leaf.shape, leaf.dtype) for leaf in jax.tree_leaves(value)
+        )
+        cur_shape_types = tuple(
+            (leaf.shape, leaf.dtype) for leaf in jax.tree_leaves(current_value)
+        )
+        assert (
+            new_shape_types == cur_shape_types
+        ), f"Shape/type error: {new_shape_types} does not match {cur_shape_types}!"
+        object.__setattr__(self, name, value)
+    else:
+        raise dataclasses.FrozenInstanceError(
+            "Dataclass registered as PyTrees is immutable!"
+        )
+
+
+# Notes
+# =====
+# Thinking about functional (or almost functional) approaches for mutating nested
+# dataclasses, when said dataclasses are frozen for safety reasons.
+#
+# Currently this requires nesting a bunch of calls to `dataclasses.replace()`.
+# Two options for more succinctly performing this operation -- with extra validation for
+# array shapes and types -- are included below.
+#
+# For usage, see ../tests/test_update_buffer.py
+
+
+def _mark_mutable(obj: Any, mutable: bool) -> None:
+    if isinstance(obj, (tuple, list)):
+        for child in obj:
+            _mark_mutable(child, mutable)
+    elif isinstance(obj, dict):
+        for child in obj.values():
+            _mark_mutable(child, mutable)
+    elif dataclasses.is_dataclass(obj):
+        object.__setattr__(obj, "__is_update_buffer__", mutable)
+        for child in vars(obj).values():
+            _mark_mutable(child, mutable)
+
+
+def replace_context(obj: T) -> ContextManager[T]:
+    """Context manager that creates a copy a dataclass and allows for temporary mutations."""
+
+    # Inner function helps with static typing
+    def _replace_context(obj: T):
+        # Make a copy of the input object
+        obj_copy = jax.tree_map(lambda leaf: leaf, obj)
+
+        # Mark it as mutable
+        _mark_mutable(obj_copy, mutable=True)
+
+        # Yield
+        yield obj_copy
+
+        # When done, mark as immutable again
+        _mark_mutable(obj_copy, mutable=False)
+
+    return contextlib.contextmanager(_replace_context)(obj)
