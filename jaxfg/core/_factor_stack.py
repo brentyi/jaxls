@@ -42,7 +42,6 @@ class FactorStack(Generic[FactorType]):
         use_onp: bool,
     ) -> "FactorStack[FactorType]":
         """Make a stacked factor."""
-        print(len(factors))
 
         # For one-off computations, onp has much less overhead than jnp
         jnp = onp if use_onp else globals()["jnp"]
@@ -91,6 +90,7 @@ class FactorStack(Generic[FactorType]):
     ) -> List[sparse.SparseCooCoordinates]:
         """Computes Jacobian coordinates for a factor stack. One array of indices per
         variable."""
+
         variable_types: List[Type[VariableBase]] = [
             type(v) for v in factors[0].variables
         ]

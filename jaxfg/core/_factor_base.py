@@ -22,21 +22,6 @@ VariableValueTuple = TypeVar(
 T = TypeVar("T")
 
 
-def _make_unhashable(x: T) -> T:
-    """Helper for making sure variables with meaningless hashes are not hashed. Should
-    be called on all variables that are restored from a treedef; see explanation
-    below."""
-
-    def new_hash() -> int:
-        assert False
-
-    x.__hash__ = new_hash  # type: ignore
-    return x
-
-
-import functools
-
-
 @dataclasses.dataclass
 class _FactorBase:
     # For why we have two classes:
