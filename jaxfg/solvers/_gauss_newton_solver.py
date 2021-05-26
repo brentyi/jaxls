@@ -28,12 +28,11 @@ class GaussNewtonSolver(
         # Initialize
         cost, residual_vector = graph.compute_cost(initial_assignments)
         return NonlinearSolverState(
-            # Using arrays instead of native types helps avoid redundant JIT compilation
-            iterations=onp.array(0),
+            iterations=0,
             assignments=initial_assignments,
             cost=cost,
             residual_vector=residual_vector,
-            done=onp.array(False),
+            done=False,
         )
 
     @overrides

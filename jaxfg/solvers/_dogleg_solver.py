@@ -42,16 +42,12 @@ class DoglegSolver(
         # Initialize
         cost, residual_vector = graph.compute_cost(initial_assignments)
         return _DoglegState(
-            # Using arrays instead of native types helps avoid redundant JIT compilation
-            # TODO: for floats, we may not always want 32-bit
-            iterations=onp.array(0),
+            iterations=0,
             assignments=initial_assignments,
             cost=cost,
             residual_vector=residual_vector,
-            done=onp.array(False),
-            radius=jnp.array(
-                self.radius_initial, dtype=jnp.float32
-            ),  # We use jnp here because lambda_initial will be traced!
+            done=False,
+            radius=self.radius_initial,
         )
 
     @overrides
