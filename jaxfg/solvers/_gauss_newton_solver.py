@@ -1,10 +1,10 @@
-import dataclasses
 from typing import TYPE_CHECKING
 
+import jax_dataclasses
 import numpy as onp
 from overrides import overrides
 
-from .. import sparse, utils
+from .. import sparse
 from ..core._variable_assignments import VariableAssignments
 from ._mixins import _TerminationCriteriaMixin
 from ._nonlinear_solver_base import NonlinearSolverBase, NonlinearSolverState
@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class GaussNewtonSolver(
     NonlinearSolverBase[NonlinearSolverState],
     _TerminationCriteriaMixin,

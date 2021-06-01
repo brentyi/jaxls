@@ -1,11 +1,11 @@
-import dataclasses
 from typing import TYPE_CHECKING
 
+import jax_dataclasses
 import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import hints, sparse, utils
+from .. import hints, sparse
 from ..core._variable_assignments import VariableAssignments
 from ._mixins import _TerminationCriteriaMixin, _TrustRegionMixin
 from ._nonlinear_solver_base import NonlinearSolverBase, NonlinearSolverState
@@ -14,16 +14,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class _LevenbergMarquardtState(NonlinearSolverState):
     """State passed between LM iterations."""
 
     lambd: hints.Scalar
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class LevenbergMarquardtSolver(
     NonlinearSolverBase[_LevenbergMarquardtState],
     _TerminationCriteriaMixin,
@@ -123,7 +121,7 @@ class LevenbergMarquardtSolver(
         )
 
         # Get output assignments
-        assignments = dataclasses.replace(
+        assignments = jax_dataclasses.replace(
             state_prev.assignments,
             storage=jnp.where(
                 accept_flag,

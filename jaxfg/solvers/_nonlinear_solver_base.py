@@ -1,13 +1,13 @@
 import abc
-import dataclasses
 from typing import TYPE_CHECKING, Callable, Generic, TypeVar, Union
 
 import jax
+import jax_dataclasses
 from jax import numpy as jnp
 from jax.experimental import host_callback as hcb
 from overrides import EnforceOverrides
 
-from .. import hints, sparse, utils
+from .. import hints, sparse
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
@@ -17,8 +17,7 @@ Int = Union[hints.Array, int]
 Boolean = Union[hints.Array, bool]
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class NonlinearSolverState:
     """Standard state passed between nonlinear solve iterations."""
 
@@ -34,7 +33,7 @@ NonlinearSolverStateType = TypeVar(
 )
 
 
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
@@ -44,10 +43,10 @@ class _NonlinearSolverBase:
     max_iterations: int = 100
     """Maximum number of iterations."""
 
-    verbose: Boolean = dataclasses.field(default=True, metadata=utils.static_field())
+    verbose: Boolean = jax_dataclasses.static_field(default=True)
     """Set to `True` to enable printing."""
 
-    linear_solver: sparse.LinearSubproblemSolverBase = dataclasses.field(
+    linear_solver: sparse.LinearSubproblemSolverBase = jax_dataclasses.field(
         default_factory=lambda: sparse.CholmodSolver()
     )
     """Solver to use for linear subproblems."""

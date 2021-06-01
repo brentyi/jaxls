@@ -1,12 +1,12 @@
-import dataclasses
 from collections import defaultdict
 from typing import DefaultDict, Dict, Hashable, Iterable, List, Tuple, cast
 
 import jax
+import jax_dataclasses
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import hints, noises, sparse, utils
+from .. import hints, noises, sparse
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factor_base import FactorBase
 from ._factor_stack import FactorStack
@@ -17,8 +17,7 @@ from ._variables import VariableBase
 GroupKey = Hashable
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 
@@ -27,10 +26,8 @@ class StackedFactorGraph:
 
     factor_stacks: List[FactorStack]
     jacobian_coords: sparse.SparseCooCoordinates
-    local_storage_metadata: StorageMetadata = dataclasses.field(
-        metadata=utils.static_field()
-    )
-    residual_dim: int = dataclasses.field(metadata=utils.static_field())
+    local_storage_metadata: StorageMetadata = jax_dataclasses.static_field()
+    residual_dim: int = jax_dataclasses.static_field()
 
     def __post_init__(self):
         """Check that inputs make sense!"""

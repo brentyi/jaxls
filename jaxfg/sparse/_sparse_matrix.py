@@ -1,14 +1,13 @@
-import dataclasses
 from typing import Tuple
 
+import jax_dataclasses
 import scipy
 from jax import numpy as jnp
 
-from .. import hints, utils
+from .. import hints
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class SparseCooCoordinates:
     rows: hints.Array
     """Row indices of non-zero entries. Shape should be `(*, N)`."""
@@ -20,8 +19,7 @@ class SparseCooCoordinates:
     #     assert self.rows.shape == self.cols.shape
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class SparseCooMatrix:
     """Sparse matrix in COO form."""
 
@@ -29,7 +27,7 @@ class SparseCooMatrix:
     """Non-zero matrix values. Shape should be `(*, N)`."""
     coords: SparseCooCoordinates
     """Row and column indices of non-zero entries. Shapes should be `(*, N)`."""
-    shape: Tuple[int, int] = dataclasses.field(metadata=utils.static_field())
+    shape: Tuple[int, int] = jax_dataclasses.static_field()
     """Shape of matrix."""
 
     # Shape checks seem to break under vmap

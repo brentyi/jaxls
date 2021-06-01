@@ -1,18 +1,17 @@
-import dataclasses
 from typing import Dict, Iterable, Type, TypeVar
 
 import jax
+import jax_dataclasses
 from jax import numpy as jnp
 
-from .. import hints, utils
+from .. import hints
 from ._storage_metadata import StorageMetadata
 from ._variables import VariableBase
 
 VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class VariableAssignments:
     """Storage class that maps variables to values."""
 
@@ -20,7 +19,7 @@ class VariableAssignments:
     """Values of variables stacked and flattened. Can either be local or global
     parameterizations, depending on the value of `.storage_metadata.local_flag`."""
 
-    storage_metadata: StorageMetadata = dataclasses.field(metadata=utils.static_field())
+    storage_metadata: StorageMetadata = jax_dataclasses.static_field()
     """Metadata for how variables are stored."""
 
     @staticmethod
@@ -154,4 +153,4 @@ class VariableAssignments:
                 ).flatten()
             )
 
-        return dataclasses.replace(self, storage=new_storage)
+        return jax_dataclasses.replace(self, storage=new_storage)

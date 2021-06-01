@@ -1,10 +1,9 @@
-import dataclasses
 from typing import TYPE_CHECKING
 
 import jax
+import jax_dataclasses
 from overrides import overrides
 
-from .. import utils
 from ..core._variable_assignments import VariableAssignments
 from ._gauss_newton_solver import GaussNewtonSolver
 
@@ -12,15 +11,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class FixedIterationGaussNewtonSolver(GaussNewtonSolver):
     """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
 
-    unroll: bool = dataclasses.field(default=True, metadata=utils.static_field())
+    unroll: bool = jax_dataclasses.static_field(default=True)
 
     # To unroll the optimizer loop, we must have a concrete (static) iteration count
-    max_iterations: int = dataclasses.field(default=10, metadata=utils.static_field())
+    max_iterations: int = jax_dataclasses.static_field(default=10)
 
     @jax.jit
     @overrides

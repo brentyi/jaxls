@@ -1,14 +1,14 @@
 import abc
-import dataclasses
 from typing import Generic, Sequence, Tuple, Type, TypeVar, cast, get_type_hints
 
 import jax
+import jax_dataclasses
 import numpy as onp
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final
 from typing_utils import get_args, issubtype
 
-from .. import hints, noises, utils
+from .. import hints, noises
 from ._variable_assignments import VariableAssignments
 from ._variables import VariableBase
 
@@ -22,14 +22,12 @@ VariableValueTuple = TypeVar(
 T = TypeVar("T")
 
 
-@dataclasses.dataclass
+@jax_dataclasses.dataclass
 class _FactorBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
 
-    variables: Tuple[VariableBase, ...] = dataclasses.field(
-        metadata=utils.static_field()
-    )
+    variables: Tuple[VariableBase, ...] = jax_dataclasses.static_field()
     """Variables connected to this factor. 1-to-1, in-order correspondence with
     `VariableValueTuple`."""
 
