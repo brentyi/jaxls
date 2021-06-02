@@ -170,3 +170,12 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
             )
 
         return output
+
+    def anonymize_variables(self: FactorType) -> FactorType:
+        """Returns a copy of this factor with all variables replaced with their
+        canonical instances. Used for factor stacking.
+        """
+        v: VariableBase
+        return jax_dataclasses.replace(
+            self, variables=tuple(v.canonical_instance() for v in self.variables)
+        )

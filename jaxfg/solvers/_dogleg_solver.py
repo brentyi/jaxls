@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 import jax_dataclasses
-import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 

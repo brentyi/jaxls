@@ -56,15 +56,11 @@ class StackedFactorGraph:
             # Each factor is ultimately just a PyTree node; in order for a set of
             # factors to be batchable, they must share the same:
             group_key: GroupKey = (
-                # (1) Factor type
-                type(factor),
-                # (2) Variable types
-                tuple(type(v) for v in factor.variables),
-                # (3) Leaf shapes: contained array shapes must match
+                # (1) Treedef. Note that variables can be different as long as their
+                # types are the same.
+                jax.tree_structure(factor.anonymize_variables()),
+                # (2) Leaf shapes: contained array shapes must match
                 tuple(leaf.shape for leaf in jax.tree_leaves(factor)),
-                # Tree structure will not match, because variables (which may be
-                # different) are part of the treedef!
-                # > jax.tree_structure(factor),
             )
 
             # Record factor and variables

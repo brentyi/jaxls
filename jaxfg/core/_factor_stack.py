@@ -48,9 +48,7 @@ class FactorStack(Generic[FactorType]):
         # Stack factors in our group
         # This requires that the treedefs of each factor match, which won't be
         # the case when factors are connected to different variables!
-        anonymized_factors = [
-            jax_dataclasses.replace(f, variables=factors[0].variables) for f in factors
-        ]
+        anonymized_factors = [f.anonymize_variables() for f in factors]
         stacked_factor: FactorType = jax.tree_multimap(
             lambda *arrays: jnp.stack(arrays, axis=0), *anonymized_factors
         )

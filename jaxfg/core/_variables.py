@@ -1,6 +1,6 @@
 import abc
 import inspect
-from typing import Callable, ClassVar, Dict, Generic, Mapping, Type, TypeVar
+from typing import Callable, ClassVar, Dict, Generic, Mapping, Type, TypeVar, cast
 
 from jax import flatten_util
 from jax import numpy as jnp
@@ -8,6 +8,7 @@ from overrides import EnforceOverrides, final, overrides
 
 from .. import hints
 
+VariableType = TypeVar("VariableType", bound="VariableBase")
 VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
@@ -53,6 +54,13 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     _unflatten: ClassVar[Callable[[hints.Array], VariableValueType]]
     """Helper for unflattening variable values. Set in `__init_subclass__`."""
 
+    _canonical_instance: ClassVar["VariableBase"]
+    """An instance of this class."""
+
+    def __init__(self):
+        """Variable constructor. Should take no arguments."""
+        super().__init__()
+
     def __init_subclass__(cls):
         """For non-abstract subclasses, we determine the parameter dimensionality and
         unflattening procedure from the example provided by `get_default_value()`."""
@@ -67,6 +75,7 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 
         cls._parameter_dim = parameter_dim
         cls._unflatten = unflatten
+        cls._canonical_instance = cls()
 
     @classmethod
     @final
@@ -101,6 +110,13 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
             VariableValueType: Variable value.
         """
         return cls._unflatten(flat)
+
+    @classmethod
+    def canonical_instance(cls: Type[VariableType]) -> VariableType:
+        """Returns the 'canonical instance' of a variable. For a given class, this will
+        be the same instance each time the method is called. Used for factor stacking.
+        """
+        return cast(VariableType, cls._canonical_instance)
 
     @overrides
     @final
