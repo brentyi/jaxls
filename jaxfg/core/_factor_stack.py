@@ -1,11 +1,11 @@
-import dataclasses
 from typing import Generic, List, Sequence, Tuple, Type, TypeVar
 
 import jax
+import jax_dataclasses
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import hints, sparse, utils
+from .. import hints, sparse
 from ._factor_base import FactorBase
 from ._variable_assignments import StorageMetadata, VariableAssignments
 from ._variables import VariableBase
@@ -13,12 +13,11 @@ from ._variables import VariableBase
 FactorType = TypeVar("FactorType", bound=FactorBase)
 
 
-@utils.register_dataclass_pytree(static_fields=("num_factors",))
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class FactorStack(Generic[FactorType]):
     """A set of factors, with their parameters stacked."""
 
-    num_factors: int
+    num_factors: int = jax_dataclasses.static_field()
     factor: FactorType
     value_indices: Tuple[hints.Array, ...]
 
@@ -47,8 +46,13 @@ class FactorStack(Generic[FactorType]):
         jnp = onp if use_onp else globals()["jnp"]
 
         # Stack factors in our group
+        # This requires that the treedefs of each factor match, which won't be
+        # the case when factors are connected to different variables!
+        anonymized_factors = [
+            jax_dataclasses.replace(f, variables=factors[0].variables) for f in factors
+        ]
         stacked_factor: FactorType = jax.tree_multimap(
-            lambda *arrays: jnp.stack(arrays, axis=0), *factors
+            lambda *arrays: jnp.stack(arrays, axis=0), *anonymized_factors
         )
 
         # Get indices for each variable of each factor
@@ -57,6 +61,9 @@ class FactorStack(Generic[FactorType]):
         )
         for factor in factors:
             for i, variable in enumerate(factor.variables):
+                assert isinstance(
+                    variable, type(factors[0].variables[i])
+                ), "Variable types of stacked factors must match"
                 storage_pos = storage_metadata.index_from_variable[variable]
                 value_indices_list[i].append(
                     onp.arange(storage_pos, storage_pos + variable.get_parameter_dim())
@@ -82,6 +89,7 @@ class FactorStack(Generic[FactorType]):
     ) -> List[sparse.SparseCooCoordinates]:
         """Computes Jacobian coordinates for a factor stack. One array of indices per
         variable."""
+
         variable_types: List[Type[VariableBase]] = [
             type(v) for v in factors[0].variables
         ]

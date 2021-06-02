@@ -1,13 +1,13 @@
 import abc
-import dataclasses
 from typing import TYPE_CHECKING, Callable, Generic, TypeVar, Union
 
 import jax
+import jax_dataclasses
 from jax import numpy as jnp
 from jax.experimental import host_callback as hcb
 from overrides import EnforceOverrides
 
-from .. import hints, sparse, utils
+from .. import hints, sparse
 from ..core._variable_assignments import VariableAssignments
 
 if TYPE_CHECKING:
@@ -17,8 +17,7 @@ Int = Union[hints.Array, int]
 Boolean = Union[hints.Array, bool]
 
 
-@utils.register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class NonlinearSolverState:
     """Standard state passed between nonlinear solve iterations."""
 
@@ -34,8 +33,7 @@ NonlinearSolverStateType = TypeVar(
 )
 
 
-@utils.register_dataclass_pytree(static_fields=("verbose",))
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
@@ -45,33 +43,13 @@ class _NonlinearSolverBase:
     max_iterations: int = 100
     """Maximum number of iterations."""
 
-    verbose: Boolean = True
+    verbose: Boolean = jax_dataclasses.static_field(default=True)
     """Set to `True` to enable printing."""
 
-    linear_solver: sparse.LinearSubproblemSolverBase = dataclasses.field(
+    linear_solver: sparse.LinearSubproblemSolverBase = jax_dataclasses.field(
         default_factory=lambda: sparse.CholmodSolver()
     )
     """Solver to use for linear subproblems."""
-
-    def _hcb_print(
-        self,
-        string_from_args: Callable[..., str],
-        *args: hints.PyTree,
-        **kwargs: hints.PyTree,
-    ) -> None:
-        """Helper for printer optimizer messages via host callbacks. No-op if `verbose`
-        is set to `False`."""
-
-        if not self.verbose:
-            return
-
-        hcb.id_tap(
-            lambda args_kwargs, _unused_transforms: print(
-                f"[{type(self).__name__}]",
-                string_from_args(*args_kwargs[0], **args_kwargs[1]),
-            ),
-            (args, kwargs),
-        )
 
 
 class NonlinearSolverBase(
@@ -127,3 +105,23 @@ class NonlinearSolverBase(
         )
 
         return state.assignments
+
+    def _hcb_print(
+        self,
+        string_from_args: Callable[..., str],
+        *args: hints.PyTree,
+        **kwargs: hints.PyTree,
+    ) -> None:
+        """Helper for printer optimizer messages via host callbacks. No-op if `verbose`
+        is set to `False`."""
+
+        if not self.verbose:
+            return
+
+        hcb.id_tap(
+            lambda args_kwargs, _unused_transforms: print(
+                f"[{type(self).__name__}]",
+                string_from_args(*args_kwargs[0], **args_kwargs[1]),
+            ),
+            (args, kwargs),
+        )

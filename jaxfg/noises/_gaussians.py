@@ -1,16 +1,14 @@
-import dataclasses
 from typing import Sequence, Union
 
+import jax_dataclasses
 from jax import numpy as jnp
 from overrides import overrides
 
 from .. import hints
-from ..utils import register_dataclass_pytree
 from ._noise_model_base import NoiseModelBase
 
 
-@register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class Gaussian(NoiseModelBase):
     sqrt_precision_matrix: hints.Array
     """Lower-triangular square root precision matrix."""
@@ -41,8 +39,7 @@ class Gaussian(NoiseModelBase):
         return jnp.einsum("ij,jk->ik", self.sqrt_precision_matrix, jacobian)
 
 
-@register_dataclass_pytree
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class DiagonalGaussian(NoiseModelBase):
     sqrt_precision_diagonal: hints.Array
     """Diagonal elements of square root precision matrix."""

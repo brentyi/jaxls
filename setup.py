@@ -16,6 +16,7 @@ setup(
         "jax",
         "jaxlib",
         "jaxlie>=1.0.0",
+        "jax_dataclasses>=1.0.0",
         "overrides",
         "scikit-sparse",
         "termcolor",

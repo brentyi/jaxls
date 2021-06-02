@@ -1,7 +1,7 @@
-import dataclasses
 from typing import NamedTuple, Tuple
 
 import jax
+import jax_dataclasses
 import jaxlie
 from jax import numpy as jnp
 from overrides import overrides
@@ -14,7 +14,7 @@ from ._lie_variables import LieVariableBase
 PriorValueTuple = Tuple[jaxlie.MatrixLieGroup]
 
 
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class PriorFactor(FactorBase[PriorValueTuple]):
     """Factor for defining a fixed prior on a frame.
 
@@ -80,7 +80,7 @@ class BetweenValueTuple(NamedTuple):
     T_world_b: jaxlie.MatrixLieGroup
 
 
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class BetweenFactor(FactorBase[BetweenValueTuple]):
     """Factor for defining a geometric relationship between frames `a` and `b`.
 

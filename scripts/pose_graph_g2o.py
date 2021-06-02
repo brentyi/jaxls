@@ -19,6 +19,9 @@ import jaxfg
 
 class SolverType(enum.Enum):
     GAUSS_NEWTON = jaxfg.solvers.GaussNewtonSolver()
+    FIXED_ITERATION_GAUSS_NEWTON = jaxfg.solvers.FixedIterationGaussNewtonSolver(
+        unroll=False
+    )
     LEVENBERG_MARQUARDT = jaxfg.solvers.LevenbergMarquardtSolver()
     DOGLEG = jaxfg.solvers.DoglegSolver()
 

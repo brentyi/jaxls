@@ -1,13 +1,9 @@
-# TODO: this is almost entirely copy and pasted from the vanilla Gauss Newton solver.
-# Should be removed or refactored.
-
-import dataclasses
 from typing import TYPE_CHECKING
 
 import jax
+import jax_dataclasses
 from overrides import overrides
 
-from .. import utils
 from ..core._variable_assignments import VariableAssignments
 from ._gauss_newton_solver import GaussNewtonSolver
 
@@ -15,16 +11,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@utils.register_dataclass_pytree(
-    # Unrolling a fixed number of steps is generally faster than a loop construct, and
-    # requires that `max_iterations` is a static/concrete value.
-    static_fields=("max_iterations", "unroll")
-)
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class FixedIterationGaussNewtonSolver(GaussNewtonSolver):
     """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
 
-    unroll: bool = True
+    unroll: bool = jax_dataclasses.static_field(default=True)
+
+    # To unroll the optimizer loop, we must have a concrete (static) iteration count
+    max_iterations: int = jax_dataclasses.static_field(default=10)
 
     @jax.jit
     @overrides

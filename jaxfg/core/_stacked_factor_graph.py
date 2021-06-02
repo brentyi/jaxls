@@ -1,12 +1,12 @@
-import dataclasses
 from collections import defaultdict
 from typing import DefaultDict, Dict, Hashable, Iterable, List, Tuple, cast
 
 import jax
+import jax_dataclasses
 import numpy as onp
 from jax import numpy as jnp
 
-from .. import hints, noises, sparse, utils
+from .. import hints, noises, sparse
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factor_base import FactorBase
 from ._factor_stack import FactorStack
@@ -17,10 +17,7 @@ from ._variables import VariableBase
 GroupKey = Hashable
 
 
-@utils.register_dataclass_pytree(
-    static_fields=("local_storage_metadata", "residual_dim")
-)
-@dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 
@@ -29,15 +26,16 @@ class StackedFactorGraph:
 
     factor_stacks: List[FactorStack]
     jacobian_coords: sparse.SparseCooCoordinates
-    local_storage_metadata: StorageMetadata
-    residual_dim: int
+    local_storage_metadata: StorageMetadata = jax_dataclasses.static_field()
+    residual_dim: int = jax_dataclasses.static_field()
 
     def __post_init__(self):
         """Check that inputs make sense!"""
         for stacked_factor in self.factor_stacks:
             N = stacked_factor.num_factors
             for value_indices, variable in zip(
-                stacked_factor.value_indices, stacked_factor.factor.variables
+                stacked_factor.value_indices,
+                stacked_factor.factor.variables,
             ):
                 assert value_indices.shape == (N, variable.get_parameter_dim())
 
@@ -58,10 +56,15 @@ class StackedFactorGraph:
             # Each factor is ultimately just a PyTree node; in order for a set of
             # factors to be batchable, they must share the same:
             group_key: GroupKey = (
-                # (1) Tree structure: this encompasses the factor class, variable types
-                jax.tree_structure(factor),
-                # (2) Leaf shapes: array shapes must match in order to be stacked
+                # (1) Factor type
+                type(factor),
+                # (2) Variable types
+                tuple(type(v) for v in factor.variables),
+                # (3) Leaf shapes: contained array shapes must match
                 tuple(leaf.shape for leaf in jax.tree_leaves(factor)),
+                # Tree structure will not match, because variables (which may be
+                # different) are part of the treedef!
+                # > jax.tree_structure(factor),
             )
 
             # Record factor and variables
