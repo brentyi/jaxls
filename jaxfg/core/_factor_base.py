@@ -22,7 +22,7 @@ VariableValueTuple = TypeVar(
 T = TypeVar("T")
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class _FactorBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381

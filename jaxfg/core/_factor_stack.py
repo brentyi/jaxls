@@ -13,7 +13,7 @@ from ._variables import VariableBase
 FactorType = TypeVar("FactorType", bound=FactorBase)
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class FactorStack(Generic[FactorType]):
     """A set of factors, with their parameters stacked."""
 

@@ -42,7 +42,7 @@ def register_dataclass_pytree(cls: Type[T]) -> Type[T]:
 
     warnings.warn(
         "@register_dataclass_pytree has been phased out -- use"
-        " @jax_dataclasses.dataclass() instead!",
+        " @jax_dataclasses.pytree_dataclass() instead!",
         DeprecationWarning,
         stacklevel=1,
     )

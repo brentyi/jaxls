@@ -7,7 +7,7 @@ from jax import numpy as jnp
 from .. import hints
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class SparseCooCoordinates:
     rows: hints.Array
     """Row indices of non-zero entries. Shape should be `(*, N)`."""
@@ -19,7 +19,7 @@ class SparseCooCoordinates:
     #     assert self.rows.shape == self.cols.shape
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class SparseCooMatrix:
     """Sparse matrix in COO form."""
 

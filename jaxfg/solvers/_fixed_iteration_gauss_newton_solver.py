@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class FixedIterationGaussNewtonSolver(GaussNewtonSolver):
     """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
 

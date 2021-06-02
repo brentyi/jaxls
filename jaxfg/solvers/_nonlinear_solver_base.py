@@ -17,7 +17,7 @@ Int = Union[hints.Array, int]
 Boolean = Union[hints.Array, bool]
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class NonlinearSolverState:
     """Standard state passed between nonlinear solve iterations."""
 
@@ -33,7 +33,7 @@ NonlinearSolverStateType = TypeVar(
 )
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381

@@ -17,7 +17,7 @@ from ._variables import VariableBase
 GroupKey = Hashable
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 

@@ -11,7 +11,7 @@ from ._variables import VariableBase
 VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class VariableAssignments:
     """Storage class that maps variables to values."""
 

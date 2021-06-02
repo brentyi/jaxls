@@ -36,7 +36,7 @@ class _LinearSolverArgs(NamedTuple):
 _cholmod_analyze_cache: Dict[Hashable, sksparse.cholmod.Factor] = {}
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class CholmodSolver(LinearSubproblemSolverBase):
     r"""CHOLMOD-based sparse linear solver. This is the default solver for performance
     reasons, but also less stable than `ConjugateGradientSolver`.
@@ -88,7 +88,7 @@ class CholmodSolver(LinearSubproblemSolverBase):
         return _cholmod_analyze_cache[self_hash].solve_A(args.ATb)
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class ConjugateGradientSolver(LinearSubproblemSolverBase):
     inexact_step_eta: float = 1e-1
     """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to

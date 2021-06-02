@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class _DoglegState(NonlinearSolverState):
     """State passed between dogleg iterations."""
 
     radius: hints.Scalar
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class DoglegSolver(
     NonlinearSolverBase[_DoglegState],
     _TerminationCriteriaMixin,

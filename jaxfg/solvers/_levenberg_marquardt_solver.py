@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class _LevenbergMarquardtState(NonlinearSolverState):
     """State passed between LM iterations."""
 
     lambd: hints.Scalar
 
 
-@jax_dataclasses.dataclass
+@jax_dataclasses.pytree_dataclass
 class LevenbergMarquardtSolver(
     NonlinearSolverBase[_LevenbergMarquardtState],
     _TerminationCriteriaMixin,
