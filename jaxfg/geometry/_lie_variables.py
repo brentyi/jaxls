@@ -34,6 +34,16 @@ class LieVariableBase(VariableBase[T], Generic[T]):
     def manifold_retract(cls, x: T, local_delta: jaxlie.hints.TangentVector) -> T:
         return jaxlie.manifold.rplus(x, local_delta)
 
+    @classmethod
+    @final
+    @overrides
+    def manifold_retract_jacobian(cls, x: T) -> T:
+        # `jaxlie` returns Jacobians as bare arrays, but emulating
+        # jax.jacfwd/jax.jacrev requires each Jacobian to be a pytree.
+        return cls.get_group_type()(
+            jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(x)
+        )
+
 
 class SO2Variable(LieVariableBase[jaxlie.SO2]):
     @staticmethod

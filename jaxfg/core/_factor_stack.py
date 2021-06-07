@@ -22,10 +22,10 @@ class FactorStack(Generic[FactorType]):
     value_indices: Tuple[hints.Array, ...]
 
     def __post_init__(self):
-        # There should be one set of indices for each variable type
+        # There should be one set of indices for each variable type.
         assert len(self.value_indices) == len(self.factor.variables)
 
-        # Check that shapes make sense
+        # Check that shapes make sense.
         for variable, indices in zip(self.factor.variables, self.value_indices):
             residual_dim = self.factor.noise_model.get_residual_dim()
             assert indices.shape == (
@@ -42,18 +42,19 @@ class FactorStack(Generic[FactorType]):
     ) -> "FactorStack[FactorType]":
         """Make a stacked factor."""
 
-        # For one-off computations, onp has much less overhead than jnp
+        # For one-off computations, onp has much less overhead than jnp.
         jnp = onp if use_onp else globals()["jnp"]
 
-        # Stack factors in our group
+        # Stack factors in our group.
         # This requires that the treedefs of each factor match, which won't be
         # the case when factors are connected to different variables!
-        anonymized_factors = [f.anonymize_variables() for f in factors]
         stacked_factor: FactorType = jax.tree_multimap(
-            lambda *arrays: jnp.stack(arrays, axis=0), *anonymized_factors
+            lambda *arrays: jnp.stack(arrays, axis=0),
+            *map(FactorBase.anonymize_variables, factors),  # type: ignore
+            # > https://github.com/python/mypy/issues/1317
         )
 
-        # Get indices for each variable of each factor
+        # Get indices for each variable of each factor.
         value_indices_list: Tuple[List[onp.ndarray], ...] = tuple(
             [] for _ in range(len(stacked_factor.variables))
         )
@@ -67,12 +68,12 @@ class FactorStack(Generic[FactorType]):
                     onp.arange(storage_pos, storage_pos + variable.get_parameter_dim())
                 )
 
-        # Stack: end result should be Tuple[array of shape (N, parameter_dim), ...]
+        # Stack: end result should be Tuple[array of shape (N, parameter_dim), ...].
         value_indices_stacked: Tuple[onp.ndarray, ...] = tuple(
             onp.array(indices) for indices in value_indices_list
         )
 
-        # Record values
+        # Record values.
         return FactorStack(
             num_factors=len(factors),
             factor=stacked_factor,
@@ -92,13 +93,13 @@ class FactorStack(Generic[FactorType]):
             type(v) for v in factors[0].variables
         ]
 
-        # Get indices for each variable
+        # Get indices for each variable.
         local_value_indices_list: Tuple[List[onp.ndarray], ...] = tuple(
             [] for _ in range(len(variable_types))
         )
         for factor in factors:
             for i, variable in enumerate(factor.variables):
-                # Record local parameterization indices
+                # Record local parameterization indices.
                 storage_pos = local_storage_metadata.index_from_variable[variable]
                 local_value_indices_list[i].append(
                     onp.arange(
@@ -107,32 +108,32 @@ class FactorStack(Generic[FactorType]):
                     )
                 )
 
-        # Stack: end result should be Tuple[array of shape (N, parameter_dim), ...]
+        # Stack: end result should be Tuple[array of shape (N, parameter_dim), ...].
         local_value_indices_stacked: Tuple[onp.ndarray, ...] = tuple(
             onp.array(indices) for indices in local_value_indices_list
         )
 
-        # Get residual indices
+        # Get residual indices.
         num_factors = len(factors)
         residual_dim = factors[0].get_residual_dim()
         residual_indices = onp.arange(num_factors * residual_dim).reshape(
             (num_factors, residual_dim)
         )
 
-        # Get Jacobian coordinates
+        # Get Jacobian coordinates.
         jacobian_coords: List[sparse.SparseCooCoordinates] = []
         for variable_index, variable_type in enumerate(variable_types):
             variable_dim = variable_type.get_local_parameter_dim()
 
             coords = onp.stack(
                 (
-                    # Row indices
+                    # Row indices.
                     onp.broadcast_to(
                         residual_indices[:, :, None],
                         (num_factors, residual_dim, variable_dim),
                     )
                     + row_offset,
-                    # Column indices
+                    # Column indices.
                     onp.broadcast_to(
                         local_value_indices_stacked[variable_index][:, None, :],
                         (num_factors, residual_dim, variable_dim),
@@ -159,14 +160,14 @@ class FactorStack(Generic[FactorType]):
         Shape of output should be `(N, stacked_factor.factor.get_residual_dim())`.
         """
 
-        # Stack inputs to our factors
+        # Stack inputs to our factors.
         values_stacked = tuple(
             jax.vmap(type(variable).unflatten)(assignments.storage[indices])
             for variable, indices in zip(self.factor.variables, self.value_indices)
         )
 
-        # Vectorized residual computation
-        # The type of `values_stacked` should match `FactorVariableValues`
+        # Vectorized residual computation.
+        # The type of `values_stacked` should match `FactorVariableValues`.
         residual_vector = jax.vmap(type(self.factor).compute_residual_vector)(
             self.factor,
             self.factor.build_variable_value_tuple(values_stacked),
@@ -182,14 +183,14 @@ class FactorStack(Generic[FactorType]):
         Shape of each Jacobian array should be `(N, local parameter dim, residual dim)`.
         """
 
-        # Stack inputs to our factors
+        # Stack inputs to our factors.
         values_stacked = tuple(
             jax.vmap(variable.unflatten)(assignments.storage[indices])
             for indices, variable in zip(self.value_indices, self.factor.variables)
         )
 
-        # Compute Jacobians wrt local parameterizations
-        # The type of `values_stacked` should match `FactorVariableValues`
+        # Compute Jacobians wrt local parameterizations.
+        # The type of `values_stacked` should match `FactorVariableValues`.
         jacobians = jax.vmap(type(self.factor).compute_residual_jacobians)(
             self.factor,
             self.factor.build_variable_value_tuple(values_stacked),

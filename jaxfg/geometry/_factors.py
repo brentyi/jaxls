@@ -1,16 +1,14 @@
 from typing import NamedTuple, Tuple
 
-import jax
 import jax_dataclasses
 import jaxlie
 from jax import numpy as jnp
 from overrides import overrides
 
-from .. import noises, utils
+from .. import noises
 from ..core._factor_base import FactorBase
 from ._lie_variables import LieVariableBase
 
-# jaxlie.MatrixLieGroup = TypeVar("jaxlie.MatrixLieGroup", bound=jaxlie.MatrixLieGroup)
 PriorValueTuple = Tuple[jaxlie.MatrixLieGroup]
 
 
@@ -43,36 +41,6 @@ class PriorFactor(FactorBase[PriorValueTuple]):
 
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
         return jaxlie.manifold.rminus(value, self.mu)
-
-    @overrides
-    def compute_residual_jacobians(
-        self, variable_values: PriorValueTuple
-    ) -> Tuple[jnp.ndarray]:
-        (value,) = variable_values
-
-        # Helper for using analytical `rplus` Jacobians
-        #
-        # Implementing this is totally optional -- we should get the same results even
-        # with this function commented out!
-
-        J_residual_wrt_value = jax.jacfwd(
-            PriorFactor.compute_residual_vector, argnums=1
-        )(self, (value,))[0].parameters()
-        assert J_residual_wrt_value.shape == (
-            value.tangent_dim,
-            value.parameters_dim,
-        )
-
-        J_value_wrt_delta = jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(
-            transform=value
-        )
-        assert J_value_wrt_delta.shape == (
-            value.parameters_dim,
-            value.tangent_dim,
-        )
-
-        J_residual_wrt_delta = J_residual_wrt_value @ J_value_wrt_delta
-        return (J_residual_wrt_delta,)
 
 
 class BetweenValueTuple(NamedTuple):
@@ -117,28 +85,3 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
 
         # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
         return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
-
-    @overrides
-    def compute_residual_jacobians(
-        self, variable_values: BetweenValueTuple
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        T_world_a = variable_values.T_world_a
-        T_world_b = variable_values.T_world_b
-
-        # Helper for using analytical `rplus` Jacobians
-        #
-        # Implementing this is totally optional -- we should get the same results even
-        # with this function commented out!
-
-        J_residual_wrt_a, J_residual_wrt_b = (
-            J.parameters()
-            for J in jax.jacfwd(BetweenFactor.compute_residual_vector, argnums=1)(
-                self, BetweenValueTuple(T_world_a, T_world_b)
-            )
-        )
-
-        J_a_wrt_delta, J_b_wrt_delta = jax.vmap(
-            jaxlie.manifold.rplus_jacobian_parameters_wrt_delta
-        )(utils.pytree_stack(T_world_a, T_world_b))
-
-        return (J_residual_wrt_a @ J_a_wrt_delta, J_residual_wrt_b @ J_b_wrt_delta)

@@ -1,9 +1,8 @@
 import abc
-from typing import Generic, Sequence, Tuple, Type, TypeVar, cast, get_type_hints
+from typing import Generic, Iterable, Tuple, Type, TypeVar, cast, get_type_hints
 
 import jax
 import jax_dataclasses
-import numpy as onp
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final
 from typing_utils import get_args, issubtype
@@ -46,54 +45,47 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
             variable_values: Values of self.variables
         """
 
+    @final
     def compute_residual_jacobians(
         self, variable_values: VariableValueTuple
     ) -> Tuple[jnp.ndarray, ...]:
-        """Compute Jacobian of residual with respect to local parameterization.
+        """Compute Jacobian of residual with respect to local parameterization, by
+        composing the residual computation Jacobian with the manifold retraction
+        Jacobian.
 
-        Uses `jax.jacfwd` by default, but can optionally be overriden.
-
-        Args:
-            variable_values: Values of variables to linearize around.
+        To specify analytical Jacobians, override `manifold_retract_jacobian()` for
+        variables and define a custom JVP method for `compute_residual_vector`.
         """
+        variable: VariableBase
+        value: hints.VariableValue
 
-        def compute_cost_with_local_delta(
-            local_deltas: Sequence[jnp.ndarray],
-        ) -> jnp.ndarray:
-            # Suppressing:
-            # - Need type annotation for 'variable_value'
-            # - Argument 1 to "zip" has incompatible type "FactorVariableTypes"; expected "Iterable[<nothing>]
-            perturbed_values = tuple(  # type: ignore
-                variable.manifold_retract(
-                    x=variable_value,
-                    local_delta=local_delta,
-                )
-                for variable, variable_value, local_delta in zip(
-                    self.variables, variable_values, local_deltas  # type: ignore
+        def concatenate_jacobian_blocks(
+            trees: Iterable[hints.PyTree],
+        ) -> Tuple[jnp.ndarray, ...]:
+            return tuple(
+                map(
+                    lambda tree: jnp.concatenate(jax.tree_leaves(tree), axis=0),
+                    tuple(trees),
                 )
             )
 
-            return self.compute_residual_vector(
-                self.build_variable_value_tuple(perturbed_values)
-            )
-
-        # Evaluate Jacobian when deltas are zero
-        return jax.jacfwd(compute_cost_with_local_delta)(
-            tuple(
-                onp.zeros(variable.get_local_parameter_dim())
-                for variable in self.variables
-            )
+        # To compute the Jacobian of the residual wrt the local parameters, we
+        # compose...
+        assert len(self.variables) == len(variable_values)
+        jacobians = jax.tree_map(
+            jnp.dot,
+            # (1) The residual wrt the variable parameters.
+            concatenate_jacobian_blocks(
+                jax.jacfwd(self.compute_residual_vector)(variable_values),
+            ),
+            # (2) The variable parameters wrt the local parameterization.
+            concatenate_jacobian_blocks(
+                self.variables[i].manifold_retract_jacobian(variable_values[i])
+                for i in range(len(self.variables))
+            ),
         )
 
-    def compute_whitened_residual_vector(self, variable_values: VariableValueTuple):
-        pass
-
-    def compute_whitened_residual_jacobians(
-        self,
-        variable_values: VariableValueTuple,
-        residual_vector: hints.Array,
-    ):
-        pass
+        return tuple(jacobians)
 
     def __init_subclass__(cls, *args, **kwargs):
         """Register all factors as hashable PyTree nodes."""
@@ -171,11 +163,12 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
 
         return output
 
+    @final
     def anonymize_variables(self: FactorType) -> FactorType:
         """Returns a copy of this factor with all variables replaced with their
         canonical instances. Used for factor stacking.
         """
         v: VariableBase
         return jax_dataclasses.replace(
-            self, variables=tuple(v.canonical_instance() for v in self.variables)
+            self, variables=tuple(type(v).canonical_instance() for v in self.variables)
         )

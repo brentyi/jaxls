@@ -1,7 +1,10 @@
 import abc
+import functools
 import inspect
-from typing import Callable, ClassVar, Dict, Generic, Mapping, Type, TypeVar, cast
+from typing import Callable, ClassVar, Generic, Mapping, Type, TypeVar
 
+import jax
+import numpy as onp
 from jax import flatten_util
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final, overrides
@@ -38,24 +41,33 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         Typically written as `x $\oplus$ local_delta` or `x $\boxplus$ local_delta`.
 
         Args:
-            x (VariableValue): Absolute parameter to update.
-            local_delta (VariableValue): Delta value in local parameterizaton.
+            x: Absolute parameter to update.
+            local_delta: Delta value in local parameterizaton.
 
         Returns:
-            hints.Array: Updated parameterization.
+            Updated parameterization.
         """
         return cls.unflatten(cls.flatten(x) + local_delta)
 
-    # (3) Shared implementation details.
+    # (3) Optional
+
+    @classmethod
+    def manifold_retract_jacobian(cls, x: VariableValueType) -> VariableValueType:
+        """Jacobian of the variable parameters with respect to the local
+        parameterization, linearized around `local_delta=zero`.
+        """
+        return jax.jacfwd(cls.manifold_retract, argnums=1)(
+            x,
+            onp.zeros(cls.get_local_parameter_dim()),
+        )
+
+    # (4) Shared implementation details.
 
     _parameter_dim: ClassVar[int]
     """Parameter dimensionality. Set automatically in `__init_subclass__`."""
 
     _unflatten: ClassVar[Callable[[hints.Array], VariableValueType]]
     """Helper for unflattening variable values. Set in `__init_subclass__`."""
-
-    _canonical_instance: ClassVar["VariableBase"]
-    """An instance of this class."""
 
     def __init__(self):
         """Variable constructor. Should take no arguments."""
@@ -75,7 +87,6 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 
         cls._parameter_dim = parameter_dim
         cls._unflatten = unflatten
-        cls._canonical_instance = cls()
 
     @classmethod
     @final
@@ -112,11 +123,12 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         return cls._unflatten(flat)
 
     @classmethod
+    @functools.lru_cache(maxsize=None)
     def canonical_instance(cls: Type[VariableType]) -> VariableType:
         """Returns the 'canonical instance' of a variable. For a given class, this will
         be the same instance each time the method is called. Used for factor stacking.
         """
-        return cast(VariableType, cls._canonical_instance)
+        return cls()
 
     @overrides
     @final
@@ -136,24 +148,19 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
 class _RealVectorVariableTemplate:
     """Usage: `RealVectorVariable[N]`, where `N` is an integer dimension."""
 
-    _real_vector_variable_cache: Dict[int, Type[VariableBase]] = {}
-
     @classmethod
+    @functools.lru_cache(maxsize=None)
     def __getitem__(cls, dim: int) -> Type[VariableBase]:
         assert isinstance(dim, int)
 
-        if dim not in cls._real_vector_variable_cache:
+        class _RealVectorVariable(VariableBase[hints.Array]):
+            @staticmethod
+            @overrides
+            @final
+            def get_default_value() -> hints.Array:
+                return jnp.zeros(dim)
 
-            class _RealVectorVariable(VariableBase[hints.Array]):
-                @staticmethod
-                @overrides
-                @final
-                def get_default_value() -> hints.Array:
-                    return jnp.zeros(dim)
-
-            cls._real_vector_variable_cache[dim] = _RealVectorVariable
-
-        return cls._real_vector_variable_cache[dim]
+        return _RealVectorVariable
 
 
 RealVectorVariable: Mapping[int, Type[VariableBase[hints.Array]]]
