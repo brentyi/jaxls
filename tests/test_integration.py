@@ -1,201 +1,93 @@
 """Simple pose graph tests. Could use cleanup/refactoring."""
 
-from typing import List
+from typing import Tuple
 
-import jaxlie
+import jax_dataclasses
 from jax import numpy as jnp
+from overrides import overrides
 
 import jaxfg
 
 
-def test_pose_graph_gauss_newton():
-    pose_variables = [
-        jaxfg.geometry.SE2Variable(),
-        jaxfg.geometry.SE2Variable(),
-    ]
+@jax_dataclasses.pytree_dataclass
+class VariableValue:
+    a: jaxfg.hints.Array
+    b: jaxfg.hints.Scalar
 
-    factors: List[jaxfg.core.FactorBase] = [
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[0],
-            mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=[1.0, 1.0, 1.0]
-            ),
-        ),
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[1],
-            mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-        jaxfg.geometry.BetweenFactor.make(
-            variable_T_world_a=pose_variables[0],
-            variable_T_world_b=pose_variables[1],
-            T_a_b=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-    ]
 
-    graph = jaxfg.core.StackedFactorGraph.make(factors)
-    initial_assignments = jaxfg.core.VariableAssignments.make_from_defaults(
-        pose_variables
+class Variable(jaxfg.core.VariableBase[VariableValue]):
+    @classmethod
+    @overrides
+    def get_default_value(cls) -> VariableValue:
+        return VariableValue(jnp.array([1.0, 2.0]), 3.0)
+
+
+VariableValueSingle = Tuple[VariableValue]
+VariableValuePair = Tuple[VariableValue, VariableValue]
+
+
+@jax_dataclasses.pytree_dataclass
+class UniFactor(jaxfg.core.FactorBase[VariableValueSingle]):
+    @staticmethod
+    def make(variable: Variable) -> "UniFactor":
+        return UniFactor(
+            variables=(variable,),
+            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(jnp.ones(4)),
+        )
+
+    @overrides
+    def compute_residual_vector(
+        self, variable_values: VariableValueSingle
+    ) -> jnp.ndarray:
+        (variable,) = variable_values
+        return jnp.array(
+            [
+                variable.a[0] - 2.0,
+                variable.a[1] - 3.0,
+                variable.b - 2.0,
+                variable.b - 7.0,
+            ]
+        )
+
+
+@jax_dataclasses.pytree_dataclass
+class BiFactor(jaxfg.core.FactorBase[VariableValuePair]):
+    @staticmethod
+    def make(variable1: Variable, variable2: Variable) -> "BiFactor":
+        return BiFactor(
+            variables=(variable1, variable2),
+            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(jnp.ones(4)),
+        )
+
+    @overrides
+    def compute_residual_vector(
+        self, variable_values: VariableValuePair
+    ) -> jnp.ndarray:
+        (v1, v2) = variable_values
+        return jnp.array(
+            [
+                v1.a[0] - v2.a[1],
+                v1.a[1] - v2.a[0],
+                v1.b - v2.b,
+                jnp.sqrt(jnp.abs(v2.b - 7.0)),
+            ]
+        )
+
+
+def test_integration():
+    """Make sure everything runs without exploding!"""
+
+    variables = [Variable() for i in range(2)]
+    graph = jaxfg.core.StackedFactorGraph.make(
+        [
+            UniFactor.make(variables[0]),
+            BiFactor.make(variables[0], variables[1]),
+        ]
     )
 
-    solution_assignments = graph.solve(
-        initial_assignments,
-        solver=jaxfg.solvers.GaussNewtonSolver(
-            linear_solver=jaxfg.sparse.CholmodSolver()
-        ),
-    )
+    initial_assignments = jaxfg.core.VariableAssignments.make_from_defaults(variables)
+    solution_assignments = graph.solve(initial_assignments)
+
     assert graph.compute_joint_nll(initial_assignments) > graph.compute_joint_nll(
         solution_assignments
-    )
-
-    assert type(repr(solution_assignments)) == str
-    assert isinstance(solution_assignments.get_value(pose_variables[0]), jaxlie.SE2)
-    assert isinstance(
-        solution_assignments.get_stacked_value(jaxfg.geometry.SE2Variable), jaxlie.SE2
-    )
-    assert jnp.all(
-        solution_assignments.get_value(pose_variables[0]).parameters()
-        == solution_assignments.get_stacked_value(
-            jaxfg.geometry.SE2Variable
-        ).parameters()[0]
-    )
-    assert jnp.all(
-        solution_assignments.get_value(pose_variables[1]).parameters()
-        == solution_assignments.get_stacked_value(
-            jaxfg.geometry.SE2Variable
-        ).parameters()[1]
-    )
-
-
-def test_pose_graph_levenberg_marquardt():
-    pose_variables = [
-        jaxfg.geometry.SE2Variable(),
-        jaxfg.geometry.SE2Variable(),
-    ]
-
-    factors: List[jaxfg.core.FactorBase] = [
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[0],
-            mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[1],
-            mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-        jaxfg.geometry.BetweenFactor.make(
-            variable_T_world_a=pose_variables[0],
-            variable_T_world_b=pose_variables[1],
-            T_a_b=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-    ]
-
-    graph = jaxfg.core.StackedFactorGraph.make(factors)
-    initial_assignments = jaxfg.core.VariableAssignments.make_from_defaults(
-        pose_variables
-    )
-
-    solution_assignments = graph.solve(
-        initial_assignments,
-        solver=jaxfg.solvers.LevenbergMarquardtSolver(
-            linear_solver=jaxfg.sparse.ConjugateGradientSolver()
-        ),
-    )
-    assert graph.compute_joint_nll(initial_assignments) > graph.compute_joint_nll(
-        solution_assignments
-    )
-
-    assert type(repr(solution_assignments)) == str
-    assert isinstance(solution_assignments.get_value(pose_variables[0]), jaxlie.SE2)
-    assert isinstance(
-        solution_assignments.get_stacked_value(jaxfg.geometry.SE2Variable), jaxlie.SE2
-    )
-    assert jnp.all(
-        solution_assignments.get_value(pose_variables[0]).parameters()
-        == solution_assignments.get_stacked_value(
-            jaxfg.geometry.SE2Variable
-        ).parameters()[0]
-    )
-    assert jnp.all(
-        solution_assignments.get_value(pose_variables[1]).parameters()
-        == solution_assignments.get_stacked_value(
-            jaxfg.geometry.SE2Variable
-        ).parameters()[1]
-    )
-
-
-def test_pose_graph_dogleg():
-    pose_variables = [
-        jaxfg.geometry.SE2Variable(),
-        jaxfg.geometry.SE2Variable(),
-    ]
-
-    factors: List[jaxfg.core.FactorBase] = [
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[0],
-            mu=jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[1],
-            mu=jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-        jaxfg.geometry.BetweenFactor.make(
-            variable_T_world_a=pose_variables[0],
-            variable_T_world_b=pose_variables[1],
-            T_a_b=jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0),
-            noise_model=jaxfg.noises.DiagonalGaussian.make_from_covariance(
-                diagonal=jnp.ones(3)
-            ),
-        ),
-    ]
-
-    graph = jaxfg.core.StackedFactorGraph.make(factors)
-    initial_assignments = jaxfg.core.VariableAssignments.make_from_defaults(
-        pose_variables
-    )
-
-    solution_assignments = graph.solve(
-        initial_assignments,
-        solver=jaxfg.solvers.DoglegSolver(),
-    )
-    assert graph.compute_joint_nll(initial_assignments) > graph.compute_joint_nll(
-        solution_assignments
-    )
-
-    assert type(repr(solution_assignments)) == str
-    assert isinstance(solution_assignments.get_value(pose_variables[0]), jaxlie.SE2)
-    assert isinstance(
-        solution_assignments.get_stacked_value(jaxfg.geometry.SE2Variable), jaxlie.SE2
-    )
-    assert jnp.all(
-        solution_assignments.get_value(pose_variables[0]).parameters()
-        == solution_assignments.get_stacked_value(
-            jaxfg.geometry.SE2Variable
-        ).parameters()[0]
-    )
-    assert jnp.all(
-        solution_assignments.get_value(pose_variables[1]).parameters()
-        == solution_assignments.get_stacked_value(
-            jaxfg.geometry.SE2Variable
-        ).parameters()[1]
     )

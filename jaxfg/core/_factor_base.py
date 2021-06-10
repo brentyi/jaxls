@@ -59,33 +59,39 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         variable: VariableBase
         value: hints.VariableValue
 
-        def concatenate_jacobian_blocks(
-            trees: Iterable[hints.PyTree],
-        ) -> Tuple[jnp.ndarray, ...]:
-            return tuple(
-                map(
-                    lambda tree: jnp.concatenate(jax.tree_leaves(tree), axis=0),
-                    tuple(trees),
-                )
-            )
+        # Some helpers for reshaping + concatenating Jacobians
+        def reshape_leaves(tree: hints.PyTree, shape: Tuple[int, ...]) -> hints.PyTree:
+            return jax.tree_map(lambda leaf: leaf.reshape(shape), tree)
 
-        # To compute the Jacobian of the residual wrt the local parameters, we
-        # compose...
+        def concatenate_leaves(tree: Iterable[hints.PyTree], axis: int) -> jnp.ndarray:
+            return jnp.concatenate(jax.tree_leaves(tree), axis=axis)
+
+        # To compute the Jacobian of the residual wrt the local parameters, we compose
+        # (1) the residual wrt the variable parameters and (2) the variable parameters
+        # wrt the local parameterization.
         assert len(self.variables) == len(variable_values)
         jacobians = jax.tree_map(
             jnp.dot,
-            # (1) The residual wrt the variable parameters.
-            concatenate_jacobian_blocks(
-                jax.jacfwd(self.compute_residual_vector)(variable_values),
+            tuple(
+                concatenate_leaves(tree, axis=-1)
+                for tree in reshape_leaves(
+                    jax.jacfwd(self.compute_residual_vector)(variable_values),
+                    (self.get_residual_dim(), -1),
+                )
             ),
-            # (2) The variable parameters wrt the local parameterization.
-            concatenate_jacobian_blocks(
-                self.variables[i].manifold_retract_jacobian(variable_values[i])
-                for i in range(len(self.variables))
+            tuple(
+                concatenate_leaves(
+                    reshape_leaves(
+                        self.variables[i].manifold_retract_jacobian(variable_values[i]),
+                        (-1, v.get_local_parameter_dim()),
+                    ),
+                    axis=0,
+                )
+                for i, v in enumerate(self.variables)
             ),
         )
 
-        return tuple(jacobians)
+        return jacobians
 
     def __init_subclass__(cls, *args, **kwargs):
         """Register all factors as hashable PyTree nodes."""
