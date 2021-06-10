@@ -24,8 +24,7 @@ jobs:
           sudo apt update
           sudo apt install -y libsuitesparse-dev
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install mypy
+          pip install -e .[type-checking]
       - name: Test with mypy
         run: |
           mypy .

@@ -29,6 +29,10 @@ setup(
             # "pytest-cov",
             # "hypothesis",
             # "hypothesis[numpy]",
-        ]
+        ],
+        "type-checking": [
+            "mypy",
+            "types-termcolor",
+        ],
     },
 )
