@@ -70,7 +70,7 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         # (1) the residual wrt the variable parameters and (2) the variable parameters
         # wrt the local parameterization.
         assert len(self.variables) == len(variable_values)
-        jacobians = jax.tree_map(
+        jacobians = jax.tree_multimap(
             jnp.dot,
             tuple(
                 concatenate_leaves(tree, axis=-1)
