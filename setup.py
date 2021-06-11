@@ -13,7 +13,7 @@ setup(
     python_requires=">=3.7",
     install_requires=[
         "datargs",
-        "jax",
+        "jax>=0.2.13",
         "jaxlib",
         "jaxlie>=1.0.0",
         "jax_dataclasses>=1.0.0",

@@ -9,14 +9,19 @@ from jax import numpy as jnp
 T = TypeVar("T")
 
 
+import warnings
+
+
 def pytree_stack(*trees: T, axis=0) -> T:
     """Stack PyTrees along a specified axis."""
-    return jax.tree_multimap(lambda *arrays: jnp.stack(arrays, axis=axis), *trees)
+    warnings.warn("Deprecated!", DeprecationWarning, stacklevel=1)
+    return jax.tree_map(lambda *arrays: jnp.stack(arrays, axis=axis), *trees)
 
 
 def pytree_concatenate(*trees: T, axis=0) -> T:
     """Concatenate PyTrees along a specified axis."""
-    return jax.tree_multimap(lambda *arrays: jnp.concatenate(arrays, axis=axis), *trees)
+    warnings.warn("Deprecated!", DeprecationWarning, stacklevel=1)
+    return jax.tree_map(lambda *arrays: jnp.concatenate(arrays, axis=axis), *trees)
 
 
 @contextlib.contextmanager

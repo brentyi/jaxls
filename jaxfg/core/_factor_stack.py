@@ -48,7 +48,7 @@ class FactorStack(Generic[FactorType]):
         # Stack factors in our group.
         # This requires that the treedefs of each factor match, which won't be
         # the case when factors are connected to different variables!
-        stacked_factor: FactorType = jax.tree_multimap(
+        stacked_factor: FactorType = jax.tree_map(
             lambda *arrays: jnp.stack(arrays, axis=0),
             *map(FactorBase.anonymize_variables, factors),  # type: ignore
             # > https://github.com/python/mypy/issues/1317

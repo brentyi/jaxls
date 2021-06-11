@@ -107,7 +107,7 @@ class StackedFactorGraph:
             )
             residual_offset += stacked_factors[-1].get_residual_dim()
 
-        jacobian_coords_concat: sparse.SparseCooCoordinates = jax.tree_multimap(
+        jacobian_coords_concat: sparse.SparseCooCoordinates = jax.tree_map(
             lambda *arrays: onp.concatenate(arrays, axis=0), *jacobian_coords
         )
 
