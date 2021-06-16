@@ -2,6 +2,7 @@ from typing import NamedTuple, Tuple
 
 import jax_dataclasses
 import jaxlie
+import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -36,11 +37,22 @@ class PriorFactor(FactorBase[PriorValueTuple]):
     @overrides
     def compute_residual_vector(self, variable_values: PriorValueTuple) -> jnp.ndarray:
 
-        value: jaxlie.MatrixLieGroup
-        (value,) = variable_values
+        T: jaxlie.MatrixLieGroup
+        (T,) = variable_values
 
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
-        return jaxlie.manifold.rminus(value, self.mu)
+        return jaxlie.manifold.rminus(T, self.mu)
+
+    @overrides
+    def compute_residual_jacobians(
+        self, variable_values: PriorValueTuple
+    ) -> Tuple[jnp.ndarray, ...]:
+        # Implementing this is optional!
+        # Autodiff will handle Jacobians if we don't specify analytical ones.
+
+        T: jaxlie.MatrixLieGroup
+        (T,) = variable_values
+        return (-onp.eye(type(T).tangent_dim),)
 
 
 class BetweenValueTuple(NamedTuple):
@@ -52,7 +64,7 @@ class BetweenValueTuple(NamedTuple):
 class BetweenFactor(FactorBase[BetweenValueTuple]):
     """Factor for defining a geometric relationship between frames `a` and `b`.
 
-    Residuals are computed as `((T_world_a @ T_a_b).inverse() @ T_world_b).log()`.
+    Residuals are computed as `((T_world_a.inverse() @ T_world_b).inverse() @ T_a_b).log()`.
     """
 
     T_a_b: jaxlie.MatrixLieGroup
@@ -83,5 +95,22 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
         T_world_a = variable_values.T_world_a
         T_world_b = variable_values.T_world_b
 
-        # Equivalent to: return ((T_world_a @ self.T_a_b).inverse() @ T_world_b).log()
-        return jaxlie.manifold.rminus(T_world_a @ self.T_a_b, T_world_b)
+        return jaxlie.manifold.rminus(T_world_a.inverse() @ T_world_b, self.T_a_b)
+
+    @overrides
+    def compute_residual_jacobians(
+        self, variable_values: BetweenValueTuple
+    ) -> Tuple[jnp.ndarray, ...]:
+        # Implementing this is optional!
+        # Autodiff will handle Jacobians if we don't specify analytical ones.
+
+        T_world_a = variable_values.T_world_a
+        T_world_b = variable_values.T_world_b
+
+        assert type(T_world_a) == type(T_world_b)
+        group_cls = type(T_world_a)
+
+        return (
+            (T_world_a.inverse() @ T_world_b).inverse().adjoint(),
+            -onp.eye(group_cls.tangent_dim),
+        )

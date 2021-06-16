@@ -1,5 +1,6 @@
 import contextlib
 import time
+import warnings
 from typing import Generator, TypeVar
 
 import jax
@@ -7,9 +8,6 @@ import termcolor
 from jax import numpy as jnp
 
 T = TypeVar("T")
-
-
-import warnings
 
 
 def pytree_stack(*trees: T, axis=0) -> T:

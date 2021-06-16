@@ -45,7 +45,6 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
             variable_values: Values of self.variables
         """
 
-    @final
     def compute_residual_jacobians(
         self, variable_values: VariableValueTuple
     ) -> Tuple[jnp.ndarray, ...]:
