@@ -25,7 +25,24 @@ class VariableAssignments:
     @staticmethod
     def make_from_defaults(variables: Iterable[VariableBase]) -> "VariableAssignments":
         """Create an assignment object from the default values corresponding to each variable."""
-        return VariableAssignments.make_from_partial_dict(variables, {})
+
+        # Figure out how variables are stored
+        storage_metadata = StorageMetadata.make(variables, local=False)
+
+        # Stack variable values in order
+        storage = jnp.concatenate(
+            [
+                jnp.tile(
+                    jax.jit(variable_type.flatten)(variable_type.get_default_value()),
+                    reps=(storage_metadata.count_from_variable_type[variable_type],),
+                )
+                for variable_type in storage_metadata.get_variable_types()
+            ],
+            axis=0,
+        )
+        assert storage.shape == (storage_metadata.dim,)
+
+        return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
 
     @staticmethod
     def make_from_dict(

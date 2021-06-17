@@ -29,8 +29,14 @@ class StorageMetadata:
     """Number of variables of each type."""
 
     def get_variables(self) -> Iterable[VariableBase]:
+        """Variables. Storage indices are guaranteed to be in ascending order."""
         # Dictionaries from Python 3.7 retain insertion order
         return self.index_from_variable.keys()
+
+    def get_variable_types(self) -> Iterable[Type[VariableBase]]:
+        """Variable types. Storage indices are guaranteed to be in ascending order."""
+        # Dictionaries from Python 3.7 retain insertion order
+        return self.index_from_variable_type.keys()
 
     @staticmethod
     def make(
