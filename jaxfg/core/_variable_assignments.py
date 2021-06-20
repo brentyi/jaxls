@@ -39,7 +39,7 @@ class VariableAssignments:
                 for variable_type in storage_metadata.get_variable_types()
             ],
             axis=0,
-        )
+        ).block_until_ready()
         assert storage.shape == (storage_metadata.dim,)
 
         return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
@@ -76,12 +76,12 @@ class VariableAssignments:
                 for variable in storage_metadata.get_variables()
             ],
             axis=0,
-        )
+        ).block_until_ready()
         assert storage.shape == (storage_metadata.dim,)
 
         return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
 
-    def as_dict(self) -> Dict[VariableBase, VariableValueType]:
+    def as_dict(self) -> Dict[VariableBase, hints.VariableValue]:
         """Grab assignments as a variable -> value dictionary."""
         return {v: self.get_value(v) for v in self.get_variables()}
 
@@ -121,6 +121,20 @@ class VariableAssignments:
                 index : index + variable_type.get_parameter_dim() * count
             ].reshape((count, variable_type.get_parameter_dim()))
         )
+
+    def set_value(
+        self, variable: VariableBase[VariableValueType], value: VariableValueType
+    ) -> "VariableAssignments":
+        """Update a value corresponding to specific variable."""
+
+        index = self.storage_metadata.index_from_variable[variable]
+        with jax_dataclasses.copy_and_mutate(self) as output:
+            output.storage = (
+                jnp.asarray(output.storage)  # In case storage vector is an onp array
+                .at[index : index + type(variable).get_parameter_dim()]
+                .set(type(variable).flatten(value))
+            )
+        return output
 
     @jax.jit
     def manifold_retract(

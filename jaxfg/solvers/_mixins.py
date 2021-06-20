@@ -19,7 +19,7 @@ class _TrustRegionMixin:
         proposed_cost: hints.Scalar,
         state_prev: NonlinearSolverState,
         step_vector: jnp.ndarray,
-    ) -> bool:
+    ) -> hints.Scalar:
         """Compute step quality ratio, often denoted $$\rho$$.
         This will be 1 when the cost drops linearly wrt the update step."""
         return (proposed_cost - state_prev.cost) / (
