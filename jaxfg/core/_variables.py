@@ -130,19 +130,6 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
         """
         return cls()
 
-    @overrides
-    @final
-    def __lt__(self, other) -> bool:
-        """Compare hashes between variables. Needed to use as PyTree key.
-
-        Args:
-            other: Other object to compare.
-
-        Returns:
-            bool: True if `self < other`.
-        """
-        return hash(self) < hash(other)
-
 
 # Fake templating; RealVectorVariable[N]
 class _RealVectorVariableTemplate:

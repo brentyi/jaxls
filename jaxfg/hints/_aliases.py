@@ -6,7 +6,7 @@ from jax import numpy as jnp
 Array = Union[jnp.ndarray, onp.ndarray]
 Scalar = Union[Array, float]
 
-PyTree = Any
+Pytree = Any
 
-VariableValue = PyTree
+VariableValue = Pytree
 LocalVariableValue = Array

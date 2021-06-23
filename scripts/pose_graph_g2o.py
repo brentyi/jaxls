@@ -18,9 +18,7 @@ import jaxfg
 
 
 class SolverType(enum.Enum):
-    GAUSS_NEWTON = jaxfg.solvers.GaussNewtonSolver(
-        linear_solver=jaxfg.sparse.InexactStepConjugateGradientSolver()
-    )
+    GAUSS_NEWTON = jaxfg.solvers.GaussNewtonSolver()
     FIXED_ITERATION_GAUSS_NEWTON = jaxfg.solvers.FixedIterationGaussNewtonSolver(
         unroll=False
     )

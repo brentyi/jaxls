@@ -11,13 +11,13 @@ T = TypeVar("T")
 
 
 def pytree_stack(*trees: T, axis=0) -> T:
-    """Stack PyTrees along a specified axis."""
+    """Stack pytrees along a specified axis."""
     warnings.warn("Deprecated!", DeprecationWarning, stacklevel=1)
     return jax.tree_map(lambda *arrays: jnp.stack(arrays, axis=axis), *trees)
 
 
 def pytree_concatenate(*trees: T, axis=0) -> T:
-    """Concatenate PyTrees along a specified axis."""
+    """Concatenate pytrees along a specified axis."""
     warnings.warn("Deprecated!", DeprecationWarning, stacklevel=1)
     return jax.tree_map(lambda *arrays: jnp.concatenate(arrays, axis=axis), *trees)
 

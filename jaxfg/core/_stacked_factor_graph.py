@@ -53,7 +53,7 @@ class StackedFactorGraph:
         factors_from_group: DefaultDict[GroupKey, List[FactorBase]] = defaultdict(list)
         variables_ordered_set: Dict[VariableBase, None] = {}
         for factor in factors:
-            # Each factor is ultimately just a PyTree node; in order for a set of
+            # Each factor is ultimately just a pytree node; in order for a set of
             # factors to be batchable, they must share the same:
             group_key: GroupKey = (
                 # (1) Treedef. Note that variables can be different as long as their
@@ -68,10 +68,6 @@ class StackedFactorGraph:
             for v in factor.variables:
                 variables_ordered_set[v] = None
         variables = list(variables_ordered_set.keys())
-
-        # Make sure factors are unique
-        for factors in factors_from_group.values():
-            assert len(factors) == len(set(factors))
 
         # Fields we want to populate
         stacked_factors: List[FactorStack] = []

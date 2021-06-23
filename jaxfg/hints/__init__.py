@@ -1,9 +1,9 @@
-from ._aliases import Array, LocalVariableValue, PyTree, Scalar, VariableValue
+from ._aliases import Array, LocalVariableValue, Pytree, Scalar, VariableValue
 
 __all__ = [
     "Array",
     "LocalVariableValue",
-    "PyTree",
+    "Pytree",
     "Scalar",
     "VariableValue",
 ]

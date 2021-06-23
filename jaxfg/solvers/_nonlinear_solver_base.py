@@ -109,8 +109,8 @@ class NonlinearSolverBase(
     def _hcb_print(
         self,
         string_from_args: Callable[..., str],
-        *args: hints.PyTree,
-        **kwargs: hints.PyTree,
+        *args: hints.Pytree,
+        **kwargs: hints.Pytree,
     ) -> None:
         """Helper for printer optimizer messages via host callbacks. No-op if `verbose`
         is set to `False`."""

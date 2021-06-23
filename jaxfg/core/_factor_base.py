@@ -59,10 +59,10 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         value: hints.VariableValue
 
         # Some helpers for reshaping + concatenating Jacobians
-        def reshape_leaves(tree: hints.PyTree, shape: Tuple[int, ...]) -> hints.PyTree:
+        def reshape_leaves(tree: hints.Pytree, shape: Tuple[int, ...]) -> hints.Pytree:
             return jax.tree_map(lambda leaf: leaf.reshape(shape), tree)
 
-        def concatenate_leaves(tree: Iterable[hints.PyTree], axis: int) -> jnp.ndarray:
+        def concatenate_leaves(tree: Iterable[hints.Pytree], axis: int) -> jnp.ndarray:
             return jnp.concatenate(jax.tree_leaves(tree), axis=axis)
 
         # To compute the Jacobian of the residual wrt the local parameters, we compose
@@ -91,11 +91,6 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         )
 
         return jacobians
-
-    def __init_subclass__(cls, *args, **kwargs):
-        """Register all factors as hashable PyTree nodes."""
-        super().__init_subclass__(*args, **kwargs)
-        cls.__hash__ = object.__hash__
 
     @final
     def get_residual_dim(self) -> int:
