@@ -52,7 +52,7 @@ class PriorFactor(FactorBase[PriorValueTuple]):
 
         T: jaxlie.MatrixLieGroup
         (T,) = variable_values
-        return (-onp.eye(type(T).tangent_dim),)
+        return (-jnp.eye(type(T).tangent_dim),)
 
 
 class BetweenValueTuple(NamedTuple):
@@ -112,5 +112,5 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
 
         return (
             (T_world_a.inverse() @ T_world_b).inverse().adjoint(),
-            -onp.eye(group_cls.tangent_dim),
+            -jnp.eye(group_cls.tangent_dim),
         )
