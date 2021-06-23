@@ -88,14 +88,10 @@ class CholmodSolver(LinearSubproblemSolverBase):
         return _cholmod_analyze_cache[self_hash].solve_A(args.ATb)
 
 
-@jax_dataclasses.pytree_dataclass
-class ConjugateGradientSolver(LinearSubproblemSolverBase):
-    inexact_step_eta: float = 1e-1
-    """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
-    `eta / iteration #`.
-
-    For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
-    LEAST SQUARES, Wright & Holt 1983."""
+class _ConjugateGradientSolver(LinearSubproblemSolverBase, abc.ABC):
+    @abc.abstractmethod
+    def _get_cg_tolerance(self, iteration: hints.Scalar):
+        ...
 
     @overrides
     def solve_subproblem(
@@ -103,7 +99,7 @@ class ConjugateGradientSolver(LinearSubproblemSolverBase):
         A: SparseCooMatrix,
         ATb: hints.Array,
         lambd: hints.Scalar,
-        iteration: hints.Scalar,  # Unused
+        iteration: hints.Scalar,
     ) -> jnp.ndarray:
         assert len(A.values.shape) == 1, "A.values should be 1D"
         assert len(ATb.shape) == 1, "ATb should be 1D!"
@@ -128,7 +124,6 @@ class ConjugateGradientSolver(LinearSubproblemSolverBase):
             return x / ATA_diagonals
 
         # Solve with conjugate gradient
-        inexact_step_forcing_tolerance = self.inexact_step_eta / (iteration + 1)
         solution_values, _unused_info = jax.scipy.sparse.linalg.cg(
             A=ATA_function,
             b=ATb,
@@ -136,7 +131,31 @@ class ConjugateGradientSolver(LinearSubproblemSolverBase):
             maxiter=len(
                 initial_x
             ),  # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
-            tol=inexact_step_forcing_tolerance,
+            tol=self._get_cg_tolerance(iteration),
             M=jacobi_preconditioner,
         )
         return solution_values
+
+
+@jax_dataclasses.pytree_dataclass
+class ConjugateGradientSolver(_ConjugateGradientSolver):
+    tolerance: float = 1e-5
+    """CG convergence tolerance."""
+
+    @overrides
+    def _get_cg_tolerance(self, iteration: hints.Scalar):
+        return self.tolerance
+
+
+@jax_dataclasses.pytree_dataclass
+class InexactStepConjugateGradientSolver(_ConjugateGradientSolver):
+    inexact_step_eta: float = 1e-2
+    """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
+    `eta / iteration #`.
+
+    For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
+    LEAST SQUARES, Wright & Holt 1983."""
+
+    @overrides
+    def _get_cg_tolerance(self, iteration: hints.Scalar):
+        return self.inexact_step_eta / (iteration + 1)

@@ -10,7 +10,8 @@ import jaxfg
     "solver",
     [
         jaxfg.sparse.CholmodSolver(),
-        jaxfg.sparse.ConjugateGradientSolver(inexact_step_eta=1e-8),
+        jaxfg.sparse.ConjugateGradientSolver(tolerance=1e-8),
+        jaxfg.sparse.InexactStepConjugateGradientSolver(inexact_step_eta=1e-8),
     ],
 )
 def test_solver_no_jit(solver: jaxfg.sparse.LinearSubproblemSolverBase):
@@ -39,7 +40,8 @@ def test_solver_no_jit(solver: jaxfg.sparse.LinearSubproblemSolverBase):
     "solver",
     [
         jaxfg.sparse.CholmodSolver(),
-        jaxfg.sparse.ConjugateGradientSolver(inexact_step_eta=1e-8),
+        jaxfg.sparse.ConjugateGradientSolver(tolerance=1e-8),
+        jaxfg.sparse.InexactStepConjugateGradientSolver(inexact_step_eta=1e-8),
     ],
 )
 def test_solver_jit(solver: jaxfg.sparse.LinearSubproblemSolverBase):
