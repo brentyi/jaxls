@@ -60,8 +60,9 @@ class LevenbergMarquardtSolver(
         # updates are accepted
 
         self._hcb_print(
-            lambda i, cost, lambd: f"Iteration #{i}: cost={str(cost).ljust(15)} lambda={str(lambd)}",
+            lambda i, max_i, cost, lambd: f"Iteration #{i}/{max_i}: cost={str(cost).ljust(15)} lambda={str(lambd)}",
             i=state_prev.iterations,
+            max_i=self.max_iterations,
             cost=state_prev.cost,
             lambd=state_prev.lambd,
         )

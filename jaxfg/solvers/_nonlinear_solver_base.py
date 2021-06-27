@@ -40,9 +40,6 @@ class _NonlinearSolverBase:
 
     """Nonlinear solver interface."""
 
-    max_iterations: int = 100
-    """Maximum number of iterations."""
-
     verbose: Boolean = jax_dataclasses.static_field(default=True)
     """Set to `True` to enable printing."""
 
@@ -90,17 +87,14 @@ class NonlinearSolverBase(
 
         # Optimization
         state = jax.lax.while_loop(
-            cond_fun=lambda state: jnp.logical_and(
-                jnp.logical_not(state.done), state.iterations < self.max_iterations
-            ),
+            cond_fun=lambda state: jnp.logical_not(state.done),
             body_fun=jax.partial(self._step, graph),
             init_val=state,
         )
 
         self._hcb_print(
-            lambda i, max_i, cost: f"Terminated @ iteration #{i}/{max_i}: cost={str(cost).ljust(15)}",
+            lambda i, cost: f"Terminated @ iteration #{i}: cost={str(cost).ljust(15)}",
             i=state.iterations,
-            max_i=self.max_iterations,
             cost=state.cost,
         )
 

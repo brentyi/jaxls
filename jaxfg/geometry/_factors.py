@@ -2,7 +2,6 @@ from typing import NamedTuple, Tuple
 
 import jax_dataclasses
 import jaxlie
-import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 

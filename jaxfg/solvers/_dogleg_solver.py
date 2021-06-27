@@ -56,8 +56,9 @@ class DoglegSolver(
         # There's currently some redundancy here: we only need to re-linearize and
         # compute new GN/SD update steps when updates are actually accepted
         self._hcb_print(
-            lambda i, cost, radius: f"Iteration #{i}: cost={str(cost).ljust(15)} radius={str(radius)}",
+            lambda i, max_i, cost, radius: f"Iteration #{i}/{max_i}: cost={str(cost).ljust(15)} radius={str(radius)}",
             i=state_prev.iterations,
+            max_i=self.max_iterations,
             cost=state_prev.cost,
             radius=state_prev.radius,
         )

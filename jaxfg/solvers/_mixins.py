@@ -32,6 +32,9 @@ class _TrustRegionMixin:
 class _TerminationCriteriaMixin:
     """Mixin for Ceres-style termination criteria."""
 
+    max_iterations: int = 100
+    """Maximum number of iterations."""
+
     cost_tolerance: float = 1e-5
     """We terminate if `|cost change| / cost < cost_tolerance`."""
 
@@ -54,6 +57,9 @@ class _TerminationCriteriaMixin:
         negative_gradient: hints.Array,
     ) -> bool:
         """Check for convergence!"""
+
+        # Max iteration
+        max_iteration_exceeded = state_prev.iterations >= self.max_iterations
 
         # Cost tolerance
         converged_cost = (
@@ -87,10 +93,14 @@ class _TerminationCriteriaMixin:
             * self.parameter_tolerance
         )
 
-        return jnp.logical_or(
-            converged_cost,
-            jnp.logical_or(
-                converged_gradient,
-                converged_parameters,
+        return jnp.any(
+            jnp.array(
+                [
+                    max_iteration_exceeded,
+                    converged_cost,
+                    converged_gradient,
+                    converged_parameters,
+                ]
             ),
+            axis=0,
         )

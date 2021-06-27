@@ -42,8 +42,9 @@ class GaussNewtonSolver(
         """Linearize, solve linear subproblem, and update on manifold."""
 
         self._hcb_print(
-            lambda i, cost: f"Iteration #{i}: cost={str(cost)}",
+            lambda i, max_i, cost: f"Iteration #{i}/{max_i}: cost={str(cost)}",
             i=state_prev.iterations,
+            max_i=self.max_iterations,
             cost=state_prev.cost,
         )
 
