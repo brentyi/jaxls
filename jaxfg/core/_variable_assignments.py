@@ -39,7 +39,7 @@ class VariableAssignments:
                 for variable_type in storage_metadata.get_variable_types()
             ],
             axis=0,
-        ).block_until_ready()
+        )
         assert storage.shape == (storage_metadata.dim,)
 
         return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
@@ -76,7 +76,7 @@ class VariableAssignments:
                 for variable in storage_metadata.get_variables()
             ],
             axis=0,
-        ).block_until_ready()
+        )
         assert storage.shape == (storage_metadata.dim,)
 
         return VariableAssignments(storage=storage, storage_metadata=storage_metadata)

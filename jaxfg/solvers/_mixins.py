@@ -59,7 +59,7 @@ class _TerminationCriteriaMixin:
         """Check for convergence!"""
 
         # Max iteration
-        max_iteration_exceeded = state_prev.iterations >= self.max_iterations
+        max_iteration_exceeded = state_prev.iterations >= (self.max_iterations - 1)
 
         # Cost tolerance
         converged_cost = (
