@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
 
+import jax
 import jax_dataclasses
+from jax import numpy as jnp
 from overrides import overrides
 
 from .. import sparse
@@ -75,7 +77,7 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase[NonlinearSolverState])
 
         # Check for convergence
         cost, residual_vector = graph.compute_cost(assignments)
-        done = state_prev.iterations > self.iterations
+        done = state_prev.iterations >= (self.iterations - 1)
 
         return NonlinearSolverState(
             iterations=state_prev.iterations + 1,
@@ -84,3 +86,36 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase[NonlinearSolverState])
             residual_vector=residual_vector,
             done=done,
         )
+
+    @jax.jit
+    @overrides
+    def solve(
+        self,
+        graph: "StackedFactorGraph",
+        initial_assignments: VariableAssignments,
+    ) -> VariableAssignments:
+        """Run MAP inference on a factor graph."""
+
+        # Initialize
+        assignments = initial_assignments
+        cost, residual_vector = graph.compute_cost(assignments)
+        state = self._initialize_state(graph, initial_assignments)
+
+        # Optimization
+        if self.unroll:
+            for i in range(self.iterations):
+                state = self._step(graph, state)
+        else:
+            state = jax.lax.while_loop(
+                cond_fun=lambda state: jnp.logical_not(state.done),
+                body_fun=jax.partial(self._step, graph),
+                init_val=state,
+            )
+
+        self._hcb_print(
+            lambda i, cost: f"Terminated @ iteration #{i}: cost={str(cost).ljust(15)}",
+            i=state.iterations,
+            cost=state.cost,
+        )
+
+        return state.assignments

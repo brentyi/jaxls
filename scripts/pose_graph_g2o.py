@@ -66,19 +66,27 @@ def main():
         initial_poses = jaxfg.core.VariableAssignments.make_from_dict(g2o.initial_poses)
 
     # Time solver
-    with jaxfg.utils.stopwatch("Single-step JIT compile + solve"):
-        solution_poses = graph.solve(
-            initial_poses,
-            solver=dataclasses.replace(cli_args.solver_type.value, max_iterations=1),
-        )
-        solution_poses.storage.block_until_ready()
+    if not isinstance(
+        cli_args.solver_type.value, jaxfg.solvers.FixedIterationGaussNewtonSolver
+    ):
+        # `max_iterations` field exists for all solvers but the fixed iteration GN
+        with jaxfg.utils.stopwatch("Single-step JIT compile + solve"):
+            solution_poses = graph.solve(
+                initial_poses,
+                solver=dataclasses.replace(
+                    cli_args.solver_type.value, max_iterations=1
+                ),
+            )
+            solution_poses.storage.block_until_ready()
 
-    with jaxfg.utils.stopwatch("Single-step solve (already compiled)"):
-        solution_poses = graph.solve(
-            initial_poses,
-            solver=dataclasses.replace(cli_args.solver_type.value, max_iterations=1),
-        )
-        solution_poses.storage.block_until_ready()
+        with jaxfg.utils.stopwatch("Single-step solve (already compiled)"):
+            solution_poses = graph.solve(
+                initial_poses,
+                solver=dataclasses.replace(
+                    cli_args.solver_type.value, max_iterations=1
+                ),
+            )
+            solution_poses.storage.block_until_ready()
 
     with jaxfg.utils.stopwatch("Full solve"):
         solution_poses = graph.solve(initial_poses, solver=cli_args.solver_type.value)
