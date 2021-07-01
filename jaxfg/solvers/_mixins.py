@@ -49,6 +49,14 @@ class _TerminationCriteriaMixin:
     """We terminate if `norm_2(linear delta) < (norm2(x) + parameter_tolerance) * parameter_tolerance`."""
 
     @jax.jit
+    def check_exceeded_max_iterations(
+        self,
+        state_prev: NonlinearSolverState,
+    ) -> bool:
+        # Max iteration
+        return state_prev.iterations >= (self.max_iterations - 1)  # type: ignore
+
+    @jax.jit
     def check_convergence(
         self,
         state_prev: NonlinearSolverState,
@@ -57,9 +65,6 @@ class _TerminationCriteriaMixin:
         negative_gradient: hints.Array,
     ) -> bool:
         """Check for convergence!"""
-
-        # Max iteration
-        max_iteration_exceeded = state_prev.iterations >= (self.max_iterations - 1)
 
         # Cost tolerance
         converged_cost = (
@@ -96,7 +101,6 @@ class _TerminationCriteriaMixin:
         return jnp.any(
             jnp.array(
                 [
-                    max_iteration_exceeded,
                     converged_cost,
                     converged_gradient,
                     converged_parameters,

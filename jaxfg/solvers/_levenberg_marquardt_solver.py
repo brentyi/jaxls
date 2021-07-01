@@ -127,13 +127,16 @@ class LevenbergMarquardtSolver(
         )
 
         # Check for convergence
-        done = jnp.logical_and(
-            accept_flag,
-            self.check_convergence(
-                state_prev=state_prev,
-                cost_updated=proposed_cost,
-                local_delta_assignments=local_delta_assignments,
-                negative_gradient=ATb,
+        done = jnp.logical_or(
+            self.check_exceeded_max_iterations(state_prev=state_prev),
+            jnp.logical_and(
+                accept_flag,
+                self.check_convergence(
+                    state_prev=state_prev,
+                    cost_updated=proposed_cost,
+                    local_delta_assignments=local_delta_assignments,
+                    negative_gradient=ATb,
+                ),
             ),
         )
 

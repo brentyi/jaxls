@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import jax_dataclasses
+from jax import numpy as jnp
 from overrides import overrides
 
 from .. import sparse
@@ -73,11 +74,14 @@ class GaussNewtonSolver(
 
         # Check for convergence
         cost, residual_vector = graph.compute_cost(assignments)
-        done = self.check_convergence(
-            state_prev=state_prev,
-            cost_updated=cost,
-            local_delta_assignments=local_delta_assignments,
-            negative_gradient=ATb,
+        done = jnp.logical_or(
+            self.check_exceeded_max_iterations(state_prev=state_prev),
+            self.check_convergence(
+                state_prev=state_prev,
+                cost_updated=cost,
+                local_delta_assignments=local_delta_assignments,
+                negative_gradient=ATb,
+            ),
         )
 
         return NonlinearSolverState(
