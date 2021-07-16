@@ -21,6 +21,7 @@ setup(
         "scikit-sparse",
         "termcolor",
         "tqdm",
+        "typing_utils",  # We can phase this out if we drop support for Python 3.7
         "matplotlib",
     ],
     extras_require={
