@@ -29,15 +29,16 @@ class StackedFactorGraph:
     local_storage_metadata: StorageMetadata = jax_dataclasses.static_field()
     residual_dim: int = jax_dataclasses.static_field()
 
-    def __post_init__(self):
-        """Check that inputs make sense!"""
-        for stacked_factor in self.factor_stacks:
-            N = stacked_factor.num_factors
-            for value_indices, variable in zip(
-                stacked_factor.value_indices,
-                stacked_factor.factor.variables,
-            ):
-                assert value_indices.shape == (N, variable.get_parameter_dim())
+    # Shape checks break under vmap
+    # def __post_init__(self):
+    #     """Check that inputs make sense!"""
+    #     for stacked_factor in self.factor_stacks:
+    #         N = stacked_factor.num_factors
+    #         for value_indices, variable in zip(
+    #             stacked_factor.value_indices,
+    #             stacked_factor.factor.variables,
+    #         ):
+    #             assert value_indices.shape == (N, variable.get_parameter_dim())
 
     def get_variables(self) -> Iterable[VariableBase]:
         return self.local_storage_metadata.get_variables()

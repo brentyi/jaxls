@@ -25,14 +25,15 @@ class FactorStack(Generic[FactorType]):
         # There should be one set of indices for each variable type.
         assert len(self.value_indices) == len(self.factor.variables)
 
-        # Check that shapes make sense.
-        for variable, indices in zip(self.factor.variables, self.value_indices):
-            residual_dim = self.factor.noise_model.get_residual_dim()
-            assert indices.shape == (
-                self.num_factors,
-                variable.get_parameter_dim(),
-            )
-            assert residual_dim == self.factor.get_residual_dim()
+    # Shape checks break under vmap
+    #     # Check that shapes make sense.
+    #     for variable, indices in zip(self.factor.variables, self.value_indices):
+    #         residual_dim = self.factor.noise_model.get_residual_dim()
+    #         assert indices.shape == (
+    #             self.num_factors,
+    #             variable.get_parameter_dim(),
+    #         )
+    #         assert residual_dim == self.factor.get_residual_dim()
 
     @staticmethod
     def make(

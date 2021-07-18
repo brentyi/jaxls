@@ -14,7 +14,7 @@ class SparseCooCoordinates:
     cols: hints.Array
     """Column indices of non-zero entries. Shape should be `(*, N)`."""
 
-    # Shape checks seem to break under vmap
+    # Shape checks break under vmap
     # def __post_init__(self):
     #     assert self.rows.shape == self.cols.shape
 
@@ -30,7 +30,7 @@ class SparseCooMatrix:
     shape: Tuple[int, int] = jax_dataclasses.static_field()
     """Shape of matrix."""
 
-    # Shape checks seem to break under vmap
+    # Shape checks break under vmap
     # def __post_init__(self):
     #     print(self)
     #     assert self.coords.rows.shape == self.coords.cols.shape == self.values.shape
