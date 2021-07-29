@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Type, TypeVar
+from typing import Collection, Dict, Iterable, Type, TypeVar
 
 import jax
 import jax_dataclasses
@@ -99,7 +99,7 @@ class VariableAssignments:
         )
         return f"VariableAssignments(\n{contents}\n)"
 
-    def get_variables(self) -> Iterable[VariableBase]:
+    def get_variables(self) -> Collection[VariableBase]:
         """Helper for iterating over variables."""
         return self.storage_metadata.get_variables()
 

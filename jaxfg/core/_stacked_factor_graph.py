@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import DefaultDict, Dict, Hashable, Iterable, List, Tuple, cast
+from typing import Collection, DefaultDict, Dict, Hashable, Iterable, List, Tuple, cast
 
 import jax
 import jax_dataclasses
@@ -40,7 +40,7 @@ class StackedFactorGraph:
     #         ):
     #             assert value_indices.shape == (N, variable.get_parameter_dim())
 
-    def get_variables(self) -> Iterable[VariableBase]:
+    def get_variables(self) -> Collection[VariableBase]:
         return self.local_storage_metadata.get_variables()
 
     @staticmethod

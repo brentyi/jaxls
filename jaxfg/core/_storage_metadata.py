@@ -1,5 +1,5 @@
 import dataclasses
-from typing import DefaultDict, Dict, Iterable, List, Type
+from typing import Collection, DefaultDict, Dict, Iterable, List, Type
 
 from ._variables import VariableBase
 
@@ -28,12 +28,12 @@ class StorageMetadata:
     count_from_variable_type: Dict[Type[VariableBase], int]
     """Number of variables of each type."""
 
-    def get_variables(self) -> Iterable[VariableBase]:
+    def get_variables(self) -> Collection[VariableBase]:
         """Variables. Storage indices are guaranteed to be in ascending order."""
         # Dictionaries from Python 3.7 retain insertion order
         return self.index_from_variable.keys()
 
-    def get_variable_types(self) -> Iterable[Type[VariableBase]]:
+    def get_variable_types(self) -> Collection[Type[VariableBase]]:
         """Variable types. Storage indices are guaranteed to be in ascending order."""
         # Dictionaries from Python 3.7 retain insertion order
         return self.index_from_variable_type.keys()
