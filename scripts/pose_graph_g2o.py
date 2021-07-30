@@ -108,7 +108,7 @@ def main():
             # Equivalent:
             # *(onp.array([initial_poses.get_value(v).translation() for v in pose_variables]).T),
             c="r",
-            label="Dead-reckoned",
+            label="Initial",
         )
         plt.plot(
             *(
@@ -135,7 +135,7 @@ def main():
                 .T
             ),
             c="r",
-            label="Dead-reckoned",
+            label="Initial",
         )
         ax.plot3D(
             *(

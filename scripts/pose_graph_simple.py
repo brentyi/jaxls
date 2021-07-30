@@ -70,10 +70,6 @@ with jaxfg.utils.stopwatch("Solve after initial compilation"):
     solution_assignments = graph.solve(initial_assignments)
     solution_assignments.storage.block_until_ready()  # type: ignore
 
-with jaxfg.utils.stopwatch("Solve after initial compilation"):
-    solution_assignments = graph.solve(initial_assignments)
-    solution_assignments.storage.block_until_ready()  # type: ignore
-
 # Note that we can also specify what nonlinear solver to use. Gauss-Newton is the
 # default; Levenberg-Marquardt is also implemented:
 #

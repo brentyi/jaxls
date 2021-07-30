@@ -1,30 +1,33 @@
 # jaxfg
 
-Factor graph-based nonlinear optimization library for JAX.
+**`jaxfg`** is a factor graph-based nonlinear least squares library for JAX.
+Typical applications include sensor fusion, SLAM, bundle adjustment, optimal
+control.
 
-Applications include sensor fusion, control, planning, SLAM. Borrows _heavily_
-from a wide set of existing libraries, including:
-[Ceres Solver](http://ceres-solver.org/),
-[g2o](https://github.com/RainerKuemmerle/g2o), [GTSAM](https://gtsam.org/),
-[minisam](https://github.com/dongjing3309/minisam),
-[SwiftFusion](https://github.com/borglab/SwiftFusion).
+The premise: we provide a high-level interface for defining probability
+densities as factor graphs. MAP inference reduces to nonlinear optimization,
+which we accelerate by analyzing the structure of the graph. Repeated factor and
+variable types have operations vectorized, and the sparsity of graph connections
+is leveraged for sparse matrix operations.
 
 Features:
 
-- Autodiff-powered (sparse) Jacobians.
-- Automatic batching of factor computations.
-- Out-of-the-box support for optimization on SO(2), SO(3), SE(2), and SE(3).
-- 100% implemented in Python!
+- Autodiff-powered sparse Jacobians.
+- Automatic vectorization for repeated factor and variable types.
+- Manifold definition interface, with implementations provided for SO(2), SE(2),
+  SO(3), and SE(3) Lie groups.
+- Support for standard JAX function transformations: `jit`, `vmap`, `pmap`,
+  `grad`, etc.
+- Nonlinear optimizers: Gauss-Newton, Levenberg-Marquardt, Dogleg.
+- Sparse linear solvers: conjugate gradient (Jacobi-preconditioned), sparse
+  cholesky (via CHOLMOD).
 
-Current limitations:
-
-- JIT compilation adds significant startup overhead. This could likely be
-  optimized (for example, by specifying more analytical Jacobians) but is mostly
-  unavoidable with JAX/XLA. Limits applications for systems that are online or
-  require dynamic graph alterations.
-- Python >=3.7 only, due to features needed for generic types.
-
----
+Borrows heavily from a wide set of existing libraries, including:
+[GTSAM](https://gtsam.org/), [Ceres Solver](http://ceres-solver.org/),
+[minisam](https://github.com/dongjing3309/minisam),
+[SwiftFusion](https://github.com/borglab/SwiftFusion),
+[g2o](https://github.com/RainerKuemmerle/g2o). For additional technical
+background, we defer to [GTSAM](https://gtsam.org/tutorials/intro.html).
 
 ### Installation
 
@@ -43,25 +46,38 @@ cd jaxfg
 pip install -e .
 ```
 
----
-
 ### Example scripts
 
 Toy pose graph optimization:
 
-```
+```bash
 python scripts/pose_graph_simple.py
 ```
 
 Pose graph optimization from `.g2o` files:
 
 ```bash
-python scripts/pose_graph_g2o.py --help
+python scripts/pose_graph_g2o.py  # For options, pass in a --help flag
 ```
 
----
+![](./scripts/data/optimized_sphere2500.png)
+
+### Engineering notes
+
+We currently take a "make everything a dataclass" philosophy for software
+engineering in this library. This is convenient for several reasons, but notably
+makes it easy for objects to be registered as pytree nodes in JAX. See
+[`jax_dataclasses`](https://github.com/brentyi/jax_dataclasses) for details on
+this.
+
+In XLA, JIT compilation needs to happen for each unique set of input shapes.
+Modifying graph structures can thus introduce significant re-compilation
+overheads. This is a core limitation, that restricts dynamic and online
+applications.
 
 ### To-do
+
+This library's still in development mode! Here's our TODO list:
 
 - [x] Preliminary graph, variable, factor interfaces
 - [x] Real vector variable types
@@ -71,6 +87,7 @@ python scripts/pose_graph_g2o.py --help
   - [x] CHOLMOD linear solver
     - [x] Basic implementation. JIT-able, but no vmap, pmap, or autodiff
           support.
+    - [ ] Custom VJP rule? vmap support?
   - [x] Gauss-Newton implementation
   - [x] Termination criteria
   - [x] Damped least squares
@@ -80,7 +97,7 @@ python scripts/pose_graph_g2o.py --help
   - [x] Reduce redundant code
   - [ ] Robust losses
 - [x] Marginalization
-  - [x] Working prototype using sksparse/CHOLMOD
+  - [x] Prototype using sksparse/CHOLMOD (works but fairly slow)
   - [ ] JAX implementation?
 - [x] Validate g2o example
 - [x] Performance
@@ -110,3 +127,4 @@ python scripts/pose_graph_g2o.py --help
     - [ ] coverage
   - [ ] More comprehensive tests
   - [ ] Clean up docstrings
+  - [ ] Come up with a better name than "jaxfg"
