@@ -35,6 +35,9 @@ class _FactorBase:
 
 
 class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverrides):
+
+    # (1) Functions that must be overriden in subclasses.
+
     @abc.abstractmethod
     def compute_residual_vector(
         self, variable_values: VariableValueTuple
@@ -45,6 +48,8 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
             variable_values: Values of self.variables
         """
 
+    # (2) Function to override for analytical Jacobians. This is always optional.
+
     def compute_residual_jacobians(
         self, variable_values: VariableValueTuple
     ) -> Tuple[jnp.ndarray, ...]:
@@ -52,8 +57,10 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         composing the residual computation Jacobian with the manifold retraction
         Jacobian.
 
-        To specify analytical Jacobians, override `manifold_retract_jacobian()` for
-        variables and define a custom JVP method for `compute_residual_vector`.
+        There are two options for specifying analytical Jacobians:
+        1) Override this method directly,
+        2) Override `manifold_retract_jacobian()` for variables and define a custom JVP
+          method for `compute_residual_vector`.
         """
         variable: VariableBase
         value: hints.VariableValue
@@ -91,6 +98,8 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         )
 
         return jacobians
+
+    # (3) Shared implementations.
 
     @final
     def get_residual_dim(self) -> int:

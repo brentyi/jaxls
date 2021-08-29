@@ -27,7 +27,7 @@ setup(
     extras_require={
         "testing": [
             "pytest",
-            # "pytest-cov",
+            "pytest-cov",
             # "hypothesis",
             # "hypothesis[numpy]",
         ],

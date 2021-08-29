@@ -1,4 +1,13 @@
-"""Simple pose graph example with two variables."""
+"""Simple pose graph example with two pose variables and three factors:
+
+    ┌────────┐             ┌────────┐
+    │ Pose 0 ├───Between───┤ Pose 1 │
+    └───┬────┘             └────┬───┘
+        │                       │
+        │                       │
+      Prior                   Prior
+
+"""
 
 from typing import List
 
@@ -8,7 +17,9 @@ from jax import numpy as jnp
 import jaxfg
 
 # Create variables: each variable object represents something that we want to solve for.
-# They don't intrinsically hold any values.
+#
+# The variable objects themselves don't hold any values, but can be used as a key for
+# accessing values from a VariableAssignments object. (see below)
 pose_variables: List[jaxfg.geometry.SE2Variable] = [
     jaxfg.geometry.SE2Variable(),
     jaxfg.geometry.SE2Variable(),

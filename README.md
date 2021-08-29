@@ -1,5 +1,20 @@
 # jaxfg
 
+[![build](https://github.com/brentyi/jaxfg/actions/workflows/build.yml/badge.svg)](https://github.com/brentyi/jaxfg/actions/workflows/build.yml)
+[![lint](https://github.com/brentyi/jaxfg/actions/workflows/lint.yml/badge.svg)](https://github.com/brentyi/jaxfg/actions/workflows/lint.yml)
+[![mypy](https://github.com/brentyi/jaxfg/actions/workflows/mypy.yml/badge.svg)](https://github.com/brentyi/jaxfg/actions/workflows/mypy.yml)
+[![codecov](https://codecov.io/gh/brentyi/jaxfg/branch/master/graph/badge.svg?token=RNJB7EFC8T)](https://codecov.io/gh/brentyi/jaxfg)
+
+<!-- vim-markdown-toc GFM -->
+
+* [Installation](#installation)
+* [Example scripts](#example-scripts)
+* [Development](#development)
+* [Current limitations](#current-limitations)
+* [To-do](#to-do)
+
+<!-- vim-markdown-toc -->
+
 **`jaxfg`** is a factor graph-based nonlinear least squares library for JAX.
 Typical applications include sensor fusion, SLAM, bundle adjustment, optimal
 control.
@@ -8,7 +23,7 @@ The premise: we provide a high-level interface for defining probability
 densities as factor graphs. MAP inference reduces to nonlinear optimization,
 which we accelerate by analyzing the structure of the graph. Repeated factor and
 variable types have operations vectorized, and the sparsity of graph connections
-is leveraged for sparse matrix operations.
+is translated into sparse matrix operations.
 
 Features:
 
@@ -20,14 +35,17 @@ Features:
   `grad`, etc.
 - Nonlinear optimizers: Gauss-Newton, Levenberg-Marquardt, Dogleg.
 - Sparse linear solvers: conjugate gradient (Jacobi-preconditioned), sparse
-  cholesky (via CHOLMOD).
+  Cholesky (via CHOLMOD).
 
-Borrows heavily from a wide set of existing libraries, including:
+This library is released as part of our IROS 2021 paper (more info in our core
+experiment repository [here](https://github.com/brentyi/dfgo)) and borrows
+heavily from a wide set of existing libraries, including
 [GTSAM](https://gtsam.org/), [Ceres Solver](http://ceres-solver.org/),
 [minisam](https://github.com/dongjing3309/minisam),
-[SwiftFusion](https://github.com/borglab/SwiftFusion),
-[g2o](https://github.com/RainerKuemmerle/g2o). For additional technical
-background, we defer to [GTSAM](https://gtsam.org/tutorials/intro.html).
+[SwiftFusion](https://github.com/borglab/SwiftFusion), and
+[g2o](https://github.com/RainerKuemmerle/g2o). For technical background and
+concepts, GTSAM has a
+[great set of tutorials](https://gtsam.org/tutorials/intro.html).
 
 ### Installation
 
@@ -62,18 +80,49 @@ python scripts/pose_graph_g2o.py  # For options, pass in a --help flag
 
 ![](./scripts/data/optimized_sphere2500.png)
 
-### Engineering notes
+### Development
 
-We currently take a "make everything a dataclass" philosophy for software
-engineering in this library. This is convenient for several reasons, but notably
-makes it easy for objects to be registered as pytree nodes in JAX. See
-[`jax_dataclasses`](https://github.com/brentyi/jax_dataclasses) for details on
-this.
+If you're interested in extending this library to define your own factor graphs,
+we'd recommend first familiarizing yourself with:
 
-In XLA, JIT compilation needs to happen for each unique set of input shapes.
-Modifying graph structures can thus introduce significant re-compilation
-overheads. This is a core limitation, that restricts dynamic and online
-applications.
+1. Pytrees in JAX:
+   https://jax.readthedocs.io/en/latest/jax-101/05.1-pytrees.html
+2. Python dataclasses: https://docs.python.org/3/library/dataclasses.html
+   - We currently take a "make everything a dataclass" philosophy for software
+     engineering in this library. This is convenient for several reasons, but
+     notably makes it easy for objects to be registered as pytree nodes. See
+     [`jax_dataclasses`](https://github.com/brentyi/jax_dataclasses) for details
+     on this.
+3. Type annotations: https://docs.python.org/3/library/typing.html
+   - We rely on generics (`typing.Generic` and `typing.TypeVar`) particularly
+     heavily. If you're familiar with C++ this should come very naturally
+     (~templates).
+4. Explicit decorators for overrides/inheritance:
+   https://github.com/mkorpela/overrides
+   - The `@overrides` and `@final` decorators signal which methods are being
+     and/or shouldn't be overridden. The same goes for `@abc.abstractmethod`.
+
+From there, we have a few references for defining your own factor graphs,
+factors, and manifolds:
+
+- The [simple pose graph script](./scripts/pose_graph_simple.py) includes the
+  basics of setting up and solving a factor graph.
+- Our [Lie group variable definitions](./jaxfg/geometry/_lie_variables.py) can
+  serve as a template for defining your own variable types and manifolds. The
+  [base class](./jaxfg/core/_variables.py) also has comments on what needs to be
+  overridden.
+- Our
+  [PriorFactor and BetweenFactor implementations](./jaxfg/geometry/_factors.py)
+  can serve as a template for defining your own factor types. The
+  [base class](./jaxfg/core/_factor_base.py) also has comments on what needs to
+  be overridden.
+
+### Current limitations
+
+1. In XLA, JIT compilation needs to happen for each unique set of input shapes.
+   Modifying graph structures can thus introduce significant re-compilation
+   overheads; this can restrict applications that are dynamic or online.
+2. Our marginalization implementation is not very good.
 
 ### To-do
 
@@ -127,4 +176,4 @@ This library's still in development mode! Here's our TODO list:
     - [ ] coverage
   - [ ] More comprehensive tests
   - [ ] Clean up docstrings
-  - [ ] Come up with a better name than "jaxfg"
+  - [ ] New name

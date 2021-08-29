@@ -9,6 +9,11 @@ from .. import noises
 from ..core._factor_base import FactorBase
 from ._lie_variables import LieVariableBase
 
+# To implement a factor, we start be defining what the types of the variables that
+# connect to it are.
+# This can be either a standard tuple or a named one (see BetweenFactor for the latter),
+# and should be used to inherit from `FactorBase[some tuple type]`,  and as input to the
+# factor's `compute_residual_vector` and `compute_residual_jacobians` methods.
 PriorValueTuple = Tuple[jaxlie.MatrixLieGroup]
 
 
@@ -21,6 +26,9 @@ class PriorFactor(FactorBase[PriorValueTuple]):
 
     mu: jaxlie.MatrixLieGroup
 
+    # Optional: it can be nice to define a factory method. In this case we constrain the
+    # types a bit (for example, restrict connections to just a single variable) and call
+    # the dataclass constructor.
     @staticmethod
     def make(
         variable: LieVariableBase,
@@ -33,6 +41,7 @@ class PriorFactor(FactorBase[PriorValueTuple]):
             noise_model=noise_model,
         )
 
+    # Required: we define the residual corresponding to this factor type.
     @overrides
     def compute_residual_vector(self, variable_values: PriorValueTuple) -> jnp.ndarray:
 
@@ -42,18 +51,20 @@ class PriorFactor(FactorBase[PriorValueTuple]):
         # Equivalent to: return (variable_value.inverse() @ self.mu).log()
         return jaxlie.manifold.rminus(T, self.mu)
 
+    # Optional: we specify an analytical Jacobian.
     @overrides
     def compute_residual_jacobians(
         self, variable_values: PriorValueTuple
-    ) -> Tuple[jnp.ndarray, ...]:
-        # Implementing this is optional!
-        # Autodiff will handle Jacobians if we don't specify analytical ones.
+    ) -> Tuple[jnp.ndarray]:
 
         T: jaxlie.MatrixLieGroup
         (T,) = variable_values
         return (-jnp.eye(type(T).tangent_dim),)
 
 
+# Our BetweenFactor implementation is pretty similar to PriorFactor, but requires two
+# variables instead of just one. Named tuples are supported automatically, and can help
+# keep our code a bit tidier.
 class BetweenValueTuple(NamedTuple):
     T_world_a: jaxlie.MatrixLieGroup
     T_world_b: jaxlie.MatrixLieGroup
@@ -99,7 +110,7 @@ class BetweenFactor(FactorBase[BetweenValueTuple]):
     @overrides
     def compute_residual_jacobians(
         self, variable_values: BetweenValueTuple
-    ) -> Tuple[jnp.ndarray, ...]:
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         # Implementing this is optional!
         # Autodiff will handle Jacobians if we don't specify analytical ones.
 

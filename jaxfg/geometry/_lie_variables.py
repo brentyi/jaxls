@@ -1,5 +1,5 @@
 import abc
-from typing import Generic, Type, TypeVar, cast
+from typing import ClassVar, Generic, Type, TypeVar, cast
 
 import jaxlie
 from overrides import final, overrides
@@ -9,12 +9,26 @@ from ..core._variables import VariableBase
 T = TypeVar("T", bound=jaxlie.MatrixLieGroup)
 
 
-class LieVariableBase(VariableBase[T], Generic[T]):
+class LieVariableBase(Generic[T], VariableBase[T]):
+    """Variable definition for Lie groups."""
+
+    # Group type to be set in subclasses. This is a method instead of an attribute so
+    # the class can be properly marked as abstract.
     @staticmethod
     @abc.abstractmethod
     def get_group_type() -> Type[T]:
-        """Helper for defining Lie group types."""
-        # return jaxlie.MatrixLieGroup  # type: ignore
+        pass
+
+    # (1) Required for all variables: an example value. This is most critically used to
+    # generate functions for flattening and unflattening values.
+
+    @classmethod
+    @final
+    @overrides
+    def get_default_value(cls) -> T:
+        return cast(T, cls.get_group_type().identity())
+
+    # (2) Methods that need to be overridden for defining non-Euclidean manifolds.
 
     @classmethod
     @final
@@ -25,14 +39,11 @@ class LieVariableBase(VariableBase[T], Generic[T]):
     @classmethod
     @final
     @overrides
-    def get_default_value(cls) -> T:
-        return cast(T, cls.get_group_type().identity())
-
-    @classmethod
-    @final
-    @overrides
     def manifold_retract(cls, x: T, local_delta: jaxlie.hints.TangentVector) -> T:
         return jaxlie.manifold.rplus(x, local_delta)
+
+    # (3) Optional: analytical Jacobian for manifold retraction. If not defined, this
+    # will be handled via autodiff.
 
     @classmethod
     @final
