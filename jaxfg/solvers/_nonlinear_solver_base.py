@@ -1,4 +1,5 @@
 import abc
+import functools
 from typing import TYPE_CHECKING, Callable, Generic, TypeVar, Union
 
 import jax
@@ -88,7 +89,7 @@ class NonlinearSolverBase(
         # Optimization
         state = jax.lax.while_loop(
             cond_fun=lambda state: jnp.logical_not(state.done),
-            body_fun=jax.partial(self._step, graph),
+            body_fun=functools.partial(self._step, graph),
             init_val=state,
         )
 

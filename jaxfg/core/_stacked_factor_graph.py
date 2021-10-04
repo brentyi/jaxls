@@ -260,7 +260,7 @@ class StackedFactorGraph:
         )
         return A
 
-    # @jax.partial(jax.jit, static_argnums=2)
+    # @functools.partial(jax.jit, static_argnums=2)
     # def _compute_variable_hessian_block(
     #     self, assignments: VariableAssignments, variable: VariableBase
     # ) -> hints.Array:
