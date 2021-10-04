@@ -1,3 +1,4 @@
+import functools
 from typing import TYPE_CHECKING
 
 import jax
@@ -108,7 +109,7 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase[NonlinearSolverState])
         else:
             state = jax.lax.while_loop(
                 cond_fun=lambda state: jnp.logical_not(state.done),
-                body_fun=jax.partial(self._step, graph),
+                body_fun=functools.partial(self._step, graph),
                 init_val=state,
             )
 
