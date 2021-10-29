@@ -5,54 +5,49 @@ For a summary of options:
     python pose_graph_g2o.py --help
 
 """
-import argparse
 import dataclasses
 import enum
 import pathlib
+from typing import Dict
 
-import _g2o_utils
-import datargs
+import dcargs
+import jaxfg
 import matplotlib.pyplot as plt
 
-import jaxfg
+import _g2o_utils
 
 
 class SolverType(enum.Enum):
-    GAUSS_NEWTON = jaxfg.solvers.GaussNewtonSolver()
-    FIXED_ITERATION_GAUSS_NEWTON = jaxfg.solvers.FixedIterationGaussNewtonSolver(
-        unroll=False
-    )
-    LEVENBERG_MARQUARDT = jaxfg.solvers.LevenbergMarquardtSolver()
-    DOGLEG = jaxfg.solvers.DoglegSolver()
+    GAUSS_NEWTON = enum.auto()
+    FIXED_ITERATION_GAUSS_NEWTON = enum.auto()
+    LEVENBERG_MARQUARDT = enum.auto()
+    DOGLEG = enum.auto()
 
-    @property
-    def value(self) -> jaxfg.solvers.NonlinearSolverBase:
-        """Typed override for `enum.value`."""
-        value = super().value
-        assert isinstance(value, jaxfg.solvers.NonlinearSolverBase)
-        return value
+    def get_solver(self) -> jaxfg.solvers.NonlinearSolverBase:
+        """Get solver corresponding to an enum."""
+        map: Dict[SolverType, jaxfg.solvers.NonlinearSolverBase] = {
+            SolverType.GAUSS_NEWTON: jaxfg.solvers.GaussNewtonSolver(),
+            SolverType.FIXED_ITERATION_GAUSS_NEWTON: jaxfg.solvers.FixedIterationGaussNewtonSolver(
+                unroll=False
+            ),
+            SolverType.LEVENBERG_MARQUARDT: jaxfg.solvers.LevenbergMarquardtSolver(),
+            SolverType.DOGLEG: jaxfg.solvers.DoglegSolver(),
+        }
+        return map[self]
 
 
-@datargs.argsclass(
-    parser_params={"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
-)
 @dataclasses.dataclass
 class CliArgs:
-    g2o_path: pathlib.Path = datargs.arg(
-        positional=True,
-        nargs="?",
-        default=pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
-        help="Path to g2o file.",
-    )
-    solver_type: SolverType = datargs.arg(
-        default=SolverType.GAUSS_NEWTON,
-        help="Nonlinear solver to use.",
-    )
+    g2o_path: pathlib.Path = pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o"
+    """Path to g2o file."""
+
+    solver_type: SolverType = SolverType.GAUSS_NEWTON
+    """Nonlinear solver to use."""
 
 
 def main():
     # Parse CLI args
-    cli_args = datargs.parse(CliArgs)
+    cli_args = dcargs.parse(CliArgs)
 
     # Read graph
     with jaxfg.utils.stopwatch("Reading g2o file"):
@@ -67,14 +62,14 @@ def main():
 
     # Time solver
     if not isinstance(
-        cli_args.solver_type.value, jaxfg.solvers.FixedIterationGaussNewtonSolver
+        cli_args.solver_type.get_solver(), jaxfg.solvers.FixedIterationGaussNewtonSolver
     ):
         # `max_iterations` field exists for all solvers but the fixed iteration GN
         with jaxfg.utils.stopwatch("Single-step JIT compile + solve"):
             solution_poses = graph.solve(
                 initial_poses,
                 solver=dataclasses.replace(
-                    cli_args.solver_type.value, max_iterations=1
+                    cli_args.solver_type.get_solver(), max_iterations=1
                 ),
             )
             solution_poses.storage.block_until_ready()
@@ -83,13 +78,15 @@ def main():
             solution_poses = graph.solve(
                 initial_poses,
                 solver=dataclasses.replace(
-                    cli_args.solver_type.value, max_iterations=1
+                    cli_args.solver_type.get_solver(), max_iterations=1
                 ),
             )
             solution_poses.storage.block_until_ready()
 
     with jaxfg.utils.stopwatch("Full solve"):
-        solution_poses = graph.solve(initial_poses, solver=cli_args.solver_type.value)
+        solution_poses = graph.solve(
+            initial_poses, solver=cli_args.solver_type.get_solver()
+        )
         solution_poses.storage.block_until_ready()
 
     # Plot

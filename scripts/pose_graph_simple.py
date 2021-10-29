@@ -11,10 +11,9 @@
 
 from typing import List
 
+import jaxfg
 import jaxlie
 from jax import numpy as jnp
-
-import jaxfg
 
 # Create variables: each variable object represents something that we want to solve for.
 #

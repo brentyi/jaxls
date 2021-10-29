@@ -1,12 +1,11 @@
 import pathlib
 from typing import Dict, List, NamedTuple
 
+import jaxfg
 import jaxlie
 import numpy as onp
 from jax import numpy as jnp
 from tqdm.auto import tqdm
-
-import jaxfg
 
 
 class G2OData(NamedTuple):

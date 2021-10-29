@@ -12,7 +12,7 @@ setup(
     package_data={"jaxfg": ["py.typed"]},
     python_requires=">=3.7",
     install_requires=[
-        "datargs",
+        "dcargs",
         "jax>=0.2.13",
         "jaxlib",
         "jaxlie>=1.0.0",
