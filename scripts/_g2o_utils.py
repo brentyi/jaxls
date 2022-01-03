@@ -1,11 +1,12 @@
 import pathlib
 from typing import Dict, List, NamedTuple
 
-import jaxfg
 import jaxlie
 import numpy as onp
 from jax import numpy as jnp
 from tqdm.auto import tqdm
+
+import jaxfg
 
 
 class G2OData(NamedTuple):
@@ -78,7 +79,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             assert len(initial_poses) == index
             variable = jaxfg.geometry.SE3Variable()
             initial_poses[variable] = jaxlie.SE3(
-                wxyz_xyz=onp.array(list(map(float, [qw, qx, qy, qz, x, y, z])))
+                wxyz_xyz=onp.array(list(map(float, [qw, qx, qy, qz, x, y, z])))  # type: ignore
             )
             pose_variables.append(variable)
 

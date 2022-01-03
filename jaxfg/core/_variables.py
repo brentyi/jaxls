@@ -1,7 +1,7 @@
 import abc
 import functools
 import inspect
-from typing import Callable, ClassVar, Generic, Mapping, Type, TypeVar
+from typing import Callable, ClassVar, Generic, Mapping, Tuple, Type, TypeVar
 
 import jax
 import numpy as onp
@@ -52,11 +52,16 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     # (3) Optional
 
     @classmethod
-    def manifold_retract_jacobian(cls, x: VariableValueType) -> VariableValueType:
+    def manifold_retract_jacobian(cls, x: VariableValueType) -> Tuple[jnp.ndarray, ...]:
         """Jacobian of the variable parameters with respect to the local
-        parameterization, linearized around `local_delta=zero`.
-        """
-        return jax.jacfwd(cls.manifold_retract, argnums=1)(
+        parameterization, linearized around `local_delta=zero`. Returns a tuple of
+        Jacobian matrices,  one for each leaf in the variable value pytree."""
+        return jax.jacfwd(
+            lambda x, local_delta: jax.tree_leaves(
+                cls.manifold_retract(x, local_delta)
+            ),
+            argnums=1,
+        )(
             x,
             onp.zeros(cls.get_local_parameter_dim()),
         )
@@ -66,8 +71,11 @@ class VariableBase(abc.ABC, Generic[VariableValueType], EnforceOverrides):
     _parameter_dim: ClassVar[int]
     """Parameter dimensionality. Set automatically in `__init_subclass__`."""
 
-    _unflatten: ClassVar[Callable[[hints.Array], VariableValueType]]
-    """Helper for unflattening variable values. Set in `__init_subclass__`."""
+    _unflatten: Callable[[hints.Array], VariableValueType]
+    """Helper for unflattening variable values. Implemented in `__init_subclass__`."""
+    # ^Note that `_unflatten` should really be annotated as a ClassVar, but this raises
+    # a mypy error due to an unnecessarily limiting spec in PEP 526:
+    # https://github.com/python/mypy/issues/5144
 
     def __init__(self):
         """Variable constructor. Should take no arguments."""

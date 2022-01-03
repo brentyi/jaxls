@@ -1,5 +1,5 @@
 import abc
-from typing import Generic, Iterable, Tuple, Type, TypeVar, cast, get_type_hints
+from typing import Generic, Tuple, Type, TypeVar, cast, get_type_hints
 
 import jax
 import jax_dataclasses
@@ -69,9 +69,6 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         def reshape_leaves(tree: hints.Pytree, shape: Tuple[int, ...]) -> hints.Pytree:
             return jax.tree_map(lambda leaf: leaf.reshape(shape), tree)
 
-        def concatenate_leaves(tree: Iterable[hints.Pytree], axis: int) -> jnp.ndarray:
-            return jnp.concatenate(jax.tree_leaves(tree), axis=axis)
-
         # To compute the Jacobian of the residual wrt the local parameters, we compose
         # (1) the residual wrt the variable parameters and (2) the variable parameters
         # wrt the local parameterization.
@@ -79,14 +76,14 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         jacobians = jax.tree_map(
             jnp.dot,
             tuple(
-                concatenate_leaves(tree, axis=-1)
+                jnp.concatenate(jax.tree_leaves(tree), axis=-1)
                 for tree in reshape_leaves(
                     jax.jacfwd(self.compute_residual_vector)(variable_values),
                     (self.get_residual_dim(), -1),
                 )
             ),
             tuple(
-                concatenate_leaves(
+                jnp.concatenate(
                     reshape_leaves(
                         self.variables[i].manifold_retract_jacobian(variable_values[i]),
                         (-1, v.get_local_parameter_dim()),

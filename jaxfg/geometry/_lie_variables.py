@@ -1,9 +1,11 @@
 import abc
-from typing import ClassVar, Generic, Type, TypeVar, cast
+from typing import Generic, Tuple, Type, TypeVar, cast
 
 import jaxlie
+from jax import numpy as jnp
 from overrides import final, overrides
 
+from .. import hints
 from ..core._variables import VariableBase
 
 T = TypeVar("T", bound=jaxlie.MatrixLieGroup)
@@ -39,7 +41,7 @@ class LieVariableBase(Generic[T], VariableBase[T]):
     @classmethod
     @final
     @overrides
-    def manifold_retract(cls, x: T, local_delta: jaxlie.hints.TangentVector) -> T:
+    def manifold_retract(cls, x: T, local_delta: hints.LocalVariableValue) -> T:
         return jaxlie.manifold.rplus(x, local_delta)
 
     # (3) Optional: analytical Jacobian for manifold retraction. If not defined, this
@@ -48,12 +50,8 @@ class LieVariableBase(Generic[T], VariableBase[T]):
     @classmethod
     @final
     @overrides
-    def manifold_retract_jacobian(cls, x: T) -> T:
-        # `jaxlie` returns Jacobians as bare arrays, but emulating
-        # jax.jacfwd/jax.jacrev requires each Jacobian to be a pytree.
-        return cls.get_group_type()(
-            jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(x)
-        )
+    def manifold_retract_jacobian(cls, x: T) -> Tuple[jnp.ndarray]:
+        return (jaxlie.manifold.rplus_jacobian_parameters_wrt_delta(x),)
 
 
 class SO2Variable(LieVariableBase[jaxlie.SO2]):

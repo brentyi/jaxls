@@ -10,11 +10,11 @@ import enum
 import pathlib
 from typing import Dict
 
+import _g2o_utils
 import dcargs
-import jaxfg
 import matplotlib.pyplot as plt
 
-import _g2o_utils
+import jaxfg
 
 
 class SolverType(enum.Enum):
