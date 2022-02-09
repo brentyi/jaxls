@@ -9,7 +9,7 @@ from .. import noises
 from ..core._factor_base import FactorBase
 from ._lie_variables import LieVariableBase
 
-# To implement a factor, we start be defining what the types of the variables that
+# To implement a factor, we start by defining what the types of the variables that
 # connect to it are.
 # This can be either a standard tuple or a named one (see BetweenFactor for the latter),
 # and should be used to inherit from `FactorBase[some tuple type]`,  and as input to the
