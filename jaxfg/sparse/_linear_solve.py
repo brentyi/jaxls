@@ -3,7 +3,7 @@ from typing import Dict, Hashable, NamedTuple
 
 import jax
 import jax.experimental.host_callback as hcb
-import jax_dataclasses
+import jax_dataclasses as jdc
 import numpy as onp
 import sksparse
 from jax import numpy as jnp
@@ -36,7 +36,7 @@ class _LinearSolverArgs(NamedTuple):
 _cholmod_analyze_cache: Dict[Hashable, sksparse.cholmod.Factor] = {}
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class CholmodSolver(LinearSubproblemSolverBase):
     r"""CHOLMOD-based sparse linear solver. This is the default solver for performance
     reasons, but also less stable than `ConjugateGradientSolver`.
@@ -107,7 +107,7 @@ class _ConjugateGradientSolver(LinearSubproblemSolverBase, abc.ABC):
         initial_x = onp.zeros(ATb.shape)
 
         # Get diagonals of ATA, for regularization + Jacobi preconditioning
-        ATA_diagonals = jnp.zeros_like(initial_x).at[A.coords.cols].add(A.values ** 2)
+        ATA_diagonals = jnp.zeros_like(initial_x).at[A.coords.cols].add(A.values**2)
 
         # Form normal equation
         def ATA_function(x: hints.Array):
@@ -137,7 +137,7 @@ class _ConjugateGradientSolver(LinearSubproblemSolverBase, abc.ABC):
         return solution_values
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class ConjugateGradientSolver(_ConjugateGradientSolver):
     tolerance: float = 1e-5
     """CG convergence tolerance."""
@@ -147,7 +147,7 @@ class ConjugateGradientSolver(_ConjugateGradientSolver):
         return self.tolerance
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class InexactStepConjugateGradientSolver(_ConjugateGradientSolver):
     inexact_step_eta: float = 1e-2
     """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to

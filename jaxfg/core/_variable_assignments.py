@@ -1,7 +1,7 @@
 from typing import Collection, Dict, Iterable, Type, TypeVar
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 
 from .. import hints
@@ -11,7 +11,7 @@ from ._variables import VariableBase
 VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class VariableAssignments:
     """Storage class that maps variables to values."""
 
@@ -19,7 +19,7 @@ class VariableAssignments:
     """Values of variables stacked and flattened. Can either be local or global
     parameterizations, depending on the value of `.storage_metadata.local_flag`."""
 
-    storage_metadata: StorageMetadata = jax_dataclasses.static_field()
+    storage_metadata: StorageMetadata = jdc.static_field()
     """Metadata for how variables are stored."""
 
     @staticmethod
@@ -128,7 +128,7 @@ class VariableAssignments:
         """Update a value corresponding to specific variable."""
 
         index = self.storage_metadata.index_from_variable[variable]
-        with jax_dataclasses.copy_and_mutate(self) as output:
+        with jdc.copy_and_mutate(self) as output:
             output.storage = (
                 jnp.asarray(output.storage)  # In case storage vector is an onp array
                 .at[index : index + type(variable).get_parameter_dim()]
@@ -184,4 +184,4 @@ class VariableAssignments:
                 ).flatten()
             )
 
-        return jax_dataclasses.replace(self, storage=new_storage)
+        return jdc.replace(self, storage=new_storage)

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -13,14 +13,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class _DoglegState(NonlinearSolverState):
     """State passed between dogleg iterations."""
 
     radius: hints.Scalar
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class DoglegSolver(
     NonlinearSolverBase[_DoglegState],
     _TerminationCriteriaMixin,
@@ -86,17 +86,17 @@ class DoglegSolver(
             # Reference:
             # > METHODS FOR NON-LINEAR LEAST SQUARES PROBLEM, Madsen et al 2004.
             # > pg. 30~32
-            alpha = jnp.sum(step_vector_sd ** 2) / jnp.sum((A @ step_vector_sd) ** 2)
+            alpha = jnp.sum(step_vector_sd**2) / jnp.sum((A @ step_vector_sd) ** 2)
             a = alpha * step_vector_sd
             b = step_vector_gn
 
             c = jnp.sum(a * (b - a))
-            a_norm_sq = jnp.sum(a ** 2)
+            a_norm_sq = jnp.sum(a**2)
             b_minus_a_norm_sq = jnp.sum((b - a) ** 2)
-            radius_sq = state_prev.radius ** 2
+            radius_sq = state_prev.radius**2
             radius_sq_minus_a_norm_sq = radius_sq - a_norm_sq
             sqrt_c_sq_plus = jnp.sqrt(
-                c ** 2 + b_minus_a_norm_sq * radius_sq_minus_a_norm_sq
+                c**2 + b_minus_a_norm_sq * radius_sq_minus_a_norm_sq
             )
             beta = jnp.where(
                 c <= 0,
@@ -153,7 +153,7 @@ class DoglegSolver(
         )
 
         # Get output assignments
-        assignments = jax_dataclasses.replace(
+        assignments = jdc.replace(
             state_prev.assignments,
             storage=jnp.where(
                 accept_flag,

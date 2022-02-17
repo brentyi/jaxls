@@ -1,5 +1,5 @@
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 
 from .. import hints, sparse
@@ -7,7 +7,7 @@ from ..core._variable_assignments import VariableAssignments
 from ._nonlinear_solver_base import NonlinearSolverState
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class _TrustRegionMixin:
     """Mixin that implements a step quality check for trust region solvers."""
 
@@ -28,7 +28,7 @@ class _TrustRegionMixin:
         )
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class _TerminationCriteriaMixin:
     """Mixin for Ceres-style termination criteria."""
 
