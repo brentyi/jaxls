@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Collection, DefaultDict, Dict, Hashable, Iterable, List, Tuple, cast
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
 
@@ -17,7 +17,7 @@ from ._variables import VariableBase
 GroupKey = Hashable
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class StackedFactorGraph:
     """Dataclass for vectorized factor graph computations.
 
@@ -26,8 +26,8 @@ class StackedFactorGraph:
 
     factor_stacks: List[FactorStack]
     jacobian_coords: sparse.SparseCooCoordinates
-    local_storage_metadata: StorageMetadata = jax_dataclasses.static_field()
-    residual_dim: int = jax_dataclasses.static_field()
+    local_storage_metadata: StorageMetadata = jdc.static_field()
+    residual_dim: int = jdc.static_field()
 
     # Shape checks break under vmap
     # def __post_init__(self):
@@ -61,7 +61,10 @@ class StackedFactorGraph:
                 # types are the same.
                 jax.tree_structure(factor.anonymize_variables()),
                 # (2) Leaf shapes: contained array shapes must match
-                tuple(leaf.shape for leaf in jax.tree_leaves(factor)),
+                tuple(
+                    leaf.shape if hasattr(leaf, "shape") else ()
+                    for leaf in jax.tree_leaves(factor)
+                ),
             )
 
             # Record factor and variables
@@ -159,7 +162,7 @@ class StackedFactorGraph:
             Tuple[jnp.ndarray, jnp.ndarray]: Scalar cost, residual vector.
         """
         residual_vector = self.compute_whitened_residual_vector(assignments)
-        cost = jnp.sum(residual_vector ** 2)
+        cost = jnp.sum(residual_vector**2)
         return cost, residual_vector
 
     @jax.jit

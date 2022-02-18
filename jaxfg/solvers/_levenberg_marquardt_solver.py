@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -13,14 +13,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class _LevenbergMarquardtState(NonlinearSolverState):
     """State passed between LM iterations."""
 
     lambd: hints.Scalar
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class LevenbergMarquardtSolver(
     NonlinearSolverBase[_LevenbergMarquardtState],
     _TerminationCriteriaMixin,
@@ -117,7 +117,7 @@ class LevenbergMarquardtSolver(
         )
 
         # Get output assignments
-        assignments = jax_dataclasses.replace(
+        assignments = jdc.replace(
             state_prev.assignments,
             storage=jnp.where(
                 accept_flag,

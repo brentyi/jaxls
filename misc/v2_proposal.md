@@ -25,7 +25,7 @@ All code snippets below will assume the following imports:
 from typing import List, Type
 
 import jaxlie
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 
 import jaxfg
@@ -141,9 +141,9 @@ addressed:
 
 2. **The update interface for stacked graphs is a bit opaque.** Updating a
    `StackedFactorGraph` object directly is generally far more efficient than
-   creating new factors and re-stacking. Implementing
-   `jax_dataclasses.copy_and_mutate()` helped with this enormously, but the
-   interface is somewhat error-prone and generally not super intuitive.
+   creating new factors and re-stacking. Implementing `jdc.copy_and_mutate()`
+   helped with this enormously, but the interface is somewhat error-prone and
+   generally not super intuitive.
 
 3. **Marginalization.** We have an experimental implementation for computing
    marginal covariance matrices, but it currently doesn't scale well.
@@ -286,7 +286,7 @@ graph = graph.link_nodes(
 
 
 # Update factor parameters as needed...
-with jax_dataclasses.copy_and_mutate(graph) as graph:
+with jdc.copy_and_mutate(graph) as graph:
     graph.factor_from_type(
         jaxfg.geometry.PriorFactor
     ).mu = some_batched_transformation

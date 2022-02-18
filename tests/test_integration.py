@@ -2,14 +2,14 @@
 
 from typing import Tuple
 
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import overrides
 
 import jaxfg
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class VariableValue:
     a: jaxfg.hints.Array
     b: jaxfg.hints.Scalar
@@ -26,7 +26,7 @@ VariableValueSingle = Tuple[VariableValue]
 VariableValuePair = Tuple[VariableValue, VariableValue]
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class UniFactor(jaxfg.core.FactorBase[VariableValueSingle]):
     @staticmethod
     def make(variable: Variable) -> "UniFactor":
@@ -50,7 +50,7 @@ class UniFactor(jaxfg.core.FactorBase[VariableValueSingle]):
         )
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class BiFactor(jaxfg.core.FactorBase[VariableValuePair]):
     @staticmethod
     def make(variable1: Variable, variable2: Variable) -> "BiFactor":

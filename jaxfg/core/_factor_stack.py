@@ -1,7 +1,7 @@
 from typing import Generic, List, Sequence, Tuple, Type, TypeVar
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
 
@@ -13,11 +13,11 @@ from ._variables import VariableBase
 FactorType = TypeVar("FactorType", bound=FactorBase)
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class FactorStack(Generic[FactorType]):
     """A set of factors, with their parameters stacked."""
 
-    num_factors: int = jax_dataclasses.static_field()
+    num_factors: int = jdc.static_field()
     factor: FactorType
     value_indices: Tuple[hints.Array, ...]
 

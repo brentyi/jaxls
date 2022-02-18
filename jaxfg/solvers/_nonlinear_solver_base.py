@@ -3,7 +3,7 @@ import functools
 from typing import TYPE_CHECKING, Callable, Generic, TypeVar, Union
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from jax.experimental import host_callback as hcb
 from overrides import EnforceOverrides
@@ -18,7 +18,7 @@ Int = Union[hints.Array, int]
 Boolean = Union[hints.Array, bool]
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class NonlinearSolverState:
     """Standard state passed between nonlinear solve iterations."""
 
@@ -34,17 +34,17 @@ NonlinearSolverStateType = TypeVar(
 )
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class _NonlinearSolverBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
 
     """Nonlinear solver interface."""
 
-    verbose: Boolean = jax_dataclasses.static_field(default=True)
+    verbose: Boolean = jdc.static_field(default=True)
     """Set to `True` to enable printing."""
 
-    linear_solver: sparse.LinearSubproblemSolverBase = jax_dataclasses.field(
+    linear_solver: sparse.LinearSubproblemSolverBase = jdc.field(
         default_factory=lambda: sparse.CholmodSolver()
     )
     """Solver to use for linear subproblems."""

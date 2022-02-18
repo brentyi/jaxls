@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class GaussNewtonSolver(
     NonlinearSolverBase[NonlinearSolverState],
     _TerminationCriteriaMixin,

@@ -2,7 +2,7 @@ import functools
 from typing import TYPE_CHECKING
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import overrides
 
@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from ..core._stacked_factor_graph import StackedFactorGraph
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class FixedIterationGaussNewtonSolver(NonlinearSolverBase[NonlinearSolverState]):
     """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
 
-    unroll: bool = jax_dataclasses.static_field(default=True)
+    unroll: bool = jdc.static_field(default=True)
 
     # To unroll the optimizer loop, we must have a concrete (static) iteration count
-    iterations: int = jax_dataclasses.static_field(default=10)
+    iterations: int = jdc.static_field(default=10)
 
     @overrides
     def _initialize_state(

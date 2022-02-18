@@ -2,7 +2,7 @@ import abc
 from typing import Generic, Tuple, Type, TypeVar, cast, get_type_hints
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final
 from typing_utils import get_args, issubtype
@@ -21,12 +21,12 @@ VariableValueTuple = TypeVar(
 T = TypeVar("T")
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class _FactorBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
 
-    variables: Tuple[VariableBase, ...] = jax_dataclasses.static_field()
+    variables: Tuple[VariableBase, ...] = jdc.static_field()
     """Variables connected to this factor. 1-to-1, in-order correspondence with
     `VariableValueTuple`."""
 
@@ -175,6 +175,6 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         canonical instances. Used for factor stacking.
         """
         v: VariableBase
-        return jax_dataclasses.replace(
+        return jdc.replace(
             self, variables=tuple(type(v).canonical_instance() for v in self.variables)
         )
