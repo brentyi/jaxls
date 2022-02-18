@@ -61,7 +61,10 @@ class StackedFactorGraph:
                 # types are the same.
                 jax.tree_structure(factor.anonymize_variables()),
                 # (2) Leaf shapes: contained array shapes must match
-                tuple(leaf.shape for leaf in jax.tree_leaves(factor)),
+                tuple(
+                    leaf.shape if hasattr(leaf, "shape") else ()
+                    for leaf in jax.tree_leaves(factor)
+                ),
             )
 
             # Record factor and variables

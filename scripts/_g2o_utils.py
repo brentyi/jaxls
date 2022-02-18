@@ -1,5 +1,6 @@
+import dataclasses
 import pathlib
-from typing import Dict, List, NamedTuple
+from typing import Dict, List
 
 import jaxlie
 import numpy as onp
@@ -9,7 +10,8 @@ from tqdm.auto import tqdm
 import jaxfg
 
 
-class G2OData(NamedTuple):
+@dataclasses.dataclass
+class G2OData:
     factors: List[jaxfg.core.FactorBase]
     initial_poses: Dict[jaxfg.geometry.LieVariableBase, jaxlie.MatrixLieGroup]
 
