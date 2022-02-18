@@ -1,4 +1,4 @@
-# minimize (2 - x)^2 / 10 + (3 - x)^2
+# minimize (2 - x)^2 / 10 + (3 - x)^2 / 4
 # -> x = 19/7
 
 # Note that here we have more confidence for the prior=3 as for prior=2
