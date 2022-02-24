@@ -8,7 +8,11 @@ from ._noise_model_base import NoiseModelBase
 
 @jdc.pytree_dataclass
 class HuberWrapper(NoiseModelBase):
-    """Wrapper for applying a Huber loss to standard (eg Gaussian) noise models."""
+    """Wrapper for applying a Huber loss to standard (eg Gaussian) noise models.
+
+    TODO(brentyi): this should be functional in terms of optimization, but is still an
+    experimental state and has minor issues. Notably causes inaccuracy in the value
+    returned by `StackedFactorGraph.compute_cost()`."""
 
     wrapped: NoiseModelBase
     """Underlying noise model."""
