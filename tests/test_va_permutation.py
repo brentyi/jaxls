@@ -7,8 +7,6 @@ import numpy as onp
 from jax import numpy as jnp
 from overrides import overrides
 
-import jax
-
 @jdc.pytree_dataclass
 class VariableValue:
     scalar: jaxfg.hints.Scalar
