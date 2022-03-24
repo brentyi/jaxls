@@ -1,3 +1,4 @@
+import functools
 from typing import Collection, Dict, Iterable, Type, TypeVar
 
 import jax
@@ -80,6 +81,47 @@ class VariableAssignments:
         assert storage.shape == (storage_layout.dim,)
 
         return VariableAssignments(storage=storage, storage_layout=storage_layout)
+
+    @functools.partial(jax.jit, static_argnums=1)
+    def update_storage_layout(
+        self, storage_layout: StorageLayout
+    ) -> "VariableAssignments":
+        """Returns a new assignments object representing the same variable->value
+        mapping, but with an updated storage layout.
+
+        The primary motivation of this method is that the storage layout of an
+        assignments object can sometimes be shuffled with respect to the layout
+        expected by a graph (StackedFactorGraph)."""
+
+        # No-op if storage layouts already match.
+        # if self.storage_layout == storage_layout:
+        #     return self
+
+        assert self.storage_layout.dim == storage_layout.dim
+        assert self.storage_layout.local_flag == storage_layout.local_flag
+        assert set(self.storage_layout.get_variables()) == set(
+            storage_layout.get_variables()
+        )
+        dim = storage_layout.dim
+        variables = storage_layout.get_variables()
+        local_flag = storage_layout.local_flag
+
+        shuffle_indices = jnp.zeros(dim, dtype=jnp.int32)
+        for variable in variables:
+            source_index = self.storage_layout.index_from_variable[variable]
+            target_index = storage_layout.index_from_variable[variable]
+            variable_dim = (
+                variable.get_local_parameter_dim()
+                if local_flag
+                else variable.get_parameter_dim()
+            )
+            shuffle_indices = shuffle_indices.at[
+                target_index : target_index + variable_dim
+            ].set(jnp.arange(source_index, source_index + variable_dim))
+
+        new_storage = self.storage[shuffle_indices]
+        assert new_storage.shape == self.storage.shape
+        return VariableAssignments(storage=new_storage, storage_layout=storage_layout)
 
     def as_dict(self) -> Dict[VariableBase, hints.VariableValue]:
         """Grab assignments as a variable -> value dictionary."""

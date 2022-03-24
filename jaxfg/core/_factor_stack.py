@@ -19,7 +19,12 @@ class FactorStack(Generic[FactorType]):
 
     num_factors: int = jdc.static_field()
     factor: FactorType
+
     value_indices: Tuple[hints.Array, ...]
+    """The storage indices corresponding to the flattened value of each factor input."""
+
+    storage_layout: StorageLayout = jdc.static_field()
+    """The layout used to compute the value indices."""
 
     def __post_init__(self):
         # There should be one set of indices for each variable type.
@@ -79,6 +84,7 @@ class FactorStack(Generic[FactorType]):
             num_factors=len(factors),
             factor=stacked_factor,
             value_indices=value_indices_stacked,
+            storage_layout=storage_layout,
         )
 
     @staticmethod
@@ -161,6 +167,8 @@ class FactorStack(Generic[FactorType]):
         Shape of output should be `(N, stacked_factor.factor.get_residual_dim())`.
         """
 
+        assert assignments.storage_layout == self.storage_layout
+
         # Stack inputs to our factors.
         values_stacked = tuple(
             jax.vmap(type(variable).unflatten)(assignments.storage[indices])
@@ -183,6 +191,8 @@ class FactorStack(Generic[FactorType]):
 
         Shape of each Jacobian array should be `(N, local parameter dim, residual dim)`.
         """
+
+        assert assignments.storage_layout == self.storage_layout
 
         # Stack inputs to our factors.
         values_stacked = tuple(

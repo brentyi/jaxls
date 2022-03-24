@@ -96,10 +96,7 @@ def test_variable_and_factor_ordering():
             variable_combination
         )
 
-        solution_assignments = jax.jit(solver.solve)(
-            graph,
-            initial_assignments,
-        )
+        solution_assignments = graph.solve(initial_assignments, solver=solver)
         solutions.append(solution_assignments)
 
     for s0, s1 in zip(solutions[:-1], solutions[1:]):

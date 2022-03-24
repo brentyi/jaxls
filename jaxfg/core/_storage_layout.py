@@ -1,10 +1,12 @@
 import dataclasses
 from typing import Collection, DefaultDict, Dict, Iterable, List, Type
 
+from flax.core import FrozenDict
+
 from ._variables import VariableBase
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class StorageLayout:
     """Contains information about how the values of variables are stored in a flattened
     storage vector.
@@ -19,13 +21,15 @@ class StorageLayout:
     dim: int
     """Total dimension of storage vector."""
 
-    index_from_variable: Dict[VariableBase, int]
+    # Note that we use frozen dictionaries to ensure that layouts are hashable.
+
+    index_from_variable: FrozenDict[VariableBase, int]
     """Start index of each stored variable."""
 
-    index_from_variable_type: Dict[Type[VariableBase], int]
+    index_from_variable_type: FrozenDict[Type[VariableBase], int]
     """Variable of the same type are stored together. Index to the first of a type."""
 
-    count_from_variable_type: Dict[Type[VariableBase], int]
+    count_from_variable_type: FrozenDict[Type[VariableBase], int]
     """Number of variables of each type."""
 
     def get_variables(self) -> Collection[VariableBase]:
@@ -71,9 +75,9 @@ class StorageLayout:
         return StorageLayout(
             local_flag=local,
             dim=storage_index,
-            index_from_variable=index_from_variable,
-            index_from_variable_type=index_from_variable_type,
-            count_from_variable_type={
-                k: len(v) for k, v in variables_from_type.items()
-            },
+            index_from_variable=FrozenDict(index_from_variable),
+            index_from_variable_type=FrozenDict(index_from_variable_type),
+            count_from_variable_type=FrozenDict(
+                {k: len(v) for k, v in variables_from_type.items()}
+            ),
         )
