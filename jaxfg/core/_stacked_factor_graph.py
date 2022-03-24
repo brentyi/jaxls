@@ -10,7 +10,7 @@ from .. import hints, noises, sparse
 from ..solvers import GaussNewtonSolver, NonlinearSolverBase
 from ._factor_base import FactorBase
 from ._factor_stack import FactorStack
-from ._variable_assignments import StorageMetadata, VariableAssignments
+from ._variable_assignments import StorageLayout, VariableAssignments
 from ._variables import VariableBase
 
 # Key for determining which factors are grouped for stacking
@@ -26,7 +26,7 @@ class StackedFactorGraph:
 
     factor_stacks: List[FactorStack]
     jacobian_coords: sparse.SparseCooCoordinates
-    local_storage_metadata: StorageMetadata = jdc.static_field()
+    local_storage_layout: StorageLayout = jdc.static_field()
     residual_dim: int = jdc.static_field()
 
     # Shape checks break under vmap
@@ -41,7 +41,7 @@ class StackedFactorGraph:
     #             assert value_indices.shape == (N, variable.get_parameter_dim())
 
     def get_variables(self) -> Collection[VariableBase]:
-        return self.local_storage_metadata.get_variables()
+        return self.local_storage_layout.get_variables()
 
     @staticmethod
     def make(
@@ -77,10 +77,10 @@ class StackedFactorGraph:
         stacked_factors: List[FactorStack] = []
         jacobian_coords: List[sparse.SparseCooCoordinates] = []
 
-        # Create storage metadata: this determines which parts of our storage object is
-        # allocated to each variable type
-        storage_metadata = StorageMetadata.make(variables, local=False)
-        local_storage_metadata = StorageMetadata.make(variables, local=True)
+        # Create storage layout: this describes which parts of our storage object is
+        # allocated to each variable
+        storage_layout = StorageLayout.make(variables, local=False)
+        local_storage_layout = StorageLayout.make(variables, local=True)
 
         # Prepare each factor group
         residual_offset = 0
@@ -89,7 +89,7 @@ class StackedFactorGraph:
             stacked_factors.append(
                 FactorStack.make(
                     group,
-                    storage_metadata,
+                    storage_layout,
                     use_onp=use_onp,
                 )
             )
@@ -101,7 +101,7 @@ class StackedFactorGraph:
             jacobian_coords.extend(
                 FactorStack.compute_jacobian_coords(
                     factors=group,
-                    local_storage_metadata=local_storage_metadata,
+                    local_storage_layout=local_storage_layout,
                     row_offset=residual_offset,
                 )
             )
@@ -114,7 +114,7 @@ class StackedFactorGraph:
         return StackedFactorGraph(
             factor_stacks=stacked_factors,
             jacobian_coords=jacobian_coords_concat,
-            local_storage_metadata=local_storage_metadata,
+            local_storage_layout=local_storage_layout,
             residual_dim=residual_offset,
         )
 
@@ -259,7 +259,7 @@ class StackedFactorGraph:
         A = sparse.SparseCooMatrix(
             values=jnp.concatenate([A.flatten() for A in A_values_list]),
             coords=self.jacobian_coords,
-            shape=(self.residual_dim, self.local_storage_metadata.dim),
+            shape=(self.residual_dim, self.local_storage_layout.dim),
         )
         return A
 
@@ -278,7 +278,7 @@ class StackedFactorGraph:
     #     square it to compute a much smaller block from the Hessian.
     #     """
     #     local_dim = variable.get_local_parameter_dim()
-    #     start_col_index = self.local_storage_metadata.index_from_variable[variable]
+    #     start_col_index = self.local_storage_layout.index_from_variable[variable]
     #     end_col_index = start_col_index + local_dim
     #
     #     # Construct the full Jacobian, then grab only the columns that we care about

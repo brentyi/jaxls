@@ -80,7 +80,7 @@ class _TerminationCriteriaMixin:
                 - state_prev.assignments.manifold_retract(
                     VariableAssignments(
                         storage=negative_gradient,
-                        storage_metadata=local_delta_assignments.storage_metadata,
+                        storage_layout=local_delta_assignments.storage_layout,
                     ),
                 ).storage
             )

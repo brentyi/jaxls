@@ -5,7 +5,7 @@ from ._variables import VariableBase
 
 
 @dataclasses.dataclass
-class StorageMetadata:
+class StorageLayout:
     """Contains information about how the values of variables are stored in a flattened
     storage vector.
 
@@ -39,9 +39,7 @@ class StorageMetadata:
         return self.index_from_variable_type.keys()
 
     @staticmethod
-    def make(
-        variables: Iterable[VariableBase], local: bool = False
-    ) -> "StorageMetadata":
+    def make(variables: Iterable[VariableBase], local: bool = False) -> "StorageLayout":
         """Determine storage indexing from a list of variables."""
 
         # Sort variables by type name before bucketing
@@ -70,7 +68,7 @@ class StorageMetadata:
                     else variable.get_parameter_dim()
                 )
 
-        return StorageMetadata(
+        return StorageLayout(
             local_flag=local,
             dim=storage_index,
             index_from_variable=index_from_variable,

@@ -5,7 +5,7 @@ import jax_dataclasses as jdc
 from jax import numpy as jnp
 
 from .. import hints
-from ._storage_metadata import StorageMetadata
+from ._storage_layout import StorageLayout
 from ._variables import VariableBase
 
 VariableValueType = TypeVar("VariableValueType", bound=hints.VariableValue)
@@ -17,9 +17,9 @@ class VariableAssignments:
 
     storage: hints.Array
     """Values of variables stacked and flattened. Can either be local or global
-    parameterizations, depending on the value of `.storage_metadata.local_flag`."""
+    parameterizations, depending on the value of `.storage_layout.local_flag`."""
 
-    storage_metadata: StorageMetadata = jdc.static_field()
+    storage_layout: StorageLayout = jdc.static_field()
     """Metadata for how variables are stored."""
 
     @staticmethod
@@ -27,22 +27,22 @@ class VariableAssignments:
         """Create an assignment object from the default values corresponding to each variable."""
 
         # Figure out how variables are stored
-        storage_metadata = StorageMetadata.make(variables, local=False)
+        storage_layout = StorageLayout.make(variables, local=False)
 
         # Stack variable values in order
         storage = jnp.concatenate(
             [
                 jnp.tile(
                     jax.jit(variable_type.flatten)(variable_type.get_default_value()),
-                    reps=(storage_metadata.count_from_variable_type[variable_type],),
+                    reps=(storage_layout.count_from_variable_type[variable_type],),
                 )
-                for variable_type in storage_metadata.get_variable_types()
+                for variable_type in storage_layout.get_variable_types()
             ],
             axis=0,
         )
-        assert storage.shape == (storage_metadata.dim,)
+        assert storage.shape == (storage_layout.dim,)
 
-        return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
+        return VariableAssignments(storage=storage, storage_layout=storage_layout)
 
     @staticmethod
     def make_from_dict(
@@ -63,7 +63,7 @@ class VariableAssignments:
         assignments are assigned the default variable values."""
 
         # Figure out how variables are stored
-        storage_metadata = StorageMetadata.make(variables, local=False)
+        storage_layout = StorageLayout.make(variables, local=False)
 
         # Stack variable values in order
         storage = jnp.concatenate(
@@ -73,13 +73,13 @@ class VariableAssignments:
                     if assignments is not None and variable in assignments
                     else variable.get_default_value()
                 )
-                for variable in storage_metadata.get_variables()
+                for variable in storage_layout.get_variables()
             ],
             axis=0,
         )
-        assert storage.shape == (storage_metadata.dim,)
+        assert storage.shape == (storage_layout.dim,)
 
-        return VariableAssignments(storage=storage, storage_metadata=storage_metadata)
+        return VariableAssignments(storage=storage, storage_layout=storage_layout)
 
     def as_dict(self) -> Dict[VariableBase, hints.VariableValue]:
         """Grab assignments as a variable -> value dictionary."""
@@ -101,11 +101,11 @@ class VariableAssignments:
 
     def get_variables(self) -> Collection[VariableBase]:
         """Helper for iterating over variables."""
-        return self.storage_metadata.get_variables()
+        return self.storage_layout.get_variables()
 
     def get_value(self, variable: VariableBase[VariableValueType]) -> VariableValueType:
         """Get value corresponding to specific variable."""
-        index = self.storage_metadata.index_from_variable[variable]
+        index = self.storage_layout.index_from_variable[variable]
         return type(variable).unflatten(
             self.storage[index : index + variable.get_parameter_dim()]
         )
@@ -114,8 +114,8 @@ class VariableAssignments:
         self, variable_type: Type[VariableBase[VariableValueType]]
     ) -> VariableValueType:
         """Get values of all variables corresponding to a specific type."""
-        index = self.storage_metadata.index_from_variable_type[variable_type]
-        count = self.storage_metadata.count_from_variable_type[variable_type]
+        index = self.storage_layout.index_from_variable_type[variable_type]
+        count = self.storage_layout.count_from_variable_type[variable_type]
         return jax.vmap(variable_type.unflatten)(
             self.storage[
                 index : index + variable_type.get_parameter_dim() * count
@@ -127,7 +127,7 @@ class VariableAssignments:
     ) -> "VariableAssignments":
         """Update a value corresponding to specific variable."""
 
-        index = self.storage_metadata.index_from_variable[variable]
+        index = self.storage_layout.index_from_variable[variable]
         with jdc.copy_and_mutate(self) as output:
             output.storage = (
                 jnp.asarray(output.storage)  # In case storage vector is an onp array
@@ -143,21 +143,19 @@ class VariableAssignments:
         """Update variables on manifold."""
 
         # Check that inputs make sense
-        assert not self.storage_metadata.local_flag
-        assert local_delta_assignments.storage_metadata.local_flag
+        assert not self.storage_layout.local_flag
+        assert local_delta_assignments.storage_layout.local_flag
 
         # On-manifold retractions, one variable type at a time!
         new_storage = jnp.zeros_like(self.storage)
         variable_type: Type[VariableBase]
-        for variable_type in self.storage_metadata.index_from_variable_type.keys():
+        for variable_type in self.storage_layout.index_from_variable_type.keys():
 
             # Get locations
-            count = self.storage_metadata.count_from_variable_type[variable_type]
-            storage_index = self.storage_metadata.index_from_variable_type[
-                variable_type
-            ]
+            count = self.storage_layout.count_from_variable_type[variable_type]
+            storage_index = self.storage_layout.index_from_variable_type[variable_type]
             local_storage_index = (
-                local_delta_assignments.storage_metadata.index_from_variable_type[
+                local_delta_assignments.storage_layout.index_from_variable_type[
                     variable_type
                 ]
             )

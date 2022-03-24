@@ -19,7 +19,7 @@ class SparseCovariance:
 
     L: scipy.sparse.csc_matrix
     L_diag_inv: onp.ndarray
-    local_storage_metadata: core.StorageMetadata
+    local_storage_layout: core.StorageLayout
 
     _value_cache: Dict[Tuple[int, int], float]
 
@@ -44,7 +44,7 @@ class SparseCovariance:
         return SparseCovariance(
             L=sqrt_information_matrix,
             L_diag_inv=1.0 / sqrt_information_matrix.diagonal(),
-            local_storage_metadata=graph.local_storage_metadata,
+            local_storage_layout=graph.local_storage_layout,
             _value_cache={},
         )
 
@@ -55,7 +55,7 @@ class SparseCovariance:
             L_inv = onp.linalg.inv(self.L.todense())
             return L_inv.T @ L_inv
         else:
-            return self._compute_marginal(range(self.local_storage_metadata.dim))
+            return self._compute_marginal(range(self.local_storage_layout.dim))
 
     def compute_marginal(self, *variables: core.VariableBase) -> onp.ndarray:
         """Compute marginal covariance for a set of variables. Input order matters.
@@ -64,7 +64,7 @@ class SparseCovariance:
 
         indices: List[int] = []
         for v in variables:
-            start_index = self.local_storage_metadata.index_from_variable[v]
+            start_index = self.local_storage_layout.index_from_variable[v]
             indices.extend(
                 range(start_index, start_index + v.get_local_parameter_dim())
             )
