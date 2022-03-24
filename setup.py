@@ -13,6 +13,7 @@ setup(
     python_requires=">=3.7",
     install_requires=[
         "dcargs",
+        "frozendict",
         "jax>=0.2.13",
         "jaxlib",
         "jaxlie>=1.0.0",
