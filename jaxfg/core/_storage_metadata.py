@@ -9,7 +9,7 @@ class StorageMetadata:
     """Contains information about how the values of variables are stored in a flattened
     storage vector.
 
-    Note that this is a vanilla dataclass -- not a pytree. (in other words: all contents
+    Note that this is a vanilla dataclass -- not a PyTree. (in other words: all contents
     are static)
     """
 
