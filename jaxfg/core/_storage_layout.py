@@ -47,12 +47,6 @@ class StorageLayout:
     @staticmethod
     def make(variables: Iterable[VariableBase], local: bool = False) -> "StorageLayout":
         """Determine storage indexing from a list of variables."""
-
-        # Sort variables by type name before bucketing
-        # As variables_from_type will keep its insertion order when calling
-        # .items() this ensure we always have the same alphabetical order
-        variables = sorted(variables, key=lambda x: str(type(x)))
-
         # Bucket variables by type
         variables_from_type: DefaultDict[
             Type[VariableBase], List[VariableBase]
