@@ -94,8 +94,8 @@ class VariableAssignments:
         expected by a graph (StackedFactorGraph)."""
 
         # No-op if storage layouts already match.
-        # if self.storage_layout == storage_layout:
-        #     return self
+        if self.storage_layout == storage_layout:
+            return self
 
         assert self.storage_layout.dim == storage_layout.dim
         assert self.storage_layout.local_flag == storage_layout.local_flag
