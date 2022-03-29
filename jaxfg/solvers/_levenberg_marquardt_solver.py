@@ -83,7 +83,7 @@ class LevenbergMarquardtSolver(
         )
         local_delta_assignments = VariableAssignments(
             storage=step_vector,
-            storage_metadata=graph.local_storage_metadata,
+            storage_layout=graph.local_storage_layout,
         )
 
         # On-manifold retraction + solution check

@@ -1,15 +1,19 @@
 import dataclasses
-from typing import Collection, DefaultDict, Dict, Iterable, List, Type
+from typing import Collection, DefaultDict, Dict, Iterable, List, Mapping, Type
+
+# We could also use flax.core.FrozenDict, but are trying to keep flax out of our
+# dependencies.
+from frozendict import frozendict  # type: ignore
 
 from ._variables import VariableBase
 
 
-@dataclasses.dataclass
-class StorageMetadata:
+@dataclasses.dataclass(frozen=True)
+class StorageLayout:
     """Contains information about how the values of variables are stored in a flattened
     storage vector.
 
-    Note that this is a vanilla dataclass -- not a pytree. (in other words: all contents
+    Note that this is a vanilla dataclass -- not a PyTree. (in other words: all contents
     are static)
     """
 
@@ -19,13 +23,15 @@ class StorageMetadata:
     dim: int
     """Total dimension of storage vector."""
 
-    index_from_variable: Dict[VariableBase, int]
+    # Note that the mappings are frozen dictionaries to ensure that layouts are hashable.
+
+    index_from_variable: Mapping[VariableBase, int]
     """Start index of each stored variable."""
 
-    index_from_variable_type: Dict[Type[VariableBase], int]
+    index_from_variable_type: Mapping[Type[VariableBase], int]
     """Variable of the same type are stored together. Index to the first of a type."""
 
-    count_from_variable_type: Dict[Type[VariableBase], int]
+    count_from_variable_type: Mapping[Type[VariableBase], int]
     """Number of variables of each type."""
 
     def get_variables(self) -> Collection[VariableBase]:
@@ -39,11 +45,8 @@ class StorageMetadata:
         return self.index_from_variable_type.keys()
 
     @staticmethod
-    def make(
-        variables: Iterable[VariableBase], local: bool = False
-    ) -> "StorageMetadata":
+    def make(variables: Iterable[VariableBase], local: bool = False) -> "StorageLayout":
         """Determine storage indexing from a list of variables."""
-
         # Bucket variables by type
         variables_from_type: DefaultDict[
             Type[VariableBase], List[VariableBase]
@@ -65,12 +68,12 @@ class StorageMetadata:
                     else variable.get_parameter_dim()
                 )
 
-        return StorageMetadata(
+        return StorageLayout(
             local_flag=local,
             dim=storage_index,
-            index_from_variable=index_from_variable,
-            index_from_variable_type=index_from_variable_type,
-            count_from_variable_type={
-                k: len(v) for k, v in variables_from_type.items()
-            },
+            index_from_variable=frozendict(index_from_variable),
+            index_from_variable_type=frozendict(index_from_variable_type),
+            count_from_variable_type=frozendict(
+                {k: len(v) for k, v in variables_from_type.items()}
+            ),
         )

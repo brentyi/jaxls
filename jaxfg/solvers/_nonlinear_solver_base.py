@@ -53,7 +53,7 @@ class _NonlinearSolverBase:
 class NonlinearSolverBase(
     _NonlinearSolverBase, Generic[NonlinearSolverStateType], abc.ABC, EnforceOverrides
 ):
-    # To be overriden by subclasses
+    # To be overriden by subclasses.
 
     @abc.abstractmethod
     def _initialize_state(
@@ -71,7 +71,7 @@ class NonlinearSolverBase(
     ) -> NonlinearSolverStateType:
         """Single nonlinear optimization step."""
 
-    # Shared
+    # Shared.
 
     @jax.jit
     def solve(
@@ -81,12 +81,13 @@ class NonlinearSolverBase(
     ) -> VariableAssignments:
         """Run MAP inference on a factor graph."""
 
-        # Initialize
-        assignments = initial_assignments
+        # Initialize. Note that the storage layout of the initial assignments may not
+        # match what the graph expects.
+        assignments = initial_assignments.update_storage_layout(graph.storage_layout)
         cost, residual_vector = graph.compute_cost(assignments)
-        state = self._initialize_state(graph, initial_assignments)
+        state = self._initialize_state(graph, assignments)
 
-        # Optimization
+        # Optimization.
         state = jax.lax.while_loop(
             cond_fun=lambda state: jnp.logical_not(state.done),
             body_fun=functools.partial(self._step, graph),
@@ -99,7 +100,10 @@ class NonlinearSolverBase(
             cost=state.cost,
         )
 
-        return state.assignments
+        # Return, but with the storage layout reverted.
+        return state.assignments.update_storage_layout(
+            initial_assignments.storage_layout
+        )
 
     def _hcb_print(
         self,

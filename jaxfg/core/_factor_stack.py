@@ -7,7 +7,7 @@ from jax import numpy as jnp
 
 from .. import hints, sparse
 from ._factor_base import FactorBase
-from ._variable_assignments import StorageMetadata, VariableAssignments
+from ._variable_assignments import StorageLayout, VariableAssignments
 from ._variables import VariableBase
 
 FactorType = TypeVar("FactorType", bound=FactorBase)
@@ -19,7 +19,12 @@ class FactorStack(Generic[FactorType]):
 
     num_factors: int = jdc.static_field()
     factor: FactorType
+
     value_indices: Tuple[hints.Array, ...]
+    """The storage indices corresponding to the flattened value of each factor input."""
+
+    storage_layout: StorageLayout = jdc.static_field()
+    """The layout used to compute the value indices."""
 
     def __post_init__(self):
         # There should be one set of indices for each variable type.
@@ -38,7 +43,7 @@ class FactorStack(Generic[FactorType]):
     @staticmethod
     def make(
         factors: Sequence[FactorType],
-        storage_metadata: StorageMetadata,
+        storage_layout: StorageLayout,
         use_onp: bool,
     ) -> "FactorStack[FactorType]":
         """Make a stacked factor."""
@@ -64,7 +69,7 @@ class FactorStack(Generic[FactorType]):
                 assert isinstance(
                     variable, type(factors[0].variables[i])
                 ), "Variable types of stacked factors must match"
-                storage_pos = storage_metadata.index_from_variable[variable]
+                storage_pos = storage_layout.index_from_variable[variable]
                 value_indices_list[i].append(
                     onp.arange(storage_pos, storage_pos + variable.get_parameter_dim())
                 )
@@ -79,12 +84,13 @@ class FactorStack(Generic[FactorType]):
             num_factors=len(factors),
             factor=stacked_factor,
             value_indices=value_indices_stacked,
+            storage_layout=storage_layout,
         )
 
     @staticmethod
     def compute_jacobian_coords(
         factors: Sequence[FactorType],
-        local_storage_metadata: StorageMetadata,
+        local_storage_layout: StorageLayout,
         row_offset: int,
     ) -> List[sparse.SparseCooCoordinates]:
         """Computes Jacobian coordinates for a factor stack. One array of indices per
@@ -101,7 +107,7 @@ class FactorStack(Generic[FactorType]):
         for factor in factors:
             for i, variable in enumerate(factor.variables):
                 # Record local parameterization indices.
-                storage_pos = local_storage_metadata.index_from_variable[variable]
+                storage_pos = local_storage_layout.index_from_variable[variable]
                 local_value_indices_list[i].append(
                     onp.arange(
                         storage_pos,
@@ -161,6 +167,8 @@ class FactorStack(Generic[FactorType]):
         Shape of output should be `(N, stacked_factor.factor.get_residual_dim())`.
         """
 
+        assert assignments.storage_layout == self.storage_layout
+
         # Stack inputs to our factors.
         values_stacked = tuple(
             jax.vmap(type(variable).unflatten)(assignments.storage[indices])
@@ -183,6 +191,8 @@ class FactorStack(Generic[FactorType]):
 
         Shape of each Jacobian array should be `(N, local parameter dim, residual dim)`.
         """
+
+        assert assignments.storage_layout == self.storage_layout
 
         # Stack inputs to our factors.
         values_stacked = tuple(

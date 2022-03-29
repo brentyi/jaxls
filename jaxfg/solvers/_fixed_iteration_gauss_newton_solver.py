@@ -68,7 +68,7 @@ class FixedIterationGaussNewtonSolver(NonlinearSolverBase[NonlinearSolverState])
                 lambd=0.0,
                 iteration=state_prev.iterations,
             ),
-            storage_metadata=graph.local_storage_metadata,
+            storage_layout=graph.local_storage_layout,
         )
 
         # On-manifold retraction
