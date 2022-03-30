@@ -149,10 +149,10 @@ class _RealVectorVariableTemplate:
         assert isinstance(dim, int)
 
         class _RealVectorVariable(VariableBase[hints.Array]):
-            @staticmethod
+            @classmethod
             @overrides
             @final
-            def get_default_value() -> hints.Array:
+            def get_default_value(cls) -> hints.Array:
                 return jnp.zeros(dim)
 
         return _RealVectorVariable
