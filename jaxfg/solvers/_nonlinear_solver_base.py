@@ -84,7 +84,6 @@ class NonlinearSolverBase(
         # Initialize. Note that the storage layout of the initial assignments may not
         # match what the graph expects.
         assignments = initial_assignments.update_storage_layout(graph.storage_layout)
-        cost, residual_vector = graph.compute_cost(assignments)
         state = self._initialize_state(graph, assignments)
 
         # Optimization.
