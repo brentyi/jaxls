@@ -5,7 +5,7 @@ import jax
 import jax.experimental.host_callback as hcb
 import jax_dataclasses as jdc
 import numpy as onp
-import sksparse
+import sksparse.cholmod
 from jax import numpy as jnp
 from overrides import EnforceOverrides, overrides
 
