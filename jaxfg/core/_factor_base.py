@@ -1,11 +1,10 @@
 import abc
-from typing import Generic, Tuple, Type, TypeVar, cast, get_type_hints
+from typing import Generic, Tuple, Type, TypeVar, cast, get_args, get_type_hints
 
 import jax
 import jax_dataclasses as jdc
 from jax import numpy as jnp
 from overrides import EnforceOverrides, final
-from typing_utils import get_args, issubtype
 
 from .. import hints, noises
 from ._variable_assignments import VariableAssignments
@@ -136,7 +135,7 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
             ) from e
 
         # Function should be hinted with a tuple of some kind, but not `tuple` itself
-        assert issubtype(value_type, tuple), value_type is not tuple
+        assert issubclass(value_type, tuple), value_type is not tuple
 
         # Heuristic: evaluates to `True` for NamedTuple types but `False` for
         # `Tuple[...]` types. Note that standard superclass checking approaches don't

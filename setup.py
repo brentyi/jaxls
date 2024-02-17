@@ -10,7 +10,7 @@ setup(
     license="BSD",
     packages=find_packages(),
     package_data={"jaxfg": ["py.typed"]},
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
         "tyro",
         "frozendict",
@@ -22,7 +22,6 @@ setup(
         "scikit-sparse",
         "termcolor",
         "tqdm",
-        "typing_utils",  # We can phase this out if we drop support for Python 3.7
         "matplotlib",
     ],
     extras_require={
