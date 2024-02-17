@@ -90,8 +90,7 @@ class CholmodSolver(LinearSubproblemSolverBase):
 
 class _ConjugateGradientSolver(LinearSubproblemSolverBase, abc.ABC):
     @abc.abstractmethod
-    def _get_cg_tolerance(self, iteration: hints.Scalar):
-        ...
+    def _get_cg_tolerance(self, iteration: hints.Scalar): ...
 
     @overrides
     def solve_subproblem(

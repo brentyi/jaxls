@@ -1,7 +1,6 @@
 import itertools
 from typing import Tuple
 
-import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp

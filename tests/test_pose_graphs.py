@@ -2,13 +2,12 @@
 
 from typing import List
 
+import jaxfg
 import jaxlie
 from jax import numpy as jnp
 
-import jaxfg
 
-
-def test_pose_graph_gauss_newton():
+def test_pose_graph_gauss_newton() -> None:
     pose_variables = [
         jaxfg.geometry.SE2Variable(),
         jaxfg.geometry.SE2Variable(),
@@ -73,7 +72,7 @@ def test_pose_graph_gauss_newton():
     )
 
 
-def test_pose_graph_levenberg_marquardt():
+def test_pose_graph_levenberg_marquardt() -> None:
     pose_variables = [
         jaxfg.geometry.SE2Variable(),
         jaxfg.geometry.SE2Variable(),
@@ -138,7 +137,7 @@ def test_pose_graph_levenberg_marquardt():
     )
 
 
-def test_pose_graph_dogleg():
+def test_pose_graph_dogleg() -> None:
     pose_variables = [
         jaxfg.geometry.SE2Variable(),
         jaxfg.geometry.SE2Variable(),

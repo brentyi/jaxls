@@ -41,7 +41,7 @@ class _NonlinearSolverBase:
 
     """Nonlinear solver interface."""
 
-    verbose: Boolean = jdc.static_field(default=True)
+    verbose: jdc.Static[Boolean] = True
     """Set to `True` to enable printing."""
 
     linear_solver: sparse.LinearSubproblemSolverBase = jdc.field(
@@ -60,8 +60,7 @@ class NonlinearSolverBase(
         self,
         graph: "StackedFactorGraph",
         initial_assignments: VariableAssignments,
-    ) -> NonlinearSolverStateType:
-        ...
+    ) -> NonlinearSolverStateType: ...
 
     @abc.abstractmethod
     def _step(

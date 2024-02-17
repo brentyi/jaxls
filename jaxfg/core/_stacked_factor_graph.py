@@ -26,9 +26,9 @@ class StackedFactorGraph:
 
     factor_stacks: List[FactorStack]
     jacobian_coords: sparse.SparseCooCoordinates
-    storage_layout: StorageLayout = jdc.static_field()
-    local_storage_layout: StorageLayout = jdc.static_field()
-    residual_dim: int = jdc.static_field()
+    storage_layout: jdc.Static[StorageLayout]
+    local_storage_layout: jdc.Static[StorageLayout]
+    residual_dim: jdc.Static[int]
 
     # Shape checks break under vmap
     # def __post_init__(self):
@@ -231,7 +231,8 @@ class StackedFactorGraph:
         residual_vector: hints.Array,
     ) -> sparse.SparseCooMatrix:
         """Compute the Jacobian of a graph's residual vector with respect to the stacked
-        local delta vectors. Shape should be `(residual_dim, local_delta_storage_dim)`."""
+        local delta vectors. Shape should be `(residual_dim, local_delta_storage_dim)`.
+        """
 
         # Resolve storage layout mismatches. Factor stack computations will raise an
         # assertion error if the storage layout is incorrect.
@@ -240,6 +241,7 @@ class StackedFactorGraph:
         # Linearize factors by group.
         A_values_list: List[jnp.ndarray] = []
         residual_start = 0
+        residual_end = 0
         for stacked_factor in self.factor_stacks:
             residual_end = residual_start + stacked_factor.get_residual_dim()
             stacked_residual_vector = residual_vector[
@@ -261,6 +263,7 @@ class StackedFactorGraph:
                     )
                 )
             residual_start = residual_end
+        assert residual_end != 0
         assert residual_end == self.residual_dim
 
         # Build Jacobian.

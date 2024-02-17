@@ -6,8 +6,7 @@ import numpy as onp
 import jaxfg
 
 
-def test_marginalization():
-
+def test_marginalization() -> None:
     pose_variable = jaxfg.geometry.SE2Variable()
     pose_value = jaxlie.SE2.identity()
 
@@ -35,8 +34,7 @@ def test_marginalization():
     onp.testing.assert_allclose(cov, cov_computed, atol=1e-8, rtol=1e-5)
 
 
-def test_marginalization_double():
-
+def test_marginalization_double() -> None:
     pose_variable = jaxfg.geometry.SE2Variable()
     pose_value = jaxlie.SE2.identity()
 
@@ -68,8 +66,7 @@ def test_marginalization_double():
     onp.testing.assert_allclose(cov, cov_computed * 2.0, atol=1e-8, rtol=1e-5)
 
 
-def test_marginalization_as_dense():
-
+def test_marginalization_as_dense() -> None:
     pose_variables = [
         jaxfg.geometry.SE2Variable(),
         jaxfg.geometry.SE2Variable(),

@@ -5,16 +5,17 @@ For a summary of options:
     python pose_graph_g2o.py --help
 
 """
+
 import dataclasses
 import enum
 import pathlib
 from typing import Dict, Optional
 
-import _g2o_utils
-import dcargs
-import matplotlib.pyplot as plt
-
 import jaxfg
+import matplotlib.pyplot as plt
+import tyro
+
+import _g2o_utils
 
 
 class SolverType(enum.Enum):
@@ -48,9 +49,9 @@ class CliArgs:
     """Threshold for huber losses; if not set, a standard least-squares objective is used."""
 
 
-def main():
+def main() -> None:
     # Parse CLI args
-    cli_args = dcargs.parse(CliArgs)
+    cli_args = tyro.cli(CliArgs)
 
     # Read graph
     with jaxfg.utils.stopwatch("Reading g2o file"):

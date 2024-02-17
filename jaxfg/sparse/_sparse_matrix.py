@@ -27,7 +27,7 @@ class SparseCooMatrix:
     """Non-zero matrix values. Shape should be `(*, N)`."""
     coords: SparseCooCoordinates
     """Row and column indices of non-zero entries. Shapes should be `(*, N)`."""
-    shape: Tuple[int, int] = jdc.static_field()
+    shape: jdc.Static[Tuple[int, int]]
     """Shape of matrix."""
 
     # Shape checks break under vmap

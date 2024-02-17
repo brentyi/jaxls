@@ -20,7 +20,7 @@ class VariableAssignments:
     """Values of variables stacked and flattened. Can either be local or global
     parameterizations, depending on the value of `.storage_layout.local_flag`."""
 
-    storage_layout: StorageLayout = jdc.static_field()
+    storage_layout: jdc.Static[StorageLayout]
     """Metadata for how variables are stored."""
 
     @staticmethod
@@ -127,13 +127,11 @@ class VariableAssignments:
         """Grab assignments as a variable -> value dictionary."""
         return {v: self.get_value(v) for v in self.get_variables()}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         value_from_variable = {
             variable: self.get_value(variable) for variable in self.get_variables()
         }
-        k: VariableBase
-
-        contents: str = "\n".join(
+        contents = "\n".join(
             [
                 f"    {i}.{k.__class__.__name__}: {v}"
                 for i, (k, v) in enumerate(value_from_variable.items())
@@ -192,7 +190,6 @@ class VariableAssignments:
         new_storage = jnp.zeros_like(self.storage)
         variable_type: Type[VariableBase]
         for variable_type in self.storage_layout.index_from_variable_type.keys():
-
             # Get locations
             count = self.storage_layout.count_from_variable_type[variable_type]
             storage_index = self.storage_layout.index_from_variable_type[variable_type]

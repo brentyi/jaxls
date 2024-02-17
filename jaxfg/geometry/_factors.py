@@ -44,7 +44,6 @@ class PriorFactor(FactorBase[PriorValueTuple]):
     # Required: we define the residual corresponding to this factor type.
     @overrides
     def compute_residual_vector(self, variable_values: PriorValueTuple) -> jnp.ndarray:
-
         T: jaxlie.MatrixLieGroup
         (T,) = variable_values
 
@@ -56,7 +55,6 @@ class PriorFactor(FactorBase[PriorValueTuple]):
     def compute_residual_jacobians(
         self, variable_values: PriorValueTuple
     ) -> Tuple[jnp.ndarray]:
-
         T: jaxlie.MatrixLieGroup
         (T,) = variable_values
         return (-jnp.eye(type(T).tangent_dim),)

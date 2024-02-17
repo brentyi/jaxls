@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 class FixedIterationGaussNewtonSolver(NonlinearSolverBase[NonlinearSolverState]):
     """Alternative version of Gauss-Newton solver, which ignores convergence checks."""
 
-    unroll: bool = jdc.static_field(default=True)
+    unroll: jdc.Static[bool] = True
 
     # To unroll the optimizer loop, we must have a concrete (static) iteration count
-    iterations: int = jdc.static_field(default=10)
+    iterations: jdc.Static[int] = 10
 
     @overrides
     def _initialize_state(

@@ -12,7 +12,7 @@ setup(
     package_data={"jaxfg": ["py.typed"]},
     python_requires=">=3.7",
     install_requires=[
-        "dcargs",
+        "tyro",
         "frozendict",
         "jax>=0.2.13",
         "jaxlib",

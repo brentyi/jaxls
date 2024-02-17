@@ -48,9 +48,9 @@ class StorageLayout:
     def make(variables: Iterable[VariableBase], local: bool = False) -> "StorageLayout":
         """Determine storage indexing from a list of variables."""
         # Bucket variables by type
-        variables_from_type: DefaultDict[
-            Type[VariableBase], List[VariableBase]
-        ] = DefaultDict(list)
+        variables_from_type: DefaultDict[Type[VariableBase], List[VariableBase]] = (
+            DefaultDict(list)
+        )
         for variable in variables:
             variables_from_type[type(variable)].append(variable)
 

@@ -26,7 +26,7 @@ class _FactorBase:
     # For why we have two classes:
     # https://github.com/python/mypy/issues/5374#issuecomment-650656381
 
-    variables: Tuple[VariableBase, ...] = jdc.static_field()
+    variables: jdc.Static[Tuple[VariableBase, ...]]
     """Variables connected to this factor. 1-to-1, in-order correspondence with
     `VariableValueTuple`."""
 
@@ -35,7 +35,6 @@ class _FactorBase:
 
 
 class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverrides):
-
     # (1) Functions that must be overriden in subclasses.
 
     @abc.abstractmethod
@@ -62,8 +61,6 @@ class FactorBase(_FactorBase, Generic[VariableValueTuple], abc.ABC, EnforceOverr
         2) Override `manifold_retract_jacobian()` for variables and define a custom JVP
           method for `compute_residual_vector`.
         """
-        variable: VariableBase
-        value: hints.VariableValue
 
         # Some helpers for reshaping + concatenating Jacobians
         def reshape_leaves(tree: hints.Pytree, shape: Tuple[int, ...]) -> hints.Pytree:

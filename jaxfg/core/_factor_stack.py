@@ -17,13 +17,13 @@ FactorType = TypeVar("FactorType", bound=FactorBase)
 class FactorStack(Generic[FactorType]):
     """A set of factors, with their parameters stacked."""
 
-    num_factors: int = jdc.static_field()
+    num_factors: jdc.Static[int]
     factor: FactorType
 
     value_indices: Tuple[hints.Array, ...]
     """The storage indices corresponding to the flattened value of each factor input."""
 
-    storage_layout: StorageLayout = jdc.static_field()
+    storage_layout: jdc.Static[StorageLayout]
     """The layout used to compute the value indices."""
 
     def __post_init__(self):

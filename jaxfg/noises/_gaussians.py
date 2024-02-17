@@ -46,7 +46,7 @@ class DiagonalGaussian(NoiseModelBase):
 
     @staticmethod
     def make_from_covariance(
-        diagonal: Union[hints.Array, Sequence[float]]
+        diagonal: Union[hints.Array, Sequence[float]],
     ) -> "DiagonalGaussian":
         return DiagonalGaussian(
             sqrt_precision_diagonal=1.0 / jnp.sqrt(jnp.asarray(diagonal))

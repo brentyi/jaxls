@@ -63,7 +63,7 @@ class _TerminationCriteriaMixin:
         cost_updated: hints.Scalar,
         local_delta_assignments: VariableAssignments,
         negative_gradient: hints.Array,
-    ) -> bool:
+    ) -> jax.Array:
         """Check for convergence!"""
 
         # Cost tolerance
