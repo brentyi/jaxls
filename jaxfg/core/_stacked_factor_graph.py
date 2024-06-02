@@ -120,7 +120,7 @@ class StackedFactorGraph:
             residual_dim=residual_offset,
         )
 
-    @jax.jit
+    @jdc.jit
     def compute_whitened_residual_vector(
         self, assignments: VariableAssignments
     ) -> jnp.ndarray:
@@ -154,7 +154,7 @@ class StackedFactorGraph:
         assert residual_vector.shape == (self.residual_dim,)
         return residual_vector
 
-    @jax.jit
+    @jdc.jit
     def compute_cost(
         self, assignments: VariableAssignments
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
@@ -171,7 +171,7 @@ class StackedFactorGraph:
         cost = jnp.sum(residual_vector**2)
         return cost, residual_vector
 
-    @jax.jit
+    @jdc.jit
     def compute_joint_nll(
         self,
         assignments: VariableAssignments,
@@ -224,7 +224,7 @@ class StackedFactorGraph:
 
         return joint_nll
 
-    @jax.jit
+    @jdc.jit
     def compute_whitened_residual_jacobian(
         self,
         assignments: VariableAssignments,

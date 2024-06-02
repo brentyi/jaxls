@@ -82,9 +82,9 @@ class VariableAssignments:
 
         return VariableAssignments(storage=storage, storage_layout=storage_layout)
 
-    @functools.partial(jax.jit, static_argnums=1)
+    @jdc.jit
     def update_storage_layout(
-        self, storage_layout: StorageLayout
+        self, storage_layout: jdc.Static[StorageLayout]
     ) -> "VariableAssignments":
         """Returns a new assignments object representing the same variable->value
         mapping, but with an updated storage layout.
@@ -176,7 +176,7 @@ class VariableAssignments:
             )
         return output
 
-    @jax.jit
+    @jdc.jit
     def manifold_retract(
         self, local_delta_assignments: "VariableAssignments"
     ) -> "VariableAssignments":

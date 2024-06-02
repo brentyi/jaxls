@@ -72,7 +72,7 @@ class NonlinearSolverBase(
 
     # Shared.
 
-    @jax.jit
+    @jdc.jit
     def solve(
         self,
         graph: "StackedFactorGraph",
