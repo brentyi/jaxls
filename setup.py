@@ -1,5 +1,6 @@
 from setuptools import find_packages, setup
 
+print(find_packages())
 setup(
     name="jaxfg",
     version="0.0",
