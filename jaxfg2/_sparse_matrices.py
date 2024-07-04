@@ -1,5 +1,6 @@
 import jax
 import jax_dataclasses as jdc
+import scipy.sparse
 from jax import numpy as jnp
 
 
@@ -53,4 +54,10 @@ class SparseCooMatrix:
                 cols=self.coords.rows,
             ),
             shape=(w, h),
+        )
+
+    def as_scipy_coo_matrix(self) -> scipy.sparse.coo_matrix:
+        """Convert to a sparse scipy matrix."""
+        return scipy.sparse.coo_matrix(
+            (self.values, (self.coords.rows, self.coords.cols)), shape=self.shape
         )

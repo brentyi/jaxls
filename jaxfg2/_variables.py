@@ -1,12 +1,25 @@
 from __future__ import annotations
 
-import abc
-from typing import Any, Callable, ClassVar, Iterable, Self, override
+from dataclasses import dataclass
+from typing import Any, Callable, ClassVar, Iterable, Self, overload, override
 
 import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
+
+
+@dataclass(frozen=True)
+class VarTypeOrdering:
+    var_types: tuple[type[Var], ...]
+
+    def ordered_dict_items[T](
+        self,
+        var_type_mapping: dict[type[Var], T],
+    ) -> list[tuple[type[Var], T]]:
+        return sorted(
+            var_type_mapping.items(), key=lambda x: self.var_types.index(x[0])
+        )
 
 
 @jdc.pytree_dataclass
@@ -23,14 +36,14 @@ class Var[T]:
     """Number of parameters in this variable type."""
     tangent_dim: ClassVar[int]
     """Dimension of the tangent space."""
-    retract_fn: ClassVar[Callable[[T, jax.Array], T] | None]  # type: ignore
+    retract_fn: ClassVar[Callable[[T, jax.Array], T]]  # type: ignore
     """Retraction function for the manifold. None for Euclidean space."""
 
     def __init_subclass__(
         cls,
         default: T,
         tangent_dim: int | None,
-        retract_fn: Callable[[T, jax.Array], T] | None,
+        retract_fn: Callable[[T, jax.Array], T],
     ) -> None:
         cls.default = default
         cls.parameter_dim = int(
@@ -47,77 +60,25 @@ class Var[T]:
 
 
 @jdc.pytree_dataclass
-class _VarOrderInfo:
-    ids: jax.Array
-    """IDs of variables, before sorting."""
-
-    ids_sorted: jax.Array
-    """Variable ID corresponding to element in some stacked array. Must be sorted.
-
-    For example, if the ID array is:
-        [17, 19, 27]
-
-    And we call get_value(SomeVar(id=19)), we should return the variable value
-    with index 2.
-    """
-
-    id_argsort: jax.Array
-    """argsort() on the ID array. `ids_sorted = ids[id_argsort]`.
-
-    Usage patterns:
-        - ids[order_indices[var_type]] would sort the IDs of a specific
-          variable type.
-        - order_indices[var_type][0] would return the index to the variable
-          with the smallest ID.
-    """
-
-    def index_from_id(self, id: int | jax.Array) -> jax.Array:
-        return jnp.searchsorted(self.id_argsort, id)
-
-    @staticmethod
-    def make(vars: Iterable[Var]) -> dict[type[Var], _VarOrderInfo]:
-        # Get list of variables for each type.
-        vars_from_type = dict[type[Var], list[Var]]()
-        for var in vars:
-            if type(var) not in vars_from_type:
-                vars_from_type[type(var)] = []
-            vars_from_type[type(var)].append(var)
-
-        # Get variable IDs.
-        out = dict[type[Var], _VarOrderInfo]()
-
-        for var_type, var_list in vars_from_type.items():
-            ids = jnp.stack([var.id for var in var_list])
-            order_indices = jnp.argsort(ids)
-
-            out[var_type] = _VarOrderInfo(
-                ids=ids[order_indices],
-                ids_sorted=ids,
-                id_argsort=order_indices,
-            )
-        return out
-
-
-@jdc.pytree_dataclass
 class VarValues:
     """A mapping from variables to variable values."""
 
-    stacked_from_var_type: dict[type[Var], Any]
-    """Stacked values for each variable type. Will be sorted by ID."""
+    vals_from_type: dict[type[Var], Any]
+    """Stacked values for each variable type. Will be sorted by ID (ascending)."""
 
-    order_info: dict[type[Var], _VarOrderInfo]
-    """Descriptions of how variable IDs are ordered."""
+    ids_from_type: dict[type[Var], jax.Array]
+    """Variable ID for each value, sorted in ascending order."""
 
     def get_value[T](self, var: Var[T]) -> T:
         """Get the value of a specific variable."""
         assert getattr(var.id, "shape", None) == () or isinstance(var.id, int)
         var_type = type(var)
-        index = self.order_info[var_type].index_from_id(var.id)
-        return jax.tree.map(lambda x: x[index], self.stacked_from_var_type[var_type])
+        index = jnp.searchsorted(self.ids_from_type[var_type], var.id)
+        return jax.tree.map(lambda x: x[index], self.vals_from_type[var_type])
 
     def get_stacked_value[T](self, var_type: type[Var[T]]) -> T:
         """Get the value of all variables of a specific type."""
-        return self.stacked_from_var_type[var_type]
+        return self.vals_from_type[var_type]
 
     def __getitem__[T](self, var_or_type: Var[T] | type[Var[T]]) -> T:
         if isinstance(var_or_type, type):
@@ -127,26 +88,153 @@ class VarValues:
             return self.get_value(var_or_type)
 
     @staticmethod
-    def from_dict(val_from_var: dict[Var, Any]) -> VarValues:
-        """Create a `VarValues` object from a dictionary."""
-        id_table = _VarOrderInfo.make(val_from_var.keys())
+    def make[T](vars: Iterable[Var[T]], values: Iterable[T]) -> VarValues:
+        """Create a `VarValues` object. Entries in `vars` and entries in
+        `values` have a 1:1 correspondence.
 
-        # Get variable IDs.
-        stacked_from_var_type = dict[type[Var], Any]()
-        ids_from_var_type = dict[type[Var], jax.Array]()
-        for var_type, var_list in vars_from_type.items():
-            stacked_indices = jnp.stack([var.id for var in var_list])
-            order_indices = jnp.argsort(stacked_indices)
+        We don't use a {var: value} dictionary because variables are not
+        hashable.
+        """
+        vars = tuple(vars)
+        values = tuple(values)
+        assert len(vars) == len(values)
+        ids_from_type, vals_from_type = sort_and_stack_vars(vars, values)
+        return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
 
-            stacked_from_var_type[var_type] = jax.tree.map(
-                lambda *leafs: jnp.stack(leafs, axis=0)[order_indices],
-                [val_from_var[v] for v in var_list],
+    def _get_subset(
+        self, indices_from_type: dict[type[Var], jax.Array], ordering: VarTypeOrdering
+    ) -> VarValues:
+        """Get a new VarValues of object with only a subset of the variables.
+        Assumes that the input IDs are all sorted."""
+        vals_from_type = dict[type[Var], Any]()
+        ids_from_type = dict[type[Var], jax.Array]()
+        for var_type, indices in ordering.ordered_dict_items(indices_from_type):
+            vals_from_type[var_type] = jax.tree_map(
+                lambda x: x[indices], self.vals_from_type[var_type]
             )
-            ids_from_var_type[var_type] = stacked_indices[order_indices]
+            ids_from_type[var_type] = self.ids_from_type[var_type][indices]
+        return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
 
-        return VarValues(stacked_from_var_type, id_table)
+    def _get_tangent_dim(self) -> int:
+        """Sum of tangent dimensions of all variables in this structure.
+
+        Batch axes: assumed to be leading, not accounted for in the tangent
+        dimension computation."""
+        total = 0
+        for var_type, ids in self.ids_from_type.items():  # Order doesn't matter here.
+            total += ids.shape[-1] * var_type.tangent_dim
+        return total
+
+    def _get_batch_axes(self) -> tuple[int, ...]:
+        return next(iter(self.ids_from_type.values())).shape[:-1]
+
+    def _retract(self, tangent: jax.Array, ordering: VarTypeOrdering) -> VarValues:
+        vals_from_type = dict[type[Var], Any]()
+        tangent_slice_start = 0
+        for var_type, ids in (
+            # Respect variable ordering in tangent layout.
+            ordering.ordered_dict_items(self.ids_from_type)
+        ):
+            assert len(ids.shape) == 1
+
+            # Get slice of the tangent vector that will be used for this
+            # variable type.
+            tangent_slice_dim = var_type.tangent_dim * ids.shape[0]
+            tangent_slice = tangent[
+                tangent_slice_start : tangent_slice_start + tangent_slice_dim
+            ]
+            tangent_slice_start += tangent_slice_dim
+
+            # Apply retraction for this variable type.
+            vals_from_type[var_type] = jax.vmap(var_type.retract_fn)(
+                self.vals_from_type[var_type],
+                tangent_slice.reshape((ids.shape[0], var_type.tangent_dim)),
+            )
+
+        return VarValues(
+            vals_from_type=vals_from_type, ids_from_type=self.ids_from_type
+        )
 
     @staticmethod
     def from_defaults(vars: tuple[Var, ...]) -> VarValues:
         """Construct a `VarValues` object from default values for each variable type."""
-        return VarValues.from_dict({v: v.default for v in vars})
+        return VarValues.make(vars, tuple(v.default for v in vars))
+
+
+@overload
+def sort_and_stack_vars(
+    vars: tuple[Var, ...], values: None = None
+) -> dict[type[Var], jax.Array]:
+    ...
+
+
+@overload
+def sort_and_stack_vars(
+    vars: tuple[Var, ...], values: tuple[Any, ...]
+) -> tuple[dict[type[Var], jax.Array], dict[type[Var], Any]]:
+    ...
+
+
+def sort_and_stack_vars(
+    vars: tuple[Var, ...], values: tuple[Any, ...] | None = None
+) -> (
+    dict[type[Var], jax.Array] | tuple[dict[type[Var], jax.Array], dict[type[Var], Any]]
+):
+    """Sort variables by ID, ascending. If `values` is specified, returns a
+    (sorted ID mapping, value mapping) tuple. Otherwise, only returns the ID
+    mapping."""
+    # First, organize variables and values by type.
+    vars_from_type = dict[type[Var], list[Var]]()
+    vals_from_type = dict[type[Var], list[Any]]() if values is not None else None
+    for i in range(len(vars)):
+        var = vars[i]
+        val = values[i] if values is not None else None
+
+        # Variables should either be single or stacked.
+        if isinstance(var.id, int) or len(var.id.shape) == 0:
+            var = jax.tree.map(lambda leaf: jnp.array(leaf)[None], var)
+            if val is not None:
+                val = jax.tree.map(lambda leaf: jnp.array(leaf)[None], val)
+        else:
+            # We could easily support more, but this feels like an unlikely use case.
+            assert len(var.id.shape) == 1, "Variable IDs must be 0D or 1D."
+
+        # Put variables and values into dictionary.
+        var_type = type(var)
+        vars_from_type.setdefault(var_type, [])
+        if vals_from_type is not None:
+            vals_from_type.setdefault(var_type, [])
+
+        vars_from_type[var_type].append(var)
+        if vals_from_type is not None:
+            vals_from_type[var_type].append(val)
+
+    # Concatenate variable IDs and values along axis=0.
+    # We then re-order variables by ascending ID.
+    stacked_var_from_type = {
+        var_type: jax.tree.map(lambda *leafs: jnp.concatenate(leafs, axis=0), *vars)
+        for var_type, vars in vars_from_type.items()
+    }
+    ids_argsort_from_type = {
+        var_type: jnp.argsort(stacked_var.id)
+        for var_type, stacked_var in stacked_var_from_type.items()
+    }
+    ids_sorted_from_type = {
+        var_type: stacked_var.id[ids_argsort_from_type[var_type]]
+        for var_type, stacked_var in stacked_var_from_type.items()
+    }
+
+    if vals_from_type is None:
+        return ids_sorted_from_type
+    else:
+        stacked_vals_from_type = {
+            var_type: jax.tree_map(lambda *leafs: jnp.concatenate(leafs, axis=0), *vals)
+            for var_type, vals in vals_from_type.items()
+        }
+        sorted_vals_from_type = {
+            var_type: jax.tree.map(
+                lambda x: x[ids_argsort_from_type[var_type]], stacked_val
+            )
+            for var_type, stacked_val in stacked_vals_from_type.items()
+        }
+        return ids_sorted_from_type, sorted_vals_from_type
