@@ -23,87 +23,24 @@ pose_variables = (jaxfg2.SE2Var(-10), jaxfg2.SE2Var(0))
 
 # Create factors: each defines a conditional probability distribution over some
 # variables.
-
-
-def prior_two(vals, var, orig, var1, orig1):
-    return jnp.concatenate(
-        [(vals[var] @ orig.inverse()).log(), (vals[var1] @ orig1.inverse()).log()]
-    )
-
-
-def prior_one(vals, var, orig):
-    return (vals[var] @ orig.inverse()).log()
-
-
-# def between(vals, var0, var1, delta):
-#     return ((vals[var0] @ delta).inverse() @ vals[var1]).log()
-
-
 factors = [
+    # Prior factor for pose 0.
     jaxfg2.Factor.make(
-        # lambda vals, var0, var, init: (
-        #     vals[var] @ init
-        # ).log(),
-        prior_two,
-        (
-            pose_variables[0],
-            jaxlie.SE2.from_translation(jnp.array([100.0, 10.0])),
-            pose_variables[1],
-            jaxlie.SE2.from_translation(jnp.array([200.0, 20.0])),
-        ),
+        lambda vals, var, init: (vals[var] @ init.inverse()).log(),
+        (pose_variables[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
     ),
+    # Prior factor for pose 1.
     jaxfg2.Factor.make(
-        # lambda vals, var0, var, init: (
-        #     vals[var] @ init
-        # ).log(),
-        prior_two,
-        (
-            pose_variables[0],
-            jaxlie.SE2.from_translation(jnp.array([100.0, 10.0])),
-            pose_variables[1],
-            jaxlie.SE2.from_translation(jnp.array([200.0, 20.0])),
-        ),
+        lambda vals, var, init: (vals[var] @ init.inverse()).log(),
+        (pose_variables[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
     ),
+    # "Between" factor.
     jaxfg2.Factor.make(
-        # lambda vals, var0, var, init: (
-        #     vals[var] @ init
-        # ).log(),
-        prior_one,
-        (
-            pose_variables[0],
-            jaxlie.SE2.from_translation(jnp.array([100.0, 10.0])),
-        ),
+        lambda vals, var0, var1, delta: (
+            (vals[var0].inverse() @ vals[var1]) @ delta.inverse()
+        ).log(),
+        (pose_variables[0], pose_variables[1], jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0)),
     ),
-    jaxfg2.Factor.make(
-        # lambda vals, var0, var, init: (
-        #     vals[var] @ init
-        # ).log(),
-        prior_one,
-        (
-            pose_variables[1],
-            jaxlie.SE2.from_translation(jnp.array([200.0, 20.0])),
-        ),
-    ),
-    # jaxfg2.Factor.make(
-    #     # lambda vals, var: (
-    #     #     vals[var] @ jaxlie.SE2.from_translation(jnp.array([200.0, 20.0]))
-    #     # ).log(),
-    #     # lambda *args: prior(*args),
-    #     prior,
-    #     (pose_variables[1], jaxlie.SE2.from_translation(jnp.array([200.0, 20.0]))),
-    # ),
-    # jaxfg2.Factor.make(
-    #     # lambda vals, var: (
-    #     #     vals[var] @ jaxlie.SE2.from_translation(jnp.array([200.0, 20.0]))
-    #     # ).log(),
-    #     # lambda *args: prior(*args),
-    #     between,
-    #     (
-    #         pose_variables[0],
-    #         pose_variables[1],
-    #         jaxlie.SE2.from_translation(jnp.array([50.0, 10.0])),
-    #     ),
-    # ),
 ]
 
 # Create our "stacked" factor graph. (this is the only kind of factor graph)
@@ -111,7 +48,7 @@ factors = [
 # This goes through factors, and preprocesses them to enable vectorization of
 # computations. If we have 1000 PriorFactor objects, we stack all of the associated
 # values and perform a batched operation that computes all 1000 residuals.
-graph = jaxfg2.StackedFactorGraph.make(factors, vars=pose_variables)
+graph = jaxfg2.StackedFactorGraph.make(factors, pose_variables)
 
 
 # Create an assignments object, which you can think of as a (variable => value) mapping.

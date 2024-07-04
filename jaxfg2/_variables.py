@@ -76,6 +76,22 @@ class VarValues:
         index = jnp.searchsorted(self.ids_from_type[var_type], var.id)
         return jax.tree.map(lambda x: x[index], self.vals_from_type[var_type])
 
+    def __repr__(self) -> str:
+        out_lines = list[str]()
+
+        for var_type, ids in self.ids_from_type.items():
+            for i in range(ids.shape[-1]):
+                batch_axes = ids.shape[:-1]
+                val = jax.tree_map(
+                    lambda x: x.take(indices=i, axis=len(batch_axes)),
+                    self.vals_from_type[var_type],
+                )
+                out_lines.append(
+                    f"  {var_type.__name__}(" + f"{ids[..., i]}): ".ljust(8) + f"{val},"
+                )
+
+        return f"VarValues(\n{'\n'.join(out_lines)}\n)"
+
     def get_stacked_value[T](self, var_type: type[Var[T]]) -> T:
         """Get the value of all variables of a specific type."""
         return self.vals_from_type[var_type]
