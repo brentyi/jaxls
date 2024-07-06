@@ -1,62 +1,94 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Self, overload, override
+from typing import Any, Callable, ClassVar, Iterable, Self, cast, overload, override
 
 import jax
 import jax_dataclasses as jdc
 import numpy as onp
+from jax import flatten_util
 from jax import numpy as jnp
 
 
 @dataclass(frozen=True)
 class VarTypeOrdering:
-    var_types: tuple[type[Var], ...]
+    order_from_type: dict[type[Var], int]
 
     def ordered_dict_items[T](
         self,
         var_type_mapping: dict[type[Var], T],
     ) -> list[tuple[type[Var], T]]:
         return sorted(
-            var_type_mapping.items(), key=lambda x: self.var_types.index(x[0])
+            var_type_mapping.items(), key=lambda x: self.order_from_type[x[0]]
         )
 
 
+class _Var[T]:
+    # Subclass is a hack to avoid ClassVar[] annotations, which prevent us from using generics,
+    # while also not adding these annotations as fields to the Var() dataclass.
+    #
+    # https://github.com/python/typing/discussions/1424
+    default: T
+    """Default value for this variable."""
+    tangent_dim: int
+    """Dimension of the tangent space."""
+    retract_fn: Callable[[T, jax.Array], T]
+    """Retraction function for the manifold. None for Euclidean space."""
+
+
 @jdc.pytree_dataclass
-class Var[T]:
+class Var[T](_Var[T]):
     """A symbolic representation of an optimization variable."""
 
     id: int | jax.Array
 
-    # Class properties.
-    # type ignores are for generics: https://github.com/python/typing/discussions/1424
-    default: ClassVar[T]  # type: ignore
-    """Default value for this variable."""
-    parameter_dim: ClassVar[int]
-    """Number of parameters in this variable type."""
-    tangent_dim: ClassVar[int]
-    """Dimension of the tangent space."""
-    retract_fn: ClassVar[Callable[[T, jax.Array], T]]  # type: ignore
-    """Retraction function for the manifold. None for Euclidean space."""
+    @overload
+    def __init_subclass__(
+        cls,
+        default: T,
+        retract_fn: None = None,
+        tangent_dim: None = None,
+    ) -> None:
+        ...
+
+    @overload
+    def __init_subclass__(
+        cls,
+        default: T,
+        retract_fn: Callable[[T, jax.Array], T],
+        tangent_dim: int,
+    ) -> None:
+        ...
 
     def __init_subclass__(
         cls,
         default: T,
-        tangent_dim: int | None,
-        retract_fn: Callable[[T, jax.Array], T],
+        retract_fn: Callable[[T, jax.Array], T] | None = None,
+        tangent_dim: int | None = None,
     ) -> None:
         cls.default = default
-        cls.parameter_dim = int(
-            sum([onp.prod(leaf.size) for leaf in jax.tree.leaves(default)])
-        )
-        cls.tangent_dim = tangent_dim if tangent_dim is not None else cls.parameter_dim
-        cls.retract_fn = retract_fn  # type: ignore
+        if retract_fn is not None:
+            assert tangent_dim is not None
+            cls.tangent_dim = tangent_dim
+            cls.retract_fn = retract_fn
+        else:
+            assert tangent_dim is None
+            parameter_dim = int(
+                sum([onp.prod(leaf.size) for leaf in jax.tree.leaves(default)])
+            )
+            cls.tangent_dim = parameter_dim
+            cls.retract_fn = cls._euclidean_retract
+
         super().__init_subclass__()
 
-    @classmethod
-    def allocate(cls, count: int, start_id: int = 0) -> tuple[Self, ...]:
-        """Helper for allocating a sequence of variables."""
-        return tuple(cls(i) for i in range(start_id, start_id + count))
+        # Subclasses need to be registered as PyTrees.
+        jdc.pytree_dataclass(cls)
+
+    @staticmethod
+    def _euclidean_retract(pytree: T, delta: jax.Array) -> T:
+        # Euclidean retraction.
+        flat, unravel = flatten_util.ravel_pytree(pytree)
+        return cast(T, jax.tree_map(jnp.add, pytree, unravel(delta)))
 
 
 @jdc.pytree_dataclass

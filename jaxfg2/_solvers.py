@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import abc
 import functools
-from typing import Hashable, override
+from typing import Hashable, cast, override
 
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
+import scipy
 import sksparse.cholmod
 from jax import numpy as jnp
 
 from jaxfg2.utils import jax_log
 
-from ._factor_graph import StackedFactorGraph, TangentStorageLayout
+from ._factor_graph import StackedFactorGraph
 from ._sparse_matrices import SparseCooMatrix
-from ._variables import VarValues
+from ._variables import VarTypeOrdering, VarValues
 
 # Linear solvers.
 
@@ -63,6 +64,58 @@ class CholmodSolver:
         return _cholmod_analyze_cache[self_hash].solve_A(ATb)
 
 
+@jdc.pytree_dataclass
+class ConjugateGradientSolver:
+    tolerance: float = 1e-5
+    inexact_step_eta: float | None = 1e-2
+    """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
+    `eta / iteration #`.
+
+    For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
+    LEAST SQUARES, Wright & Holt 1983."""
+
+    def solve(
+        self,
+        A: SparseCooMatrix,
+        ATb: jax.Array,
+        lambd: float | jax.Array,
+        iterations: int | jax.Array,
+    ) -> jnp.ndarray:
+        assert len(A.values.shape) == 1, "A.values should be 1D"
+        assert len(ATb.shape) == 1, "ATb should be 1D!"
+
+        initial_x = jnp.zeros(ATb.shape)
+
+        # Get diagonals of ATA, for regularization + Jacobi preconditioning
+        ATA_diagonals = jnp.zeros_like(initial_x).at[A.coords.cols].add(A.values**2)
+
+        # Form normal equation
+        def ATA_function(x: jax.Array):
+            ATAx = A.T @ (A @ x)
+
+            # Scale-invariant regularization.
+            return ATAx + lambd * ATA_diagonals * x
+
+        def jacobi_preconditioner(x):
+            return x / ATA_diagonals
+
+        # Solve with conjugate gradient.
+        solution_values, _ = jax.scipy.sparse.linalg.cg(
+            A=ATA_function,
+            b=ATb,
+            x0=initial_x,
+            # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
+            maxiter=len(initial_x),
+            tol=cast(
+                float, jnp.maximum(self.tolerance, self.inexact_step_eta / (iterations + 1))
+            )
+            if self.inexact_step_eta is not None
+            else self.tolerance,
+            M=jacobi_preconditioner,
+        )
+        return solution_values
+
+
 # Nonlinear solve utils.
 
 
@@ -91,7 +144,7 @@ class _TerminationCriteriaMixin:
         state_prev: NonlinearSolverState,
         cost_updated: jax.Array,
         tangent: jax.Array,
-        tangent_layout: TangentStorageLayout,
+        tangent_ordering: VarTypeOrdering,
         ATb: jax.Array,
     ) -> jax.Array:
         """Check for convergence!"""
@@ -109,7 +162,7 @@ class _TerminationCriteriaMixin:
             jnp.max(
                 flat_vals
                 - jax.flatten_util.ravel_pytree(
-                    state_prev.vals._retract(ATb, tangent_layout.ordering)
+                    state_prev.vals._retract(ATb, tangent_ordering)
                 )[0]
             )
             < self.gradient_tolerance,
@@ -150,7 +203,7 @@ class NonlinearSolverState:
 
 @jdc.pytree_dataclass
 class NonlinearSolver[TState: NonlinearSolverState]:
-    linear_solver: CholmodSolver = CholmodSolver()
+    linear_solver: CholmodSolver | ConjugateGradientSolver = CholmodSolver()
     verbose: jdc.Static[bool] = True
     """Set to `True` to enable printing."""
 
@@ -209,7 +262,7 @@ class GaussNewtonSolver(
         tangent = self.linear_solver.solve(
             A, ATb, lambd=0.0, iterations=state.iterations
         )
-        vals = state.vals._retract(tangent, graph.tangent_layout.ordering)
+        vals = state.vals._retract(tangent, graph.tangent_ordering)
 
         if self.verbose:
             jax_log(
@@ -226,7 +279,7 @@ class GaussNewtonSolver(
                 state,
                 cost_updated=state_next.cost,
                 tangent=tangent,
-                tangent_layout=graph.tangent_layout,
+                tangent_ordering=graph.tangent_ordering,
                 ATb=ATb,
             )
         return state_next

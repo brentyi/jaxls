@@ -58,6 +58,7 @@ class SparseCooMatrix:
 
     def as_scipy_coo_matrix(self) -> scipy.sparse.coo_matrix:
         """Convert to a sparse scipy matrix."""
+        assert len(self.values.shape) == 1
         return scipy.sparse.coo_matrix(
             (self.values, (self.coords.rows, self.coords.cols)), shape=self.shape
         )

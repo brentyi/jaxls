@@ -17,45 +17,12 @@ from ._sparse_matrices import SparseCooCoordinates, SparseCooMatrix
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
-@dataclasses.dataclass(frozen=True)
-class TangentStorageLayout:
-    """Our tangent vector will be represented as a single flattened 1D vector.
-    How should it be laid out?"""
-
-    counts: Mapping[type[Var], int]
-    start_indices: Mapping[type[Var], int]
-    ordering: VarTypeOrdering
-
-    @staticmethod
-    def make(vars: Iterable[Var]) -> TangentStorageLayout:
-        counts: dict[type[Var], int] = {}
-        for var in vars:
-            var_type = type(var)
-            if isinstance(var.id, int) or len(var.id.shape) == 0:
-                counts[var_type] = counts.get(var_type, 0) + 1
-            else:
-                assert len(var.id.shape) == 1
-                counts[var_type] = counts.get(var_type, 0) + var.id.shape[0]
-
-        i = 0
-        start_indices: dict[type[Var], int] = {}
-        for var_type, count in counts.items():
-            start_indices[var_type] = i
-            i += var_type.parameter_dim * count
-
-        return TangentStorageLayout(
-            counts=frozendict(counts),
-            start_indices=frozendict(start_indices),
-            ordering=VarTypeOrdering(tuple(start_indices.keys())),
-        )
-
-
 @jdc.pytree_dataclass
 class StackedFactorGraph:
     stacked_factors: tuple[Factor, ...]
     stacked_factors_var_indices: tuple[dict[type[Var], jax.Array], ...]
     jacobian_coords: SparseCooCoordinates
-    tangent_layout: jdc.Static[TangentStorageLayout]
+    tangent_ordering: jdc.Static[VarTypeOrdering]
     residual_dim: jdc.Static[int]
 
     def compute_residual_vector(self, vals: VarValues) -> jax.Array:
@@ -77,9 +44,7 @@ class StackedFactorGraph:
             def compute_jac_with_perturb(
                 factor: Factor, indices_from_type: dict[type[Var], jax.Array]
             ) -> jax.Array:
-                val_subset = vals._get_subset(
-                    indices_from_type, self.tangent_layout.ordering
-                )
+                val_subset = vals._get_subset(indices_from_type, self.tangent_ordering)
                 # Shape should be: (single_residual_dim, vars * tangent_dim).
                 return (
                     # Getting the Jacobian of...
@@ -89,7 +54,7 @@ class StackedFactorGraph:
                 )(
                     # The residual function, with respect to to some local delta.
                     lambda tangent: factor.compute_residual(
-                        val_subset._retract(tangent, self.tangent_layout.ordering),
+                        val_subset._retract(tangent, self.tangent_ordering),
                         *factor.args,
                     )
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
@@ -146,8 +111,7 @@ class StackedFactorGraph:
             )
 
             # Record factor and variables.
-            factors_from_group.setdefault(group_key, [])
-            factors_from_group[group_key].append(factor)
+            factors_from_group.setdefault(group_key, []).append(factor)
 
         # Fields we want to populate.
         stacked_factors: list[Factor] = []
@@ -156,7 +120,23 @@ class StackedFactorGraph:
 
         # Create storage layout: this describes which parts of our tangent
         # vector is allocated to each variable.
-        tangent_layout = TangentStorageLayout.make(vars)
+        tangent_start_from_var_type = dict[type[Var], int]()
+
+        vars_from_var_type = dict[type[Var], list[Var]]()
+        for var in vars:
+            vars_from_var_type.setdefault(type(var), []).append(var)
+        counter = 0
+        for var_type, vars_one_type in vars_from_var_type.items():
+            tangent_start_from_var_type[var_type] = counter
+            counter += var_type.tangent_dim * len(vars_one_type)
+
+        # Create ordering helper.
+        tangent_ordering = VarTypeOrdering(
+            {
+                var_type: i
+                for i, var_type in enumerate(tangent_start_from_var_type.keys())
+            }
+        )
 
         # Sort variable IDs.
         sorted_ids_from_var_type = sort_and_stack_vars(vars)
@@ -187,7 +167,7 @@ class StackedFactorGraph:
 
             subset_indices_from_type = dict[type[Var], jax.Array]()
 
-            for var_type, ids in tangent_layout.ordering.ordered_dict_items(
+            for var_type, ids in tangent_ordering.ordered_dict_items(
                 stacked_factor.sorted_ids_from_var_type
             ):
                 logger.info("Making initial grid")
@@ -210,7 +190,7 @@ class StackedFactorGraph:
                 logger.info("Computing tangent")
                 # Variable index => indices into the tangent vector.
                 tangent_start_indices = (
-                    tangent_layout.start_indices[var_type]
+                    tangent_start_from_var_type[var_type]
                     + var_indices * var_type.tangent_dim
                 )
                 assert tangent_start_indices.shape == (len(group), ids.shape[-1])
@@ -257,7 +237,7 @@ class StackedFactorGraph:
             stacked_factors=tuple(stacked_factors),
             stacked_factors_var_indices=tuple(stacked_factor_var_indices),
             jacobian_coords=jacobian_coords_concat,
-            tangent_layout=tangent_layout,
+            tangent_ordering=tangent_ordering,
             residual_dim=residual_offset,
         )
 
