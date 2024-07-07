@@ -32,7 +32,7 @@ def main(
         jax.block_until_ready(graph)
 
     with jaxfg2.utils.stopwatch("Making solver"):
-        solver = jaxfg2.GaussNewtonSolver(verbose=True, linear_solver=jaxfg2.ConjugateGradientSolver())
+        solver = jaxfg2.GaussNewtonSolver(verbose=True) #, linear_solver=jaxfg2.ConjugateGradientSolver())
         initial_vals = jaxfg2.VarValues.make(g2o.pose_vars, g2o.initial_poses)
 
     with jaxfg2.utils.stopwatch("Running solve"):

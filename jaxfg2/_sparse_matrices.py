@@ -5,6 +5,26 @@ from jax import numpy as jnp
 
 
 @jdc.pytree_dataclass
+class SparseCsrCoordinates:
+    row_starts: jax.Array
+    """Index into `cols` for the start of each row."""
+    cols: jax.Array
+    """Column indices of non-zero entries. Shape should be `(*, N)`."""
+
+
+@jdc.pytree_dataclass
+class SparseCsrMatrix:
+    """Sparse matrix in COO form."""
+
+    values: jax.Array
+    """Non-zero matrix values. Shape should be `(*, N)`."""
+    coords: SparseCsrCoordinates
+    """Row and column indices of non-zero entries. Shapes should be `(*, N)`."""
+    shape: jdc.Static[tuple[int, int]]
+    """Shape of matrix."""
+
+
+@jdc.pytree_dataclass
 class SparseCooCoordinates:
     rows: jax.Array
     """Row indices of non-zero entries. Shape should be `(*, N)`."""
