@@ -1,19 +1,17 @@
 """Simple pose graph example with two pose variables and three factors:
 
-    ┌────────┐             ┌────────┐
-    │ Pose 0 ├───Between───┤ Pose 1 │
-    └───┬────┘             └────┬───┘
-        │                       │
-        │                       │
-      Prior                   Prior
+┌────────┐             ┌────────┐
+│ Pose 0 ├───Between───┤ Pose 1 │
+└───┬────┘             └────┬───┘
+    │                       │
+    │                       │
+  Prior                   Prior
 
 """
 
-from typing import List
 
 import jaxfg2
 import jaxlie
-from jax import numpy as jnp
 
 # Create variables: each variable object represents something that we want to solve for.
 #

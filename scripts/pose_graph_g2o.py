@@ -5,14 +5,11 @@ For a summary of options:
     python pose_graph_g2o.py --help
 
 """
-import dataclasses
-import enum
+
 import pathlib
-from typing import Dict, Optional
 
 import jax
 import jaxfg2
-import matplotlib.pyplot as plt
 import tyro
 
 import _g2o_utils
@@ -32,7 +29,9 @@ def main(
         jax.block_until_ready(graph)
 
     with jaxfg2.utils.stopwatch("Making solver"):
-        solver = jaxfg2.GaussNewtonSolver(verbose=True) #, linear_solver=jaxfg2.ConjugateGradientSolver())
+        solver = jaxfg2.GaussNewtonSolver(
+            verbose=True
+        )  # , linear_solver=jaxfg2.ConjugateGradientSolver())
         initial_vals = jaxfg2.VarValues.make(g2o.pose_vars, g2o.initial_poses)
 
     with jaxfg2.utils.stopwatch("Running solve"):

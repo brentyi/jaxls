@@ -2,13 +2,12 @@
 
 import dataclasses
 import pathlib
-from typing import Any, cast
+from typing import cast
 
 import jax
 import jaxfg2
 import jaxlie
 import numpy as onp
-from jax import numpy as jnp
 from tqdm.auto import tqdm
 
 
@@ -85,6 +84,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                     between,
                     cast(jax.Array, sqrt_precision_matrix),
                 ),
+                jacobian_mode="forward",
             )
             factors.append(factor)
 
@@ -127,13 +127,26 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
             factor = jaxfg2.Factor.make(
-                between_residual,
+                # Passing in arrays like sqrt_precision_matrix as input makes
+                # it possible for jaxfg vectorize factors.
+                (
+                    lambda values,
+                    T_world_a,
+                    T_world_b,
+                    between,
+                    sqrt_precision_matrix: sqrt_precision_matrix
+                    @ (
+                        (values[T_world_a].inverse() @ values[T_world_b]).inverse()
+                        @ between
+                    ).log()
+                ),
                 args=(
                     pose_variables[before_index],
                     pose_variables[after_index],
                     between,
                     cast(jax.Array, sqrt_precision_matrix),
                 ),
+                jacobian_mode="forward",
             )
             factors.append(factor)
         else:
@@ -145,6 +158,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             var_values[start_pose].inverse() @ initial_poses[0]
         ).log(),
         args=(pose_variables[0],),
+        jacobian_mode="reverse",
     )
     factors.append(factor)
 

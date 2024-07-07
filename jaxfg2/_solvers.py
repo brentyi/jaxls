@@ -8,13 +8,14 @@ import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
 import scipy
+import scipy.sparse
 import sksparse.cholmod
 from jax import numpy as jnp
 
 from jaxfg2.utils import jax_log
 
 from ._factor_graph import StackedFactorGraph
-from ._sparse_matrices import SparseCooMatrix
+from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
 
 # Linear solvers.
@@ -25,13 +26,8 @@ _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
 @jdc.pytree_dataclass
 class CholmodSolver:
     def solve(
-        self,
-        A: SparseCooMatrix,
-        ATb: jax.Array,
-        lambd: float | jax.Array,
-        iterations: int | jax.Array,
+        self, A: SparseCsrMatrix, ATb: jax.Array, lambd: float | jax.Array
     ) -> jax.Array:
-        del iterations
         return jax.pure_callback(
             self._solve_on_host,
             ATb,  # Result shape/dtype.
@@ -43,14 +39,16 @@ class CholmodSolver:
 
     def _solve_on_host(
         self,
-        A: SparseCooMatrix,
+        A: SparseCsrMatrix,
         ATb: jax.Array,
         lambd: float | jax.Array,
     ) -> jax.Array:
-        A_T = A.T
-        A_T_scipy = A_T.as_scipy_coo_matrix().tocsc(copy=False)
+        # Matrix is transposed when we convert CSR to CSC.
+        A_T_scipy = scipy.sparse.csc_matrix(
+            (A.values, A.coords.indices, A.coords.indptr), shape=A.coords.shape[::-1]
+        )
 
-        # Cache sparsity pattern analysis
+        # Cache sparsity pattern analysis.
         self_hash = object.__hash__(self)
         if self_hash not in _cholmod_analyze_cache:
             _cholmod_analyze_cache[self_hash] = sksparse.cholmod.analyze_AAt(A_T_scipy)
@@ -107,7 +105,8 @@ class ConjugateGradientSolver:
             # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
             maxiter=len(initial_x),
             tol=cast(
-                float, jnp.maximum(self.tolerance, self.inexact_step_eta / (iterations + 1))
+                float,
+                jnp.maximum(self.tolerance, self.inexact_step_eta / (iterations + 1)),
             )
             if self.inexact_step_eta is not None
             else self.tolerance,
@@ -256,14 +255,21 @@ class GaussNewtonSolver(
     def _step(
         self, graph: StackedFactorGraph, state: NonlinearSolverState
     ) -> NonlinearSolverState:
-        A = graph._compute_jacobian_wrt_tangent(state.vals)
-        ATb = -(A.T @ state.residual_vector)
+        jac_values = graph._compute_jacobian_values(state.vals)
+        A_coo = SparseCooMatrix(jac_values, graph._jacobian_coords_coo)
+        ATb = -(A_coo.T @ state.residual_vector)
 
-        tangent = self.linear_solver.solve(
-            A, ATb, lambd=0.0, iterations=state.iterations
-        )
-        vals = state.vals._retract(tangent, graph.tangent_ordering)
+        if isinstance(self.linear_solver, ConjugateGradientSolver):
+            tangent = self.linear_solver.solve(
+                A_coo, ATb, lambd=0.0, iterations=state.iterations
+            )
+        elif isinstance(self.linear_solver, CholmodSolver):
+            A_csr = SparseCsrMatrix(jac_values, graph._jacobian_coords_csr)
+            tangent = self.linear_solver.solve(A_csr, ATb, lambd=0.0)
+        else:
+            assert False
 
+        vals = state.vals._retract(tangent, graph._tangent_ordering)
         if self.verbose:
             jax_log(
                 "Gauss-Newton step #{i}: cost={cost:.4f}",
@@ -279,7 +285,7 @@ class GaussNewtonSolver(
                 state,
                 cost_updated=state_next.cost,
                 tangent=tangent,
-                tangent_ordering=graph.tangent_ordering,
+                tangent_ordering=graph._tangent_ordering,
                 ATb=ATb,
             )
         return state_next
