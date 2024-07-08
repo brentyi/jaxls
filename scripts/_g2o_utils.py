@@ -84,7 +84,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                     between,
                     cast(jax.Array, sqrt_precision_matrix),
                 ),
-                jacobian_mode="forward",
+                jac_mode="forward",
             )
             factors.append(factor)
 
@@ -146,7 +146,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                     between,
                     cast(jax.Array, sqrt_precision_matrix),
                 ),
-                jacobian_mode="forward",
+                jac_mode="forward",
             )
             factors.append(factor)
         else:
@@ -158,7 +158,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             var_values[start_pose].inverse() @ initial_poses[0]
         ).log(),
         args=(pose_variables[0],),
-        jacobian_mode="reverse",
+        jac_mode="reverse",
     )
     factors.append(factor)
 

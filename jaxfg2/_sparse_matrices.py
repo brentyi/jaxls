@@ -1,4 +1,5 @@
 import jax
+import jax.experimental.sparse
 import jax_dataclasses as jdc
 from jax import numpy as jnp
 
@@ -40,34 +41,13 @@ class SparseCooMatrix:
     coords: SparseCooCoordinates
     """Row and column indices of non-zero entries. Shapes should be `(*, N)`."""
 
-    def __matmul__(self, other: jax.Array):
-        """Compute `Ax`, where `x` is a 1D vector."""
-        assert other.shape == (
-            self.coords.shape[1],
-        ), "Inner product only supported for 1D vectors!"
-        return (
-            jnp.zeros(self.coords.shape[0], dtype=other.dtype)
-            .at[self.coords.rows]
-            .add(self.values * other[self.coords.cols])
-        )
-
-    def as_dense(self) -> jnp.ndarray:
-        """Convert to a dense JAX array."""
-        return (
-            jnp.zeros(self.coords.shape)
-            .at[self.coords.rows, self.coords.cols]
-            .set(self.values)
-        )
-
-    @property
-    def T(self):
-        """Return transpose of our sparse matrix."""
-        h, w = self.coords.shape
-        return SparseCooMatrix(
-            values=self.values,
-            coords=SparseCooCoordinates(
-                rows=self.coords.cols,
-                cols=self.coords.rows,
-                shape=(w, h),
+    def as_jax_bcoo(self) -> jax.experimental.sparse.BCOO:
+        return jax.experimental.sparse.BCOO(
+            args=(
+                self.values,
+                jnp.stack([self.coords.rows, self.coords.cols], axis=-1),
             ),
+            shape=self.coords.shape,
+            indices_sorted=True,
+            unique_indices=True,
         )

@@ -46,7 +46,7 @@ factors = [
 # This goes through factors, and preprocesses them to enable vectorization of
 # computations. If we have 1000 PriorFactor objects, we stack all of the associated
 # values and perform a batched operation that computes all 1000 residuals.
-graph = jaxfg2.StackedFactorGraph.make(factors, pose_variables)
+graph = jaxfg2.FactorGraph.make(factors, pose_variables)
 
 
 # Create an assignments object, which you can think of as a (variable => value) mapping.
@@ -56,7 +56,5 @@ graph = jaxfg2.StackedFactorGraph.make(factors, pose_variables)
 # problems bad initializations => no convergence when we run our nonlinear optimizer.
 initial_assignments = jaxfg2.VarValues.from_defaults(pose_variables)
 
-solver = jaxfg2.GaussNewtonSolver()
-
-output = solver.solve(graph, initial_assignments)
+output = graph.solve(initial_assignments)
 print(output)

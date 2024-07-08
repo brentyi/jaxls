@@ -1,38 +1,54 @@
 from __future__ import annotations
 
-import dataclasses
 import dis
 import functools
-import inspect
-import linecache
-from typing import Callable, Hashable, Iterable, Literal, Mapping, Self, cast
+from typing import Any, Callable, Hashable, Iterable, Literal, cast
 
 import jax
 import jax_dataclasses as jdc
 import numpy as onp
-from frozendict import frozendict
 from jax import numpy as jnp
 from loguru import logger
 
-from ._sparse_matrices import (
-    SparseCooCoordinates,
-    SparseCooMatrix,
-    SparseCsrCoordinates,
+from ._solvers import (
+    CholmodLinearSolver,
+    ConjugateGradientLinearSolver,
+    NonlinearSolver,
+    TerminationConfig,
+    TrustRegionConfig,
 )
+from ._sparse_matrices import SparseCooCoordinates, SparseCsrCoordinates
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
 @jdc.pytree_dataclass
-class StackedFactorGraph:
-    _stacked_factors: tuple[Factor, ...]
-    _jacobian_coords_coo: SparseCooCoordinates
-    _jacobian_coords_csr: SparseCsrCoordinates
-    _tangent_ordering: jdc.Static[VarTypeOrdering]
-    _residual_dim: jdc.Static[int]
+class FactorGraph:
+    stacked_factors: tuple[Factor, ...]
+    jac_coords_coo: SparseCooCoordinates
+    jac_coords_csr: SparseCsrCoordinates
+    tangent_ordering: jdc.Static[VarTypeOrdering]
+    residual_dim: jdc.Static[int]
+
+    def solve(
+        self,
+        initial_vals: VarValues,
+        linear_solver: CholmodLinearSolver
+        | ConjugateGradientLinearSolver = CholmodLinearSolver(),
+        trust_region: TrustRegionConfig | None = TrustRegionConfig(),
+        termination: TerminationConfig = TerminationConfig(),
+        verbose: bool = True,
+    ) -> VarValues:
+        """Solve the nonlinear least squares problem using either Gauss-Newton
+        or Levenberg-Marquardt."""
+        return NonlinearSolver(linear_solver, trust_region, termination, verbose).solve(
+            graph=self, initial_vals=initial_vals
+        )
 
     def compute_residual_vector(self, vals: VarValues) -> jax.Array:
+        """Compute the residual vector. The cost we are optimizing is defined
+        as the sum of squared terms within this vector."""
         residual_slices = list[jax.Array]()
-        for stacked_factor in self._stacked_factors:
+        for stacked_factor in self.stacked_factors:
             stacked_residual_slice = jax.vmap(
                 lambda args: stacked_factor.compute_residual(vals, *args)
             )(stacked_factor.args)
@@ -40,9 +56,9 @@ class StackedFactorGraph:
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_jacobian_values(self, vals: VarValues) -> jax.Array:
+    def _compute_jac_values(self, vals: VarValues) -> jax.Array:
         jac_vals = []
-        for factor in self._stacked_factors:
+        for factor in self.stacked_factors:
             # Shape should be: (num_variables, len(group), single_residual_dim, var.tangent_dim).
             def compute_jac_with_perturb(factor: Factor) -> jax.Array:
                 val_subset = vals._get_subset(
@@ -50,22 +66,22 @@ class StackedFactorGraph:
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
                         for var_type, ids in factor.sorted_ids_from_var_type.items()
                     },
-                    self._tangent_ordering,
+                    self.tangent_ordering,
                 )
                 # Shape should be: (single_residual_dim, vars * tangent_dim).
                 return (
                     # Getting the Jacobian of...
                     jax.jacrev
                     if (
-                        factor.jacobian_mode == "auto"
+                        factor.jac_mode == "auto"
                         and factor.residual_dim < val_subset._get_tangent_dim()
-                        or factor.jacobian_mode == "reverse"
+                        or factor.jac_mode == "reverse"
                     )
                     else jax.jacfwd
                 )(
                     # The residual function, with respect to to some local delta.
                     lambda tangent: factor.compute_residual(
-                        val_subset._retract(tangent, self._tangent_ordering),
+                        val_subset._retract(tangent, self.tangent_ordering),
                         *factor.args,
                     )
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
@@ -79,7 +95,7 @@ class StackedFactorGraph:
             )
             jac_vals.append(stacked_jac.flatten())
         jac_vals = jnp.concatenate(jac_vals, axis=0)
-        assert jac_vals.shape == (self._jacobian_coords_coo.rows.shape[0],)
+        assert jac_vals.shape == (self.jac_coords_coo.rows.shape[0],)
         return jac_vals
 
     @staticmethod
@@ -87,7 +103,7 @@ class StackedFactorGraph:
         factors: Iterable[Factor],
         vars: Iterable[Var],
         use_onp: bool = True,
-    ) -> StackedFactorGraph:
+    ) -> FactorGraph:
         """Create a factor graph from a set of factors and a set of variables."""
 
         # Operations using vanilla numpy can be faster.
@@ -103,7 +119,7 @@ class StackedFactorGraph:
         )
 
         # Start by grouping our factors and grabbing a list of (ordered!) variables
-        factors_from_group = dict[Hashable, list[Factor]]()
+        factors_from_group = dict[Any, list[Factor]]()
         for factor in factors:
             # Each factor is ultimately just a pytree node; in order for a set of
             # factors to be batchable, they must share the same:
@@ -122,19 +138,25 @@ class StackedFactorGraph:
 
         # Fields we want to populate.
         stacked_factors: list[Factor] = []
-        jacobian_coords: list[tuple[jax.Array, jax.Array]] = []
+        jac_coords: list[tuple[jax.Array, jax.Array]] = []
 
         # Create storage layout: this describes which parts of our tangent
         # vector is allocated to each variable.
         tangent_start_from_var_type = dict[type[Var], int]()
 
-        vars_from_var_type = dict[type[Var], list[Var]]()
+        def _sort_key(x: Any) -> str:
+            """We're going to sort variable / factor types by name. This should
+            prevent re-compiling when factors or variables are reordered."""
+            return str(x)
+
+        # Count variables of each type.
+        count_from_var_type = dict[type[Var], int]()
         for var in vars:
-            vars_from_var_type.setdefault(type(var), []).append(var)
-        tangent_offset = 0
-        for var_type, vars_one_type in vars_from_var_type.items():
-            tangent_start_from_var_type[var_type] = tangent_offset
-            tangent_offset += var_type.tangent_dim * len(vars_one_type)
+            count_from_var_type[type(var)] = count_from_var_type.get(type(var), 0) + 1
+        tangent_dim_sum = 0
+        for var_type in sorted(count_from_var_type.keys(), key=_sort_key):
+            tangent_start_from_var_type[var_type] = tangent_dim_sum
+            tangent_dim_sum += var_type.tangent_dim * count_from_var_type[var_type]
 
         # Create ordering helper.
         tangent_ordering = VarTypeOrdering(
@@ -148,9 +170,10 @@ class StackedFactorGraph:
         sorted_ids_from_var_type = sort_and_stack_vars(vars)
         del vars
 
-        # Prepare each factor group.
-        residual_offset = 0
-        for group_key, group in factors_from_group.items():
+        # Prepare each factor group. We put groups in a consistent order.
+        residual_dim_sum = 0
+        for group_key in sorted(factors_from_group.keys(), key=_sort_key):
+            group = factors_from_group[group_key]
             logger.info(
                 "Group with factors={}, variables={}: {}",
                 len(group),
@@ -170,7 +193,7 @@ class StackedFactorGraph:
             # residual indices and columns correspond to tangent vector indices.
             rows, cols = jax.vmap(
                 functools.partial(
-                    Factor._compute_block_sparse_jacobian_indices,
+                    Factor._compute_block_sparse_jac_indices,
                     tangent_ordering=tangent_ordering,
                     sorted_ids_from_var_type=sorted_ids_from_var_type,
                     tangent_start_from_var_type=tangent_start_from_var_type,
@@ -184,32 +207,29 @@ class StackedFactorGraph:
             rows = rows + (
                 jnp.arange(len(group))[:, None, None] * stacked_factor.residual_dim
             )
-            rows = rows + residual_offset
-            jacobian_coords.append((rows.flatten(), cols.flatten()))
-            residual_offset += stacked_factor.residual_dim * len(group)
+            rows = rows + residual_dim_sum
+            jac_coords.append((rows.flatten(), cols.flatten()))
+            residual_dim_sum += stacked_factor.residual_dim * len(group)
 
-        jacobian_coords_concat: SparseCooCoordinates = SparseCooCoordinates(
-            *jax.tree_map(
-                lambda *arrays: jnp.concatenate(arrays, axis=0), *jacobian_coords
-            ),
-            shape=(residual_offset, tangent_offset),
+        jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
+            *jax.tree_map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
+            shape=(residual_dim_sum, tangent_dim_sum),
+        )
+        csr_indptr = jnp.searchsorted(
+            jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
+        )
+        jac_coords_csr = SparseCsrCoordinates(
+            indices=jac_coords_coo.cols,
+            indptr=cast(jax.Array, csr_indptr),
+            shape=(residual_dim_sum, tangent_dim_sum),
         )
         logger.info("Done!")
-        return StackedFactorGraph(
-            _stacked_factors=tuple(stacked_factors),
-            _jacobian_coords_coo=jacobian_coords_concat,
-            _jacobian_coords_csr=SparseCsrCoordinates(
-                indices=jacobian_coords_concat.cols,
-                indptr=cast(
-                    jax.Array,
-                    jnp.searchsorted(
-                        jacobian_coords_concat.rows, jnp.arange(residual_offset + 1)
-                    ),
-                ),
-                shape=(residual_offset, tangent_offset),
-            ),
-            _tangent_ordering=tangent_ordering,
-            _residual_dim=residual_offset,
+        return FactorGraph(
+            stacked_factors=tuple(stacked_factors),
+            jac_coords_coo=jac_coords_coo,
+            jac_coords_csr=jac_coords_csr,
+            tangent_ordering=tangent_ordering,
+            residual_dim=residual_dim_sum,
         )
 
 
@@ -226,13 +246,13 @@ class Factor[*Args]:
     num_vars: jdc.Static[int]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
     residual_dim: jdc.Static[int]
-    jacobian_mode: jdc.Static[Literal["auto", "forward", "reverse"]]
+    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]]
 
     @staticmethod
     def make[*Args_](
         compute_residual: Callable[[VarValues, *Args_], jax.Array],
         args: tuple[*Args_],
-        jacobian_mode: Literal["auto", "forward", "reverse"] = "auto",
+        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
     ) -> Factor[*Args_]:
         """Construct a factor for our factor graph."""
         # If we see two functions with the same signature, we always use the
@@ -243,14 +263,14 @@ class Factor[*Args]:
                 Factor._get_function_signature(compute_residual), compute_residual
             ),
         )
-        return Factor._make_impl(compute_residual, args, jacobian_mode)
+        return Factor._make_impl(compute_residual, args, jac_mode)
 
     @staticmethod
     @jdc.jit
     def _make_impl[*Args_](
         compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
         args: tuple[*Args_],
-        jacobian_mode: jdc.Static[Literal["auto", "forward", "reverse"]],
+        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]],
     ) -> Factor[*Args_]:
         """Construct a factor for our factor graph."""
 
@@ -288,7 +308,7 @@ class Factor[*Args]:
                 tuple(cast(Var, args[i]) for i in variable_indices)
             ),
             residual_dim=_residual_dim_cache[residual_dim_cache_key],
-            jacobian_mode=jacobian_mode,
+            jac_mode=jac_mode,
         )
 
     @staticmethod
@@ -307,7 +327,7 @@ class Factor[*Args]:
     def _get_batch_axes(self) -> tuple[int, ...]:
         return next(iter(self.sorted_ids_from_var_type.values())).shape[:-1]
 
-    def _compute_block_sparse_jacobian_indices(
+    def _compute_block_sparse_jac_indices(
         self: Factor,
         tangent_ordering: VarTypeOrdering,
         sorted_ids_from_var_type: dict[type[Var], jax.Array],

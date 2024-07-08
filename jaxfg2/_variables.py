@@ -12,6 +12,16 @@ from jax import numpy as jnp
 
 @dataclass(frozen=True)
 class VarTypeOrdering:
+    """Object describing how variables are ordered within a `VarValues` object
+    or tangent vector.
+
+    We should use this instead of iterating directly over `dict[type[Var], T]`
+    objects. It ensures correct tangent vector computation and also prevents
+    dictionary ordering edge cases.
+
+    Relevant: https://github.com/google/jax/issues/4085
+    """
+
     order_from_type: dict[type[Var], int]
 
     def ordered_dict_items[T](
