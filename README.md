@@ -1,9 +1,8 @@
 # jaxls
 
-[![build](https://github.com/brentyi/jaxfg/actions/workflows/build.yml/badge.svg)](https://github.com/brentyi/jaxfg/actions/workflows/build.yml)
-[![lint](https://github.com/brentyi/jaxfg/actions/workflows/lint.yml/badge.svg)](https://github.com/brentyi/jaxfg/actions/workflows/lint.yml)
-[![mypy](https://github.com/brentyi/jaxfg/actions/workflows/mypy.yml/badge.svg)](https://github.com/brentyi/jaxfg/actions/workflows/mypy.yml)
-[![codecov](https://codecov.io/gh/brentyi/jaxfg/branch/master/graph/badge.svg?token=RNJB7EFC8T)](https://codecov.io/gh/brentyi/jaxfg)
+[![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
+
+*status: work-in-progress*
 
 **`jaxls`** is a library for sparse nonlinear least squares in JAX.
 
