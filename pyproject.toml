@@ -22,11 +22,12 @@ dependencies = [
     "jax_dataclasses>=1.0.0",
     "scikit-sparse",
     "loguru",
-    "tqdm",
-    "matplotlib",
+    "termcolor",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pyright>=1.1.308",
+    "tqdm",
+    "matplotlib",
 ]
