@@ -275,20 +275,15 @@ class Factor[*Args]:
         """Construct a factor for our factor graph."""
 
         # TODO: ideally we should get the variables by traversing as a pytree.
-        variable_indices = tuple(
-            i for i, arg in enumerate(args) if isinstance(arg, Var)
-        )
+        variables = tuple(arg for arg in args if isinstance(arg, Var))
 
         # Cache the residual dimension for this factor.
         residual_dim_cache_key = (
             compute_residual,
-            variable_indices,
-            tuple(type(args[i]) for i in variable_indices),
+            jax.tree.structure(args),
         )
         if residual_dim_cache_key not in _residual_dim_cache:
-            dummy = VarValues.from_defaults(
-                tuple(cast(Var, args[i]) for i in variable_indices)
-            )
+            dummy = VarValues.from_defaults(variables)
             residual_shape = jax.eval_shape(compute_residual, dummy, *args).shape
             assert len(residual_shape) == 1, "Residual must be a 1D array."
             _residual_dim_cache[residual_dim_cache_key] = residual_shape[0]
@@ -303,10 +298,8 @@ class Factor[*Args]:
         return Factor(
             compute_residual,
             args=args,
-            num_vars=len(variable_indices),
-            sorted_ids_from_var_type=sort_and_stack_vars(
-                tuple(cast(Var, args[i]) for i in variable_indices)
-            ),
+            num_vars=len(variables),
+            sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_dim=_residual_dim_cache[residual_dim_cache_key],
             jac_mode=jac_mode,
         )
