@@ -24,6 +24,7 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 @jdc.pytree_dataclass
 class FactorGraph:
     stacked_factors: tuple[Factor, ...]
+    sorted_ids_from_var_type: dict[type[Var], jax.Array]
     jac_coords_coo: SparseCooCoordinates
     jac_coords_csr: SparseCsrCoordinates
     tangent_ordering: jdc.Static[VarTypeOrdering]
@@ -31,7 +32,7 @@ class FactorGraph:
 
     def solve(
         self,
-        initial_vals: VarValues,
+        initial_vals: VarValues | None = None,
         linear_solver: CholmodLinearSolver
         | ConjugateGradientLinearSolver = CholmodLinearSolver(),
         trust_region: TrustRegionConfig | None = TrustRegionConfig(),
@@ -40,9 +41,12 @@ class FactorGraph:
     ) -> VarValues:
         """Solve the nonlinear least squares problem using either Gauss-Newton
         or Levenberg-Marquardt."""
-        return NonlinearSolver(linear_solver, trust_region, termination, verbose).solve(
-            graph=self, initial_vals=initial_vals
-        )
+        if initial_vals is None:
+            initial_vals = VarValues.make(
+                var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
+            )
+        solver = NonlinearSolver(linear_solver, trust_region, termination, verbose)
+        return solver.solve(graph=self, initial_vals=initial_vals)
 
     def compute_residual_vector(self, vals: VarValues) -> jax.Array:
         """Compute the residual vector. The cost we are optimizing is defined
@@ -101,7 +105,7 @@ class FactorGraph:
     @staticmethod
     def make(
         factors: Iterable[Factor],
-        vars: Iterable[Var],
+        variables: Iterable[Var],
         use_onp: bool = True,
     ) -> FactorGraph:
         """Create a factor graph from a set of factors and a set of variables."""
@@ -113,9 +117,11 @@ class FactorGraph:
             from jax import numpy as jnp
 
         factors = tuple(factors)
-        vars = tuple(vars)
+        variables = tuple(variables)
         logger.info(
-            "Building graph with {} factors and {} variables.", len(factors), len(vars)
+            "Building graph with {} factors and {} variables.",
+            len(factors),
+            len(variables),
         )
 
         # Start by grouping our factors and grabbing a list of (ordered!) variables
@@ -142,7 +148,7 @@ class FactorGraph:
 
         # Create storage layout: this describes which parts of our tangent
         # vector is allocated to each variable.
-        tangent_start_from_var_type = dict[type[Var], int]()
+        tangent_start_from_var_type = dict[type[Var[Any]], int]()
 
         def _sort_key(x: Any) -> str:
             """We're going to sort variable / factor types by name. This should
@@ -150,8 +156,8 @@ class FactorGraph:
             return str(x)
 
         # Count variables of each type.
-        count_from_var_type = dict[type[Var], int]()
-        for var in vars:
+        count_from_var_type = dict[type[Var[Any]], int]()
+        for var in variables:
             count_from_var_type[type(var)] = count_from_var_type.get(type(var), 0) + 1
         tangent_dim_sum = 0
         for var_type in sorted(count_from_var_type.keys(), key=_sort_key):
@@ -167,8 +173,8 @@ class FactorGraph:
         )
 
         # Sort variable IDs.
-        sorted_ids_from_var_type = sort_and_stack_vars(vars)
-        del vars
+        sorted_ids_from_var_type = sort_and_stack_vars(variables)
+        del variables
 
         # Prepare each factor group. We put groups in a consistent order.
         residual_dim_sum = 0
@@ -177,7 +183,7 @@ class FactorGraph:
             logger.info(
                 "Group with factors={}, variables={}: {}",
                 len(group),
-                group[0].num_vars,
+                group[0].num_variables,
                 group[0].compute_residual.__name__,
             )
 
@@ -226,6 +232,7 @@ class FactorGraph:
         logger.info("Done!")
         return FactorGraph(
             stacked_factors=tuple(stacked_factors),
+            sorted_ids_from_var_type=sorted_ids_from_var_type,
             jac_coords_coo=jac_coords_coo,
             jac_coords_csr=jac_coords_csr,
             tangent_ordering=tangent_ordering,
@@ -243,8 +250,8 @@ class Factor[*Args]:
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
-    num_vars: jdc.Static[int]
-    sorted_ids_from_var_type: dict[type[Var], jax.Array]
+    num_variables: jdc.Static[int]
+    sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
     residual_dim: jdc.Static[int]
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]]
 
@@ -283,7 +290,7 @@ class Factor[*Args]:
             jax.tree.structure(args),
         )
         if residual_dim_cache_key not in _residual_dim_cache:
-            dummy = VarValues.from_defaults(variables)
+            dummy = VarValues.make(variables)
             residual_shape = jax.eval_shape(compute_residual, dummy, *args).shape
             assert len(residual_shape) == 1, "Residual must be a 1D array."
             _residual_dim_cache[residual_dim_cache_key] = residual_shape[0]
@@ -298,7 +305,7 @@ class Factor[*Args]:
         return Factor(
             compute_residual,
             args=args,
-            num_vars=len(variables),
+            num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_dim=_residual_dim_cache[residual_dim_cache_key],
             jac_mode=jac_mode,
@@ -323,8 +330,8 @@ class Factor[*Args]:
     def _compute_block_sparse_jac_indices(
         self: Factor,
         tangent_ordering: VarTypeOrdering,
-        sorted_ids_from_var_type: dict[type[Var], jax.Array],
-        tangent_start_from_var_type: dict[type[Var], int],
+        sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array],
+        tangent_start_from_var_type: dict[type[Var[Any]], int],
     ) -> tuple[jax.Array, jax.Array]:
         """Compute row and column indices for block-sparse Jacobian of shape
         (residual dim, total tangent dim). Residual indices will start at row=0."""

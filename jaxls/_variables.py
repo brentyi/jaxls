@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterable, Self, cast, overload, override
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Iterable,
+    Literal,
+    cast,
+    overload,
+)
 
 import jax
 import jax_dataclasses as jdc
@@ -15,65 +23,64 @@ class VarTypeOrdering:
     """Object describing how variables are ordered within a `VarValues` object
     or tangent vector.
 
-    We should use this instead of iterating directly over `dict[type[Var], T]`
+    We should use this instead of iterating directly over `dict[type[Var[Any]], T]`
     objects. It ensures correct tangent vector computation and also prevents
     dictionary ordering edge cases.
 
     Relevant: https://github.com/google/jax/issues/4085
     """
 
-    order_from_type: dict[type[Var], int]
+    order_from_type: dict[type[Var[Any]], int]
 
     def ordered_dict_items[T](
         self,
-        var_type_mapping: dict[type[Var], T],
-    ) -> list[tuple[type[Var], T]]:
+        var_type_mapping: dict[type[Var[Any]], T],
+    ) -> list[tuple[type[Var[Any]], T]]:
         return sorted(
             var_type_mapping.items(), key=lambda x: self.order_from_type[x[0]]
         )
 
 
-class _Var[T]:
-    # Subclass is a hack to avoid ClassVar[] annotations, which prevent us from using generics,
-    # while also not adding these annotations as fields to the Var() dataclass.
-    #
-    # https://github.com/python/typing/discussions/1424
-    default: T
-    """Default value for this variable."""
-    tangent_dim: int
-    """Dimension of the tangent space."""
-    retract_fn: Callable[[T, jax.Array], T]
-    """Retraction function for the manifold. None for Euclidean space."""
-
-
 @jdc.pytree_dataclass
-class Var[T](_Var[T]):
+class Var[T]:
     """A symbolic representation of an optimization variable."""
 
     id: int | jax.Array
 
-    @overload
-    def __init_subclass__(
-        cls,
-        default: T,
-        retract_fn: None = None,
-        tangent_dim: None = None,
-    ) -> None:
-        ...
+    # We would ideally annotate these as `ClassVar[T]`, but we can't.
+    #
+    # https://github.com/python/typing/discussions/1424
+    default: ClassVar[Any]
+    """Default value for this variable."""
+    tangent_dim: ClassVar[int]
+    """Dimension of the tangent space."""
+    retract_fn: ClassVar[Callable[[Any, jax.Array], Any]]
+    """Retraction function for the manifold. None for Euclidean space."""
 
-    @overload
-    def __init_subclass__(
-        cls,
-        default: T,
-        retract_fn: Callable[[T, jax.Array], T],
-        tangent_dim: int,
-    ) -> None:
-        ...
+    # https://github.com/microsoft/pyright/issues/8343
 
-    def __init_subclass__(
+    # @overload
+    # def __init_subclass__[T_](
+    #     cls,
+    #     default: T_,
+    #     retract_fn: None = None,
+    #     tangent_dim: None = None,
+    # ) -> None:
+    #     ...
+
+    # @overload
+    # def __init_subclass__[T_](
+    #     cls,
+    #     default: T_,
+    #     retract_fn: Callable[[T_, jax.Array], T_],
+    #     tangent_dim: int,
+    # ) -> None:
+    #     ...
+
+    def __init_subclass__[T_](
         cls,
-        default: T,
-        retract_fn: Callable[[T, jax.Array], T] | None = None,
+        default: T_,
+        retract_fn: Callable[[T_, jax.Array], T_] | None = None,
         tangent_dim: int | None = None,
     ) -> None:
         cls.default = default
@@ -105,10 +112,10 @@ class Var[T](_Var[T]):
 class VarValues:
     """A mapping from variables to variable values."""
 
-    vals_from_type: dict[type[Var], Any]
+    vals_from_type: dict[type[Var[Any]], Any]
     """Stacked values for each variable type. Will be sorted by ID (ascending)."""
 
-    ids_from_type: dict[type[Var], jax.Array]
+    ids_from_type: dict[type[Var[Any]], jax.Array]
     """Variable ID for each value, sorted in ascending order."""
 
     def get_value[T](self, var: Var[T]) -> T:
@@ -146,26 +153,43 @@ class VarValues:
             return self.get_value(var_or_type)
 
     @staticmethod
-    def make[T](vars: Iterable[Var[T]], values: Iterable[T]) -> VarValues:
+    def make[T](
+        variables: Iterable[Var[T]],
+        values: Iterable[T] | Literal["default"] = "default",
+    ) -> VarValues:
         """Create a `VarValues` object. Entries in `vars` and entries in
         `values` have a 1:1 correspondence.
 
         We don't use a {var: value} dictionary because variables are not
         hashable.
         """
-        vars = tuple(vars)
-        values = tuple(values)
-        assert len(vars) == len(values)
-        ids_from_type, vals_from_type = sort_and_stack_vars(vars, values)
-        return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
+        variables = tuple(variables)
+        if values == "default":
+            ids_from_type = sort_and_stack_vars(variables)
+            vals_from_type = {
+                # This should be faster than jnp.stack().
+                var_type: jax.tree_map(
+                    lambda x: jnp.broadcast_to(x[None, ...], (len(ids), *x.shape)),
+                    var_type.default,
+                )
+                for var_type, ids in ids_from_type.items()
+            }
+            return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
+        else:
+            values = tuple(values)
+            assert len(variables) == len(values)
+            ids_from_type, vals_from_type = sort_and_stack_vars(variables, values)
+            return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
 
     def _get_subset(
-        self, indices_from_type: dict[type[Var], jax.Array], ordering: VarTypeOrdering
+        self,
+        indices_from_type: dict[type[Var[Any]], jax.Array],
+        ordering: VarTypeOrdering,
     ) -> VarValues:
         """Get a new VarValues of object with only a subset of the variables.
         Assumes that the input IDs are all sorted."""
-        vals_from_type = dict[type[Var], Any]()
-        ids_from_type = dict[type[Var], jax.Array]()
+        vals_from_type = dict[type[Var[Any]], Any]()
+        ids_from_type = dict[type[Var[Any]], jax.Array]()
         for var_type, indices in ordering.ordered_dict_items(indices_from_type):
             vals_from_type[var_type] = jax.tree_map(
                 lambda x: x[indices], self.vals_from_type[var_type]
@@ -187,7 +211,7 @@ class VarValues:
         return next(iter(self.ids_from_type.values())).shape[:-1]
 
     def _retract(self, tangent: jax.Array, ordering: VarTypeOrdering) -> VarValues:
-        vals_from_type = dict[type[Var], Any]()
+        vals_from_type = dict[type[Var[Any]], Any]()
         tangent_slice_start = 0
         for var_type, ids in (
             # Respect variable ordering in tangent layout.
@@ -213,39 +237,33 @@ class VarValues:
             vals_from_type=vals_from_type, ids_from_type=self.ids_from_type
         )
 
-    @staticmethod
-    def from_defaults(vars: tuple[Var, ...]) -> VarValues:
-        """Construct a `VarValues` object from default values for each variable type."""
-        return VarValues.make(vars, tuple(v.default for v in vars))
+
+@overload
+def sort_and_stack_vars(
+    variables: tuple[Var, ...], values: None = None
+) -> dict[type[Var[Any]], jax.Array]: ...
 
 
 @overload
 def sort_and_stack_vars(
-    vars: tuple[Var, ...], values: None = None
-) -> dict[type[Var], jax.Array]:
-    ...
-
-
-@overload
-def sort_and_stack_vars(
-    vars: tuple[Var, ...], values: tuple[Any, ...]
-) -> tuple[dict[type[Var], jax.Array], dict[type[Var], Any]]:
-    ...
+    variables: tuple[Var, ...], values: tuple[Any, ...]
+) -> tuple[dict[type[Var[Any]], jax.Array], dict[type[Var[Any]], Any]]: ...
 
 
 def sort_and_stack_vars(
-    vars: tuple[Var, ...], values: tuple[Any, ...] | None = None
+    variables: tuple[Var, ...], values: tuple[Any, ...] | None = None
 ) -> (
-    dict[type[Var], jax.Array] | tuple[dict[type[Var], jax.Array], dict[type[Var], Any]]
+    dict[type[Var[Any]], jax.Array]
+    | tuple[dict[type[Var[Any]], jax.Array], dict[type[Var[Any]], Any]]
 ):
     """Sort variables by ID, ascending. If `values` is specified, returns a
     (sorted ID mapping, value mapping) tuple. Otherwise, only returns the ID
     mapping."""
     # First, organize variables and values by type.
-    vars_from_type = dict[type[Var], list[Var]]()
-    vals_from_type = dict[type[Var], list[Any]]() if values is not None else None
-    for i in range(len(vars)):
-        var = vars[i]
+    vars_from_type = dict[type[Var[Any]], list[Var]]()
+    vals_from_type = dict[type[Var[Any]], list[Any]]() if values is not None else None
+    for i in range(len(variables)):
+        var = variables[i]
         val = values[i] if values is not None else None
 
         # Variables should either be single or stacked.

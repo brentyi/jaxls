@@ -11,12 +11,10 @@ import scipy
 import scipy.sparse
 import sksparse.cholmod
 from jax import numpy as jnp
-from jax.experimental.sparse import BCOO
-
-from jaxfg2.utils import jax_log
 
 from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
+from .utils import jax_log
 
 if TYPE_CHECKING:
     from ._factor_graph import FactorGraph
