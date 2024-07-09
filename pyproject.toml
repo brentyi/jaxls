@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jaxls"
+version = "0.0.0"
+description = "Nonlinear least squares with JAX"
+readme = "README.md"
+license = { text="MIT" }
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "tyro",
+    "jax>=0.4.0",
+    "jaxlib",
+    "jaxlie>=1.0.0",
+    "jax_dataclasses>=1.0.0",
+    "scikit-sparse",
+    "loguru",
+    "tqdm",
+    "matplotlib",
+]

@@ -1,19 +1,21 @@
+# from __future__ import annotations
+
 import dataclasses
 import pathlib
-from typing import Dict, List
+from typing import cast
 
+import jax
 import jaxlie
+import jaxls
 import numpy as onp
-from jax import numpy as jnp
 from tqdm.auto import tqdm
-
-import jaxfg
 
 
 @dataclasses.dataclass
 class G2OData:
-    factors: List[jaxfg.core.FactorBase]
-    initial_poses: Dict[jaxfg.geometry.LieVariableBase, jaxlie.MatrixLieGroup]
+    factors: list[jaxls.Factor]
+    initial_poses: list[jaxlie.MatrixLieGroup]
+    pose_vars: list[jaxls.Var]
 
 
 def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
@@ -22,16 +24,13 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
     with open(path) as file:
         lines = [line.strip() for line in file.readlines()]
 
-    pose_variables: List[jaxfg.geometry.LieVariableBase] = []
-    initial_poses: Dict[jaxfg.geometry.LieVariableBase, jaxlie.MatrixLieGroup] = {}
-
-    factors: List[jaxfg.core.FactorBase] = []
+    var_count = 0
+    factors = list[jaxls.Factor]()
+    pose_variables = list[jaxls.Var]()
+    initial_poses = list[jaxlie.MatrixLieGroup]()
 
     for line in tqdm(lines):
         parts = [part for part in line.split(" ") if part != ""]
-
-        variable: jaxfg.geometry.LieVariableBase
-        between: jaxlie.MatrixLieGroup
 
         if parts[0] == "VERTEX_SE2":
             if len(pose_variables) > pose_count_limit:
@@ -42,8 +41,10 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             index = int(index)
             x, y, theta = map(float, [x, y, theta])
             assert len(initial_poses) == index
-            variable = jaxfg.geometry.SE2Variable()
-            initial_poses[variable] = jaxlie.SE2.from_xy_theta(x, y, theta)
+            variable = jaxls.SE2Var(id=var_count)
+            var_count += 1
+
+            initial_poses.append(jaxlie.SE2.from_xy_theta(x, y, theta))
             pose_variables.append(variable)
 
         elif parts[0] == "EDGE_SE2":
@@ -63,27 +64,43 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             precision_matrix[onp.triu_indices(3)] = precision_matrix_components
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factors.append(
-                jaxfg.geometry.BetweenFactor.make(
-                    variable_T_world_a=pose_variables[before_index],
-                    variable_T_world_b=pose_variables[after_index],
-                    T_a_b=between,
-                    noise_model=jaxfg.noises.Gaussian(
-                        sqrt_precision_matrix=sqrt_precision_matrix
-                    ),
-                )
+            factor = jaxls.Factor.make(
+                # Passing in arrays like sqrt_precision_matrix as input makes
+                # it possible vectorize factors.
+                (
+                    lambda values,
+                    T_world_a,
+                    T_world_b,
+                    between,
+                    sqrt_precision_matrix: sqrt_precision_matrix
+                    @ (
+                        (values[T_world_a].inverse() @ values[T_world_b]).inverse()
+                        @ between
+                    ).log()
+                ),
+                args=(
+                    pose_variables[before_index],
+                    pose_variables[after_index],
+                    between,
+                    cast(jax.Array, sqrt_precision_matrix),
+                ),
+                jac_mode="forward",
             )
+            factors.append(factor)
 
         elif parts[0] == "VERTEX_SE3:QUAT":
             # Create SE(3) variable
             _, index, x, y, z, qx, qy, qz, qw = parts
             index = int(index)
             assert len(initial_poses) == index
-            variable = jaxfg.geometry.SE3Variable()
-            initial_poses[variable] = jaxlie.SE3(
-                wxyz_xyz=onp.array(list(map(float, [qw, qx, qy, qz, x, y, z])))  # type: ignore
+            variable = jaxls.SE3Var(id=var_count)
+            initial_poses.append(
+                jaxlie.SE3(
+                    wxyz_xyz=onp.array(list(map(float, [qw, qx, qy, qz, x, y, z])))  # type: ignore
+                )
             )
             pose_variables.append(variable)
+            var_count += 1
 
         elif parts[0] == "EDGE_SE3:QUAT":
             # Create relative offset between pair of SE(3) variables
@@ -109,31 +126,45 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factors.append(
-                jaxfg.geometry.BetweenFactor.make(
-                    variable_T_world_a=pose_variables[before_index],
-                    variable_T_world_b=pose_variables[after_index],
-                    T_a_b=between,
-                    noise_model=jaxfg.noises.Gaussian(
-                        sqrt_precision_matrix=sqrt_precision_matrix
-                    ),
-                )
+            factor = jaxls.Factor.make(
+                # Passing in arrays like sqrt_precision_matrix as input makes
+                # it possible for jaxfg vectorize factors.
+                (
+                    lambda values,
+                    T_world_a,
+                    T_world_b,
+                    between,
+                    sqrt_precision_matrix: sqrt_precision_matrix
+                    @ (
+                        (values[T_world_a].inverse() @ values[T_world_b]).inverse()
+                        @ between
+                    ).log()
+                ),
+                args=(
+                    pose_variables[before_index],
+                    pose_variables[after_index],
+                    between,
+                    cast(jax.Array, sqrt_precision_matrix),
+                ),
+                jac_mode="forward",
             )
+            factors.append(factor)
         else:
             assert False, f"Unexpected line type: {parts[0]}"
 
     # Anchor start pose
-    factors.append(
-        jaxfg.geometry.PriorFactor.make(
-            variable=pose_variables[0],
-            mu=initial_poses[pose_variables[0]],
-            noise_model=jaxfg.noises.DiagonalGaussian(
-                jnp.ones(pose_variables[0].get_local_parameter_dim()) * 100.0
-            ),
-        )
+    factor = jaxls.Factor.make(
+        lambda var_values, start_pose: (
+            var_values[start_pose].inverse() @ initial_poses[0]
+        ).log(),
+        args=(pose_variables[0],),
+        jac_mode="reverse",
     )
+    factors.append(factor)
 
-    return G2OData(factors=factors, initial_poses=initial_poses)
+    return G2OData(
+        factors=factors, initial_poses=initial_poses, pose_vars=pose_variables
+    )
 
 
 __all__ = ["G2OData", "parse_g2o"]
