@@ -25,3 +25,8 @@ dependencies = [
     "tqdm",
     "matplotlib",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pyright>=1.1.308",
+]
