@@ -92,25 +92,22 @@ class ConjugateGradientLinearSolver:
         ATb: jax.Array,
         lambd: float | jax.Array,
         iterations: int | jax.Array,
-    ) -> jnp.ndarray:
+    ) -> jax.Array:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
 
         initial_x = jnp.zeros(ATb.shape)
 
-        # Get diagonals of ATA, for regularization + Jacobi preconditioning
+        # Get diagonals of ATA for preconditioning.
         ATA_diagonals = (
-            jnp.zeros_like(initial_x).at[A_coo.indices[1]].add(A_coo.data**2)
+            jnp.zeros_like(initial_x).at[A_coo.indices[:, 1]].add(A_coo.data**2)
         )
 
-        # Form normal equation
+        # Form normal equation.
         def ATA_function(x: jax.Array):
-            ATAx = A_coo.T @ (A_coo @ x)
+            ATAx = A_coo.transpose() @ (A_coo @ x)
             # We could also use (lambd * ATA_diagonals * x) for
             # scale-invariance. But this is hard to match with CHOLMOD.
             return ATAx + lambd * x
-
-        def jacobi_preconditioner(x):
-            return x / ATA_diagonals
 
         # Solve with conjugate gradient.
         solution_values, _ = jax.scipy.sparse.linalg.cg(
@@ -125,12 +122,9 @@ class ConjugateGradientLinearSolver:
             )
             if self.inexact_step_eta is not None
             else self.tolerance,
-            M=jacobi_preconditioner,
+            M=lambda x: x / ATA_diagonals,  # Jacobi preconditioner.
         )
         return solution_values
-
-
-# Nonlinear solve utils.
 
 
 # Nonlinear solvers.
