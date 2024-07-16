@@ -33,10 +33,10 @@ def main(
         initial_vals = jaxls.VarValues.make(g2o.pose_vars, g2o.initial_poses)
 
     with jaxls.utils.stopwatch("Running solve"):
-        solution_vals = graph.solve(initial_vals, trust_region=None, linear_solver=jaxls.ConjugateGradientLinearSolver())
+        solution_vals = graph.solve(initial_vals, trust_region=None)
 
     with jaxls.utils.stopwatch("Running solve (again)"):
-        solution_vals = graph.solve(initial_vals, trust_region=None, linear_solver=jaxls.ConjugateGradientLinearSolver())
+        solution_vals = graph.solve(initial_vals, trust_region=None)
 
     # Plot
     plt.figure()
