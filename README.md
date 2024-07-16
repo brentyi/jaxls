@@ -2,28 +2,36 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-*status: work-in-progress*
+_status: work-in-progress_
 
-**`jaxls`** is a library for sparse nonlinear least squares in JAX.
+**`jaxls`** is a library for nonlinear least squares in JAX.
 
-We provide a factor graph interface for defining variables and costs. We
-analyze the structure of the graph to automatically vectorize factor and
-variable operations, and translate the sparsity of graph connections into
-sparse matrix operations.
-
-This is useful for optimization problems where gradient-based methods are slow
-or ineffective. In robotics, common ones includes sensor fusion, SLAM, bundle
-adjustment, optimal control, inverse kinematics, and motion planning.
+We provide a factor graph interface for specifying and solving least squares
+problems. We accelerate optimization by analyzing the structure of graphs:
+repeated factor and variable types are vectorized, and the sparsity of adjacency
+in the graph is translated into sparse matrix operations.
 
 Features:
 
-- Sparse Jacobians via autodiff.
-- Manifold support; SO(2), SO(3), SE(2), and SE(3) implementations included.
-- Nonlinear solvers: Gauss-Newton and Levenberg-Marquardt.
-- Linear solvers: sparse Cholesky (CPU only via CHOLMOD), Jacobi-preconditioned Conjugate Gradient.
+- Automatic sparse Jacobians.
+- Optimization on manifolds; SO(2), SO(3), SE(2), and SE(3) implementations
+  included.
+- Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
+- Linear solvers: both direct (sparse Cholesky via CHOLMOD, on CPU) and
+  iterative (Jacobi-preconditioned Conjugate Gradient).
 
-For the first iteration of this library (written for [IROS 2021](https://github.com/brentyi/dfgo)), see [jaxfg](https://github.com/brentyi/jaxfg).
-`jaxls` is faster and easier to use.
+Use cases are primarily in least squares problems that are inherently (1) sparse
+and (2) inefficient to solve with gradient-based methods. In robotics, these are
+ubiquitous across classical approaches to perception, planning, and control.
+
+For the first iteration of this library, written for
+[IROS 2021](https://github.com/brentyi/dfgo), see
+[jaxfg](https://github.com/brentyi/jaxfg). `jaxls` is a rewrite that aims to be
+faster and easier to use. For additional references, see inspirations like
+[GTSAM](https://gtsam.org/), [Ceres Solver](http://ceres-solver.org/),
+[minisam](https://github.com/dongjing3309/minisam),
+[SwiftFusion](https://github.com/borglab/SwiftFusion),
+[g2o](https://github.com/RainerKuemmerle/g2o).
 
 ### Installation
 
@@ -56,15 +64,23 @@ import jaxls
 import jaxlie
 ```
 
-**Defining variables.** Each variable is given an integer ID. They don't need to be contiguous.
+**Defining variables.** Each variable is given an integer ID. They don't need to
+be contiguous.
 
 ```
 pose_vars = [jaxls.SE2Var(0), jaxls.SE2Var(1)]
 ```
 
-**Defining factors.** Factors are defined using a callable cost function and a set of arguments.
+**Defining factors.** Factors are defined using a callable cost function and a
+set of arguments.
 
 ```python
+# Factors take two arguments:
+# - A callable with signature `(jaxls.VarValues, *Args) -> jax.Array`.
+# - A tuple of arguments: the type should be `tuple[*Args]`.
+#
+# All arguments should be PyTree structures. Variable types within the PyTree
+# will be automatically detected.
 factors = [
     # Cost on pose 0.
     jaxfg2.Factor.make(
@@ -86,10 +102,11 @@ factors = [
 ]
 ```
 
-Factors with similar structure, like the first two in this example, will be vectorized under-the-hood.
+Factors with similar structure, like the first two in this example, will be
+vectorized under-the-hood.
 
-**Solving optimization problems.** We can set up the optimization problem,
-solve it, and print the solutions:
+**Solving optimization problems.** We can set up the optimization problem, solve
+it, and print the solutions:
 
 ```python
 graph = jaxfg2.FactorGraph.make(factors, pose_vars)

@@ -1,15 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    Iterable,
-    Literal,
-    cast,
-    overload,
-)
+from typing import Any, Callable, ClassVar, Iterable, Literal, cast, overload
 
 import jax
 import jax_dataclasses as jdc
@@ -57,25 +49,21 @@ class Var[T]:
     retract_fn: ClassVar[Callable[[Any, jax.Array], Any]]
     """Retraction function for the manifold. None for Euclidean space."""
 
-    # https://github.com/microsoft/pyright/issues/8343
+    @overload
+    def __init_subclass__[T_](
+        cls,
+        default: T_,
+        retract_fn: Callable[[T_, jax.Array], T_],
+        tangent_dim: int,
+    ) -> None: ...
 
-    # @overload
-    # def __init_subclass__[T_](
-    #     cls,
-    #     default: T_,
-    #     retract_fn: None = None,
-    #     tangent_dim: None = None,
-    # ) -> None:
-    #     ...
-
-    # @overload
-    # def __init_subclass__[T_](
-    #     cls,
-    #     default: T_,
-    #     retract_fn: Callable[[T_, jax.Array], T_],
-    #     tangent_dim: int,
-    # ) -> None:
-    #     ...
+    @overload
+    def __init_subclass__(
+        cls,
+        default: Any,
+        retract_fn: None = None,
+        tangent_dim: None = None,
+    ) -> None: ...
 
     def __init_subclass__[T_](
         cls,
@@ -105,12 +93,28 @@ class Var[T]:
     def _euclidean_retract(pytree: T, delta: jax.Array) -> T:
         # Euclidean retraction.
         flat, unravel = flatten_util.ravel_pytree(pytree)
+        del flat
         return cast(T, jax.tree_map(jnp.add, pytree, unravel(delta)))
 
 
 @jdc.pytree_dataclass
 class VarValues:
-    """A mapping from variables to variable values."""
+    """A mapping from variables to variable values.
+
+    Given a variable object `var` and a values of object `vals`, we can get the
+    value by calling one of:
+
+        # Equivalent.
+        vals.get_value(var)
+        vals[var]
+
+    To get all values of a specific type `var_type`, use:
+
+        # Equivalent.
+        vals.get_stacked_value(var_type)
+        vals[var_type]
+
+    """
 
     vals_from_type: dict[type[Var[Any]], Any]
     """Stacked values for each variable type. Will be sorted by ID (ascending)."""
@@ -124,6 +128,17 @@ class VarValues:
         var_type = type(var)
         index = jnp.searchsorted(self.ids_from_type[var_type], var.id)
         return jax.tree.map(lambda x: x[index], self.vals_from_type[var_type])
+
+    def get_stacked_value[T](self, var_type: type[Var[T]]) -> T:
+        """Get the value of all variables of a specific type."""
+        return self.vals_from_type[var_type]
+
+    def __getitem__[T](self, var_or_type: Var[T] | type[Var[T]]) -> T:
+        if isinstance(var_or_type, type):
+            return self.get_stacked_value(var_or_type)
+        else:
+            assert isinstance(var_or_type, Var)
+            return self.get_value(var_or_type)
 
     def __repr__(self) -> str:
         out_lines = list[str]()
@@ -140,17 +155,6 @@ class VarValues:
                 )
 
         return f"VarValues(\n{'\n'.join(out_lines)}\n)"
-
-    def get_stacked_value[T](self, var_type: type[Var[T]]) -> T:
-        """Get the value of all variables of a specific type."""
-        return self.vals_from_type[var_type]
-
-    def __getitem__[T](self, var_or_type: Var[T] | type[Var[T]]) -> T:
-        if isinstance(var_or_type, type):
-            return self.get_stacked_value(var_or_type)
-        else:
-            assert isinstance(var_or_type, Var)
-            return self.get_value(var_or_type)
 
     @staticmethod
     def make[T](

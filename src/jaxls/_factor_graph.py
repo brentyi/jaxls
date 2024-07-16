@@ -8,6 +8,7 @@ import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
+from jax.tree_util import default_registry
 from loguru import logger
 
 from ._solvers import (
@@ -73,16 +74,14 @@ class FactorGraph:
                     self.tangent_ordering,
                 )
                 # Shape should be: (single_residual_dim, vars * tangent_dim).
-                return (
-                    # Getting the Jacobian of...
-                    jax.jacrev
-                    if (
-                        factor.jac_mode == "auto"
-                        and factor.residual_dim < val_subset._get_tangent_dim()
-                        or factor.jac_mode == "reverse"
-                    )
-                    else jax.jacfwd
-                )(
+                jacfunc = {
+                    "forward": jax.jacfwd,
+                    "reverse": jax.jacrev,
+                    "auto": jax.jacrev
+                    if factor.residual_dim < val_subset._get_tangent_dim()
+                    else jax.jacrev,
+                }[factor.jac_mode]
+                return jacfunc(
                     # The residual function, with respect to to some local delta.
                     lambda tangent: factor.compute_residual(
                         val_subset._retract(tangent, self.tangent_ordering),
@@ -281,8 +280,19 @@ class Factor[*Args]:
     ) -> Factor[*Args_]:
         """Construct a factor for our factor graph."""
 
-        # TODO: ideally we should get the variables by traversing as a pytree.
-        variables = tuple(arg for arg in args if isinstance(arg, Var))
+        # Get all variables in the PyTree structure.
+        def traverse_args(current: Any, variables: list[Var]) -> list[Var]:
+            children_and_meta = default_registry.flatten_one_level(current)
+            if children_and_meta is None:
+                return variables
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    variables.append(child)
+                else:
+                    traverse_args(child, variables)
+            return variables
+
+        variables = tuple(traverse_args(args, []))
 
         # Cache the residual dimension for this factor.
         residual_dim_cache_key = (

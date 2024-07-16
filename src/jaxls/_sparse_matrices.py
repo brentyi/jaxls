@@ -11,6 +11,7 @@ class SparseCsrCoordinates:
     indptr: jax.Array
     """Index of start to each row. Shape should be `(*, num_rows)`."""
     shape: jdc.Static[tuple[int, int]]
+    """Shape of matrix."""
 
 
 @jdc.pytree_dataclass
@@ -20,6 +21,7 @@ class SparseCsrMatrix:
     values: jax.Array
     """Non-zero matrix values. Shape should be `(*, N)`."""
     coords: SparseCsrCoordinates
+    """Indices describing non-zero entries."""
 
 
 @jdc.pytree_dataclass
@@ -39,7 +41,7 @@ class SparseCooMatrix:
     values: jax.Array
     """Non-zero matrix values. Shape should be `(*, N)`."""
     coords: SparseCooCoordinates
-    """Row and column indices of non-zero entries. Shapes should be `(*, N)`."""
+    """Indices describing non-zero entries."""
 
     def as_jax_bcoo(self) -> jax.experimental.sparse.BCOO:
         return jax.experimental.sparse.BCOO(
