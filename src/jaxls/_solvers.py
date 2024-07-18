@@ -79,7 +79,7 @@ class ConjugateGradientLinearSolver:
     """Iterative solver for sparse linear systems. Can run on CPU or GPU."""
 
     tolerance: float = 1e-5
-    inexact_step_eta: float | None = 1e-2
+    inexact_step_eta: float | None = None
     """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
     `eta / iteration #`.
 
@@ -115,7 +115,7 @@ class ConjugateGradientLinearSolver:
             b=ATb,
             x0=initial_x,
             # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
-            maxiter=len(initial_x),
+            # maxiter=len(initial_x),
             tol=cast(
                 float,
                 jnp.maximum(self.tolerance, self.inexact_step_eta / (iterations + 1)),
@@ -202,7 +202,25 @@ class NonlinearSolver:
                 i=state.iterations,
                 cost=state.cost,
                 lambd=state.lambd,
+                ordered=True,
             )
+            residual_index = 0
+            for f, count in zip(graph.stacked_factors, graph.factor_counts):
+                stacked_dim = count * f.residual_dim
+                partial_cost = jnp.sum(
+                    state.residual_vector[residual_index : residual_index + stacked_dim]
+                    ** 2
+                )
+                residual_index += stacked_dim
+                jax_log(
+                    "     - "
+                    + f"{f.compute_residual.__name__}({count}):".ljust(15)
+                    + " {:.5f} (avg {:.5f})",
+                    partial_cost,
+                    partial_cost / stacked_dim,
+                    ordered=True,
+                )
+
         with jdc.copy_and_mutate(state) as state_next:
             proposed_residual_vector = graph.compute_residual_vector(vals)
             proposed_cost = jnp.sum(proposed_residual_vector**2)
@@ -273,14 +291,14 @@ class TrustRegionConfig:
 class TerminationConfig:
     # Termination criteria.
     max_iterations: int = 100
-    cost_tolerance: float = 1e-4
+    cost_tolerance: float = 1e-6
     """We terminate if `|cost change| / cost < cost_tolerance`."""
-    gradient_tolerance: float = 1e-6
+    gradient_tolerance: float = 1e-8
     """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
     gradient_tolerance_start_step: int = 10
     """When to start checking the gradient tolerance condition. Helps solve precision
     issues caused by inexact Newton steps."""
-    parameter_tolerance: float = 1e-5
+    parameter_tolerance: float = 1e-7
     """We terminate if `norm_2(linear delta) < (norm2(x) + parameter_tolerance) * parameter_tolerance`."""
 
     def _check_convergence(
