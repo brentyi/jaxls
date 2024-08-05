@@ -115,7 +115,7 @@ class ConjugateGradientLinearSolver:
             b=ATb,
             x0=initial_x,
             # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
-            # maxiter=len(initial_x),
+            maxiter=len(initial_x),
             tol=cast(
                 float,
                 jnp.maximum(self.tolerance, self.inexact_step_eta / (iterations + 1)),

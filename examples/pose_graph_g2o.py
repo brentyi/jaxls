@@ -57,7 +57,7 @@ def main(
     # Visualize 3D poses
     elif isinstance(g2o.pose_vars[0], jaxls.SE3Var):
         ax = plt.axes(projection="3d")
-        ax.set_box_aspect(1.0)
+        ax.set_box_aspect((1.0, 1.0, 1.0))  # type: ignore
         ax.plot3D(  # type: ignore
             *(initial_vals.get_stacked_value(jaxls.SE3Var).translation().T),
             c="r",
