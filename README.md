@@ -109,7 +109,7 @@ vectorized under-the-hood.
 it, and print the solutions:
 
 ```python
-graph = jaxfg2.FactorGraph.make(factors, pose_vars)
+graph = jaxls.FactorGraph.make(factors, pose_vars)
 solution = graph.solve()
 print("All solutions", solution)
 print("Pose 0", solution[pose_vars[0]])
