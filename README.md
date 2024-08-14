@@ -2,7 +2,7 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-_status: work-in-progress_
+_status: working! see limitations [here](#limitations)_ 
 
 **`jaxls`** is a library for nonlinear least squares in JAX.
 
@@ -115,3 +115,11 @@ print("All solutions", solution)
 print("Pose 0", solution[pose_vars[0]])
 print("Pose 1", solution[pose_vars[1]])
 ```
+
+### Limitations
+
+There are many practical features that we don't currently support:
+- GPU accelerated Cholesky factorization. (for CHOLMOD we wrap [scikit-sparse](https://scikit-sparse.readthedocs.io/en/latest/), which runs on CPU only)
+- Covariance estimation / marginalization.
+- Incremental solves.
+- Analytical Jacobians.
