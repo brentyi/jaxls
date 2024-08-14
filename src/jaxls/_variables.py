@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import total_ordering
 from typing import Any, Callable, ClassVar, Iterable, Literal, cast, overload
 
 import jax
@@ -8,6 +9,24 @@ import jax_dataclasses as jdc
 import numpy as onp
 from jax import flatten_util
 from jax import numpy as jnp
+
+
+@total_ordering
+class _HashableSortableMeta(type):
+    """We use variable types as dictionary keys. This metaclass makes sure that
+    the types themselves can be hashed and ordered.
+
+    Relevant: https://github.com/google/jax/issues/15358
+    """
+
+    def __hash__(cls):
+        return object.__hash__(cls)
+
+    def __lt__(cls, other):
+        if cls.__name__ == other.__name__:
+            return id(cls) < id(other)
+        else:
+            return cls.__name__ < other.__name__
 
 
 @dataclass(frozen=True)
@@ -28,13 +47,11 @@ class VarTypeOrdering:
         self,
         var_type_mapping: dict[type[Var[Any]], T],
     ) -> list[tuple[type[Var[Any]], T]]:
-        return sorted(
-            var_type_mapping.items(), key=lambda x: self.order_from_type[x[0]]
-        )
+        return sorted(var_type_mapping.items(), key=lambda x: x[0])
 
 
 @jdc.pytree_dataclass
-class Var[T]:
+class Var[T](metaclass=_HashableSortableMeta):
     """A symbolic representation of an optimization variable."""
 
     id: int | jax.Array
