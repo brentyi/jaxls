@@ -47,7 +47,9 @@ class VarTypeOrdering:
         self,
         var_type_mapping: dict[type[Var[Any]], T],
     ) -> list[tuple[type[Var[Any]], T]]:
-        return sorted(var_type_mapping.items(), key=lambda x: x[0])
+        return sorted(
+            var_type_mapping.items(), key=lambda x: self.order_from_type[x[0]]
+        )
 
 
 @jdc.pytree_dataclass
