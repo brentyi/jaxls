@@ -144,7 +144,7 @@ class FactorGraph:
 
             ids = next(iter(factor.sorted_ids_from_var_type.values()))
             if len(ids.shape) == 1:
-                factor = jax.tree.map(lambda x: x[None], factor)
+                factor = jax.tree.map(lambda x: jnp.asarray(x)[None], factor)
                 count_from_group[group_key] += 1
             else:
                 assert len(ids.shape) == 2

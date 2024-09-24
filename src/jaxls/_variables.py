@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Any, Callable, ClassVar, Iterable, Literal, cast, overload
+from typing import Any, Callable, ClassVar, cast, overload
 
 import jax
 import jax_dataclasses as jdc
@@ -53,10 +54,19 @@ class VarTypeOrdering:
 
 
 @jdc.pytree_dataclass
+class VarWithValue[T]:
+    """Structure containing a single variable with a value, or multiple if a
+    leading batch axis is present. Returned by `Var.with_value()`."""
+
+    variable: Var[T]
+    value: T
+
+
+@jdc.pytree_dataclass
 class Var[T](metaclass=_HashableSortableMeta):
     """A symbolic representation of an optimization variable."""
 
-    id: int | jax.Array
+    id: jax.Array | int
 
     # We would ideally annotate these as `ClassVar[T]`, but we can't.
     #
@@ -67,6 +77,11 @@ class Var[T](metaclass=_HashableSortableMeta):
     """Dimension of the tangent space."""
     retract_fn: ClassVar[Callable[[Any, jax.Array], Any]]
     """Retraction function for the manifold. None for Euclidean space."""
+
+    def with_value(self, value: T) -> VarWithValue[T]:
+        """Assign a value to this variable. Returned value can be used as input
+        for `VarValues.make()`."""
+        return VarWithValue(self, value)
 
     @overload
     def __init_subclass__[T_](
@@ -176,33 +191,42 @@ class VarValues:
         return f"VarValues(\n{'\n'.join(out_lines)}\n)"
 
     @staticmethod
-    def make[T](
-        variables: Iterable[Var[T]],
-        values: Iterable[T] | Literal["default"] = "default",
-    ) -> VarValues:
-        """Create a `VarValues` object. Entries in `vars` and entries in
-        `values` have a 1:1 correspondence.
+    def make(variables: Iterable[Var[Any] | VarWithValue[Any]]) -> VarValues:
+        """Create a VarValues object from a list of variables with or without
+        values assigned to them. In the latter case, value are set to the
+        default value of the variable type.
 
-        We don't use a {var: value} dictionary because variables are not
-        hashable.
+        Example:
+            >>> v1 = SomeVar(1)
+            >>> v2 = AnotherVar(2)
+            >>> values = VarValues.make(v1, v2.with_value(custom_value))
         """
-        variables = tuple(variables)
-        if values == "default":
-            ids_from_type = sort_and_stack_vars(variables)
-            vals_from_type = {
-                # This should be faster than jnp.stack().
-                var_type: jax.tree_map(
-                    lambda x: jnp.broadcast_to(x[None, ...], (len(ids), *x.shape)),
-                    var_type.default,
+        vars = list[Var[Any]]()
+        vals = list[Any]()
+        for v in variables:
+            if isinstance(v, Var):
+                # Default value.
+                ids = v.id
+                assert isinstance(ids, int) or len(ids.shape) in (0, 1)
+                vars.append(v)
+                vals.append(
+                    v.default
+                    if isinstance(ids, int) or len(ids.shape) == 0
+                    else jax.tree_map(
+                        lambda x: jnp.broadcast_to(
+                            x[None, ...],
+                            (len(cast(jax.Array, ids).shape), *x.shape),
+                        ),
+                        v.default,
+                    )
                 )
-                for var_type, ids in ids_from_type.items()
-            }
-            return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
-        else:
-            values = tuple(values)
-            assert len(variables) == len(values)
-            ids_from_type, vals_from_type = sort_and_stack_vars(variables, values)
-            return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
+            else:
+                # Assigned value.
+                vars.append(v.variable)
+                vals.append(v.value)
+
+        ids_from_type, vals_from_type = sort_and_stack_vars(tuple(vars), tuple(vals))
+        return VarValues(vals_from_type=vals_from_type, ids_from_type=ids_from_type)
 
     def _get_subset(
         self,

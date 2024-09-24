@@ -30,7 +30,12 @@ def main(
         jax.block_until_ready(graph)
 
     with jaxls.utils.stopwatch("Making solver"):
-        initial_vals = jaxls.VarValues.make(g2o.pose_vars, g2o.initial_poses)
+        initial_vals = jaxls.VarValues.make(
+            (
+                pose_var.with_value(pose)
+                for pose_var, pose in zip(g2o.pose_vars, g2o.initial_poses)
+            )
+        )
 
     with jaxls.utils.stopwatch("Running solve"):
         solution_vals = graph.solve(initial_vals, trust_region=None)
