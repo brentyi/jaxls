@@ -40,18 +40,21 @@ faster and easier to use. For additional references, see inspirations like
 For Cholesky factorization via CHOLMOD, `scikit-sparse` requires SuiteSparse:
 
 ```bash
-# Via conda.
+# Option 1: via conda.
 conda install conda-forge::suitesparse
-# Via apt.
+# Option 2: via apt.
 sudo apt update
 sudo apt install -y libsuitesparse-dev
-# Via brew.
+# Option 3: via brew.
 brew install suite-sparse
 ```
 
 Then, from your environment of choice:
 
 ```bash
+# Option 1: from git.
+pip install git+ssh://git@github.com/brentyi/jaxls.git
+# Option 2: editable.
 git clone https://github.com/brentyi/jaxls.git
 cd jaxls
 pip install -e .

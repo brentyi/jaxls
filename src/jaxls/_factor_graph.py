@@ -118,10 +118,25 @@ class FactorGraph:
 
         factors = tuple(factors)
         variables = tuple(variables)
+
+        # We're assuming no more than 1 batch axis.
+        num_factors = 0
+        for f in factors:
+            assert len(f._get_batch_axes()) in (0, 1)
+            num_factors += (
+                1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
+            )
+
+        num_variables = 0
+        for v in variables:
+            assert isinstance(v.id, int) or len(v.id.shape) in (0, 1)
+            num_variables += (
+                1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
+            )
         logger.info(
             "Building graph with {} factors and {} variables.",
-            len(factors),
-            len(variables),
+            num_factors,
+            num_variables,
         )
 
         # Start by grouping our factors and grabbing a list of (ordered!) variables
@@ -322,6 +337,19 @@ class Factor[*Args]:
 
         variables = tuple(traverse_args(args, []))
         assert len(variables) > 0
+
+        # Support batch axis.
+        if not isinstance(variables[0].id, int):
+            batch_axes = variables[0].id.shape
+            assert len(batch_axes) in (0, 1)
+            for var in variables[1:]:
+                assert (
+                    () if isinstance(var.id, int) else var.id.shape
+                ) == batch_axes, "Batch axes of variables do not match."
+            if len(batch_axes) == 1:
+                return jax.vmap(Factor._make_impl, in_axes=(None, 0, None))(
+                    compute_residual, args, jac_mode
+                )
 
         # Cache the residual dimension for this factor.
         residual_dim_cache_key = (
