@@ -71,7 +71,7 @@ class Var[T](metaclass=_HashableSortableMeta):
     # We would ideally annotate these as `ClassVar[T]`, but we can't.
     #
     # https://github.com/python/typing/discussions/1424
-    default: ClassVar[Any]
+    default_factory: ClassVar[Callable[[], Any]]
     """Default value for this variable."""
     tangent_dim: ClassVar[int]
     """Dimension of the tangent space."""
@@ -86,7 +86,8 @@ class Var[T](metaclass=_HashableSortableMeta):
     @overload
     def __init_subclass__[T_](
         cls,
-        default: T_,
+        *,
+        default_factory: Callable[[], T_],
         retract_fn: Callable[[T_, jax.Array], T_],
         tangent_dim: int,
     ) -> None: ...
@@ -94,18 +95,29 @@ class Var[T](metaclass=_HashableSortableMeta):
     @overload
     def __init_subclass__(
         cls,
-        default: Any,
-        retract_fn: None = None,
-        tangent_dim: None = None,
+        *,
+        default_factory: Callable[[], Any],
     ) -> None: ...
 
     def __init_subclass__[T_](
         cls,
-        default: T_,
+        *,
+        default_factory: Callable[[], T_] | None = None,
+        default: T_ | None = None,
         retract_fn: Callable[[T_, jax.Array], T_] | None = None,
         tangent_dim: int | None = None,
     ) -> None:
-        cls.default = default
+        if default_factory is None:
+            assert default is not None
+            import warnings
+
+            warnings.warn(
+                "Defining 'default' for variables is deprecated. Use 'default_factory' instead.",
+                stacklevel=2,
+            )
+            default_factory = lambda: default
+
+        cls.default_factory = staticmethod(default_factory)
         if retract_fn is not None:
             assert tangent_dim is not None
             cls.tangent_dim = tangent_dim
@@ -113,7 +125,12 @@ class Var[T](metaclass=_HashableSortableMeta):
         else:
             assert tangent_dim is None
             parameter_dim = int(
-                sum([onp.prod(leaf.size) for leaf in jax.tree.leaves(default)])
+                sum(
+                    [
+                        onp.prod(leaf.shape)
+                        for leaf in jax.tree.leaves(jax.eval_shape(default_factory))
+                    ]
+                )
             )
             cls.tangent_dim = parameter_dim
             cls.retract_fn = cls._euclidean_retract
@@ -203,21 +220,29 @@ class VarValues:
         """
         vars = list[Var[Any]]()
         vals = list[Any]()
+
+        cached_default_from_type = dict[type[Var], Any]()
+
         for v in variables:
             if isinstance(v, Var):
                 # Default value.
+                if type(v) not in cached_default_from_type:
+                    cached_default_from_type[type(v)] = v.default_factory()
+
                 ids = v.id
                 assert isinstance(ids, int) or len(ids.shape) in (0, 1)
                 vars.append(v)
                 vals.append(
-                    v.default
-                    if isinstance(ids, int) or len(ids.shape) == 0
-                    else jax.tree_map(
-                        lambda x: jnp.broadcast_to(
-                            x[None, ...],
-                            (len(cast(jax.Array, ids).shape), *x.shape),
+                    jax.tree_map(
+                        (lambda x: x)
+                        if isinstance(ids, int) or len(ids.shape) == 0
+                        else (
+                            lambda x: jnp.broadcast_to(
+                                x[None, ...],
+                                (len(cast(jax.Array, ids).shape), *x.shape),
+                            )
                         ),
-                        v.default,
+                        cached_default_from_type[type(v)],
                     )
                 )
             else:

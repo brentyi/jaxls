@@ -30,4 +30,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyright>=1.1.308",
+    "ruff",
 ]
+
+[tool.ruff.lint]
+ignore = ["E731"]  # Ignore lambda assignment warnings
