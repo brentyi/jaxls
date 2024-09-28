@@ -139,40 +139,6 @@ class FactorGraph:
             num_variables,
         )
 
-        # Start by grouping our factors and grabbing a list of (ordered!) variables
-        factors_from_group = dict[Any, list[Factor]]()
-        count_from_group = dict[Any, int]()
-        for factor in factors:
-            # Each factor is ultimately just a pytree node; in order for a set of
-            # factors to be batchable, they must share the same:
-            group_key: Hashable = (
-                # (1) Treedef. Structure of inputs must match.
-                jax.tree_structure(factor),
-                # (2) Leaf shapes: contained array shapes must match
-                tuple(
-                    leaf.shape if hasattr(leaf, "shape") else ()
-                    for leaf in jax.tree_leaves(factor)
-                ),
-            )
-            factors_from_group.setdefault(group_key, [])
-            count_from_group.setdefault(group_key, 0)
-
-            ids = next(iter(factor.sorted_ids_from_var_type.values()))
-            if len(ids.shape) == 1:
-                factor = jax.tree.map(lambda x: jnp.asarray(x)[None], factor)
-                count_from_group[group_key] += 1
-            else:
-                assert len(ids.shape) == 2
-                count_from_group[group_key] += ids.shape[0]
-
-            # Record factor and variables.
-            factors_from_group[group_key].append(factor)
-
-        # Fields we want to populate.
-        stacked_factors = list[Factor]()
-        factor_counts = list[int]()
-        jac_coords = list[tuple[jax.Array, jax.Array]]()
-
         # Create storage layout: this describes which parts of our tangent
         # vector is allocated to each variable.
         tangent_start_from_var_type = dict[type[Var[Any]], int]()
@@ -204,6 +170,48 @@ class FactorGraph:
                 for i, var_type in enumerate(tangent_start_from_var_type.keys())
             }
         )
+
+        # Start by grouping our factors and grabbing a list of (ordered!) variables
+        factors_from_group = dict[Any, list[Factor]]()
+        count_from_group = dict[Any, int]()
+        for i, factor in enumerate(factors):
+            # Each factor is ultimately just a pytree node; in order for a set of
+            # factors to be batchable, they must share the same:
+            group_key: Hashable = (
+                # (1) Treedef. Structure of inputs must match.
+                jax.tree_structure(factor),
+                # (2) Leaf shapes: contained array shapes must match
+                tuple(
+                    leaf.shape if hasattr(leaf, "shape") else ()
+                    for leaf in jax.tree_leaves(factor)
+                ),
+            )
+            factors_from_group.setdefault(group_key, [])
+            count_from_group.setdefault(group_key, 0)
+
+            ids = next(iter(factor.sorted_ids_from_var_type.values()))
+            if len(ids.shape) == 1:
+                factor = jax.tree.map(lambda x: jnp.asarray(x)[None], factor)
+                count_from_group[group_key] += 1
+            else:
+                assert len(ids.shape) == 2
+                count_from_group[group_key] += ids.shape[0]
+
+            # Record factor and variables.
+            factors_from_group[group_key].append(factor)
+
+            # Check that all variables are present.
+            for var_type in factor.sorted_ids_from_var_type.keys():
+                assert var_type in tangent_start_from_var_type, (
+                    f"Found variable of type {var_type} as input"
+                    f" to factor #{i} with residual {factor.compute_residual},"
+                    " but variable type is missing from `FactorGraph.make()`."
+                )
+
+        # Fields we want to populate.
+        stacked_factors = list[Factor]()
+        factor_counts = list[int]()
+        jac_coords = list[tuple[jax.Array, jax.Array]]()
 
         # Sort variable IDs.
         sorted_ids_from_var_type = sort_and_stack_vars(variables)
