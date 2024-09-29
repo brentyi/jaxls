@@ -222,7 +222,7 @@ class FactorGraph:
         for group_key in sorted(factors_from_group.keys(), key=_sort_key):
             group = factors_from_group[group_key]
             logger.info(
-                "Group with factors={}, variables={}: {}",
+                "Vectorizing group with {} factors, {} variables each: {}",
                 count_from_group[group_key],
                 group[0].num_variables,
                 group[0].compute_residual.__name__,
@@ -278,7 +278,6 @@ class FactorGraph:
             indptr=cast(jax.Array, csr_indptr),
             shape=(residual_dim_sum, tangent_dim_sum),
         )
-        logger.info("Done!")
         return FactorGraph(
             stacked_factors=tuple(stacked_factors),
             factor_counts=tuple(factor_counts),
