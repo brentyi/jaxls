@@ -2,7 +2,7 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-_status: working! see limitations [here](#limitations)_ 
+_status: working! see limitations [here](#limitations)_
 
 **`jaxls`** is a library for nonlinear least squares in JAX.
 
@@ -21,8 +21,7 @@ Features:
   iterative (Jacobi-preconditioned Conjugate Gradient).
 
 Use cases are primarily in least squares problems that are inherently (1) sparse
-and (2) inefficient to solve with gradient-based methods. In robotics, these are
-ubiquitous across classical approaches to perception, planning, and control.
+and (2) inefficient to solve with gradient-based methods.
 
 For the first iteration of this library, written for
 [IROS 2021](https://github.com/brentyi/dfgo), see
@@ -122,6 +121,7 @@ print("Pose 1", solution[pose_vars[1]])
 ### Limitations
 
 There are many practical features that we don't currently support:
+
 - GPU accelerated Cholesky factorization. (for CHOLMOD we wrap [scikit-sparse](https://scikit-sparse.readthedocs.io/en/latest/), which runs on CPU only)
 - Covariance estimation / marginalization.
 - Incremental solves.

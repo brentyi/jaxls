@@ -19,7 +19,12 @@ from ._solvers import (
     TerminationConfig,
     TrustRegionConfig,
 )
-from ._sparse_matrices import SparseCooCoordinates, SparseCsrCoordinates
+from ._sparse_matrices import (
+    BatchedBlock,
+    BatchedBlockSparseMatrix,
+    SparseCooCoordinates,
+    SparseCsrCoordinates,
+)
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
@@ -41,9 +46,10 @@ class FactorGraph:
     stacked_factors: tuple[_AnalyzedFactor, ...]
     factor_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
-    jac_coords_coo: SparseCooCoordinates
     jac_coords_csr: SparseCsrCoordinates
     tangent_ordering: jdc.Static[VarTypeOrdering]
+    tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
+    tangent_dim: jdc.Static[int]
     residual_dim: jdc.Static[int]
 
     def solve(
@@ -76,8 +82,13 @@ class FactorGraph:
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_jac_values(self, vals: VarValues) -> jax.Array:
+    def _compute_jac_values(
+        self, vals: VarValues
+    ) -> tuple[jax.Array, BatchedBlockSparseMatrix]:
         jac_vals = []
+        blocks = dict[tuple[int, int], list[BatchedBlock]]()
+        residual_offset = 0
+
         for factor in self.stacked_factors:
             # Shape should be: (num_variables, count_from_group[group_key], single_residual_dim, var.tangent_dim).
             def compute_jac_with_perturb(factor: _AnalyzedFactor) -> jax.Array:
@@ -112,9 +123,64 @@ class FactorGraph:
                 stacked_jac.shape[-1],  # Tangent dimension.
             )
             jac_vals.append(stacked_jac.flatten())
+
+            start_col = 0
+            for var_type, ids in self.tangent_ordering.ordered_dict_items(
+                # This ordering shouldn't actually matter!
+                factor.sorted_ids_from_var_type
+            ):
+                block_shape = (factor.residual_dim, var_type.tangent_dim)
+                (num_factor_, num_vars) = ids.shape
+                assert num_factor == num_factor_
+                end_col = start_col + num_vars * var_type.tangent_dim
+
+                block_vals = jnp.moveaxis(
+                    stacked_jac[:, :, start_col:end_col].reshape(
+                        (
+                            num_factor_,
+                            factor.residual_dim,
+                            num_vars,
+                            var_type.tangent_dim,
+                        )
+                    ),
+                    2,
+                    1,
+                ).reshape(
+                    (num_factor_ * num_vars, factor.residual_dim, var_type.tangent_dim)
+                )
+                blocks.setdefault(block_shape, []).append(
+                    BatchedBlock(
+                        start_row=residual_offset
+                        + jnp.repeat(
+                            jnp.arange(num_factor_) * factor.residual_dim, num_vars
+                        ),
+                        start_col=(
+                            jnp.searchsorted(
+                                self.sorted_ids_from_var_type[var_type], ids.flatten()
+                            )
+                            * var_type.tangent_dim
+                            + self.tangent_start_from_var_type[var_type]
+                        ),
+                        values=block_vals,
+                    )
+                )
+                start_col = end_col
+
+            assert stacked_jac.shape[-1] == start_col
+
+            residual_offset += factor.residual_dim * num_factor
+        assert residual_offset == self.residual_dim
+
+        bsparse_jacobian = BatchedBlockSparseMatrix(
+            blocks={
+                shape: jax.tree.map(lambda *x: jnp.concatenate(x, axis=0), *blocklist)
+                for shape, blocklist in blocks.items()
+            },
+            shape=(self.residual_dim, self.tangent_dim),
+        )
         jac_vals = jnp.concatenate(jac_vals, axis=0)
-        assert jac_vals.shape == (self.jac_coords_coo.rows.shape[0],)
-        return jac_vals
+        assert jac_vals.shape == (self.jac_coords_csr.indices.shape[0],)
+        return jac_vals, bsparse_jacobian
 
     @staticmethod
     def make(
@@ -242,10 +308,11 @@ class FactorGraph:
             stacked_factor: Factor = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
-            stacked_factor_expanded: _AnalyzedFactor = jax.vmap(_AnalyzedFactor._make)(
-                stacked_factor
-            )
-            stacked_factors.append(stacked_factor_expanded)
+            stacked_factor_analyzed: _AnalyzedFactor = jax.vmap(
+                _AnalyzedFactor._analyze
+            )(stacked_factor)
+
+            stacked_factors.append(stacked_factor_analyzed)
             factor_counts.append(count_from_group[group_key])
 
             logger.info(
@@ -254,6 +321,14 @@ class FactorGraph:
                 stacked_factors[-1].num_variables,
                 stacked_factors[-1].compute_residual.__name__,
             )
+
+            # Check that all variables are present.
+            for var_type in stacked_factor_analyzed.sorted_ids_from_var_type.keys():
+                assert var_type in tangent_start_from_var_type, (
+                    f"Found variable of type {var_type} as input"
+                    f" to factor with residual {stacked_factor_analyzed.compute_residual},"
+                    " but variable type is missing from `FactorGraph.make()`."
+                )
 
             # Compute Jacobian coordinates.
             #
@@ -266,24 +341,24 @@ class FactorGraph:
                     sorted_ids_from_var_type=sorted_ids_from_var_type,
                     tangent_start_from_var_type=tangent_start_from_var_type,
                 )
-            )(stacked_factor_expanded)
+            )(stacked_factor_analyzed)
             assert (
                 rows.shape
                 == cols.shape
                 == (
                     count_from_group[group_key],
-                    stacked_factor_expanded.residual_dim,
+                    stacked_factor_analyzed.residual_dim,
                     rows.shape[-1],
                 )
             )
             rows = rows + (
                 jnp.arange(count_from_group[group_key])[:, None, None]
-                * stacked_factor_expanded.residual_dim
+                * stacked_factor_analyzed.residual_dim
             )
             rows = rows + residual_dim_sum
             jac_coords.append((rows.flatten(), cols.flatten()))
             residual_dim_sum += (
-                stacked_factor_expanded.residual_dim * count_from_group[group_key]
+                stacked_factor_analyzed.residual_dim * count_from_group[group_key]
             )
 
         jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
@@ -302,9 +377,10 @@ class FactorGraph:
             stacked_factors=tuple(stacked_factors),
             factor_counts=tuple(factor_counts),
             sorted_ids_from_var_type=sorted_ids_from_var_type,
-            jac_coords_coo=jac_coords_coo,
             jac_coords_csr=jac_coords_csr,
             tangent_ordering=tangent_ordering,
+            tangent_start_from_var_type=tangent_start_from_var_type,
+            tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
         )
 
@@ -358,7 +434,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
 
     @staticmethod
     @jdc.jit
-    def _make[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
+    def _analyze[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
         """Construct a factor for our factor graph."""
 
         compute_residual = factor.compute_residual
@@ -389,7 +465,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
                     () if isinstance(var.id, int) else var.id.shape
                 ) == batch_axes, "Batch axes of variables do not match."
             if len(batch_axes) == 1:
-                return jax.vmap(_AnalyzedFactor._make)(factor)
+                return jax.vmap(_AnalyzedFactor._analyze)(factor)
 
         # Cache the residual dimension for this factor.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
