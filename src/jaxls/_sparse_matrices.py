@@ -1,7 +1,73 @@
+from __future__ import annotations
+
 import jax
 import jax.experimental.sparse
 import jax_dataclasses as jdc
 from jax import numpy as jnp
+
+
+@jdc.pytree_dataclass
+class MatrixBlock:
+    start_row: jax.Array
+    start_col: jax.Array
+    values: jax.Array
+
+
+@jdc.pytree_dataclass
+class BlockSparseMatrix:
+    blocks: dict[tuple[int, int], MatrixBlock]
+    """Map from block shape to block (values, start row, start col)."""
+    shape: jdc.Static[tuple[int, int]]
+    """Shape of matrix."""
+
+    def transpose(self) -> BlockSparseMatrix:
+        new_blocks = {}
+        for block_shape, block in self.blocks.items():
+            new_block = MatrixBlock(
+                start_row=block.start_col,
+                start_col=block.start_row,
+                values=jnp.swapaxes(block.values, -1, -2),
+            )
+            new_blocks[block_shape[::-1]] = new_block
+        return BlockSparseMatrix(new_blocks, (self.shape[1], self.shape[0]))
+
+    def __matmul__(self, target: jax.Array) -> jax.Array:
+        result = jnp.zeros(self.shape[0])
+        for block_shape, block in self.blocks.items():
+            start_row, start_col = block.start_row, block.start_col
+            assert len(start_row.shape) == 1
+            assert len(start_col.shape) == 1
+            values = block.values
+            assert values.shape == (len(start_row), *block_shape)
+
+            def multiply_one_block(col, vals) -> jax.Array:
+                target_slice = jax.lax.dynamic_slice_in_dim(
+                    target, col, block_shape[1], axis=0
+                )
+                return jnp.einsum("ij,j->i", vals, target_slice)
+
+            update_indices = start_row[:, None] + jnp.arange(block_shape[0])[None, :]
+            result = result.at[update_indices].add(
+                jax.vmap(multiply_one_block)(start_col, values)
+            )
+        return result
+
+    def todense(self) -> jax.Array:
+        result = jnp.zeros(self.shape)
+        for block_shape, block in self.blocks.items():
+            start_row, start_col = block.start_row, block.start_col
+            assert len(start_row.shape) == 1
+            assert len(start_col.shape) == 1
+            values = block.values
+            assert values.shape == (len(start_row), *block_shape)
+
+            # TODO: inefficient
+            for idx in range(len(start_col)):
+                result = jax.lax.dynamic_update_slice(
+                    result, values[idx], (start_row[idx], start_col[idx])
+                )
+
+        return result
 
 
 @jdc.pytree_dataclass
