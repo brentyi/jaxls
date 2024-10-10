@@ -64,7 +64,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             precision_matrix[onp.triu_indices(3)] = precision_matrix_components
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factor = jaxls.Factor.make(
+            factor = jaxls.Factor(
                 # Passing in arrays like sqrt_precision_matrix as input makes
                 # it possible vectorize factors.
                 (
@@ -126,7 +126,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factor = jaxls.Factor.make(
+            factor = jaxls.Factor(
                 # Passing in arrays like sqrt_precision_matrix as input makes
                 # it possible for jaxfg vectorize factors.
                 (
@@ -153,7 +153,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             assert False, f"Unexpected line type: {parts[0]}"
 
     # Anchor start pose
-    factor = jaxls.Factor.make(
+    factor = jaxls.Factor(
         lambda var_values, start_pose: (
             var_values[start_pose].inverse() @ initial_poses[0]
         ).log(),

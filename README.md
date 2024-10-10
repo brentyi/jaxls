@@ -86,17 +86,17 @@ set of arguments.
 # will be automatically detected.
 factors = [
     # Cost on pose 0.
-    jaxls.Factor.make(
+    jaxls.Factor(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (pose_vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
     ),
     # Cost on pose 1.
-    jaxls.Factor.make(
+    jaxls.Factor(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (pose_vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
     ),
     # Cost between poses.
-    jaxls.Factor.make(
+    jaxls.Factor(
         lambda vals, var0, var1, delta: (
             (vals[var0].inverse() @ vals[var1]) @ delta.inverse()
         ).log(),

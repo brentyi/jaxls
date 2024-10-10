@@ -10,6 +10,7 @@ import numpy as onp
 from jax import numpy as jnp
 from jax.tree_util import default_registry
 from loguru import logger
+from typing_extensions import deprecated
 
 from ._solvers import (
     CholmodLinearSolver,
@@ -22,9 +23,22 @@ from ._sparse_matrices import SparseCooCoordinates, SparseCsrCoordinates
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
+def _get_function_signature(func: Callable) -> Hashable:
+    """Returns a hashable value, which should be equal for equivalent input functions."""
+    closure = func.__closure__
+    if closure:
+        closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
+    else:
+        closure_vars = ()
+
+    bytecode = dis.Bytecode(func)
+    bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
+    return bytecode_tuple, closure_vars
+
+
 @jdc.pytree_dataclass
 class FactorGraph:
-    stacked_factors: tuple[Factor, ...]
+    stacked_factors: tuple[_AnalyzedFactor, ...]
     factor_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
     jac_coords_coo: SparseCooCoordinates
@@ -66,7 +80,7 @@ class FactorGraph:
         jac_vals = []
         for factor in self.stacked_factors:
             # Shape should be: (num_variables, count_from_group[group_key], single_residual_dim, var.tangent_dim).
-            def compute_jac_with_perturb(factor: Factor) -> jax.Array:
+            def compute_jac_with_perturb(factor: _AnalyzedFactor) -> jax.Array:
                 val_subset = vals._get_subset(
                     {
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
@@ -122,7 +136,7 @@ class FactorGraph:
             jdc.replace(
                 factor,
                 compute_residual=compute_residual_from_hash.setdefault(
-                    factor._get_function_signature(factor.compute_residual),
+                    _get_function_signature(factor.compute_residual),
                     factor.compute_residual,
                 ),
             )
@@ -199,27 +213,19 @@ class FactorGraph:
             factors_from_group.setdefault(group_key, [])
             count_from_group.setdefault(group_key, 0)
 
-            ids = next(iter(factor.sorted_ids_from_var_type.values()))
-            if len(ids.shape) == 1:
+            batch_axes = factor._get_batch_axes()
+            if len(batch_axes) == 0:
                 factor = jax.tree.map(lambda x: jnp.asarray(x)[None], factor)
                 count_from_group[group_key] += 1
             else:
-                assert len(ids.shape) == 2
-                count_from_group[group_key] += ids.shape[0]
+                assert len(batch_axes) == 1
+                count_from_group[group_key] += batch_axes[0]
 
             # Record factor and variables.
             factors_from_group[group_key].append(factor)
 
-            # Check that all variables are present.
-            for var_type in factor.sorted_ids_from_var_type.keys():
-                assert var_type in tangent_start_from_var_type, (
-                    f"Found variable of type {var_type} as input"
-                    f" to factor #{i} with residual {factor.compute_residual},"
-                    " but variable type is missing from `FactorGraph.make()`."
-                )
-
         # Fields we want to populate.
-        stacked_factors = list[Factor]()
+        stacked_factors = list[_AnalyzedFactor]()
         factor_counts = list[int]()
         jac_coords = list[tuple[jax.Array, jax.Array]]()
 
@@ -231,19 +237,23 @@ class FactorGraph:
         residual_dim_sum = 0
         for group_key in sorted(factors_from_group.keys(), key=_sort_key):
             group = factors_from_group[group_key]
-            logger.info(
-                "Vectorizing group with {} factors, {} variables each: {}",
-                count_from_group[group_key],
-                group[0].num_variables,
-                group[0].compute_residual.__name__,
-            )
 
             # Stack factor parameters.
             stacked_factor: Factor = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
-            stacked_factors.append(stacked_factor)
+            stacked_factor_expanded: _AnalyzedFactor = jax.vmap(_AnalyzedFactor._make)(
+                stacked_factor
+            )
+            stacked_factors.append(stacked_factor_expanded)
             factor_counts.append(count_from_group[group_key])
+
+            logger.info(
+                "Vectorizing group with {} factors, {} variables each: {}",
+                count_from_group[group_key],
+                stacked_factors[-1].num_variables,
+                stacked_factors[-1].compute_residual.__name__,
+            )
 
             # Compute Jacobian coordinates.
             #
@@ -251,29 +261,29 @@ class FactorGraph:
             # residual indices and columns correspond to tangent vector indices.
             rows, cols = jax.vmap(
                 functools.partial(
-                    Factor._compute_block_sparse_jac_indices,
+                    _AnalyzedFactor._compute_block_sparse_jac_indices,
                     tangent_ordering=tangent_ordering,
                     sorted_ids_from_var_type=sorted_ids_from_var_type,
                     tangent_start_from_var_type=tangent_start_from_var_type,
                 )
-            )(stacked_factor)
+            )(stacked_factor_expanded)
             assert (
                 rows.shape
                 == cols.shape
                 == (
                     count_from_group[group_key],
-                    stacked_factor.residual_dim,
+                    stacked_factor_expanded.residual_dim,
                     rows.shape[-1],
                 )
             )
             rows = rows + (
                 jnp.arange(count_from_group[group_key])[:, None, None]
-                * stacked_factor.residual_dim
+                * stacked_factor_expanded.residual_dim
             )
             rows = rows + residual_dim_sum
             jac_coords.append((rows.flatten(), cols.flatten()))
             residual_dim_sum += (
-                stacked_factor.residual_dim * count_from_group[group_key]
+                stacked_factor_expanded.residual_dim * count_from_group[group_key]
             )
 
         jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
@@ -305,19 +315,55 @@ class Factor[*Args]:
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
-    num_variables: jdc.Static[int]
-    sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
-    residual_dim: jdc.Static[int]
-    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]]
+    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
 
     @staticmethod
-    @jdc.jit
+    @deprecated("Use Factor() directly instead of Factor.make()")
     def make[*Args_](
         compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
         args: tuple[*Args_],
-        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "reverse",
+        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
     ) -> Factor[*Args_]:
+        import warnings
+
+        warnings.warn(
+            "Use Factor() directly instead of Factor.make()", DeprecationWarning
+        )
+        return Factor(compute_residual, args, jac_mode)
+
+    def _get_batch_axes(self) -> tuple[int, ...]:
+        def traverse_args(current: Any) -> tuple[int, ...]:
+            children_and_meta = default_registry.flatten_one_level(current)
+            assert children_and_meta is not None
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    return () if isinstance(child.id, int) else child.id.shape
+                else:
+                    return traverse_args(child)
+            assert False, "No variables found in factor!"
+
+        return traverse_args(self.args)
+
+
+@jdc.pytree_dataclass
+class _AnalyzedFactor[*Args](Factor[*Args]):
+    """Same as `Factor`, but with extra fields."""
+
+    # These need defaults because `jac_mode` has a default.
+    num_variables: jdc.Static[int] = 0
+    sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array] = jdc.field(
+        default_factory=dict
+    )
+    residual_dim: jdc.Static[int] = 0
+
+    @staticmethod
+    @jdc.jit
+    def _make[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
         """Construct a factor for our factor graph."""
+
+        compute_residual = factor.compute_residual
+        args = factor.args
+        jac_mode = factor.jac_mode
 
         # Get all variables in the PyTree structure.
         def traverse_args(current: Any, variables: list[Var]) -> list[Var]:
@@ -343,9 +389,7 @@ class Factor[*Args]:
                     () if isinstance(var.id, int) else var.id.shape
                 ) == batch_axes, "Batch axes of variables do not match."
             if len(batch_axes) == 1:
-                return jax.vmap(Factor.make, in_axes=(None, 0, None))(
-                    compute_residual, args, jac_mode
-                )
+                return jax.vmap(_AnalyzedFactor._make)(factor)
 
         # Cache the residual dimension for this factor.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
@@ -353,7 +397,7 @@ class Factor[*Args]:
         assert len(residual_shape) == 1, "Residual must be a 1D array."
         (residual_dim,) = residual_shape
 
-        return Factor(
+        return _AnalyzedFactor(
             compute_residual,
             args=args,
             num_variables=len(variables),
@@ -362,24 +406,8 @@ class Factor[*Args]:
             jac_mode=jac_mode,
         )
 
-    @staticmethod
-    def _get_function_signature(func: Callable) -> Hashable:
-        """Returns a hashable value, which should be equal for equivalent input functions."""
-        closure = func.__closure__
-        if closure:
-            closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
-        else:
-            closure_vars = ()
-
-        bytecode = dis.Bytecode(func)
-        bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
-        return bytecode_tuple, closure_vars
-
-    def _get_batch_axes(self) -> tuple[int, ...]:
-        return next(iter(self.sorted_ids_from_var_type.values())).shape[:-1]
-
     def _compute_block_sparse_jac_indices(
-        self: Factor,
+        self,
         tangent_ordering: VarTypeOrdering,
         sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array],
         tangent_start_from_var_type: dict[type[Var[Any]], int],
