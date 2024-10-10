@@ -149,7 +149,6 @@ class FactorGraph:
                 ).reshape(
                     (num_factor_ * num_vars, factor.residual_dim, var_type.tangent_dim)
                 )
-                print("SETTING BLOCK", block_shape, block_vals.shape)
                 blocks.setdefault(block_shape, []).append(
                     MatrixBlock(
                         start_row=residual_offset
