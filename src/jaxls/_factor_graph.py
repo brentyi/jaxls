@@ -308,10 +308,11 @@ class FactorGraph:
             stacked_factor: Factor = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
-            stacked_factor_expanded: _AnalyzedFactor = jax.vmap(_AnalyzedFactor._make)(
-                stacked_factor
-            )
-            stacked_factors.append(stacked_factor_expanded)
+            stacked_factor_analyzed: _AnalyzedFactor = jax.vmap(
+                _AnalyzedFactor._analyze
+            )(stacked_factor)
+
+            stacked_factors.append(stacked_factor_analyzed)
             factor_counts.append(count_from_group[group_key])
 
             logger.info(
@@ -320,6 +321,14 @@ class FactorGraph:
                 stacked_factors[-1].num_variables,
                 stacked_factors[-1].compute_residual.__name__,
             )
+
+            # Check that all variables are present.
+            for var_type in stacked_factor_analyzed.sorted_ids_from_var_type.keys():
+                assert var_type in tangent_start_from_var_type, (
+                    f"Found variable of type {var_type} as input"
+                    f" to factor with residual {stacked_factor_analyzed.compute_residual},"
+                    " but variable type is missing from `FactorGraph.make()`."
+                )
 
             # Compute Jacobian coordinates.
             #
@@ -332,24 +341,24 @@ class FactorGraph:
                     sorted_ids_from_var_type=sorted_ids_from_var_type,
                     tangent_start_from_var_type=tangent_start_from_var_type,
                 )
-            )(stacked_factor_expanded)
+            )(stacked_factor_analyzed)
             assert (
                 rows.shape
                 == cols.shape
                 == (
                     count_from_group[group_key],
-                    stacked_factor_expanded.residual_dim,
+                    stacked_factor_analyzed.residual_dim,
                     rows.shape[-1],
                 )
             )
             rows = rows + (
                 jnp.arange(count_from_group[group_key])[:, None, None]
-                * stacked_factor_expanded.residual_dim
+                * stacked_factor_analyzed.residual_dim
             )
             rows = rows + residual_dim_sum
             jac_coords.append((rows.flatten(), cols.flatten()))
             residual_dim_sum += (
-                stacked_factor_expanded.residual_dim * count_from_group[group_key]
+                stacked_factor_analyzed.residual_dim * count_from_group[group_key]
             )
 
         jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
@@ -425,7 +434,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
 
     @staticmethod
     @jdc.jit
-    def _make[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
+    def _analyze[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
         """Construct a factor for our factor graph."""
 
         compute_residual = factor.compute_residual
@@ -456,7 +465,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
                     () if isinstance(var.id, int) else var.id.shape
                 ) == batch_axes, "Batch axes of variables do not match."
             if len(batch_axes) == 1:
-                return jax.vmap(_AnalyzedFactor._make)(factor)
+                return jax.vmap(_AnalyzedFactor._analyze)(factor)
 
         # Cache the residual dimension for this factor.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
