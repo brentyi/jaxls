@@ -20,8 +20,8 @@ from ._solvers import (
     TrustRegionConfig,
 )
 from ._sparse_matrices import (
-    BlockSparseMatrix,
-    MatrixBlock,
+    BatchedBlock,
+    BatchedBlockSparseMatrix,
     SparseCooCoordinates,
     SparseCsrCoordinates,
 )
@@ -46,7 +46,6 @@ class FactorGraph:
     stacked_factors: tuple[_AnalyzedFactor, ...]
     factor_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
-    jac_coords_coo: SparseCooCoordinates
     jac_coords_csr: SparseCsrCoordinates
     tangent_ordering: jdc.Static[VarTypeOrdering]
     tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
@@ -85,9 +84,9 @@ class FactorGraph:
 
     def _compute_jac_values(
         self, vals: VarValues
-    ) -> tuple[jax.Array, BlockSparseMatrix]:
+    ) -> tuple[jax.Array, BatchedBlockSparseMatrix]:
         jac_vals = []
-        blocks = dict[tuple[int, int], list[MatrixBlock]]()
+        blocks = dict[tuple[int, int], list[BatchedBlock]]()
         residual_offset = 0
 
         for factor in self.stacked_factors:
@@ -150,7 +149,7 @@ class FactorGraph:
                     (num_factor_ * num_vars, factor.residual_dim, var_type.tangent_dim)
                 )
                 blocks.setdefault(block_shape, []).append(
-                    MatrixBlock(
+                    BatchedBlock(
                         start_row=residual_offset
                         + jnp.repeat(
                             jnp.arange(num_factor_) * factor.residual_dim, num_vars
@@ -172,7 +171,7 @@ class FactorGraph:
             residual_offset += factor.residual_dim * num_factor
         assert residual_offset == self.residual_dim
 
-        bsparse_jacobian = BlockSparseMatrix(
+        bsparse_jacobian = BatchedBlockSparseMatrix(
             blocks={
                 shape: jax.tree.map(lambda *x: jnp.concatenate(x, axis=0), *blocklist)
                 for shape, blocklist in blocks.items()
@@ -180,7 +179,7 @@ class FactorGraph:
             shape=(self.residual_dim, self.tangent_dim),
         )
         jac_vals = jnp.concatenate(jac_vals, axis=0)
-        assert jac_vals.shape == (self.jac_coords_coo.rows.shape[0],)
+        assert jac_vals.shape == (self.jac_coords_csr.indices.shape[0],)
         return jac_vals, bsparse_jacobian
 
     @staticmethod
@@ -369,7 +368,6 @@ class FactorGraph:
             stacked_factors=tuple(stacked_factors),
             factor_counts=tuple(factor_counts),
             sorted_ids_from_var_type=sorted_ids_from_var_type,
-            jac_coords_coo=jac_coords_coo,
             jac_coords_csr=jac_coords_csr,
             tangent_ordering=tangent_ordering,
             tangent_start_from_var_type=tangent_start_from_var_type,
