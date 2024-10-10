@@ -12,7 +12,7 @@ import scipy.sparse
 import sksparse.cholmod
 from jax import numpy as jnp
 
-from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
+from ._sparse_matrices import BlockSparseMatrix, SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
@@ -89,6 +89,8 @@ class ConjugateGradientLinearSolver:
     def _solve(
         self,
         A_coo: jax.experimental.sparse.BCOO,
+        A_blocksparse: BlockSparseMatrix,
+        AT_blocksparse: BlockSparseMatrix,
         ATb: jax.Array,
         lambd: float | jax.Array,
         iterations: int | jax.Array,
@@ -104,7 +106,7 @@ class ConjugateGradientLinearSolver:
 
         # Form normal equation.
         def ATA_function(x: jax.Array):
-            ATAx = A_coo.transpose() @ (A_coo @ x)
+            ATAx = AT_blocksparse @ (A_blocksparse @ x)
             # We could also use (lambd * ATA_diagonals * x) for
             # scale-invariance. But this is hard to match with CHOLMOD.
             return ATAx + lambd * x
@@ -181,13 +183,20 @@ class NonlinearSolver:
     def step(
         self, graph: FactorGraph, state: NonlinearSolverState
     ) -> NonlinearSolverState:
-        jac_values = graph._compute_jac_values(state.vals)
+        jac_values, A_blocksparse = graph._compute_jac_values(state.vals)
         A_coo = SparseCooMatrix(jac_values, graph.jac_coords_coo).as_jax_bcoo()
-        ATb = -(A_coo.transpose() @ state.residual_vector)
+
+        AT_blocksparse = A_blocksparse.transpose()
+        ATb = -(AT_blocksparse @ state.residual_vector)
 
         if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
             tangent = self.linear_solver._solve(
-                A_coo, ATb, lambd=state.lambd, iterations=state.iterations
+                A_coo,
+                A_blocksparse,
+                AT_blocksparse,
+                ATb,
+                lambd=state.lambd,
+                iterations=state.iterations,
             )
         elif isinstance(self.linear_solver, CholmodLinearSolver):
             A_csr = SparseCsrMatrix(jac_values, graph.jac_coords_csr)
