@@ -24,8 +24,8 @@ class MatrixBlockRow:
 @jdc.pytree_dataclass
 class BlockRowSparseMatrix:
     block_rows: tuple[MatrixBlockRow, ...]
-    """Batched blocks. Each element in the tuple has a list of consecutive
-    blocks."""
+    """Batched blocks. Each element in the tuple has a leading axis, which
+    represents consecutive block rows."""
     shape: jdc.Static[tuple[int, int]]
     """Shape of matrix."""
 
