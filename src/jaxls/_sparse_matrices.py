@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Hashable
+
 import jax
 import jax.experimental.sparse
 import jax_dataclasses as jdc
@@ -7,64 +9,56 @@ from jax import numpy as jnp
 
 
 @jdc.pytree_dataclass
-class MatrixBlock:
+class MatrixBlockRow:
     start_row: jax.Array
-    start_col: jax.Array
-    values: jax.Array
+    """Row indices of the start of each block. Shape should be `(num_blocks,)`."""
+    start_cols: tuple[jax.Array, ...]
+    """Column indices of the start of each block. Shape in tuple should be `(num_blocks,)`."""
+    blocks: tuple[jax.Array, ...]
+    """Blocks of matrix. Shape in tuple should be `(num_blocks, rows, cols)`."""
+
+    def treedef(self) -> Hashable:
+        return tuple(block.shape for block in self.blocks)
 
 
 @jdc.pytree_dataclass
-class BlockSparseMatrix:
-    blocks: dict[tuple[int, int], MatrixBlock]
-    """Map from block shape to block (values, start row, start col)."""
+class BlockRowSparseMatrix:
+    block_rows: tuple[MatrixBlockRow, ...]
+    """Batched blocks. Each element in the tuple has a list of consecutive
+    blocks."""
     shape: jdc.Static[tuple[int, int]]
     """Shape of matrix."""
 
-    def transpose(self) -> BlockSparseMatrix:
-        new_blocks = {}
-        for block_shape, block in self.blocks.items():
-            new_block = MatrixBlock(
-                start_row=block.start_col,
-                start_col=block.start_row,
-                values=jnp.swapaxes(block.values, -1, -2),
-            )
-            new_blocks[block_shape[::-1]] = new_block
-        return BlockSparseMatrix(new_blocks, (self.shape[1], self.shape[0]))
-
     def multiply(self, target: jax.Array) -> jax.Array:
-        result = jnp.zeros(self.shape[0])
-        for block_shape, block in self.blocks.items():
-            start_row, start_col = block.start_row, block.start_col
-            assert len(start_row.shape) == 1
-            assert len(start_col.shape) == 1
-            values = block.values
-            assert values.shape == (len(start_row), *block_shape)
+        assert target.ndim == 1
 
-            def multiply_one_block(col, vals) -> jax.Array:
-                target_slice = jax.lax.dynamic_slice_in_dim(
-                    target, col, block_shape[1], axis=0
+        def multiply_one_block_row(
+            start_cols: tuple[jax.Array, ...], blocks: tuple[jax.Array, ...]
+        ) -> jax.Array:
+            vecs = list[jax.Array]()
+            for start_col, block in zip(start_cols, blocks):
+                vecs.append(
+                    jnp.einsum(
+                        "ij,j->i",
+                        block,
+                        jax.lax.dynamic_slice_in_dim(target, start_col, block.shape[1]),
+                    )
                 )
-                return jnp.einsum("ij,j->i", vals, target_slice)
+            return jax.tree.reduce(jnp.add, vecs)
 
-            update_indices = start_row[:, None] + jnp.arange(block_shape[0])[None, :]
-            result = result.at[update_indices].add(
-                jax.vmap(multiply_one_block)(start_col, values)
+        out_slices = []
+        for block_row in self.block_rows:
+            # Do matrix multiplies for all blocks in block-row.
+            vecs = jax.vmap(multiply_one_block_row)(
+                block_row.start_cols, block_row.blocks
             )
-        return result
+            proto_block = block_row.blocks[0]
+            assert proto_block.ndim == 3  # (batch, rows, cols)
+            assert vecs.shape == (proto_block.shape[0], proto_block.shape[1])
+            out_slices.append(vecs.flatten())
+            assert block_row.start_row.shape == (vecs.shape[0],)
 
-    def todense(self) -> jax.Array:
-        result = jnp.zeros(self.shape)
-        for block_shape, block in self.blocks.items():
-            start_row, start_col = block.start_row, block.start_col
-            assert len(start_row.shape) == 1
-            assert len(start_col.shape) == 1
-            values = block.values
-            assert values.shape == (len(start_row), *block_shape)
-
-            row_indices = start_row[:, None] + jnp.arange(block_shape[0])[None, :]
-            col_indices = start_col[:, None] + jnp.arange(block_shape[1])[None, :]
-            result = result.at[row_indices, col_indices].set(values)
-
+        result = jnp.concatenate(out_slices, axis=0)
         return result
 
 

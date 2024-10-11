@@ -20,8 +20,8 @@ from ._solvers import (
     TrustRegionConfig,
 )
 from ._sparse_matrices import (
-    BlockSparseMatrix,
-    MatrixBlock,
+    BlockRowSparseMatrix,
+    MatrixBlockRow,
     SparseCooCoordinates,
     SparseCsrCoordinates,
 )
@@ -85,9 +85,9 @@ class FactorGraph:
 
     def _compute_jac_values(
         self, vals: VarValues
-    ) -> tuple[jax.Array, BlockSparseMatrix]:
+    ) -> tuple[jax.Array, BlockRowSparseMatrix]:
         jac_vals = []
-        blocks = dict[tuple[int, int], list[MatrixBlock]]()
+        block_rows = list[MatrixBlockRow]()
         residual_offset = 0
 
         for factor in self.stacked_factors:
@@ -125,58 +125,57 @@ class FactorGraph:
             )
             jac_vals.append(stacked_jac.flatten())
 
-            start_col = 0
+            stacked_jac_start_col = 0
+
+            start_cols = list[jax.Array]()
+            blocks = list[jax.Array]()
             for var_type, ids in self.tangent_ordering.ordered_dict_items(
                 # This ordering shouldn't actually matter!
                 factor.sorted_ids_from_var_type
             ):
-                block_shape = (factor.residual_dim, var_type.tangent_dim)
                 (num_factor_, num_vars) = ids.shape
                 assert num_factor == num_factor_
-                end_col = start_col + num_vars * var_type.tangent_dim
+                stacked_jac_end_col = (
+                    stacked_jac_start_col + num_vars * var_type.tangent_dim
+                )
 
-                block_vals = jnp.moveaxis(
-                    stacked_jac[:, :, start_col:end_col].reshape(
-                        (
-                            num_factor_,
-                            factor.residual_dim,
-                            num_vars,
-                            var_type.tangent_dim,
+                for var_idx in range(ids.shape[-1]):
+                    print(f"{ids.shape=}")
+                    start_cols.append(
+                        jnp.searchsorted(
+                            self.sorted_ids_from_var_type[var_type], ids[..., var_idx]
                         )
-                    ),
-                    2,
-                    1,
-                ).reshape(
-                    (num_factor_ * num_vars, factor.residual_dim, var_type.tangent_dim)
-                )
-                blocks.setdefault(block_shape, []).append(
-                    MatrixBlock(
-                        start_row=residual_offset
-                        + jnp.repeat(
-                            jnp.arange(num_factor_) * factor.residual_dim, num_vars
-                        ),
-                        start_col=(
-                            jnp.searchsorted(
-                                self.sorted_ids_from_var_type[var_type], ids.flatten()
-                            )
-                            * var_type.tangent_dim
-                            + self.tangent_start_from_var_type[var_type]
-                        ),
-                        values=block_vals,
+                        * var_type.tangent_dim
+                        + self.tangent_start_from_var_type[var_type]
                     )
-                )
-                start_col = end_col
+                    assert start_cols[-1].shape == (num_factor_,)
+                    subblock_start = (
+                        stacked_jac_start_col + var_idx * var_type.tangent_dim
+                    )
+                    blocks.append(
+                        stacked_jac[
+                            ..., subblock_start : subblock_start + var_type.tangent_dim
+                        ]
+                    )
 
-            assert stacked_jac.shape[-1] == start_col
+                stacked_jac_start_col = stacked_jac_end_col
+
+            assert stacked_jac.shape[-1] == stacked_jac_start_col
+
+            block_rows.append(
+                MatrixBlockRow(
+                    start_row=jnp.arange(num_factor) * factor.residual_dim
+                    + residual_offset,
+                    start_cols=tuple(start_cols),
+                    blocks=tuple(blocks),
+                )
+            )
 
             residual_offset += factor.residual_dim * num_factor
         assert residual_offset == self.residual_dim
 
-        bsparse_jacobian = BlockSparseMatrix(
-            blocks={
-                shape: jax.tree.map(lambda *x: jnp.concatenate(x, axis=0), *blocklist)
-                for shape, blocklist in blocks.items()
-            },
+        bsparse_jacobian = BlockRowSparseMatrix(
+            block_rows=tuple(block_rows),
             shape=(self.residual_dim, self.tangent_dim),
         )
         jac_vals = jnp.concatenate(jac_vals, axis=0)

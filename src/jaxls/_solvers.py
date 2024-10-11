@@ -78,7 +78,7 @@ class CholmodLinearSolver:
 class ConjugateGradientLinearSolver:
     """Iterative solver for sparse linear systems. Can run on CPU or GPU."""
 
-    tolerance: float = 1e-5
+    tolerance: float = 1e-6
     inexact_step_eta: float | None = None
     """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
     `eta / iteration #`.
@@ -172,18 +172,18 @@ class NonlinearSolver:
         self, graph: FactorGraph, state: NonlinearSolverState
     ) -> NonlinearSolverState:
         jac_values, A_blocksparse = graph._compute_jac_values(state.vals)
-        A_coo = SparseCooMatrix(jac_values, graph.jac_coords_coo).as_jax_bcoo()
-        A_multiply = A_blocksparse.multiply
-        AT_multiply = A_blocksparse.transpose().multiply
 
-        # Equivalently:
-        #     AT_multiply = lambda vec: jax.linear_transpose(
-        #         A_blocksparse.multiply, jnp.zeros((A_blocksparse.shape[1],))
-        #     )(vec)[0]
+        # linear_transpose() will return a tuple, with one element per primal.
+        A_multiply = A_blocksparse.multiply
+        AT_multiply_ = jax.linear_transpose(
+            A_multiply, jnp.zeros((A_blocksparse.shape[1],))
+        )
+        AT_multiply = lambda vec: AT_multiply_(vec)[0]
 
         ATb = -AT_multiply(state.residual_vector)
 
         if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
+            A_coo = SparseCooMatrix(jac_values, graph.jac_coords_coo).as_jax_bcoo()
             tangent = self.linear_solver._solve(
                 A_coo,
                 # We could also use (lambd * ATA_diagonals * vec) for
@@ -237,7 +237,10 @@ class NonlinearSolver:
             # For Levenberg-Marquardt, we need to evaluate the step quality.
             else:
                 step_quality = (proposed_cost - state.cost) / (
-                    jnp.sum((A_coo @ tangent + state.residual_vector) ** 2) - state.cost
+                    jnp.sum(
+                        (A_blocksparse.multiply(tangent) + state.residual_vector) ** 2
+                    )
+                    - state.cost
                 )
                 accept_flag = step_quality >= self.trust_region.step_quality_min
 
