@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Hashable, cast
+from typing import TYPE_CHECKING, Callable, Hashable, cast
 
 import jax
 import jax.experimental.sparse
@@ -89,29 +89,19 @@ class ConjugateGradientLinearSolver:
     def _solve(
         self,
         A_coo: jax.experimental.sparse.BCOO,
+        ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
-        lambd: float | jax.Array,
         iterations: int | jax.Array,
     ) -> jax.Array:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
 
-        initial_x = jnp.zeros(ATb.shape)
-
         # Get diagonals of ATA for preconditioning.
-        ATA_diagonals = (
-            jnp.zeros_like(initial_x).at[A_coo.indices[:, 1]].add(A_coo.data**2)
-        )
-
-        # Form normal equation.
-        def ATA_function(x: jax.Array):
-            ATAx = A_coo.transpose() @ (A_coo @ x)
-            # We could also use (lambd * ATA_diagonals * x) for
-            # scale-invariance. But this is hard to match with CHOLMOD.
-            return ATAx + lambd * x
+        ATA_diagonals = jnp.zeros_like(ATb).at[A_coo.indices[:, 1]].add(A_coo.data**2)
 
         # Solve with conjugate gradient.
+        initial_x = jnp.zeros(ATb.shape)
         solution_values, _ = jax.scipy.sparse.linalg.cg(
-            A=ATA_function,
+            A=ATA_multiply,
             b=ATb,
             x0=initial_x,
             # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
@@ -181,13 +171,26 @@ class NonlinearSolver:
     def step(
         self, graph: FactorGraph, state: NonlinearSolverState
     ) -> NonlinearSolverState:
-        jac_values = graph._compute_jac_values(state.vals)
+        jac_values, A_blocksparse = graph._compute_jac_values(state.vals)
         A_coo = SparseCooMatrix(jac_values, graph.jac_coords_coo).as_jax_bcoo()
-        ATb = -(A_coo.transpose() @ state.residual_vector)
+        A_multiply = A_blocksparse.multiply
+        AT_multiply = A_blocksparse.transpose().multiply
+
+        # Equivalently:
+        #     AT_multiply = lambda vec: jax.linear_transpose(
+        #         A_blocksparse.multiply, jnp.zeros((A_blocksparse.shape[1],))
+        #     )(vec)[0]
+
+        ATb = -AT_multiply(state.residual_vector)
 
         if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
             tangent = self.linear_solver._solve(
-                A_coo, ATb, lambd=state.lambd, iterations=state.iterations
+                A_coo,
+                # We could also use (lambd * ATA_diagonals * vec) for
+                # scale-invariant damping. But this is hard to match with CHOLMOD.
+                lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
+                ATb,
+                iterations=state.iterations,
             )
         elif isinstance(self.linear_solver, CholmodLinearSolver):
             A_csr = SparseCsrMatrix(jac_values, graph.jac_coords_csr)

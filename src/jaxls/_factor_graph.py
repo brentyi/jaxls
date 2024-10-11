@@ -19,7 +19,12 @@ from ._solvers import (
     TerminationConfig,
     TrustRegionConfig,
 )
-from ._sparse_matrices import SparseCooCoordinates, SparseCsrCoordinates
+from ._sparse_matrices import (
+    BlockSparseMatrix,
+    MatrixBlock,
+    SparseCooCoordinates,
+    SparseCsrCoordinates,
+)
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
@@ -44,6 +49,8 @@ class FactorGraph:
     jac_coords_coo: SparseCooCoordinates
     jac_coords_csr: SparseCsrCoordinates
     tangent_ordering: jdc.Static[VarTypeOrdering]
+    tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
+    tangent_dim: jdc.Static[int]
     residual_dim: jdc.Static[int]
 
     def solve(
@@ -76,8 +83,13 @@ class FactorGraph:
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_jac_values(self, vals: VarValues) -> jax.Array:
+    def _compute_jac_values(
+        self, vals: VarValues
+    ) -> tuple[jax.Array, BlockSparseMatrix]:
         jac_vals = []
+        blocks = dict[tuple[int, int], list[MatrixBlock]]()
+        residual_offset = 0
+
         for factor in self.stacked_factors:
             # Shape should be: (num_variables, count_from_group[group_key], single_residual_dim, var.tangent_dim).
             def compute_jac_with_perturb(factor: _AnalyzedFactor) -> jax.Array:
@@ -112,9 +124,64 @@ class FactorGraph:
                 stacked_jac.shape[-1],  # Tangent dimension.
             )
             jac_vals.append(stacked_jac.flatten())
+
+            start_col = 0
+            for var_type, ids in self.tangent_ordering.ordered_dict_items(
+                # This ordering shouldn't actually matter!
+                factor.sorted_ids_from_var_type
+            ):
+                block_shape = (factor.residual_dim, var_type.tangent_dim)
+                (num_factor_, num_vars) = ids.shape
+                assert num_factor == num_factor_
+                end_col = start_col + num_vars * var_type.tangent_dim
+
+                block_vals = jnp.moveaxis(
+                    stacked_jac[:, :, start_col:end_col].reshape(
+                        (
+                            num_factor_,
+                            factor.residual_dim,
+                            num_vars,
+                            var_type.tangent_dim,
+                        )
+                    ),
+                    2,
+                    1,
+                ).reshape(
+                    (num_factor_ * num_vars, factor.residual_dim, var_type.tangent_dim)
+                )
+                blocks.setdefault(block_shape, []).append(
+                    MatrixBlock(
+                        start_row=residual_offset
+                        + jnp.repeat(
+                            jnp.arange(num_factor_) * factor.residual_dim, num_vars
+                        ),
+                        start_col=(
+                            jnp.searchsorted(
+                                self.sorted_ids_from_var_type[var_type], ids.flatten()
+                            )
+                            * var_type.tangent_dim
+                            + self.tangent_start_from_var_type[var_type]
+                        ),
+                        values=block_vals,
+                    )
+                )
+                start_col = end_col
+
+            assert stacked_jac.shape[-1] == start_col
+
+            residual_offset += factor.residual_dim * num_factor
+        assert residual_offset == self.residual_dim
+
+        bsparse_jacobian = BlockSparseMatrix(
+            blocks={
+                shape: jax.tree.map(lambda *x: jnp.concatenate(x, axis=0), *blocklist)
+                for shape, blocklist in blocks.items()
+            },
+            shape=(self.residual_dim, self.tangent_dim),
+        )
         jac_vals = jnp.concatenate(jac_vals, axis=0)
         assert jac_vals.shape == (self.jac_coords_coo.rows.shape[0],)
-        return jac_vals
+        return jac_vals, bsparse_jacobian
 
     @staticmethod
     def make(
@@ -305,6 +372,8 @@ class FactorGraph:
             jac_coords_coo=jac_coords_coo,
             jac_coords_csr=jac_coords_csr,
             tangent_ordering=tangent_ordering,
+            tangent_start_from_var_type=tangent_start_from_var_type,
+            tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
         )
 
