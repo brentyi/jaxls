@@ -61,11 +61,9 @@ class BlockSparseMatrix:
             values = block.values
             assert values.shape == (len(start_row), *block_shape)
 
-            # TODO: inefficient
-            for idx in range(len(start_col)):
-                result = jax.lax.dynamic_update_slice(
-                    result, values[idx], (start_row[idx], start_col[idx])
-                )
+            row_indices = start_row[:, None] + jnp.arange(block_shape[0])[None, :]
+            col_indices = start_col[:, None] + jnp.arange(block_shape[1])[None, :]
+            result = result.at[row_indices, col_indices].set(values)
 
         return result
 
