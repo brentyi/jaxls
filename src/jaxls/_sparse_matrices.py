@@ -31,7 +31,7 @@ class BlockSparseMatrix:
             new_blocks[block_shape[::-1]] = new_block
         return BlockSparseMatrix(new_blocks, (self.shape[1], self.shape[0]))
 
-    def __matmul__(self, target: jax.Array) -> jax.Array:
+    def multiply(self, target: jax.Array) -> jax.Array:
         result = jnp.zeros(self.shape[0])
         for block_shape, block in self.blocks.items():
             start_row, start_col = block.start_row, block.start_col
