@@ -30,6 +30,7 @@ class BlockRowSparseMatrix:
     """Shape of matrix."""
 
     def multiply(self, target: jax.Array) -> jax.Array:
+        """Sparse-dense multiplication."""
         assert target.ndim == 1
 
         def multiply_one_block_row(

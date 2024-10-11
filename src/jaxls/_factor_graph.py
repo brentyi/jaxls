@@ -116,6 +116,7 @@ class FactorGraph:
                     )
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
+            # Compute Jacobian for each factor.
             stacked_jac = jax.vmap(compute_jac_with_perturb)(factor)
             (num_factor,) = factor._get_batch_axes()
             assert stacked_jac.shape == (
@@ -125,8 +126,8 @@ class FactorGraph:
             )
             jac_vals.append(stacked_jac.flatten())
 
+            # Compute block-row representation for sparse Jacobian.
             stacked_jac_start_col = 0
-
             start_cols = list[jax.Array]()
             blocks = list[jax.Array]()
             for var_type, ids in self.tangent_ordering.ordered_dict_items(
@@ -135,12 +136,9 @@ class FactorGraph:
             ):
                 (num_factor_, num_vars) = ids.shape
                 assert num_factor == num_factor_
-                stacked_jac_end_col = (
-                    stacked_jac_start_col + num_vars * var_type.tangent_dim
-                )
 
+                # Get one block for each variable.
                 for var_idx in range(ids.shape[-1]):
-                    print(f"{ids.shape=}")
                     start_cols.append(
                         jnp.searchsorted(
                             self.sorted_ids_from_var_type[var_type], ids[..., var_idx]
@@ -149,16 +147,16 @@ class FactorGraph:
                         + self.tangent_start_from_var_type[var_type]
                     )
                     assert start_cols[-1].shape == (num_factor_,)
-                    subblock_start = (
-                        stacked_jac_start_col + var_idx * var_type.tangent_dim
-                    )
+                    block_start = stacked_jac_start_col + var_idx * var_type.tangent_dim
                     blocks.append(
                         stacked_jac[
-                            ..., subblock_start : subblock_start + var_type.tangent_dim
+                            ..., block_start : block_start + var_type.tangent_dim
                         ]
                     )
 
-                stacked_jac_start_col = stacked_jac_end_col
+                stacked_jac_start_col = (
+                    stacked_jac_start_col + num_vars * var_type.tangent_dim
+                )
 
             assert stacked_jac.shape[-1] == stacked_jac_start_col
 
