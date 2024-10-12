@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Hashable
+
 import jax
 import jax.experimental.sparse
 import jax_dataclasses as jdc
@@ -7,64 +9,64 @@ from jax import numpy as jnp
 
 
 @jdc.pytree_dataclass
-class MatrixBlock:
+class MatrixBlockRow:
     start_row: jax.Array
-    start_col: jax.Array
-    values: jax.Array
+    """Row indices of the start of each block. Shape should be `(num_blocks,)`."""
+    start_cols: tuple[jax.Array, ...]
+    """Column indices of the start of each block."""
+    block_widths: jdc.Static[tuple[int, ...]]
+    """Width of each block in the block-row."""
+    blocks_concat: jax.Array
+    """Blocks of matrix, concatenated along the column axis. Shape in tuple should be `(num_blocks, rows, cols)`."""
+
+    def treedef(self) -> Hashable:
+        return tuple(block.shape for block in self.blocks_concat)
 
 
 @jdc.pytree_dataclass
-class BlockSparseMatrix:
-    blocks: dict[tuple[int, int], MatrixBlock]
-    """Map from block shape to block (values, start row, start col)."""
+class BlockRowSparseMatrix:
+    block_rows: tuple[MatrixBlockRow, ...]
+    """Batched block-rows, ordered. Each element in the tuple has a leading
+    axis, which represents consecutive block-rows."""
     shape: jdc.Static[tuple[int, int]]
     """Shape of matrix."""
 
-    def transpose(self) -> BlockSparseMatrix:
-        new_blocks = {}
-        for block_shape, block in self.blocks.items():
-            new_block = MatrixBlock(
-                start_row=block.start_col,
-                start_col=block.start_row,
-                values=jnp.swapaxes(block.values, -1, -2),
-            )
-            new_blocks[block_shape[::-1]] = new_block
-        return BlockSparseMatrix(new_blocks, (self.shape[1], self.shape[0]))
-
     def multiply(self, target: jax.Array) -> jax.Array:
-        result = jnp.zeros(self.shape[0])
-        for block_shape, block in self.blocks.items():
-            start_row, start_col = block.start_row, block.start_col
-            assert len(start_row.shape) == 1
-            assert len(start_col.shape) == 1
-            values = block.values
-            assert values.shape == (len(start_row), *block_shape)
+        """Sparse-dense multiplication."""
+        assert target.ndim == 1
 
-            def multiply_one_block(col, vals) -> jax.Array:
-                target_slice = jax.lax.dynamic_slice_in_dim(
-                    target, col, block_shape[1], axis=0
-                )
-                return jnp.einsum("ij,j->i", vals, target_slice)
+        out_slices = []
+        for block_row in self.block_rows:
+            # Do matrix multiplies for all blocks in block-row.
+            (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
+            del block_rows
 
-            update_indices = start_row[:, None] + jnp.arange(block_shape[0])[None, :]
-            result = result.at[update_indices].add(
-                jax.vmap(multiply_one_block)(start_col, values)
+            # Get slices corresponding to nonzero terms in block-row.
+            assert len(block_row.start_cols) == len(block_row.block_widths)
+            target_slice_parts = list[jax.Array]()
+            for start_cols, width in zip(block_row.start_cols, block_row.block_widths):
+                assert start_cols.shape == (n_block,)
+                assert isinstance(width, int)
+                slice_part = jax.vmap(
+                    lambda start_col: jax.lax.dynamic_slice_in_dim(
+                        target, start_index=start_col, slice_size=width, axis=0
+                    )
+                )(start_cols)
+                assert slice_part.shape == (n_block, width)
+                target_slice_parts.append(slice_part)
+
+            # Concatenate slices to form target slice.
+            target_slice = jnp.concatenate(target_slice_parts, axis=1)
+            assert target_slice.shape == (n_block, block_nz_cols)
+
+            # Multiply block-rows with target slice.
+            out_slices.append(
+                jnp.einsum(
+                    "bij,bj->bi", block_row.blocks_concat, target_slice
+                ).flatten()
             )
-        return result
 
-    def todense(self) -> jax.Array:
-        result = jnp.zeros(self.shape)
-        for block_shape, block in self.blocks.items():
-            start_row, start_col = block.start_row, block.start_col
-            assert len(start_row.shape) == 1
-            assert len(start_col.shape) == 1
-            values = block.values
-            assert values.shape == (len(start_row), *block_shape)
-
-            row_indices = start_row[:, None] + jnp.arange(block_shape[0])[None, :]
-            col_indices = start_col[:, None] + jnp.arange(block_shape[1])[None, :]
-            result = result.at[row_indices, col_indices].set(values)
-
+        result = jnp.concatenate(out_slices, axis=0)
         return result
 
 
