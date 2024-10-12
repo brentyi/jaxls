@@ -91,7 +91,9 @@ class ConjugateGradientLinearSolver:
     For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
     LEAST SQUARES, Wright & Holt 1983."""
 
-    preconditioner: jdc.Static[Literal["block-jacobi", "point-jacobi"]] | None = "block-jacobi"
+    preconditioner: jdc.Static[Literal["block-jacobi", "point-jacobi"] | None] = (
+        "block-jacobi"
+    )
     """Preconditioner to use for linear solves."""
 
     def _solve(
