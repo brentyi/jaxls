@@ -85,8 +85,8 @@ def make_block_jacobi_precoditioner(
             assert gram_blocks.shape == (
                 num_factors,
                 num_vars,
-                factor.residual_dim,
-                factor.residual_dim,
+                var_type.tangent_dim,
+                var_type.tangent_dim,
             )
 
             start_concat_col = end_concat_col

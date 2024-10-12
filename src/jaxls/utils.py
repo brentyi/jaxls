@@ -20,7 +20,7 @@ def stopwatch(label: str = "unlabeled block") -> Generator[None, None, None]:
 
 
 def _log(fmt: str, *args, **kwargs) -> None:
-    logger.bind(function="jakljk").info(fmt, *args, **kwargs)
+    logger.bind(function="log").info(fmt, *args, **kwargs)
 
 
 def jax_log(fmt: str, *args, **kwargs) -> None:
