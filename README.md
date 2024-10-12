@@ -2,7 +2,7 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-_status: working! see limitations [here](#limitations)_ 
+_status: working! see limitations [here](#limitations)_
 
 **`jaxls`** is a library for nonlinear least squares in JAX.
 
@@ -11,18 +11,20 @@ problems. We accelerate optimization by analyzing the structure of graphs:
 repeated factor and variable types are vectorized, and the sparsity of adjacency
 in the graph is translated into sparse matrix operations.
 
-Features:
+Currently supported:
 
 - Automatic sparse Jacobians.
 - Optimization on manifolds; SO(2), SO(3), SE(2), and SE(3) implementations
   included.
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- Linear solvers: both direct (sparse Cholesky via CHOLMOD, on CPU) and
-  iterative (Jacobi-preconditioned Conjugate Gradient).
+- Direct linear solves via sparse Cholesky / CHOLMOD, on CPU.
+- Iterative linear solves via Conjugate Gradient.
+  - Preconditioning: block and point Jacobi.
+  - Inexact Newton via Eisenstat-Walker.
 
-Use cases are primarily in least squares problems that are inherently (1) sparse
-and (2) inefficient to solve with gradient-based methods. In robotics, these are
-ubiquitous across classical approaches to perception, planning, and control.
+Use cases are primarily in least squares problems that are inherently (1)
+sparse and (2) inefficient to solve with gradient-based methods. These are
+common in robotics.
 
 For the first iteration of this library, written for
 [IROS 2021](https://github.com/brentyi/dfgo), see
@@ -122,6 +124,7 @@ print("Pose 1", solution[pose_vars[1]])
 ### Limitations
 
 There are many practical features that we don't currently support:
+
 - GPU accelerated Cholesky factorization. (for CHOLMOD we wrap [scikit-sparse](https://scikit-sparse.readthedocs.io/en/latest/), which runs on CPU only)
 - Covariance estimation / marginalization.
 - Incremental solves.
