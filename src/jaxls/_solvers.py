@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Callable, Hashable, cast
+from typing import TYPE_CHECKING, Callable, Hashable, Literal, assert_never, cast
 
 import jax
 import jax.experimental.sparse
@@ -12,7 +12,12 @@ import scipy.sparse
 import sksparse.cholmod
 from jax import numpy as jnp
 
-from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
+from jaxls._preconditioning import (
+    make_block_jacobi_precoditioner,
+    make_jacobi_precoditioner,
+)
+
+from ._sparse_matrices import BlockRowSparseMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
@@ -79,21 +84,35 @@ class ConjugateGradientLinearSolver:
     """Iterative solver for sparse linear systems. Can run on CPU or GPU."""
 
     tolerance: float = 1e-7
-    inexact_step_eta: float | None = 1e-2
+    inexact_step_eta: float | None = None  # 1e-2
     """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
     `eta / iteration #`.
 
     For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
     LEAST SQUARES, Wright & Holt 1983."""
 
+    preconditioner: Literal["block-jacobi", "jacobi"] | None = "block-jacobi"
+    """Preconditioner to use for linear solves."""
+
     def _solve(
         self,
+        graph: FactorGraph,
+        A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
-        ATA_diagonals: jax.Array,
         ATb: jax.Array,
         iterations: int | jax.Array,
     ) -> jax.Array:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
+
+        # Preconditioning setup.
+        if self.preconditioner == "block-jacobi":
+            preconditioner = make_block_jacobi_precoditioner(graph, A_blocksparse)
+        elif self.preconditioner == "jacobi":
+            preconditioner = make_jacobi_precoditioner(A_blocksparse)
+        elif self.preconditioner is None:
+            preconditioner = lambda x: x
+        else:
+            assert_never(self.preconditioner)
 
         # Solve with conjugate gradient.
         initial_x = jnp.zeros(ATb.shape)
@@ -109,7 +128,8 @@ class ConjugateGradientLinearSolver:
             )
             if self.inexact_step_eta is not None
             else self.tolerance,
-            M=lambda x: x / ATA_diagonals,  # Jacobi preconditioner.
+            M=preconditioner,
+            # M=lambda x: x / ATA_diagonals,  # Jacobi preconditioner.
         )
         return solution_values
 
@@ -191,16 +211,13 @@ class NonlinearSolver:
         ATb = -AT_multiply(state.residual_vector)
 
         if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
-            # Get diagonals of ATA for preconditioning.
-            ATA_diagonals = (
-                jnp.zeros_like(ATb).at[graph.jac_coords_coo.cols].add(jac_values**2)
-            )
             local_delta = self.linear_solver._solve(
+                graph,
+                A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
                 lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
-                ATA_diagonals,
-                ATb,
+                ATb=ATb,
                 iterations=state.iterations,
             )
         elif isinstance(self.linear_solver, CholmodLinearSolver):
@@ -308,7 +325,7 @@ class TrustRegionConfig:
 @jdc.pytree_dataclass
 class TerminationConfig:
     # Termination criteria.
-    max_iterations: int = 100
+    max_iterations: int = 10  # 100
     cost_tolerance: float = 1e-6
     """We terminate if `|cost change| / cost < cost_tolerance`."""
     gradient_tolerance: float = 1e-7
