@@ -83,10 +83,7 @@ class FactorGraph:
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_jac_values(
-        self, vals: VarValues
-    ) -> tuple[jax.Array, BlockRowSparseMatrix]:
-        jac_vals = []
+    def _compute_jac_values(self, vals: VarValues) -> BlockRowSparseMatrix:
         block_rows = list[MatrixBlockRow]()
         residual_offset = 0
 
@@ -124,7 +121,6 @@ class FactorGraph:
                 factor.residual_dim,
                 stacked_jac.shape[-1],  # Tangent dimension.
             )
-            jac_vals.append(stacked_jac.flatten())
 
             # Compute block-row representation for sparse Jacobian.
             stacked_jac_start_col = 0
@@ -171,9 +167,7 @@ class FactorGraph:
             block_rows=tuple(block_rows),
             shape=(self.residual_dim, self.tangent_dim),
         )
-        jac_vals = jnp.concatenate(jac_vals, axis=0)
-        assert jac_vals.shape == (self.jac_coords_coo.rows.shape[0],)
-        return jac_vals, bsparse_jacobian
+        return bsparse_jacobian
 
     @staticmethod
     def make(

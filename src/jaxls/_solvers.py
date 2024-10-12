@@ -78,8 +78,8 @@ class CholmodLinearSolver:
 class ConjugateGradientLinearSolver:
     """Iterative solver for sparse linear systems. Can run on CPU or GPU."""
 
-    tolerance: float = 1e-6
-    inexact_step_eta: float | None = None
+    tolerance: float = 1e-7
+    inexact_step_eta: float | None = 1e-2
     """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
     `eta / iteration #`.
 
@@ -88,15 +88,12 @@ class ConjugateGradientLinearSolver:
 
     def _solve(
         self,
-        A_coo: jax.experimental.sparse.BCOO,
         ATA_multiply: Callable[[jax.Array], jax.Array],
+        ATA_diagonals: jax.Array,
         ATb: jax.Array,
         iterations: int | jax.Array,
     ) -> jax.Array:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
-
-        # Get diagonals of ATA for preconditioning.
-        ATA_diagonals = jnp.zeros_like(ATb).at[A_coo.indices[:, 1]].add(A_coo.data**2)
 
         # Solve with conjugate gradient.
         initial_x = jnp.zeros(ATb.shape)
@@ -171,7 +168,17 @@ class NonlinearSolver:
     def step(
         self, graph: FactorGraph, state: NonlinearSolverState
     ) -> NonlinearSolverState:
-        jac_values, A_blocksparse = graph._compute_jac_values(state.vals)
+        # Get nonzero values of Jacobian.
+        A_blocksparse = graph._compute_jac_values(state.vals)
+
+        # Get flattened version for COO/CSR matrices.
+        jac_values = jnp.concatenate(
+            [
+                block_row.blocks_concat.flatten()
+                for block_row in A_blocksparse.block_rows
+            ],
+            axis=0,
+        )
 
         # linear_transpose() will return a tuple, with one element per primal.
         A_multiply = A_blocksparse.multiply
@@ -180,25 +187,29 @@ class NonlinearSolver:
         )
         AT_multiply = lambda vec: AT_multiply_(vec)[0]
 
+        # Compute right-hand side of normal equation.
         ATb = -AT_multiply(state.residual_vector)
 
         if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
-            A_coo = SparseCooMatrix(jac_values, graph.jac_coords_coo).as_jax_bcoo()
-            tangent = self.linear_solver._solve(
-                A_coo,
+            # Get diagonals of ATA for preconditioning.
+            ATA_diagonals = (
+                jnp.zeros_like(ATb).at[graph.jac_coords_coo.cols].add(jac_values**2)
+            )
+            local_delta = self.linear_solver._solve(
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
                 lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
+                ATA_diagonals,
                 ATb,
                 iterations=state.iterations,
             )
         elif isinstance(self.linear_solver, CholmodLinearSolver):
             A_csr = SparseCsrMatrix(jac_values, graph.jac_coords_csr)
-            tangent = self.linear_solver._solve(A_csr, ATb, lambd=state.lambd)
+            local_delta = self.linear_solver._solve(A_csr, ATb, lambd=state.lambd)
         else:
             assert False
 
-        vals = state.vals._retract(tangent, graph.tangent_ordering)
+        vals = state.vals._retract(local_delta, graph.tangent_ordering)
         if self.verbose:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f}",
@@ -238,7 +249,8 @@ class NonlinearSolver:
             else:
                 step_quality = (proposed_cost - state.cost) / (
                     jnp.sum(
-                        (A_blocksparse.multiply(tangent) + state.residual_vector) ** 2
+                        (A_blocksparse.multiply(local_delta) + state.residual_vector)
+                        ** 2
                     )
                     - state.cost
                 )
@@ -271,7 +283,7 @@ class NonlinearSolver:
             state_next.done = self.termination._check_convergence(
                 state,
                 cost_updated=state_next.cost,
-                tangent=tangent,
+                tangent=local_delta,
                 tangent_ordering=graph.tangent_ordering,
                 ATb=ATb,
             )
@@ -296,10 +308,10 @@ class TrustRegionConfig:
 @jdc.pytree_dataclass
 class TerminationConfig:
     # Termination criteria.
-    max_iterations: int = 10  # TODO: revert
-    cost_tolerance: float = 1e-8  # TODO: revert
+    max_iterations: int = 100
+    cost_tolerance: float = 1e-6
     """We terminate if `|cost change| / cost < cost_tolerance`."""
-    gradient_tolerance: float = 1e-8  # TODO: revert
+    gradient_tolerance: float = 1e-7
     """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
     gradient_tolerance_start_step: int = 10
     """When to start checking the gradient tolerance condition. Helps solve precision
