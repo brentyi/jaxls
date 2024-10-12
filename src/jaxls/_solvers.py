@@ -80,16 +80,35 @@ class CholmodLinearSolver:
 
 
 @jdc.pytree_dataclass
+class ConjugateGradientState:
+    """State used for Eisenstat-Walker criterion in ConjugateGradientLinearSolver."""
+
+    ATb_norm_prev: float | jax.Array
+    """Previous norm of ATb."""
+    eta: float | jax.Array
+    """Current tolerance."""
+
+
+@jdc.pytree_dataclass
 class ConjugateGradientLinearSolver:
-    """Iterative solver for sparse linear systems. Can run on CPU or GPU."""
+    """Iterative solver for sparse linear systems. Can run on CPU or GPU.
 
-    tolerance: float = 1e-7
-    inexact_step_eta: float | None = None  # 1e-2
-    """Forcing sequence parameter for inexact Newton steps. CG tolerance is set to
-    `eta / iteration #`.
+    For inexact steps, we use the Eisenstat-Walker criterion. For reference,
+    see "Choosing the Forcing Terms in an Inexact Newton Method", Eisenstat &
+    Walker, 1996."
+    """
 
-    For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
-    LEAST SQUARES, Wright & Holt 1983."""
+    tolerance_min: float = 1e-7
+    tolerance_max: float = 1e-2
+
+    eisenstat_walker_gamma: float = 0.9
+    """Eisenstat-Walker criterion gamma term. Controls how quickly the tolerance
+    decreases. Typical values range from 0.5 to 0.9. Higher values lead to more
+    aggressive tolerance reduction."""
+    eisenstat_walker_alpha: float = 2.0
+    """ Eisenstat-Walker criterion alpha term. Determines rate at which the
+    tolerance changes based on residual reduction. Typical values are 1.5 or
+    2.0. Higher values make the tolerance more sensitive to residual changes."""
 
     preconditioner: jdc.Static[Literal["block-jacobi", "point-jacobi"] | None] = (
         "block-jacobi"
@@ -102,8 +121,8 @@ class ConjugateGradientLinearSolver:
         A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
-        iterations: int | jax.Array,
-    ) -> jax.Array:
+        prev_linear_state: ConjugateGradientState,
+    ) -> tuple[jax.Array, ConjugateGradientState]:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
 
         # Preconditioning setup.
@@ -116,6 +135,18 @@ class ConjugateGradientLinearSolver:
         else:
             assert_never(self.preconditioner)
 
+        # Calculate tolerance using Eisenstat-Walker criterion.
+        ATb_norm = jnp.linalg.norm(ATb)
+        current_eta = jnp.minimum(
+            self.eisenstat_walker_gamma
+            * (ATb_norm / (prev_linear_state.ATb_norm_prev + 1e-7))
+            ** self.eisenstat_walker_alpha,
+            self.tolerance_max,
+        )
+        current_eta = jnp.maximum(
+            self.tolerance_min, jnp.minimum(current_eta, prev_linear_state.eta)
+        )
+
         # Solve with conjugate gradient.
         initial_x = jnp.zeros(ATb.shape)
         solution_values, _ = jax.scipy.sparse.linalg.cg(
@@ -124,16 +155,12 @@ class ConjugateGradientLinearSolver:
             x0=initial_x,
             # https://en.wikipedia.org/wiki/Conjugate_gradient_method#Convergence_properties
             maxiter=len(initial_x),
-            tol=cast(
-                float,
-                jnp.maximum(self.tolerance, self.inexact_step_eta / (iterations + 1)),
-            )
-            if self.inexact_step_eta is not None
-            else self.tolerance,
+            tol=cast(float, current_eta),
             M=preconditioner,
-            # M=lambda x: x / ATA_diagonals,  # Jacobi preconditioner.
         )
-        return solution_values
+        return solution_values, ConjugateGradientState(
+            ATb_norm_prev=ATb_norm, eta=current_eta
+        )
 
 
 # Nonlinear solvers.
@@ -147,6 +174,8 @@ class NonlinearSolverState:
     residual_vector: jax.Array
     done: bool | jax.Array
     lambd: float | jax.Array
+
+    linear_state: ConjugateGradientState | None
 
 
 @jdc.pytree_dataclass
@@ -171,6 +200,11 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
+            linear_state=None
+            if isinstance(self.linear_solver, CholmodLinearSolver)
+            else ConjugateGradientState(
+                ATb_norm_prev=0.0, eta=self.linear_solver.tolerance_max
+            ),
         )
 
         # Optimization.
@@ -212,15 +246,17 @@ class NonlinearSolver:
         # Compute right-hand side of normal equation.
         ATb = -AT_multiply(state.residual_vector)
 
+        linear_state = None
         if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
-            local_delta = self.linear_solver._solve(
+            assert isinstance(state.linear_state, ConjugateGradientState)
+            local_delta, linear_state = self.linear_solver._solve(
                 graph,
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
                 lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
                 ATb=ATb,
-                iterations=state.iterations,
+                prev_linear_state=state.linear_state,
             )
         elif isinstance(self.linear_solver, CholmodLinearSolver):
             A_csr = SparseCsrMatrix(jac_values, graph.jac_coords_csr)
@@ -257,6 +293,10 @@ class NonlinearSolver:
         with jdc.copy_and_mutate(state) as state_next:
             proposed_residual_vector = graph.compute_residual_vector(vals)
             proposed_cost = jnp.sum(proposed_residual_vector**2)
+
+            # Update ATb_norm for Eisenstat-Walker criterion.
+            if linear_state is not None:
+                state_next.linear_state = linear_state
 
             # Always accept Gauss-Newton steps.
             if self.trust_region is None:
@@ -327,7 +367,7 @@ class TrustRegionConfig:
 @jdc.pytree_dataclass
 class TerminationConfig:
     # Termination criteria.
-    max_iterations: int = 10  # 100
+    max_iterations: int = 100
     cost_tolerance: float = 1e-6
     """We terminate if `|cost change| / cost < cost_tolerance`."""
     gradient_tolerance: float = 1e-7

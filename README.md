@@ -11,15 +11,16 @@ problems. We accelerate optimization by analyzing the structure of graphs:
 repeated factor and variable types are vectorized, and the sparsity of adjacency
 in the graph is translated into sparse matrix operations.
 
-Features:
+Currently supported:
 
 - Automatic sparse Jacobians.
 - Optimization on manifolds; SO(2), SO(3), SE(2), and SE(3) implementations
   included.
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- Linear solvers: both direct (sparse Cholesky via CHOLMOD, on CPU) and
-  iterative (Conjugate Gradient).
-- Preconditioning: block and point Jacobi.
+- Direct linear solves via sparse Cholesky / CHOLMOD, on CPU.
+- Iterative linear solves via Conjugate Gradient.
+  - Preconditioning: block and point Jacobi.
+  - Inexact Newton via Eisenstat-Walker.
 
 Use cases are primarily in least squares problems that are inherently (1)
 sparse and (2) inefficient to solve with gradient-based methods. These are
