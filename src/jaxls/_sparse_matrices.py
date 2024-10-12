@@ -13,19 +13,21 @@ class MatrixBlockRow:
     start_row: jax.Array
     """Row indices of the start of each block. Shape should be `(num_blocks,)`."""
     start_cols: tuple[jax.Array, ...]
-    """Column indices of the start of each block. Shape in tuple should be `(num_blocks,)`."""
-    blocks: tuple[jax.Array, ...]
-    """Blocks of matrix. Shape in tuple should be `(num_blocks, rows, cols)`."""
+    """Column indices of the start of each block."""
+    block_widths: jdc.Static[tuple[int, ...]]
+    """Width of each block in the block-row."""
+    blocks_concat: jax.Array
+    """Blocks of matrix, concatenated along the column axis. Shape in tuple should be `(num_blocks, rows, cols)`."""
 
     def treedef(self) -> Hashable:
-        return tuple(block.shape for block in self.blocks)
+        return tuple(block.shape for block in self.blocks_concat)
 
 
 @jdc.pytree_dataclass
 class BlockRowSparseMatrix:
     block_rows: tuple[MatrixBlockRow, ...]
-    """Batched blocks. Each element in the tuple has a leading axis, which
-    represents consecutive block rows."""
+    """Batched block-rows, ordered. Each element in the tuple has a leading
+    axis, which represents consecutive block-rows."""
     shape: jdc.Static[tuple[int, int]]
     """Shape of matrix."""
 
@@ -33,31 +35,36 @@ class BlockRowSparseMatrix:
         """Sparse-dense multiplication."""
         assert target.ndim == 1
 
-        def multiply_one_block_row(
-            start_cols: tuple[jax.Array, ...], blocks: tuple[jax.Array, ...]
-        ) -> jax.Array:
-            vecs = list[jax.Array]()
-            for start_col, block in zip(start_cols, blocks):
-                vecs.append(
-                    jnp.einsum(
-                        "ij,j->i",
-                        block,
-                        jax.lax.dynamic_slice_in_dim(target, start_col, block.shape[1]),
-                    )
-                )
-            return jax.tree.reduce(jnp.add, vecs)
-
         out_slices = []
         for block_row in self.block_rows:
             # Do matrix multiplies for all blocks in block-row.
-            vecs = jax.vmap(multiply_one_block_row)(
-                block_row.start_cols, block_row.blocks
+            (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
+            del block_rows
+
+            # Get slices corresponding to nonzero terms in block-row.
+            assert len(block_row.start_cols) == len(block_row.block_widths)
+            target_slice_parts = list[jax.Array]()
+            for start_cols, width in zip(block_row.start_cols, block_row.block_widths):
+                assert start_cols.shape == (n_block,)
+                assert isinstance(width, int)
+                slice_part = jax.vmap(
+                    lambda start_col: jax.lax.dynamic_slice_in_dim(
+                        target, start_index=start_col, slice_size=width, axis=0
+                    )
+                )(start_cols)
+                assert slice_part.shape == (n_block, width)
+                target_slice_parts.append(slice_part)
+
+            # Concatenate slices to form target slice.
+            target_slice = jnp.concatenate(target_slice_parts, axis=1)
+            assert target_slice.shape == (n_block, block_nz_cols)
+
+            # Multiply block-rows with target slice.
+            out_slices.append(
+                jnp.einsum(
+                    "bij,bj->bi", block_row.blocks_concat, target_slice
+                ).flatten()
             )
-            proto_block = block_row.blocks[0]
-            assert proto_block.ndim == 3  # (batch, rows, cols)
-            assert vecs.shape == (proto_block.shape[0], proto_block.shape[1])
-            out_slices.append(vecs.flatten())
-            assert block_row.start_row.shape == (vecs.shape[0],)
 
         result = jnp.concatenate(out_slices, axis=0)
         return result

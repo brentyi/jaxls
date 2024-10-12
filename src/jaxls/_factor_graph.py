@@ -129,7 +129,7 @@ class FactorGraph:
             # Compute block-row representation for sparse Jacobian.
             stacked_jac_start_col = 0
             start_cols = list[jax.Array]()
-            blocks = list[jax.Array]()
+            block_widths = list[int]()
             for var_type, ids in self.tangent_ordering.ordered_dict_items(
                 # This ordering shouldn't actually matter!
                 factor.sorted_ids_from_var_type
@@ -146,18 +146,12 @@ class FactorGraph:
                         * var_type.tangent_dim
                         + self.tangent_start_from_var_type[var_type]
                     )
+                    block_widths.append(var_type.tangent_dim)
                     assert start_cols[-1].shape == (num_factor_,)
-                    block_start = stacked_jac_start_col + var_idx * var_type.tangent_dim
-                    blocks.append(
-                        stacked_jac[
-                            ..., block_start : block_start + var_type.tangent_dim
-                        ]
-                    )
 
                 stacked_jac_start_col = (
                     stacked_jac_start_col + num_vars * var_type.tangent_dim
                 )
-
             assert stacked_jac.shape[-1] == stacked_jac_start_col
 
             block_rows.append(
@@ -165,7 +159,8 @@ class FactorGraph:
                     start_row=jnp.arange(num_factor) * factor.residual_dim
                     + residual_offset,
                     start_cols=tuple(start_cols),
-                    blocks=tuple(blocks),
+                    block_widths=tuple(block_widths),
+                    blocks_concat=stacked_jac,
                 )
             )
 

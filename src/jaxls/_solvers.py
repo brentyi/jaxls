@@ -296,10 +296,10 @@ class TrustRegionConfig:
 @jdc.pytree_dataclass
 class TerminationConfig:
     # Termination criteria.
-    max_iterations: int = 100
-    cost_tolerance: float = 1e-6
+    max_iterations: int = 10  # TODO: revert
+    cost_tolerance: float = 1e-8  # TODO: revert
     """We terminate if `|cost change| / cost < cost_tolerance`."""
-    gradient_tolerance: float = 1e-8
+    gradient_tolerance: float = 1e-8  # TODO: revert
     """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
     gradient_tolerance_start_step: int = 10
     """When to start checking the gradient tolerance condition. Helps solve precision
