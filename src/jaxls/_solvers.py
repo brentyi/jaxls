@@ -14,7 +14,7 @@ from jax import numpy as jnp
 
 from jaxls._preconditioning import (
     make_block_jacobi_precoditioner,
-    make_jacobi_precoditioner,
+    make_point_jacobi_precoditioner,
 )
 
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCsrMatrix
@@ -91,7 +91,7 @@ class ConjugateGradientLinearSolver:
     For reference, see AN INEXACT LEVENBERG-MARQUARDT METHOD FOR LARGE SPARSE NONLINEAR
     LEAST SQUARES, Wright & Holt 1983."""
 
-    preconditioner: Literal["block-jacobi", "jacobi"] | None = "block-jacobi"
+    preconditioner: Literal["block-jacobi", "point-jacobi"] | None = "block-jacobi"
     """Preconditioner to use for linear solves."""
 
     def _solve(
@@ -107,8 +107,8 @@ class ConjugateGradientLinearSolver:
         # Preconditioning setup.
         if self.preconditioner == "block-jacobi":
             preconditioner = make_block_jacobi_precoditioner(graph, A_blocksparse)
-        elif self.preconditioner == "jacobi":
-            preconditioner = make_jacobi_precoditioner(A_blocksparse)
+        elif self.preconditioner == "point-jacobi":
+            preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
         elif self.preconditioner is None:
             preconditioner = lambda x: x
         else:

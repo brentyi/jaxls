@@ -10,10 +10,10 @@ if TYPE_CHECKING:
     from ._sparse_matrices import BlockRowSparseMatrix
 
 
-def make_jacobi_precoditioner(
+def make_point_jacobi_precoditioner(
     A_blocksparse: BlockRowSparseMatrix,
 ) -> Callable[[jax.Array], jax.Array]:
-    """Returns a diagonal Jacobi preconditioner."""
+    """Returns a point Jacobi (diagonal) preconditioner."""
     ATA_diagonals = jnp.zeros(A_blocksparse.shape[1])
 
     for block_row in A_blocksparse.block_rows:
@@ -40,7 +40,7 @@ def make_jacobi_precoditioner(
 def make_block_jacobi_precoditioner(
     graph: FactorGraph, A_blocksparse: BlockRowSparseMatrix
 ) -> Callable[[jax.Array], jax.Array]:
-    """Returns a Block-Jacobi preconditioner."""
+    """Returns a block Jacobi preconditioner."""
 
     # This list will store block diagonal gram matrices corresponding to each
     # variable.
@@ -103,7 +103,7 @@ def make_block_jacobi_precoditioner(
     ]
 
     def preconditioner(vec: jax.Array) -> jax.Array:
-        """Compute Block-Jacobi preconditioning."""
+        """Compute block Jacobi preconditioning."""
         precond_parts = []
         offset = 0
         for inv_batched_block in inv_block_diagonals:
