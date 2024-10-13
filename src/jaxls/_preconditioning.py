@@ -25,9 +25,9 @@ def make_point_jacobi_precoditioner(
         block_l2_cols = jnp.sum(block_row.blocks_concat**2, axis=1).flatten()
         indices = jnp.concatenate(
             [
-                (start_col[:, None] + jnp.arange(width)[None, :])
-                for start_col, width in zip(
-                    block_row.start_cols, block_row.block_widths
+                (start_col[:, None] + jnp.arange(block_cols)[None, :])
+                for start_col, block_cols in zip(
+                    block_row.start_cols, block_row.block_num_cols
                 )
             ],
             axis=1,

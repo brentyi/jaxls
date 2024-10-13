@@ -13,15 +13,14 @@ from loguru import logger
 from typing_extensions import deprecated
 
 from ._solvers import (
-    CholmodLinearSolver,
-    ConjugateGradientLinearSolver,
+    ConjugateGradientConfig,
     NonlinearSolver,
     TerminationConfig,
     TrustRegionConfig,
 )
 from ._sparse_matrices import (
     BlockRowSparseMatrix,
-    MatrixBlockRow,
+    SparseBlockRow,
     SparseCooCoordinates,
     SparseCsrCoordinates,
 )
@@ -56,8 +55,9 @@ class FactorGraph:
     def solve(
         self,
         initial_vals: VarValues | None = None,
-        linear_solver: CholmodLinearSolver
-        | ConjugateGradientLinearSolver = CholmodLinearSolver(),
+        *,
+        linear_solver: Literal["cholmod", "conjugate_gradient", "dense_cholesky"]
+        | ConjugateGradientConfig = "cholmod",
         trust_region: TrustRegionConfig | None = TrustRegionConfig(),
         termination: TerminationConfig = TerminationConfig(),
         verbose: bool = True,
@@ -68,7 +68,19 @@ class FactorGraph:
             initial_vals = VarValues.make(
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
-        solver = NonlinearSolver(linear_solver, trust_region, termination, verbose)
+
+        # In our internal API, linear_solver needs to always be a string. The
+        # conjugate gradient config is a separate field. This is more
+        # convenient to implement, because then the former can be static while
+        # the latter is a pytree.
+        conjugate_gradient_config = None
+        if isinstance(linear_solver, ConjugateGradientConfig):
+            conjugate_gradient_config = linear_solver
+            linear_solver = "conjugate_gradient"
+
+        solver = NonlinearSolver(
+            linear_solver, trust_region, termination, conjugate_gradient_config, verbose
+        )
         return solver.solve(graph=self, initial_vals=initial_vals)
 
     def compute_residual_vector(self, vals: VarValues) -> jax.Array:
@@ -84,7 +96,7 @@ class FactorGraph:
         return jnp.concatenate(residual_slices, axis=0)
 
     def _compute_jac_values(self, vals: VarValues) -> BlockRowSparseMatrix:
-        block_rows = list[MatrixBlockRow]()
+        block_rows = list[SparseBlockRow]()
         residual_offset = 0
 
         for factor in self.stacked_factors:
@@ -151,11 +163,10 @@ class FactorGraph:
             assert stacked_jac.shape[-1] == stacked_jac_start_col
 
             block_rows.append(
-                MatrixBlockRow(
-                    start_row=jnp.arange(num_factor) * factor.residual_dim
-                    + residual_offset,
+                SparseBlockRow(
+                    num_cols=self.tangent_dim,
                     start_cols=tuple(start_cols),
-                    block_widths=tuple(block_widths),
+                    block_num_cols=tuple(block_widths),
                     blocks_concat=stacked_jac,
                 )
             )

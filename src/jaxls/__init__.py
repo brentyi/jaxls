@@ -5,8 +5,7 @@ from ._lie_group_variables import SE2Var as SE2Var
 from ._lie_group_variables import SE3Var as SE3Var
 from ._lie_group_variables import SO2Var as SO2Var
 from ._lie_group_variables import SO3Var as SO3Var
-from ._solvers import CholmodLinearSolver as CholmodLinearSolver
-from ._solvers import ConjugateGradientLinearSolver as ConjugateGradientLinearSolver
+from ._solvers import ConjugateGradientConfig as ConjugateGradientConfig
 from ._solvers import TerminationConfig as TerminationConfig
 from ._solvers import TrustRegionConfig as TrustRegionConfig
 from ._variables import Var as Var
