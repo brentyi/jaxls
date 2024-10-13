@@ -14,13 +14,14 @@ in the graph is translated into sparse matrix operations.
 Currently supported:
 
 - Automatic sparse Jacobians.
-- Optimization on manifolds; SO(2), SO(3), SE(2), and SE(3) implementations
-  included.
+- Optimization on manifolds like SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- Direct linear solves via sparse Cholesky / CHOLMOD, on CPU.
-- Iterative linear solves via Conjugate Gradient.
-  - Preconditioning: block and point Jacobi.
-  - Inexact Newton via Eisenstat-Walker.
+- Multiple solvers for linear subproblems:
+  - Sparse direct with Cholesky / CHOLMOD, on CPU.
+  - Sparse iterative with Conjugate Gradient.
+    - Preconditioning: block and point Jacobi.
+    - Inexact Newton via Eisenstat-Walker.
+  - Dense Cholesky for smaller problems.
 
 Use cases are primarily in least squares problems that are inherently (1)
 sparse and (2) inefficient to solve with gradient-based methods. These are
