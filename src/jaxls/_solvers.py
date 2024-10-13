@@ -195,16 +195,6 @@ class NonlinearSolver:
         vals = initial_vals
         residual_vector = graph.compute_residual_vector(vals)
 
-        cg_state = None
-        if isinstance(self.linear_solver, ConjugateGradientConfig):
-            cg_state = _ConjugateGradientState(
-                ATb_norm_prev=0.0, eta=self.linear_solver.tolerance_max
-            )
-        elif self.linear_solver == "conjugate_gradient":
-            cg_state = _ConjugateGradientState(
-                ATb_norm_prev=0.0, eta=ConjugateGradientConfig().tolerance_max
-            )
-
         state = NonlinearSolverState(
             iterations=0,
             vals=vals,
@@ -215,7 +205,16 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
-            cg_state=cg_state,
+            cg_state=None
+            if self.linear_solver != "conjugate_gradient"
+            else _ConjugateGradientState(
+                ATb_norm_prev=0.0,
+                eta=(
+                    ConjugateGradientConfig()
+                    if self.conjugate_gradient_config is None
+                    else self.conjugate_gradient_config
+                ).tolerance_max,
+            ),
         )
 
         # Optimization.
