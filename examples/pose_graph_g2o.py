@@ -19,18 +19,14 @@ import _g2o_utils
 
 def main(
     g2o_path: pathlib.Path = pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
-    linear_solver: Literal["cholmod", "pcg"] = "cholmod",
+    linear_solver: Literal[
+        "cholmod", "conjugate_gradient", "dense_cholesky"
+    ] = "cholmod",
 ) -> None:
     # Parse g2o file.
     with jaxls.utils.stopwatch("Reading g2o file"):
         g2o: _g2o_utils.G2OData = _g2o_utils.parse_g2o(g2o_path)
         jax.block_until_ready(g2o)
-
-    # Get linear solver.
-    linear_solver_config = {
-        "cholmod": jaxls.CholmodLinearSolver,
-        "pcg": jaxls.ConjugateGradientLinearSolver,
-    }[linear_solver]()
 
     # Making graph.
     with jaxls.utils.stopwatch("Making graph"):
@@ -47,12 +43,12 @@ def main(
 
     with jaxls.utils.stopwatch("Running solve"):
         solution_vals = graph.solve(
-            initial_vals, trust_region=None, linear_solver=linear_solver_config
+            initial_vals, trust_region=None, linear_solver=linear_solver
         )
 
     with jaxls.utils.stopwatch("Running solve (again)"):
         solution_vals = graph.solve(
-            initial_vals, trust_region=None, linear_solver=linear_solver_config
+            initial_vals, trust_region=None, linear_solver=linear_solver
         )
 
     # Plot

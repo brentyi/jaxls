@@ -28,59 +28,57 @@ if TYPE_CHECKING:
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
 
 
-@jdc.pytree_dataclass
-class CholmodLinearSolver:
-    """Direct solver for sparse linear systems. Runs on CPU."""
+def _cholmod_solve(
+    A: SparseCsrMatrix, ATb: jax.Array, lambd: float | jax.Array
+) -> jax.Array:
+    """JIT-friendly linear solve using CHOLMOD."""
+    return jax.pure_callback(
+        _cholmod_solve_on_host,
+        ATb,  # Result shape/dtype.
+        A,
+        ATb,
+        lambd,
+        vectorized=False,
+    )
 
-    def _solve(
-        self, A: SparseCsrMatrix, ATb: jax.Array, lambd: float | jax.Array
-    ) -> jax.Array:
-        return jax.pure_callback(
-            self._solve_on_host,
-            ATb,  # Result shape/dtype.
-            A,
-            ATb,
-            lambd,
-            vectorized=False,
-        )
 
-    def _solve_on_host(
-        self,
-        A: SparseCsrMatrix,
-        ATb: jax.Array,
-        lambd: float | jax.Array,
-    ) -> jax.Array:
-        # Matrix is transposed when we convert CSR to CSC.
-        A_T_scipy = scipy.sparse.csc_matrix(
-            (A.values, A.coords.indices, A.coords.indptr), shape=A.coords.shape[::-1]
-        )
+def _cholmod_solve_on_host(
+    A: SparseCsrMatrix,
+    ATb: jax.Array,
+    lambd: float | jax.Array,
+) -> jax.Array:
+    """Solve a linear system using CHOLMOD. Should be called on the host."""
+    # Matrix is transposed when we convert CSR to CSC.
+    A_T_scipy = scipy.sparse.csc_matrix(
+        (A.values, A.coords.indices, A.coords.indptr), shape=A.coords.shape[::-1]
+    )
 
-        # Cache sparsity pattern analysis.
-        cache_key = (
-            A.coords.indices.tobytes(),
-            A.coords.indptr.tobytes(),
-            A.coords.shape,
-        )
-        factor = _cholmod_analyze_cache.get(cache_key, None)
-        if factor is None:
-            factor = sksparse.cholmod.analyze_AAt(A_T_scipy)
-            _cholmod_analyze_cache[cache_key] = factor
+    # Cache sparsity pattern analysis.
+    cache_key = (
+        A.coords.indices.tobytes(),
+        A.coords.indptr.tobytes(),
+        A.coords.shape,
+    )
+    factor = _cholmod_analyze_cache.get(cache_key, None)
+    if factor is None:
+        factor = sksparse.cholmod.analyze_AAt(A_T_scipy)
+        _cholmod_analyze_cache[cache_key] = factor
 
-            max_cache_size = 512
-            if len(_cholmod_analyze_cache) > max_cache_size:
-                _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
+        max_cache_size = 512
+        if len(_cholmod_analyze_cache) > max_cache_size:
+            _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
-        # Factorize and solve
-        factor = factor.cholesky_AAt(
-            A_T_scipy,
-            # Some simple linear problems blow up without this 1e-5 term.
-            beta=lambd + 1e-5,
-        )
-        return factor.solve_A(ATb)
+    # Factorize and solve
+    factor = factor.cholesky_AAt(
+        A_T_scipy,
+        # Some simple linear problems blow up without this 1e-5 term.
+        beta=lambd + 1e-5,
+    )
+    return factor.solve_A(ATb)
 
 
 @jdc.pytree_dataclass
-class ConjugateGradientState:
+class _ConjugateGradientState:
     """State used for Eisenstat-Walker criterion in ConjugateGradientLinearSolver."""
 
     ATb_norm_prev: float | jax.Array
@@ -90,7 +88,7 @@ class ConjugateGradientState:
 
 
 @jdc.pytree_dataclass
-class ConjugateGradientLinearSolver:
+class ConjugateGradientConfig:
     """Iterative solver for sparse linear systems. Can run on CPU or GPU.
 
     For inexact steps, we use the Eisenstat-Walker criterion. For reference,
@@ -110,8 +108,8 @@ class ConjugateGradientLinearSolver:
     tolerance changes based on residual reduction. Typical values are 1.5 or
     2.0. Higher values make the tolerance more sensitive to residual changes."""
 
-    preconditioner: jdc.Static[Literal["block-jacobi", "point-jacobi"] | None] = (
-        "block-jacobi"
+    preconditioner: jdc.Static[Literal["block_jacobi", "point_jacobi"] | None] = (
+        "block_jacobi"
     )
     """Preconditioner to use for linear solves."""
 
@@ -121,14 +119,14 @@ class ConjugateGradientLinearSolver:
         A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
-        prev_linear_state: ConjugateGradientState,
-    ) -> tuple[jax.Array, ConjugateGradientState]:
+        prev_linear_state: _ConjugateGradientState,
+    ) -> tuple[jax.Array, _ConjugateGradientState]:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
 
         # Preconditioning setup.
-        if self.preconditioner == "block-jacobi":
+        if self.preconditioner == "block_jacobi":
             preconditioner = make_block_jacobi_precoditioner(graph, A_blocksparse)
-        elif self.preconditioner == "point-jacobi":
+        elif self.preconditioner == "point_jacobi":
             preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
         elif self.preconditioner is None:
             preconditioner = lambda x: x
@@ -158,7 +156,7 @@ class ConjugateGradientLinearSolver:
             tol=cast(float, current_eta),
             M=preconditioner,
         )
-        return solution_values, ConjugateGradientState(
+        return solution_values, _ConjugateGradientState(
             ATb_norm_prev=ATb_norm, eta=current_eta
         )
 
@@ -177,22 +175,36 @@ class NonlinearSolverState:
     lambd: float | jax.Array
 
     # Conjugate gradient state. Not used for other solvers.
-    cg_state: ConjugateGradientState | None
+    cg_state: _ConjugateGradientState | None
 
 
 @jdc.pytree_dataclass
 class NonlinearSolver:
     """Helper class for solving using Gauss-Newton or Levenberg-Marquardt."""
 
-    linear_solver: CholmodLinearSolver | ConjugateGradientLinearSolver
+    linear_solver: jdc.Static[
+        Literal["cholmod", "dense_cholesky", "conjugate_gradient"]
+    ]
     trust_region: TrustRegionConfig | None
     termination: TerminationConfig
+    conjugate_gradient_config: ConjugateGradientConfig | None
     verbose: jdc.Static[bool]
 
     @jdc.jit
     def solve(self, graph: FactorGraph, initial_vals: VarValues) -> VarValues:
         vals = initial_vals
         residual_vector = graph.compute_residual_vector(vals)
+
+        cg_state = None
+        if isinstance(self.linear_solver, ConjugateGradientConfig):
+            cg_state = _ConjugateGradientState(
+                ATb_norm_prev=0.0, eta=self.linear_solver.tolerance_max
+            )
+        elif self.linear_solver == "conjugate_gradient":
+            cg_state = _ConjugateGradientState(
+                ATb_norm_prev=0.0, eta=ConjugateGradientConfig().tolerance_max
+            )
+
         state = NonlinearSolverState(
             iterations=0,
             vals=vals,
@@ -203,11 +215,7 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
-            cg_state=None
-            if isinstance(self.linear_solver, CholmodLinearSolver)
-            else ConjugateGradientState(
-                ATb_norm_prev=0.0, eta=self.linear_solver.tolerance_max
-            ),
+            cg_state=cg_state,
         )
 
         # Optimization.
@@ -254,9 +262,18 @@ class NonlinearSolver:
         ATb = -AT_multiply(state.residual_vector)
 
         linear_state = None
-        if isinstance(self.linear_solver, ConjugateGradientLinearSolver):
-            assert isinstance(state.cg_state, ConjugateGradientState)
-            local_delta, linear_state = self.linear_solver._solve(
+        if (
+            isinstance(self.linear_solver, ConjugateGradientConfig)
+            or self.linear_solver == "conjugate_gradient"
+        ):
+            # Use default CG config is specified as a string, otherwise use the provided config.
+            cg_config = (
+                ConjugateGradientConfig()
+                if self.linear_solver == "conjugate_gradient"
+                else self.linear_solver
+            )
+            assert isinstance(state.cg_state, _ConjugateGradientState)
+            local_delta, linear_state = cg_config._solve(
                 graph,
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
@@ -265,11 +282,19 @@ class NonlinearSolver:
                 ATb=ATb,
                 prev_linear_state=state.cg_state,
             )
-        elif isinstance(self.linear_solver, CholmodLinearSolver):
+        elif self.linear_solver == "cholmod":
+            # Use CHOLMOD for direct solve.
             A_csr = SparseCsrMatrix(jac_values, graph.jac_coords_csr)
-            local_delta = self.linear_solver._solve(A_csr, ATb, lambd=state.lambd)
+            local_delta = _cholmod_solve(A_csr, ATb, lambd=state.lambd)
+        elif self.linear_solver == "dense_cholesky":
+            A_dense = A_blocksparse.to_dense()
+            ATA = A_dense.T @ A_dense
+            diag_idx = jnp.arange(ATA.shape[0])
+            ATA = ATA.at[diag_idx, diag_idx].add(state.lambd)
+            cho_factor = jax.scipy.linalg.cho_factor(ATA)
+            local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
         else:
-            assert False
+            assert_never(self.linear_solver)
 
         vals = state.vals._retract(local_delta, graph.tangent_ordering)
         if self.verbose:

@@ -9,23 +9,68 @@ from jax import numpy as jnp
 
 
 @jdc.pytree_dataclass
-class MatrixBlockRow:
-    start_row: jax.Array
-    """Row indices of the start of each block. Shape should be `(num_blocks,)`."""
+class SparseBlockRow:
+    """A sparse block-row. Each block-row contains:
+
+    - A set of N blocks with shape (rows, cols_i), for i=1...N.
+        - Every block has an equal number of rows.
+        - Blocks can have different numbers of columns. We store these in
+          the `block_num_cols` attribute.
+        - Concatenated values are stored in `blocks_concat`.
+    - An initial column index for each block in the block row.
+        - We store these in `start_cols`.
+
+    A `num_block_rows` leading axis will often be prepended to all contained
+    arrays. In this case, the `SparseBlockRow` structure represents multiple
+    sequential block rows. Each resulting block-row has the same block count
+    and widths; they would otherwise not be stackable. However, their sparsity
+    patterns may vary due to different values held in `start_cols`.
+    """
+
+    num_cols: jdc.Static[int]
+    """Total width of the block-row, including columns with zero values."""
     start_cols: tuple[jax.Array, ...]
-    """Column indices of the start of each block."""
-    block_widths: jdc.Static[tuple[int, ...]]
-    """Width of each block in the block-row."""
+    """Column indices of the start of each block. Shape in tuple should be
+    `([num_block_rows],)`."""
+    block_num_cols: jdc.Static[tuple[int, ...]]
+    """# of columns for each block in the block-row."""
     blocks_concat: jax.Array
-    """Blocks of matrix, concatenated along the column axis. Shape in tuple should be `(num_blocks, rows, cols)`."""
+    """Blocks of matrix, concatenated along the column axis. Shape in tuple
+    should be `([num_block_rows,] rows, cols)`."""
 
     def treedef(self) -> Hashable:
         return tuple(block.shape for block in self.blocks_concat)
 
+    def to_dense(self) -> jax.Array:
+        """Convert block-row or batched block-rows to dense representation."""
+        if self.blocks_concat.ndim == 3:
+            # Batched block-rows.
+            (num_block_rows, num_rows, _) = self.blocks_concat.shape
+            return jax.vmap(SparseBlockRow.to_dense)(self).reshape(
+                (num_block_rows * num_rows, self.num_cols)
+            )
+
+        assert self.blocks_concat.ndim == 2
+        num_rows, num_cols_concat = self.blocks_concat.shape
+        out = jnp.zeros((num_rows, self.num_cols))
+
+        start_concat_col = 0
+        for start_col, block_width in zip(self.start_cols, self.block_num_cols):
+            end_concat_col = start_concat_col + block_width
+            out = jax.lax.dynamic_update_slice(
+                out,
+                update=self.blocks_concat[:, start_concat_col:end_concat_col],
+                start_indices=(0, start_col),
+            )
+            start_concat_col = end_concat_col
+
+        assert start_concat_col == num_cols_concat
+        return out
+
 
 @jdc.pytree_dataclass
 class BlockRowSparseMatrix:
-    block_rows: tuple[MatrixBlockRow, ...]
+    block_rows: tuple[SparseBlockRow, ...]
     """Batched block-rows, ordered. Each element in the tuple has a leading
     axis, which represents consecutive block-rows."""
     shape: jdc.Static[tuple[int, int]]
@@ -42,9 +87,11 @@ class BlockRowSparseMatrix:
             del block_rows
 
             # Get slices corresponding to nonzero terms in block-row.
-            assert len(block_row.start_cols) == len(block_row.block_widths)
+            assert len(block_row.start_cols) == len(block_row.block_num_cols)
             target_slice_parts = list[jax.Array]()
-            for start_cols, width in zip(block_row.start_cols, block_row.block_widths):
+            for start_cols, width in zip(
+                block_row.start_cols, block_row.block_num_cols
+            ):
                 assert start_cols.shape == (n_block,)
                 assert isinstance(width, int)
                 slice_part = jax.vmap(
@@ -68,6 +115,15 @@ class BlockRowSparseMatrix:
 
         result = jnp.concatenate(out_slices, axis=0)
         return result
+
+    def to_dense(self) -> jax.Array:
+        """Convert to a dense matrix."""
+        out = jnp.concatenate(
+            [block_row.to_dense() for block_row in self.block_rows],
+            axis=0,
+        )
+        assert out.shape == self.shape
+        return out
 
 
 @jdc.pytree_dataclass
