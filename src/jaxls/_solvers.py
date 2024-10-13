@@ -345,6 +345,17 @@ class NonlinearSolver:
             if linear_state is not None:
                 state_next.cg_state = linear_state
 
+            # Compute termination criteria.
+            state_next.termination_criteria, state_next.termination_deltas = (
+                self.termination._check_convergence(
+                    state,
+                    cost_updated=proposed_cost,
+                    tangent=local_delta,
+                    tangent_ordering=graph.tangent_ordering,
+                    ATb=ATb,
+                )
+            )
+
             # Always accept Gauss-Newton steps.
             if self.trust_region is None:
                 state_next.vals = vals
@@ -361,6 +372,11 @@ class NonlinearSolver:
                     - state.cost
                 )
                 accept_flag = step_quality >= self.trust_region.step_quality_min
+
+                # Should not terminate if we're rejecting step.
+                state_next.termination_criteria = jnp.logical_and(
+                    accept_flag, state_next.termination_criteria
+                )
 
                 state_next.vals = jax.tree_map(
                     lambda proposed, current: jnp.where(accept_flag, proposed, current),
@@ -386,15 +402,6 @@ class NonlinearSolver:
                 )
 
             state_next.iterations += 1
-            state_next.termination_criteria, state_next.termination_deltas = (
-                self.termination._check_convergence(
-                    state,
-                    cost_updated=state_next.cost,
-                    tangent=local_delta,
-                    tangent_ordering=graph.tangent_ordering,
-                    ATb=ATb,
-                )
-            )
         return state_next
 
 
