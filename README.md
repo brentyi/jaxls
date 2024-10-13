@@ -11,26 +11,25 @@ problems. We accelerate optimization by analyzing the structure of graphs:
 repeated factor and variable types are vectorized, and the sparsity of adjacency
 in the graph is translated into sparse matrix operations.
 
+Use cases are primarily in least squares problems that are (1) sparse and (2)
+inefficient to solve with gradient-based methods.
+
 Currently supported:
 
 - Automatic sparse Jacobians.
-- Optimization on manifolds like SO(2), SO(3), SE(2), and SE(3).
+- Optimization on manifolds.
+  - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- Multiple solvers for linear subproblems:
+- Linear subproblem solvers:
   - Sparse direct with Cholesky / CHOLMOD, on CPU.
   - Sparse iterative with Conjugate Gradient.
     - Preconditioning: block and point Jacobi.
     - Inexact Newton via Eisenstat-Walker.
   - Dense Cholesky for smaller problems.
 
-Use cases are primarily in least squares problems that are inherently (1)
-sparse and (2) inefficient to solve with gradient-based methods. These are
-common in robotics.
-
-For the first iteration of this library, written for
-[IROS 2021](https://github.com/brentyi/dfgo), see
-[jaxfg](https://github.com/brentyi/jaxfg). `jaxls` is a rewrite that aims to be
-faster and easier to use. For additional references, see inspirations like
+For the first iteration of this library, written for [IROS 2021](https://github.com/brentyi/dfgo), see
+[jaxfg](https://github.com/brentyi/jaxfg). `jaxls` is a rewrite that is faster
+and easier to use. For additional references, see inspirations like
 [GTSAM](https://gtsam.org/), [Ceres Solver](http://ceres-solver.org/),
 [minisam](https://github.com/dongjing3309/minisam),
 [SwiftFusion](https://github.com/borglab/SwiftFusion),

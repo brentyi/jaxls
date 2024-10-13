@@ -48,7 +48,7 @@ factors = [
 graph = jaxls.FactorGraph.make(factors, vars)
 
 # Solve the optimization problem.
-solution = graph.solve(linear_solver=jaxls.DenseLinearSolver())
+solution = graph.solve()
 print("All solutions", solution)
 print("Pose 0", solution[vars[0]])
 print("Pose 1", solution[vars[1]])
