@@ -398,17 +398,22 @@ class Factor[*Args]:
         return Factor(compute_residual, args, jac_mode)
 
     def _get_batch_axes(self) -> tuple[int, ...]:
-        def traverse_args(current: Any) -> tuple[int, ...]:
+        def traverse_args(current: Any) -> tuple[int, ...] | None:
             children_and_meta = default_registry.flatten_one_level(current)
-            assert children_and_meta is not None
+            if children_and_meta is None:
+                return None
             for child in children_and_meta[0]:
                 if isinstance(child, Var):
                     return () if isinstance(child.id, int) else child.id.shape
                 else:
-                    return traverse_args(child)
-            assert False, "No variables found in factor!"
+                    batch_axes = traverse_args(child)
+                    if batch_axes is not None:
+                        return batch_axes
+            return None
 
-        return traverse_args(self.args)
+        batch_axes = traverse_args(self.args)
+        assert batch_axes is not None, "No variables found in factor!"
+        return batch_axes
 
 
 @jdc.pytree_dataclass

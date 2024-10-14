@@ -33,10 +33,10 @@ factors = [
     ),
     # "Between" factor.
     jaxls.Factor(
-        lambda vals, var0, var1, delta: (
+        lambda vals, delta, var0, var1: (
             (vals[var0].inverse() @ vals[var1]) @ delta.inverse()
         ).log(),
-        (vars[0], vars[1], jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0)),
+        (jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0), vars[0], vars[1]),
     ),
 ]
 
