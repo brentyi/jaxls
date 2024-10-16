@@ -56,8 +56,8 @@ class FactorGraph:
         self,
         initial_vals: VarValues | None = None,
         *,
-        linear_solver: Literal["cholmod", "conjugate_gradient", "dense_cholesky"]
-        | ConjugateGradientConfig = "cholmod",
+        linear_solver: Literal["conjugate_gradient", "cholmod", "dense_cholesky"]
+        | ConjugateGradientConfig = "conjugate_gradient",
         trust_region: TrustRegionConfig | None = TrustRegionConfig(),
         termination: TerminationConfig = TerminationConfig(),
         verbose: bool = True,

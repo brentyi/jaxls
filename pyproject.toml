@@ -20,7 +20,6 @@ dependencies = [
     "jaxlib",
     "jaxlie>=1.0.0",
     "jax_dataclasses>=1.0.0",
-    "scikit-sparse",
     "loguru",
     "termcolor",
     "tqdm",
@@ -30,6 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyright>=1.1.308",
+    "scikit-sparse",
     "ruff",
 ]
 
