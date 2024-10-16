@@ -9,7 +9,6 @@ import jax.flatten_util
 import jax_dataclasses as jdc
 import scipy
 import scipy.sparse
-import sksparse.cholmod
 from jax import numpy as jnp
 
 from jaxls._preconditioning import (
@@ -22,6 +21,8 @@ from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
 if TYPE_CHECKING:
+    import sksparse.cholmod
+
     from ._factor_graph import FactorGraph
 
 
@@ -48,6 +49,8 @@ def _cholmod_solve_on_host(
     lambd: float | jax.Array,
 ) -> jax.Array:
     """Solve a linear system using CHOLMOD. Should be called on the host."""
+    import sksparse.cholmod
+
     # Matrix is transposed when we convert CSR to CSC.
     A_T_scipy = scipy.sparse.csc_matrix(
         (A.values, A.coords.indices, A.coords.indptr), shape=A.coords.shape[::-1]
@@ -183,7 +186,7 @@ class NonlinearSolver:
     """Helper class for solving using Gauss-Newton or Levenberg-Marquardt."""
 
     linear_solver: jdc.Static[
-        Literal["cholmod", "dense_cholesky", "conjugate_gradient"]
+        Literal["conjugate_gradient", "cholmod", "dense_cholesky"]
     ]
     trust_region: TrustRegionConfig | None
     termination: TerminationConfig

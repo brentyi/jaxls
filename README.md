@@ -2,8 +2,6 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-_status: working! see limitations [here](#limitations)_
-
 **`jaxls`** is a library for nonlinear least squares in JAX.
 
 We provide a factor graph interface for specifying and solving least squares
@@ -21,10 +19,10 @@ Currently supported:
   - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
 - Linear subproblem solvers:
-  - Sparse direct with Cholesky / CHOLMOD, on CPU.
   - Sparse iterative with Conjugate Gradient.
     - Preconditioning: block and point Jacobi.
     - Inexact Newton via Eisenstat-Walker.
+  - Sparse direct with Cholesky / CHOLMOD, on CPU.
   - Dense Cholesky for smaller problems.
 
 For the first iteration of this library, written for [IROS 2021](https://github.com/brentyi/dfgo), see
@@ -37,29 +35,32 @@ and easier to use. For additional references, see inspirations like
 
 ### Installation
 
-`jaxls` supports `python>=3.12`.
+`jaxls` supports `python>=3.12`:
 
-For Cholesky factorization via CHOLMOD, `scikit-sparse` requires SuiteSparse:
+```bash
+pip install git+https://github.com/brentyi/jaxls.git
+```
+
+**Optional: CHOLMOD dependencies**
+
+By default, we use an iterative linear solver. This requires no extra
+dependencies. For some problems, like those with banded matrices, a direct
+solver can be much faster.
+
+For Cholesky factorization via CHOLMOD, we rely on SuiteSparse:
 
 ```bash
 # Option 1: via conda.
 conda install conda-forge::suitesparse
+
 # Option 2: via apt.
-sudo apt update
 sudo apt install -y libsuitesparse-dev
-# Option 3: via brew.
-brew install suite-sparse
 ```
 
-Then, from your environment of choice:
+You'll also need _scikit-sparse_:
 
 ```bash
-# Option 1: from git.
-pip install git+ssh://git@github.com/brentyi/jaxls.git
-# Option 2: editable.
-git clone https://github.com/brentyi/jaxls.git
-cd jaxls
-pip install -e .
+pip install scikit-sparse
 ```
 
 ### Pose graph example

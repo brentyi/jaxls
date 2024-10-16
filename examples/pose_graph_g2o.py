@@ -20,8 +20,8 @@ import _g2o_utils
 def main(
     g2o_path: pathlib.Path = pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
     linear_solver: Literal[
-        "cholmod", "conjugate_gradient", "dense_cholesky"
-    ] = "cholmod",
+        "conjugate_gradient", "cholmod", "dense_cholesky"
+    ] = "conjugate_gradient",
 ) -> None:
     # Parse g2o file.
     with jaxls.utils.stopwatch("Reading g2o file"):
