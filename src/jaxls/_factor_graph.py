@@ -60,10 +60,24 @@ class FactorGraph:
         | ConjugateGradientConfig = "conjugate_gradient",
         trust_region: TrustRegionConfig | None = TrustRegionConfig(),
         termination: TerminationConfig = TerminationConfig(),
+        sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
         verbose: bool = True,
     ) -> VarValues:
         """Solve the nonlinear least squares problem using either Gauss-Newton
-        or Levenberg-Marquardt."""
+        or Levenberg-Marquardt.
+
+        Args:
+            initial_vals: Initial values for the variables. If None, default values will be used.
+            linear_solver: The linear solver to use.
+            trust_region: Configuration for Levenberg-Marquardt trust region.
+            termination: Configuration for termination criteria.
+            sparse_mode: The representation to use for sparse matrix
+                multiplication. Can be "blockrow", "coo", or "csr".
+            verbose: Whether to print verbose output during optimization.
+
+        Returns:
+            Optimized variable values.
+        """
         if initial_vals is None:
             initial_vals = VarValues.make(
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
@@ -79,7 +93,12 @@ class FactorGraph:
             linear_solver = "conjugate_gradient"
 
         solver = NonlinearSolver(
-            linear_solver, trust_region, termination, conjugate_gradient_config, verbose
+            linear_solver,
+            trust_region,
+            termination,
+            conjugate_gradient_config,
+            sparse_mode,
+            verbose,
         )
         return solver.solve(graph=self, initial_vals=initial_vals)
 

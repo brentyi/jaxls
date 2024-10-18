@@ -16,7 +16,7 @@ from jaxls._preconditioning import (
     make_point_jacobi_precoditioner,
 )
 
-from ._sparse_matrices import BlockRowSparseMatrix, SparseCsrMatrix
+from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
@@ -191,6 +191,7 @@ class NonlinearSolver:
     trust_region: TrustRegionConfig | None
     termination: TerminationConfig
     conjugate_gradient_config: ConjugateGradientConfig | None
+    sparse_mode: jdc.Static[Literal["blockrow", "coo", "csr"]]
     verbose: jdc.Static[bool]
 
     @jdc.jit
@@ -254,11 +255,30 @@ class NonlinearSolver:
         )
 
         # linear_transpose() will return a tuple, with one element per primal.
-        A_multiply = A_blocksparse.multiply
-        AT_multiply_ = jax.linear_transpose(
-            A_multiply, jnp.zeros((A_blocksparse.shape[1],))
-        )
-        AT_multiply = lambda vec: AT_multiply_(vec)[0]
+        if self.sparse_mode == "blockrow":
+            A_multiply = A_blocksparse.multiply
+            AT_multiply_ = jax.linear_transpose(
+                A_multiply, jnp.zeros((A_blocksparse.shape[1],))
+            )
+            AT_multiply = lambda vec: AT_multiply_(vec)[0]
+        elif self.sparse_mode == "coo":
+            A_coo = SparseCooMatrix(
+                values=jac_values, coords=graph.jac_coords_coo
+            ).as_jax_bcoo()
+            AT_coo = A_coo.transpose()
+            A_multiply = lambda vec: A_coo @ vec
+            AT_multiply = lambda vec: AT_coo @ vec
+        elif self.sparse_mode == "csr":
+            A_csr = SparseCsrMatrix(
+                values=jac_values, coords=graph.jac_coords_csr
+            ).as_jax_bcsr()
+            A_multiply = lambda vec: A_csr @ vec
+            AT_multiply_ = jax.linear_transpose(
+                A_multiply, jnp.zeros((A_blocksparse.shape[1],))
+            )
+            AT_multiply = lambda vec: AT_multiply_(vec)[0]
+        else:
+            assert_never(self.sparse_mode)
 
         # Compute right-hand side of normal equation.
         ATb = -AT_multiply(state.residual_vector)

@@ -145,6 +145,14 @@ class SparseCsrMatrix:
     coords: SparseCsrCoordinates
     """Indices describing non-zero entries."""
 
+    def as_jax_bcsr(self) -> jax.experimental.sparse.BCSR:
+        return jax.experimental.sparse.BCSR(
+            args=(self.values, self.coords.indices, self.coords.indptr),
+            shape=self.coords.shape,
+            indices_sorted=True,
+            unique_indices=True,
+        )
+
 
 @jdc.pytree_dataclass
 class SparseCooCoordinates:
