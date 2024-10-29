@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Any, Callable, ClassVar, cast, overload
+from typing import Any, Callable, ClassVar, Self, cast, overload
 
 import jax
 import jax_dataclasses as jdc
@@ -82,6 +82,11 @@ class Var[T](metaclass=_HashableSortableMeta):
         """Assign a value to this variable. Returned value can be used as input
         for `VarValues.make()`."""
         return VarWithValue(self, value)
+
+    def __getitem__(self, index_or_slice: int | slice) -> Self:
+        """Shorthand for slicing the variable ID."""
+        assert not isinstance(self.id, int)
+        return self.__class__(self.id[index_or_slice])
 
     @overload
     def __init_subclass__[T_](
@@ -174,7 +179,10 @@ class VarValues:
     """Variable ID for each value, sorted in ascending order."""
 
     def get_value[T](self, var: Var[T]) -> T:
-        """Get the value of a specific variable."""
+        """Get the value of a specific variable or variables."""
+        if not isinstance(var.id, int) and var.id.ndim > 0:
+            return jax.vmap(self.get_value)(var)
+
         assert getattr(var.id, "shape", None) == () or isinstance(var.id, int)
         var_type = type(var)
         index = jnp.searchsorted(self.ids_from_type[var_type], var.id)

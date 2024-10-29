@@ -145,7 +145,9 @@ class FactorGraph:
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
             # Compute Jacobian for each factor.
-            stacked_jac = jax.vmap(compute_jac_with_perturb)(factor)
+            stacked_jac = jax.lax.map(
+                compute_jac_with_perturb, factor, batch_size=factor.jac_batch_size
+            )
             (num_factor,) = factor._get_batch_axes()
             assert stacked_jac.shape == (
                 num_factor,
@@ -396,11 +398,20 @@ class FactorGraph:
 
 @jdc.pytree_dataclass
 class Factor[*Args]:
-    """A single cost in our factor graph."""
+    """A single cost in our factor graph. Costs with the same pytree structure
+    will automatically be paralellized."""
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
+    """Depending on the function being differentiated, it may be faster to use
+    forward-mode or reverse-mode autodiff."""
+    jac_batch_size: jdc.Static[int | None] = None
+    """Batch size for computing Jacobians that can be parallelized. Can be set
+    to make tradeoffs between runtime and memory usage.
+
+    If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
+    one at a time."""
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
