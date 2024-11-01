@@ -42,9 +42,7 @@ def main(
         )
 
     with jaxls.utils.stopwatch("Running solve"):
-        solution_vals = graph.solve(
-            initial_vals, trust_region=None, linear_solver=linear_solver
-        )
+        solution_vals = graph.solve(initial_vals, linear_solver=linear_solver)
 
     with jaxls.utils.stopwatch("Running solve (again)"):
         solution_vals = graph.solve(

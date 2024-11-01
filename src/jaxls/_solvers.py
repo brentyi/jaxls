@@ -12,8 +12,8 @@ import scipy.sparse
 from jax import numpy as jnp
 
 from jaxls._preconditioning import (
+    get_ATA_diag,
     make_block_jacobi_precoditioner,
-    make_point_jacobi_precoditioner,
 )
 
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
@@ -122,6 +122,7 @@ class ConjugateGradientConfig:
         A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
+        ATA_diagonals: jax.Array,
         prev_linear_state: _ConjugateGradientState,
     ) -> tuple[jax.Array, _ConjugateGradientState]:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
@@ -130,7 +131,7 @@ class ConjugateGradientConfig:
         if self.preconditioner == "block_jacobi":
             preconditioner = make_block_jacobi_precoditioner(graph, A_blocksparse)
         elif self.preconditioner == "point_jacobi":
-            preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
+            preconditioner = lambda vec: vec / ATA_diagonals
         elif self.preconditioner is None:
             preconditioner = lambda x: x
         else:
@@ -283,6 +284,9 @@ class NonlinearSolver:
         # Compute right-hand side of normal equation.
         ATb = -AT_multiply(state.residual_vector)
 
+        # Used for CG + dense Cholesky.
+        ATA_diagonals = get_ATA_diag(A_blocksparse)
+
         linear_state = None
         if (
             isinstance(self.linear_solver, ConjugateGradientConfig)
@@ -300,8 +304,10 @@ class NonlinearSolver:
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
-                lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
+                lambda vec: AT_multiply(A_multiply(vec))
+                + state.lambd * ATA_diagonals * vec,
                 ATb=ATb,
+                ATA_diagonals=ATA_diagonals,
                 prev_linear_state=state.cg_state,
             )
         elif self.linear_solver == "cholmod":
@@ -312,7 +318,7 @@ class NonlinearSolver:
             A_dense = A_blocksparse.to_dense()
             ATA = A_dense.T @ A_dense
             diag_idx = jnp.arange(ATA.shape[0])
-            ATA = ATA.at[diag_idx, diag_idx].add(state.lambd)
+            ATA = ATA.at[diag_idx, diag_idx].add(state.lambd * ATA_diagonals)
             cho_factor = jax.scipy.linalg.cho_factor(ATA)
             local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
         else:
@@ -428,7 +434,13 @@ class NonlinearSolver:
 class TrustRegionConfig:
     # Levenberg-Marquardt parameters.
     lambda_initial: float = 5e-4
-    """Initial damping factor. Only used for Levenberg-Marquardt."""
+    """Initial damping factor. Only used for Levenberg-Marquardt.
+
+    *Unfortunate note:* the damping behavior of LM will currently be different
+    depending on which linear solver you use.
+    - For CHOLMOD, we apply damping naively to normal equations by solving `(ATA + lambda*I)x = ATb`.
+    - For all other solvers, we apply scale-invariant damping by solving `(ATA + lambda * diag(ATA)) x = ATb`.
+    """
     lambda_factor: float = 2.0
     """Factor to increase or decrease damping. Only used for Levenberg-Marquardt."""
     lambda_min: float = 1e-5
