@@ -145,9 +145,14 @@ class FactorGraph:
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
             # Compute Jacobian for each factor.
-            stacked_jac = jax.lax.map(
-                compute_jac_with_perturb, factor, batch_size=factor.jac_batch_size
-            )
+            if factor.jac_batch_size is None:
+                stacked_jac = jax.vmap(compute_jac_with_perturb)(factor)
+            else:
+                # When `batch_size` is `None`, jax.lax.map reduces to a scan
+                # (similar to `batch_size=1`).
+                stacked_jac = jax.lax.map(
+                    compute_jac_with_perturb, factor, batch_size=factor.jac_batch_size
+                )
             (num_factor,) = factor._get_batch_axes()
             assert stacked_jac.shape == (
                 num_factor,
