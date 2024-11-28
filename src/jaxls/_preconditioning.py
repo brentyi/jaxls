@@ -10,11 +10,9 @@ if TYPE_CHECKING:
     from ._sparse_matrices import BlockRowSparseMatrix
 
 
-def make_point_jacobi_precoditioner(
-    A_blocksparse: BlockRowSparseMatrix,
-) -> Callable[[jax.Array], jax.Array]:
-    """Returns a point Jacobi (diagonal) preconditioner."""
-    ATA_diagonals = jnp.zeros(A_blocksparse.shape[1])
+def get_ATA_diag(A_blocksparse: BlockRowSparseMatrix) -> jnp.ndarray:
+    """Get 1D array of diagonal elements of the Gram matrix."""
+    ATA_diag = jnp.zeros(A_blocksparse.shape[1])
 
     for block_row in A_blocksparse.block_rows:
         (n_blocks, rows, cols_concat) = block_row.blocks_concat.shape
@@ -32,9 +30,8 @@ def make_point_jacobi_precoditioner(
             ],
             axis=1,
         ).flatten()
-        ATA_diagonals = ATA_diagonals.at[indices].add(block_l2_cols)
-
-    return lambda vec: vec / ATA_diagonals
+        ATA_diag = ATA_diag.at[indices].add(block_l2_cols)
+    return ATA_diag
 
 
 def make_block_jacobi_precoditioner(
