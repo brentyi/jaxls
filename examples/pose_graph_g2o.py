@@ -16,6 +16,10 @@ import tyro
 
 import _g2o_utils
 
+jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")
+jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
+jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
+
 
 def main(
     g2o_path: pathlib.Path = pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
@@ -40,16 +44,19 @@ def main(
                 for pose_var, pose in zip(g2o.pose_vars, g2o.initial_poses)
             )
         )
+        jax.block_until_ready(initial_vals)
 
     with jaxls.utils.stopwatch("Running solve"):
         solution_vals = graph.solve(
             initial_vals, trust_region=None, linear_solver=linear_solver
         )
+        jax.block_until_ready(solution_vals)
 
     with jaxls.utils.stopwatch("Running solve (again)"):
         solution_vals = graph.solve(
             initial_vals, trust_region=None, linear_solver=linear_solver
         )
+        jax.block_until_ready(solution_vals)
 
     # Plot
     plt.figure()
