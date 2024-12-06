@@ -2,17 +2,23 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-**`jaxls`** is a library for nonlinear least squares in JAX.
+**`jaxls`** is a library for solving sparse [NLLS](https://en.wikipedia.org/wiki/Non-linear_least_squares) and [IRLS](https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares) problems in JAX.
+These are common in classical robotics and computer vision.
+
+To install on Python 3.12+:
+
+```bash
+pip install git+https://github.com/brentyi/jaxls.git
+```
+
+### Overviews
 
 We provide a factor graph interface for specifying and solving least squares
-problems. We accelerate optimization by analyzing the structure of graphs:
-repeated factor and variable types are vectorized, and the sparsity of adjacency
-in the graph is translated into sparse matrix operations.
+problems. **`jaxls`** takes advantage of structure in graphs: repeated factor
+and variable types are vectorized, and sparsity of adjacency is translated into
+sparse matrix operations.
 
-Use cases are primarily in least squares problems that are (1) sparse and (2)
-inefficient to solve with gradient-based methods.
-
-Currently supported:
+Supported:
 
 - Automatic sparse Jacobians.
 - Optimization on manifolds.
@@ -22,46 +28,16 @@ Currently supported:
   - Sparse iterative with Conjugate Gradient.
     - Preconditioning: block and point Jacobi.
     - Inexact Newton via Eisenstat-Walker.
-  - Sparse direct with Cholesky / CHOLMOD, on CPU.
-  - Dense Cholesky for smaller problems.
+    - Recommended for most problems.
+  - Dense Cholesky.
+    - Fast for small problems.
+  - Sparse Cholesky, on CPU. (CHOLMOD)
 
-For the first iteration of this library, written for [IROS 2021](https://github.com/brentyi/dfgo), see
-[jaxfg](https://github.com/brentyi/jaxfg). `jaxls` is a rewrite that is faster
-and easier to use. For additional references, see inspirations like
+`jaxls` borrows heavily from libraries like
 [GTSAM](https://gtsam.org/), [Ceres Solver](http://ceres-solver.org/),
 [minisam](https://github.com/dongjing3309/minisam),
 [SwiftFusion](https://github.com/borglab/SwiftFusion),
-[g2o](https://github.com/RainerKuemmerle/g2o).
-
-### Installation
-
-`jaxls` supports `python>=3.12`:
-
-```bash
-pip install git+https://github.com/brentyi/jaxls.git
-```
-
-**Optional: CHOLMOD dependencies**
-
-By default, we use an iterative linear solver. This requires no extra
-dependencies. For some problems, like those with banded matrices, a direct
-solver can be much faster.
-
-For Cholesky factorization via CHOLMOD, we rely on SuiteSparse:
-
-```bash
-# Option 1: via conda.
-conda install conda-forge::suitesparse
-
-# Option 2: via apt.
-sudo apt install -y libsuitesparse-dev
-```
-
-You'll also need _scikit-sparse_:
-
-```bash
-pip install scikit-sparse
-```
+and [g2o](https://github.com/RainerKuemmerle/g2o).
 
 ### Pose graph example
 
@@ -111,8 +87,12 @@ factors = [
 Factors with similar structure, like the first two in this example, will be
 vectorized under-the-hood.
 
-**Solving optimization problems.** We can set up the optimization problem, solve
-it, and print the solutions:
+Batched inputs can also be manually constructed, and are detected by inspecting
+the shape of variable ID arrays in the input. Just add a leading batch axis to
+all elements in the arguments tuple.
+
+**Solving optimization problems.** To set up the optimization problem, solve
+it, and print solutions:
 
 ```python
 graph = jaxls.FactorGraph.make(factors, pose_vars)
@@ -122,11 +102,24 @@ print("Pose 0", solution[pose_vars[0]])
 print("Pose 1", solution[pose_vars[1]])
 ```
 
-### Limitations
+### CHOLMOD setup
 
-There are many practical features that we don't currently support:
+By default, we use an iterative linear solver. This requires no extra
+dependencies. For problems with strong supernodal structure or where our
+preconditioners are ineffective, a direct solver can be much faster.
 
-- GPU accelerated Cholesky factorization. (for CHOLMOD we wrap [scikit-sparse](https://scikit-sparse.readthedocs.io/en/latest/), which runs on CPU only)
-- Covariance estimation / marginalization.
-- Incremental solves.
-- Analytical Jacobians.
+For Cholesky factorization via CHOLMOD, we rely on SuiteSparse:
+
+```bash
+# Option 1: via conda.
+conda install conda-forge::suitesparse
+
+# Option 2: via apt.
+sudo apt install -y libsuitesparse-dev
+```
+
+You'll also need _scikit-sparse_:
+
+```bash
+pip install scikit-sparse
+```
