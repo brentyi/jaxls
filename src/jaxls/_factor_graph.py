@@ -134,7 +134,7 @@ class FactorGraph:
                     "reverse": jax.jacrev,
                     "auto": jax.jacrev
                     if factor.residual_dim < val_subset._get_tangent_dim()
-                    else jax.jacrev,
+                    else jax.jacfwd,
                 }[factor.jac_mode]
                 return jacfunc(
                     # The residual function, with respect to to some local delta.
