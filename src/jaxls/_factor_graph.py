@@ -129,6 +129,10 @@ class FactorGraph:
                     self.tangent_ordering,
                 )
                 # Shape should be: (single_residual_dim, vars * tangent_dim).
+                if factor.jac_mode == "custom":
+                    assert factor.jac_custom_fn is not None
+                    return factor.jac_custom_fn(vals, *factor.args)
+
                 jacfunc = {
                     "forward": jax.jacfwd,
                     "reverse": jax.jacrev,
@@ -408,7 +412,7 @@ class Factor[*Args]:
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
-    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
+    jac_mode: jdc.Static[Literal["auto", "forward", "reverse", "custom"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff."""
     jac_batch_size: jdc.Static[int | None] = None
@@ -417,20 +421,25 @@ class Factor[*Args]:
 
     If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
     one at a time."""
+    jac_custom_fn: jdc.Static[Callable[[VarValues, *Args], jax.Array] | None] = None
+    """Custom Jacobian function to use. If None, we use autodiff."""
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
     def make[*Args_](
         compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
         args: tuple[*Args_],
-        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
+        jac_mode: jdc.Static[Literal["auto", "forward", "reverse", "custom"]] = "auto",
+        jac_custom_fn: jdc.Static[
+            Callable[[VarValues, *Args_], jax.Array] | None
+        ] = None,
     ) -> Factor[*Args_]:
         import warnings
 
         warnings.warn(
             "Use Factor() directly instead of Factor.make()", DeprecationWarning
         )
-        return Factor(compute_residual, args, jac_mode)
+        return Factor(compute_residual, args, jac_mode, None, jac_custom_fn)
 
     def _get_batch_axes(self) -> tuple[int, ...]:
         def traverse_args(current: Any) -> tuple[int, ...] | None:
@@ -470,6 +479,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         compute_residual = factor.compute_residual
         args = factor.args
         jac_mode = factor.jac_mode
+        jac_custom_fn = factor.jac_custom_fn
 
         # Get all variables in the PyTree structure.
         def traverse_args(current: Any, variables: list[Var]) -> list[Var]:
@@ -510,6 +520,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_dim=residual_dim,
             jac_mode=jac_mode,
+            jac_custom_fn=jac_custom_fn,
         )
 
     def _compute_block_sparse_jac_indices(
