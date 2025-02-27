@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Callable, Hashable, Literal, assert_never, cast
+from typing import TYPE_CHECKING, Callable, Hashable, Literal, cast
+from typing_extensions import assert_never
 
 import jax
 import jax.experimental.sparse
