@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import dis
 import functools
-from typing import Any, Callable, Hashable, Iterable, Literal, cast
+from typing import Any, Callable, Generic, Hashable, Iterable, Literal, TypeVar, cast
 
 import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
-from jax.tree_util import default_registry
+from jax.tree_util import default_registry, tree_leaves, tree_map, tree_structure
 from loguru import logger
-from typing_extensions import deprecated
+from typing_extensions import deprecated, TypeVarTuple, Unpack
+
+# Define type variables for the Factor class
+Ts = TypeVarTuple('Ts')
+T = TypeVar('T')
 
 from ._solvers import (
     ConjugateGradientConfig,
@@ -105,7 +109,7 @@ class FactorGraph:
     def compute_residual_vector(self, vals: VarValues) -> jax.Array:
         """Compute the residual vector. The cost we are optimizing is defined
         as the sum of squared terms within this vector."""
-        residual_slices = list[jax.Array]()
+        residual_slices: list[jax.Array] = []
         for stacked_factor in self.stacked_factors:
             stacked_residual_slice = jax.vmap(
                 lambda args: stacked_factor.compute_residual(vals, *args)
@@ -162,8 +166,8 @@ class FactorGraph:
 
             # Compute block-row representation for sparse Jacobian.
             stacked_jac_start_col = 0
-            start_cols = list[jax.Array]()
-            block_widths = list[int]()
+            start_cols: list[jax.Array] = []
+            block_widths: list[int] = []
             for var_type, ids in self.tangent_ordering.ordered_dict_items(
                 # This ordering shouldn't actually matter!
                 factor.sorted_ids_from_var_type
@@ -221,7 +225,7 @@ class FactorGraph:
             from jax import numpy as jnp
 
         variables = tuple(variables)
-        compute_residual_from_hash = dict[Hashable, Callable]()
+        compute_residual_from_hash: dict[Hashable, Callable] = {}
         factors = tuple(
             jdc.replace(
                 factor,
@@ -286,26 +290,28 @@ class FactorGraph:
         )
 
         # Start by grouping our factors and grabbing a list of (ordered!) variables
-        factors_from_group = dict[Any, list[Factor]]()
-        count_from_group = dict[Any, int]()
+        factors_from_group: dict[Any, list[Factor]] = {}
+        count_from_group: dict[Any, int] = {}
         for i, factor in enumerate(factors):
             # Each factor is ultimately just a pytree node; in order for a set of
             # factors to be batchable, they must share the same:
             group_key: Hashable = (
                 # (1) Treedef. Structure of inputs must match.
-                jax.tree_structure(factor),
+                tree_structure(factor),
                 # (2) Leaf shapes: contained array shapes must match
                 tuple(
                     leaf.shape if hasattr(leaf, "shape") else ()
-                    for leaf in jax.tree_leaves(factor)
+                    for leaf in tree_leaves(factor)
                 ),
             )
-            factors_from_group.setdefault(group_key, [])
-            count_from_group.setdefault(group_key, 0)
+            if group_key not in factors_from_group:
+                factors_from_group[group_key] = []
+            if group_key not in count_from_group:
+                count_from_group[group_key] = 0
 
             batch_axes = factor._get_batch_axes()
             if len(batch_axes) == 0:
-                factor = jax.tree.map(lambda x: jnp.asarray(x)[None], factor)
+                factor = tree_map(lambda x: jnp.asarray(x)[None], factor)
                 count_from_group[group_key] += 1
             else:
                 assert len(batch_axes) == 1
@@ -315,9 +321,9 @@ class FactorGraph:
             factors_from_group[group_key].append(factor)
 
         # Fields we want to populate.
-        stacked_factors = list[_AnalyzedFactor]()
-        factor_counts = list[int]()
-        jac_coords = list[tuple[jax.Array, jax.Array]]()
+        stacked_factors: list[_AnalyzedFactor] = []
+        factor_counts: list[int] = []
+        jac_coords: list[tuple[jax.Array, jax.Array]] = []
 
         # Sort variable IDs.
         sorted_ids_from_var_type = sort_and_stack_vars(variables)
@@ -329,7 +335,7 @@ class FactorGraph:
             group = factors_from_group[group_key]
 
             # Stack factor parameters.
-            stacked_factor: Factor = jax.tree.map(
+            stacked_factor: Factor = tree_map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
             stacked_factor_expanded: _AnalyzedFactor = jax.vmap(_AnalyzedFactor._make)(
@@ -377,7 +383,7 @@ class FactorGraph:
             )
 
         jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
-            *jax.tree_map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
+            *tree_map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
             shape=(residual_dim_sum, tangent_dim_sum),
         )
         csr_indptr = jnp.searchsorted(
@@ -402,12 +408,12 @@ class FactorGraph:
 
 
 @jdc.pytree_dataclass
-class Factor[*Args]:
+class Factor(Generic[Unpack[Ts]]):
     """A single cost in our factor graph. Costs with the same pytree structure
     will automatically be paralellized."""
 
-    compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
-    args: tuple[*Args]
+    compute_residual: jdc.Static[Callable[[VarValues, Unpack[Ts]], jax.Array]]
+    args: tuple[Unpack[Ts]]
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff."""
@@ -420,11 +426,11 @@ class Factor[*Args]:
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
-    def make[*Args_](
-        compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
-        args: tuple[*Args_],
+    def make(
+        compute_residual: jdc.Static[Callable[[VarValues, Unpack[Ts]], jax.Array]],
+        args: tuple[Unpack[Ts]],
         jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
-    ) -> Factor[*Args_]:
+    ) -> "Factor[Unpack[Ts]]":
         import warnings
 
         warnings.warn(
@@ -452,7 +458,7 @@ class Factor[*Args]:
 
 
 @jdc.pytree_dataclass
-class _AnalyzedFactor[*Args](Factor[*Args]):
+class _AnalyzedFactor(Factor[Unpack[Ts]]):
     """Same as `Factor`, but with extra fields."""
 
     # These need defaults because `jac_mode` has a default.
@@ -464,7 +470,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
 
     @staticmethod
     @jdc.jit
-    def _make[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
+    def _make(factor: Factor[Unpack[Ts]]) -> Any:  # We'll cast this to _AnalyzedFactor[Unpack[Ts]] later
         """Construct a factor for our factor graph."""
 
         compute_residual = factor.compute_residual
@@ -495,7 +501,10 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
                     () if isinstance(var.id, int) else var.id.shape
                 ) == batch_axes, "Batch axes of variables do not match."
             if len(batch_axes) == 1:
-                return jax.vmap(_AnalyzedFactor._make)(factor)
+                # Use Any to bypass the type checker for the invariant generic type parameter
+                factor_any = cast(Any, factor)
+                result = jax.vmap(_AnalyzedFactor._make)(factor_any)
+                return cast("_AnalyzedFactor[Unpack[Ts]]", result)
 
         # Cache the residual dimension for this factor.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
