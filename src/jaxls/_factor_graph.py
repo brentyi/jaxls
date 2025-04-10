@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dis
 import functools
-from typing import Any, Callable, Hashable, Iterable, Literal, cast
+from typing import Any, Callable, Hashable, Iterable, Literal, cast, Optional
 
 import jax
 import jax_dataclasses as jdc
@@ -25,19 +25,6 @@ from ._sparse_matrices import (
     SparseCsrCoordinates,
 )
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
-
-
-def _get_function_signature(func: Callable) -> Hashable:
-    """Returns a hashable value, which should be equal for equivalent input functions."""
-    closure = func.__closure__
-    if closure:
-        closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
-    else:
-        closure_vars = ()
-
-    bytecode = dis.Bytecode(func)
-    bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
-    return bytecode_tuple, closure_vars
 
 
 @jdc.pytree_dataclass
@@ -226,7 +213,7 @@ class FactorGraph:
             jdc.replace(
                 factor,
                 compute_residual=compute_residual_from_hash.setdefault(
-                    _get_function_signature(factor.compute_residual),
+                    factor.get_signature(),
                     factor.compute_residual,
                 ),
             )
@@ -342,7 +329,11 @@ class FactorGraph:
                 "Vectorizing group with {} factors, {} variables each: {}",
                 count_from_group[group_key],
                 stacked_factors[-1].num_variables,
-                stacked_factors[-1].compute_residual.__name__,
+                (
+                    stacked_factors[-1].name
+                    if stacked_factors[-1].name is not None
+                    else stacked_factors[-1].compute_residual.__name__
+                ),
             )
 
             # Compute Jacobian coordinates.
@@ -408,6 +399,8 @@ class Factor[*Args]:
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
+    name: jdc.Static[str | None] = None
+    signature_fn: jdc.Static[Optional[Callable[[Callable], Hashable]]] = None
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff."""
@@ -450,12 +443,40 @@ class Factor[*Args]:
         assert batch_axes is not None, "No variables found in factor!"
         return batch_axes
 
+    @staticmethod
+    def _default_get_signature(func: Callable) -> Hashable:
+        """Default logic for generating a function signature."""
+        closure = func.__closure__
+        if closure:
+            closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
+        else:
+            closure_vars = ()
+
+        bytecode = dis.Bytecode(func)
+        bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
+        return bytecode_tuple, closure_vars
+
+    def get_signature(self) -> Hashable:
+        """Gets the signature for this factor's cost function.
+
+        Uses the custom signature_fn override if provided, otherwise uses the
+        default static signature logic.
+        """
+        cost_fn = self.compute_residual
+        if self.signature_fn is not None:
+            # Use the custom function passed during Factor creation.
+            # Assumes it captures necessary context (like self for instance methods).
+            return self.signature_fn(cost_fn)
+        else:
+            return Factor._default_get_signature(cost_fn)
+
 
 @jdc.pytree_dataclass
 class _AnalyzedFactor[*Args](Factor[*Args]):
     """Same as `Factor`, but with extra fields."""
 
     # These need defaults because `jac_mode` has a default.
+    name: jdc.Static[str | None] = None
     num_variables: jdc.Static[int] = 0
     sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array] = jdc.field(
         default_factory=dict
@@ -506,6 +527,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         return _AnalyzedFactor(
             compute_residual,
             args=args,
+            name=factor.name,
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_dim=residual_dim,
