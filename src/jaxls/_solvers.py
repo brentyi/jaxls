@@ -353,7 +353,7 @@ class NonlinearSolver:
                 residual_index += stacked_dim
                 jax_log(
                     "     - "
-                    + f"{f.compute_residual.__name__}({count}):".ljust(15)
+                    + f"{f._get_name()}({count}):".ljust(15)
                     + " {:.5f} (avg {:.5f})",
                     partial_cost,
                     partial_cost / stacked_dim,

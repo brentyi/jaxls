@@ -351,11 +351,7 @@ class FactorGraph:
                 "Vectorizing group with {} factors, {} variables each: {}",
                 count_from_group[group_key],
                 stacked_factors[-1].num_variables,
-                (
-                    stacked_factors[-1].name
-                    if stacked_factors[-1].name is not None
-                    else stacked_factors[-1].compute_residual.__name__
-                ),
+                stacked_factors[-1]._get_name(),
             )
 
             # Compute Jacobian coordinates.
@@ -421,7 +417,7 @@ class Factor[*Args]:
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
-    name: jdc.Static[str | None] = None
+
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff."""
@@ -431,6 +427,16 @@ class Factor[*Args]:
 
     If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
     one at a time."""
+
+    name: jdc.Static[str | None] = None
+    """Custom name for the factor. This is used for debugging and logging."""
+
+    def _get_name(self) -> str:
+        """Get the name of the factor. If not set, we use
+        `factor.compute_residual.__name__`."""
+        if self.name is None:
+            return self.compute_residual.__name__
+        return self.name
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
