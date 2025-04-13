@@ -125,7 +125,7 @@ class FactorGraph:
         residual_offset = 0
 
         for factor in self.stacked_factors:
-            # Shape should be: (num_variables, count_from_group[group_key], single_residual_dim, var.tangent_dim).
+            # Shape should be: (count_from_group[group_key], single_residual_dim, sum_of_tangent_dims_of_variables).
             def compute_jac_with_perturb(factor: _AnalyzedFactor) -> jax.Array:
                 val_subset = vals._get_subset(
                     {
@@ -134,9 +134,9 @@ class FactorGraph:
                     },
                     self.tangent_ordering,
                 )
-                # Shape should be: (single_residual_dim, vars * tangent_dim).
-                if factor.jac_mode == "custom":
-                    assert factor.jac_custom_fn is not None
+
+                # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
+                if factor.jac_custom_fn is not None:
                     return factor.jac_custom_fn(vals, *factor.args)
 
                 jacfunc = {
@@ -421,9 +421,10 @@ class Factor[*Args]:
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
-    jac_mode: jdc.Static[Literal["auto", "forward", "reverse", "custom"]] = "auto"
+    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
-    forward-mode or reverse-mode autodiff."""
+    forward-mode or reverse-mode autodiff. Ignored if `jac_custom_fn` is
+    specified."""
     jac_batch_size: jdc.Static[int | None] = None
     """Batch size for computing Jacobians that can be parallelized. Can be set
     to make tradeoffs between runtime and memory usage.
@@ -431,7 +432,9 @@ class Factor[*Args]:
     If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
     one at a time."""
     jac_custom_fn: jdc.Static[Callable[[VarValues, *Args], jax.Array] | None] = None
-    """Custom Jacobian function to use. If None, we use autodiff."""
+    """Optional custom Jacobian function. If None, we use autodiff. Inputs are
+    the same as `compute_residual`. Output is a single 2D Jacobian matrix with
+    shape (residual_dim, sum_of_tangent_dims_of_variables)."""
 
     name: jdc.Static[str | None] = None
     """Custom name for the factor. This is used for debugging and logging."""
@@ -448,7 +451,7 @@ class Factor[*Args]:
     def make[*Args_](
         compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
         args: tuple[*Args_],
-        jac_mode: jdc.Static[Literal["auto", "forward", "reverse", "custom"]] = "auto",
+        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
         jac_custom_fn: jdc.Static[
             Callable[[VarValues, *Args_], jax.Array] | None
         ] = None,
