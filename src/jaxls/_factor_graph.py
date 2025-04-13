@@ -29,15 +29,21 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 def _get_function_signature(func: Callable) -> Hashable:
     """Returns a hashable value, which should be equal for equivalent input functions."""
-    closure = func.__closure__
-    if closure:
+    closure = getattr(func, "__closure__", None)
+    if closure is not None:
         closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
     else:
         closure_vars = ()
 
+    instance = getattr(func, "__self__", None)
+    if instance is not None:
+        instance_id = id(instance)
+    else:
+        instance_id = None
+
     bytecode = dis.Bytecode(func)
     bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
-    return bytecode_tuple, closure_vars
+    return bytecode_tuple, closure_vars, instance_id
 
 
 @jdc.pytree_dataclass
@@ -292,7 +298,10 @@ class FactorGraph:
         # Start by grouping our factors and grabbing a list of (ordered!) variables
         factors_from_group = dict[Any, list[Factor]]()
         count_from_group = dict[Any, int]()
-        for i, factor in enumerate(factors):
+        for factor in factors:
+            # Support broadcasting for factor arguments.
+            factor = factor._broadcast_batch_axes()
+
             # Each factor is ultimately just a pytree node; in order for a set of
             # factors to be batchable, they must share the same:
             group_key: Hashable = (
@@ -346,7 +355,7 @@ class FactorGraph:
                 "Vectorizing group with {} factors, {} variables each: {}",
                 count_from_group[group_key],
                 stacked_factors[-1].num_variables,
-                stacked_factors[-1].compute_residual.__name__,
+                stacked_factors[-1]._get_name(),
             )
 
             # Compute Jacobian coordinates.
@@ -424,6 +433,16 @@ class Factor[*Args]:
     jac_custom_fn: jdc.Static[Callable[[VarValues, *Args], jax.Array] | None] = None
     """Custom Jacobian function to use. If None, we use autodiff."""
 
+    name: jdc.Static[str | None] = None
+    """Custom name for the factor. This is used for debugging and logging."""
+
+    def _get_name(self) -> str:
+        """Get the name of the factor. If not set, we use
+        `factor.compute_residual.__name__`."""
+        if self.name is None:
+            return self.compute_residual.__name__
+        return self.name
+
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
     def make[*Args_](
@@ -441,23 +460,42 @@ class Factor[*Args]:
         )
         return Factor(compute_residual, args, jac_mode, None, jac_custom_fn)
 
-    def _get_batch_axes(self) -> tuple[int, ...]:
-        def traverse_args(current: Any) -> tuple[int, ...] | None:
+    def _get_variables(self) -> tuple[Var, ...]:
+        def get_variables(current: Any) -> list[Var]:
             children_and_meta = default_registry.flatten_one_level(current)
             if children_and_meta is None:
-                return None
+                return []
+
+            variables = []
             for child in children_and_meta[0]:
                 if isinstance(child, Var):
-                    return () if isinstance(child.id, int) else child.id.shape
+                    variables.append(child)
                 else:
-                    batch_axes = traverse_args(child)
-                    if batch_axes is not None:
-                        return batch_axes
-            return None
+                    variables.extend(get_variables(child))
+            return variables
 
-        batch_axes = traverse_args(self.args)
-        assert batch_axes is not None, "No variables found in factor!"
-        return batch_axes
+        return tuple(get_variables(self.args))
+
+    def _get_batch_axes(self) -> tuple[int, ...]:
+        variables = self._get_variables()
+        assert len(variables) != 0, "No variables found in factor!"
+        return jnp.broadcast_shapes(
+            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
+        )
+
+    def _broadcast_batch_axes(self) -> Factor:
+        batch_axes = self._get_batch_axes()
+        if batch_axes is None:
+            return self
+        leaves, treedef = jax.tree.flatten(self)
+        broadcasted_leaves = []
+        for leaf in leaves:
+            if isinstance(leaf, (int, float)):
+                leaf = jnp.array(leaf)
+            broadcasted_leaves.append(
+                jnp.broadcast_to(leaf, batch_axes + leaf.shape[len(batch_axes) :])
+            )
+        return jax.tree.unflatten(treedef, broadcasted_leaves)
 
 
 @jdc.pytree_dataclass
@@ -479,21 +517,8 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         compute_residual = factor.compute_residual
         args = factor.args
         jac_mode = factor.jac_mode
+        variables = factor._get_variables()
         jac_custom_fn = factor.jac_custom_fn
-
-        # Get all variables in the PyTree structure.
-        def traverse_args(current: Any, variables: list[Var]) -> list[Var]:
-            children_and_meta = default_registry.flatten_one_level(current)
-            if children_and_meta is None:
-                return variables
-            for child in children_and_meta[0]:
-                if isinstance(child, Var):
-                    variables.append(child)
-                else:
-                    traverse_args(child, variables)
-            return variables
-
-        variables = tuple(traverse_args(args, []))
         assert len(variables) > 0
 
         # Support batch axis.

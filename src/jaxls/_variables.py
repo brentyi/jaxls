@@ -68,7 +68,7 @@ class Var[T](metaclass=_HashableSortableMeta):
 
     id: jax.Array | int
 
-    # We would ideally annotate these as `ClassVar[T]`, but we can't.
+    # We would ideally annotate with `T` in the ClassVars, but we can't.
     #
     # https://github.com/python/typing/discussions/1424
     default_factory: ClassVar[Callable[[], Any]]
@@ -122,7 +122,7 @@ class Var[T](metaclass=_HashableSortableMeta):
             )
             default_factory = lambda: default
 
-        cls.default_factory = staticmethod(default_factory)
+        cls.default_factory = staticmethod(default_factory)  # type: ignore
         if retract_fn is not None:
             assert tangent_dim is not None
             cls.tangent_dim = tangent_dim
@@ -224,7 +224,12 @@ class VarValues:
         Example:
             >>> v1 = SomeVar(1)
             >>> v2 = AnotherVar(2)
-            >>> values = VarValues.make(v1, v2.with_value(custom_value))
+            >>>
+            >>> # Set v1 to default, v2 to custom value:
+            >>> values = VarValues.make([v1, v2.with_value(custom_value)])
+            >>>
+            >>> # The previous example is equivalent to:
+            >>> values = VarValues.make([v1.with_value(v1.default_factory()), v2.with_value(custom_value)])
         """
         vars = list[Var[Any]]()
         vals = list[Any]()
