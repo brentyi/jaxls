@@ -30,14 +30,20 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 def _get_function_signature(func: Callable) -> Hashable:
     """Returns a hashable value, which should be equal for equivalent input functions."""
     closure = func.__closure__
-    if closure:
+    if closure is not None:
         closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
     else:
         closure_vars = ()
 
+    instance = getattr(func, "__self__", None)
+    if instance is not None:
+        instance_id = id(instance)
+    else:
+        instance_id = None
+
     bytecode = dis.Bytecode(func)
     bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
-    return bytecode_tuple, closure_vars
+    return bytecode_tuple, closure_vars, instance_id
 
 
 @jdc.pytree_dataclass
