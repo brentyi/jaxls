@@ -220,7 +220,7 @@ class FactorGraph:
     def make(
         factors: Iterable[Factor],
         variables: Iterable[Var],
-        use_onp: bool = True,
+        use_onp: bool = False,
     ) -> FactorGraph:
         """Create a factor graph from a set of factors and a set of variables."""
 
