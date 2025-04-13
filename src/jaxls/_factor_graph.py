@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dis
 import functools
-from typing import Any, Callable, Hashable, Iterable, Literal, cast, Optional
+from typing import Any, Callable, Hashable, Iterable, Literal, cast
 
 import jax
 import jax_dataclasses as jdc
@@ -232,7 +232,7 @@ class FactorGraph:
             jdc.replace(
                 factor,
                 compute_residual=compute_residual_from_hash.setdefault(
-                    factor.get_signature(),
+                    _get_function_signature(factor.compute_residual),
                     factor.compute_residual,
                 ),
             )
@@ -422,7 +422,6 @@ class Factor[*Args]:
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
     name: jdc.Static[str | None] = None
-    signature_fn: jdc.Static[Optional[Callable[[Callable], Hashable]]] = None
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff."""
@@ -483,33 +482,6 @@ class Factor[*Args]:
                 jnp.broadcast_to(leaf, batch_axes + leaf.shape[len(batch_axes) :])
             )
         return jax.tree.unflatten(treedef, broadcasted_leaves)
-
-    @staticmethod
-    def _default_get_signature(func: Callable) -> Hashable:
-        """Default logic for generating a function signature."""
-        closure = func.__closure__
-        if closure:
-            closure_vars = tuple(sorted((str(cell.cell_contents) for cell in closure)))
-        else:
-            closure_vars = ()
-
-        bytecode = dis.Bytecode(func)
-        bytecode_tuple = tuple((instr.opname, instr.argrepr) for instr in bytecode)
-        return bytecode_tuple, closure_vars
-
-    def get_signature(self) -> Hashable:
-        """Gets the signature for this factor's cost function.
-
-        Uses the custom signature_fn override if provided, otherwise uses the
-        default static signature logic.
-        """
-        cost_fn = self.compute_residual
-        if self.signature_fn is not None:
-            # Use the custom function passed during Factor creation.
-            # Assumes it captures necessary context (like self for instance methods).
-            return self.signature_fn(cost_fn)
-        else:
-            return Factor._default_get_signature(cost_fn)
 
 
 @jdc.pytree_dataclass
