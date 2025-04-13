@@ -113,8 +113,14 @@ class FactorGraph:
         as the sum of squared terms within this vector."""
         residual_slices = list[jax.Array]()
         for stacked_factor in self.stacked_factors:
+            # Flatten the output of the user-provided compute_residual.
+            compute_residual_flat = (
+                lambda args_for_one_factor: stacked_factor.compute_residual(
+                    vals, *args_for_one_factor
+                ).flatten()
+            )
             stacked_residual_slice = jax.vmap(
-                lambda args: stacked_factor.compute_residual(vals, *args)
+                compute_residual_flat
             )(stacked_factor.args)
             assert len(stacked_residual_slice.shape) == 2
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
@@ -147,11 +153,12 @@ class FactorGraph:
                     else jax.jacfwd,
                 }[factor.jac_mode]
                 return jacfunc(
-                    # The residual function, with respect to to some local delta.
+                    # Flatten the output of compute_residual before computing Jacobian.
+                    # The Jacobian is computed with respect to the flattened residual.
                     lambda tangent: factor.compute_residual(
                         val_subset._retract(tangent, self.tangent_ordering),
                         *factor.args,
-                    )
+                    ).flatten()
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
             # Compute Jacobian for each factor.
@@ -435,6 +442,8 @@ class Factor[*Args]:
     """Optional custom Jacobian function. If None, we use autodiff. Inputs are
     the same as `compute_residual`. Output is a single 2D Jacobian matrix with
     shape (residual_dim, sum_of_tangent_dims_of_variables)."""
+    # Note: residual_dim corresponds to the size of the *flattened* residual
+    # if the output of `compute_residual` is multi-dimensional.
 
     name: jdc.Static[str | None] = None
     """Custom name for the factor. This is used for debugging and logging."""
@@ -511,6 +520,8 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         default_factory=dict
     )
     residual_dim: jdc.Static[int] = 0
+    # Note: residual_dim corresponds to the size of the *flattened* residual
+    # if the output of `compute_residual` is multi-dimensional.
 
     @staticmethod
     @jdc.jit
@@ -536,8 +547,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         # Cache the residual dimension for this factor.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
         residual_shape = jax.eval_shape(compute_residual, dummy_vals, *args).shape
-        assert len(residual_shape) == 1, "Residual must be a 1D array."
-        (residual_dim,) = residual_shape
+        residual_dim = onp.prod(residual_shape).item()
 
         return _AnalyzedFactor(
             compute_residual,
