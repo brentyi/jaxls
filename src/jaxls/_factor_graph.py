@@ -495,7 +495,6 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
     """Same as `Factor`, but with extra fields."""
 
     # These need defaults because `jac_mode` has a default.
-    name: jdc.Static[str | None] = None
     num_variables: jdc.Static[int] = 0
     sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array] = jdc.field(
         default_factory=dict
@@ -533,7 +532,6 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         return _AnalyzedFactor(
             compute_residual,
             args=args,
-            name=factor.name,
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_dim=residual_dim,
