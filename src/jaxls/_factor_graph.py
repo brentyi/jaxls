@@ -288,7 +288,10 @@ class FactorGraph:
         # Start by grouping our factors and grabbing a list of (ordered!) variables
         factors_from_group = dict[Any, list[Factor]]()
         count_from_group = dict[Any, int]()
-        for i, factor in enumerate(factors):
+        for factor in factors:
+            # Support broadcasting for factor arguments.
+            factor = factor._broadcast_batch_axes()
+
             # Each factor is ultimately just a pytree node; in order for a set of
             # factors to be batchable, they must share the same:
             group_key: Hashable = (
@@ -432,23 +435,42 @@ class Factor[*Args]:
         )
         return Factor(compute_residual, args, jac_mode)
 
-    def _get_batch_axes(self) -> tuple[int, ...]:
-        def traverse_args(current: Any) -> tuple[int, ...] | None:
+    def _get_variables(self) -> tuple[Var, ...]:
+        def get_variables(current: Any) -> list[Var]:
             children_and_meta = default_registry.flatten_one_level(current)
             if children_and_meta is None:
-                return None
+                return []
+
+            variables = []
             for child in children_and_meta[0]:
                 if isinstance(child, Var):
-                    return () if isinstance(child.id, int) else child.id.shape
+                    variables.append(child)
                 else:
-                    batch_axes = traverse_args(child)
-                    if batch_axes is not None:
-                        return batch_axes
-            return None
+                    variables.extend(get_variables(child))
+            return variables
 
-        batch_axes = traverse_args(self.args)
-        assert batch_axes is not None, "No variables found in factor!"
-        return batch_axes
+        return tuple(get_variables(self.args))
+
+    def _get_batch_axes(self) -> tuple[int, ...]:
+        variables = self._get_variables()
+        assert len(variables) != 0, "No variables found in factor!"
+        return jnp.broadcast_shapes(
+            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
+        )
+
+    def _broadcast_batch_axes(self) -> Factor:
+        batch_axes = self._get_batch_axes()
+        if batch_axes is None:
+            return self
+        leaves, treedef = jax.tree.flatten(self)
+        broadcasted_leaves = []
+        for leaf in leaves:
+            if isinstance(leaf, (int, float)):
+                leaf = jnp.array(leaf)
+            broadcasted_leaves.append(
+                jnp.broadcast_to(leaf, batch_axes + leaf.shape[len(batch_axes) :])
+            )
+        return jax.tree.unflatten(treedef, broadcasted_leaves)
 
 
 @jdc.pytree_dataclass
@@ -470,20 +492,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
         compute_residual = factor.compute_residual
         args = factor.args
         jac_mode = factor.jac_mode
-
-        # Get all variables in the PyTree structure.
-        def traverse_args(current: Any, variables: list[Var]) -> list[Var]:
-            children_and_meta = default_registry.flatten_one_level(current)
-            if children_and_meta is None:
-                return variables
-            for child in children_and_meta[0]:
-                if isinstance(child, Var):
-                    variables.append(child)
-                else:
-                    traverse_args(child, variables)
-            return variables
-
-        variables = tuple(traverse_args(args, []))
+        variables = factor._get_variables()
         assert len(variables) > 0
 
         # Support batch axis.
