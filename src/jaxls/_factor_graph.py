@@ -519,9 +519,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
 
         compute_residual = factor.compute_residual
         args = factor.args
-        jac_mode = factor.jac_mode
         variables = factor._get_variables()
-        jac_custom_fn = factor.jac_custom_fn
         assert len(variables) > 0
 
         # Support batch axis.
@@ -547,8 +545,8 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_dim=residual_dim,
-            jac_mode=jac_mode,
-            jac_custom_fn=jac_custom_fn,
+            jac_mode=factor.jac_mode,
+            jac_custom_fn=factor.jac_custom_fn,
         )
 
     def _compute_block_sparse_jac_indices(
