@@ -465,9 +465,9 @@ class Factor[*Args]:
     @staticmethod
     def create_factory[**Args_](
         compute_residual: ResidualFunc[Args_],
-        /,
     ) -> CostFactory[Args_]: ...
 
+    # Decorator factory with keyword arguments.
     @overload
     @staticmethod
     def create_factory[**Args_](
@@ -481,7 +481,7 @@ class Factor[*Args]:
     @staticmethod
     def create_factory[**Args_](
         compute_residual: ResidualFunc[Args_] | None = None,
-        /,
+        *,
         jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
         jac_batch_size: jdc.Static[int | None] = None,
         jac_custom_fn: jdc.Static[JacobianFunc | None] = None,
