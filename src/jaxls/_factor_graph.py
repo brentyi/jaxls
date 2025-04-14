@@ -547,6 +547,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
             residual_dim=residual_dim,
             jac_mode=factor.jac_mode,
             jac_custom_fn=factor.jac_custom_fn,
+            name=factor.name,
         )
 
     def _compute_block_sparse_jac_indices(
