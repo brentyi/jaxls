@@ -1,4 +1,4 @@
-"""Simple pose graph example with two pose variables and three factors:
+"""Simple pose graph example with two pose variables and three costs:
 
 ┌────────┐             ┌────────┐
 │ Pose 0 ├───Between───┤ Pose 1 │
@@ -20,19 +20,19 @@ vars = (jaxls.SE2Var(0), jaxls.SE2Var(1))
 
 # Create factors: each defines a conditional probability distribution over some
 # variables.
-factors = [
+costs = [
     # Prior factor for pose 0.
-    jaxls.Factor(
+    jaxls.Cost(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
     ),
     # Prior factor for pose 1.
-    jaxls.Factor(
+    jaxls.Cost(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
     ),
     # "Between" factor.
-    jaxls.Factor(
+    jaxls.Cost(
         lambda vals, delta, var0, var1: (
             (vals[var0].inverse() @ vals[var1]) @ delta.inverse()
         ).log(),
@@ -42,10 +42,10 @@ factors = [
 
 # Create our "stacked" factor graph. (this is the only kind of factor graph)
 #
-# This goes through factors, and preprocesses them to enable vectorization of
+# This goes through costs, and preprocesses them to enable vectorization of
 # computations. If we have 1000 PriorFactor objects, we stack all of the associated
 # values and perform a batched operation that computes all 1000 residuals.
-graph = jaxls.FactorGraph.make(factors, vars)
+graph = jaxls.LeastSquaresProblem.make(costs, vars)
 
 # Solve the optimization problem.
 solution = graph.solve()

@@ -34,7 +34,7 @@ def main(
 
     # Making graph.
     with jaxls.utils.stopwatch("Making graph"):
-        graph = jaxls.FactorGraph.make(factors=g2o.factors, variables=g2o.pose_vars)
+        graph = jaxls.LeastSquaresProblem.make(costs=g2o.costs, variables=g2o.pose_vars)
         jax.block_until_ready(graph)
 
     with jaxls.utils.stopwatch("Making solver"):

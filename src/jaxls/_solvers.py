@@ -22,7 +22,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._factor_graph import FactorGraph
+    from ._core import LeastSquaresProblem
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
@@ -61,22 +61,22 @@ def _cholmod_solve_on_host(
         A.coords.indptr.tobytes(),
         A.coords.shape,
     )
-    factor = _cholmod_analyze_cache.get(cache_key, None)
-    if factor is None:
-        factor = sksparse.cholmod.analyze_AAt(A_T_scipy)
-        _cholmod_analyze_cache[cache_key] = factor
+    cost = _cholmod_analyze_cache.get(cache_key, None)
+    if cost is None:
+        cost = sksparse.cholmod.analyze_AAt(A_T_scipy)
+        _cholmod_analyze_cache[cache_key] = cost
 
         max_cache_size = 512
         if len(_cholmod_analyze_cache) > max_cache_size:
             _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
     # Factorize and solve
-    factor = factor.cholesky_AAt(
+    cost = cost.cholesky_AAt(
         A_T_scipy,
         # Some simple linear problems blow up without this 1e-5 term.
         beta=lambd + 1e-5,
     )
-    return factor.solve_A(ATb)
+    return cost.solve_A(ATb)
 
 
 @jdc.pytree_dataclass
@@ -117,7 +117,7 @@ class ConjugateGradientConfig:
 
     def _solve(
         self,
-        graph: FactorGraph,
+        graph: LeastSquaresProblem,
         A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
@@ -194,7 +194,7 @@ class NonlinearSolver:
     verbose: jdc.Static[bool]
 
     @jdc.jit
-    def solve(self, graph: FactorGraph, initial_vals: VarValues) -> VarValues:
+    def solve(self, graph: LeastSquaresProblem, initial_vals: VarValues) -> VarValues:
         vals = initial_vals
         residual_vector = graph.compute_residual_vector(vals)
 
@@ -239,7 +239,7 @@ class NonlinearSolver:
         return state.vals
 
     def step(
-        self, graph: FactorGraph, state: NonlinearSolverState
+        self, graph: LeastSquaresProblem, state: NonlinearSolverState
     ) -> NonlinearSolverState:
         # Get nonzero values of Jacobian.
         A_blocksparse = graph._compute_jac_values(state.vals)
@@ -343,7 +343,7 @@ class NonlinearSolver:
                     ordered=True,
                 )
             residual_index = 0
-            for f, count in zip(graph.stacked_factors, graph.factor_counts):
+            for f, count in zip(graph.stacked_costs, graph.cost_counts):
                 stacked_dim = count * f.residual_flat_dim
                 partial_cost = jnp.sum(
                     state.residual_vector[residual_index : residual_index + stacked_dim]
