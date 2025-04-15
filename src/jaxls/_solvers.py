@@ -345,7 +345,7 @@ class NonlinearSolver:
                 )
             residual_index = 0
             for f, count in zip(graph.stacked_factors, graph.factor_counts):
-                stacked_dim = count * f.residual_dim
+                stacked_dim = count * f.residual_flat_dim
                 partial_cost = jnp.sum(
                     state.residual_vector[residual_index : residual_index + stacked_dim]
                     ** 2
