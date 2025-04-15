@@ -1,8 +1,9 @@
 import sys
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from . import utils as utils
+from ._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
 from ._core import Cost as Cost
 from ._core import LeastSquaresProblem as LeastSquaresProblem
 from ._lie_group_variables import SE2Var as SE2Var
@@ -31,26 +32,26 @@ if not TYPE_CHECKING:
     class _FactorGraphDescriptor:
         def __get__(self, obj: Any, objtype: Any = None) -> Any:
             warnings.warn(
-                "`jaxls.FactorGraph` has been renamed `jaxls.LeastSquaresProblem`",
+                "`jaxls.FactorGraph.make(...)` has been replaced with `jaxls.LeastSquaresProblem(...).analyze()`",
                 DeprecationWarning,
                 stacklevel=2,
             )
 
             class FactorGraph:
                 @staticmethod
-                def make(*args, **kwargs):
-                    from ._core import FactorGraph
-
+                def make(factors, variables, use_onp=False):
                     if "factors" in kwargs:
                         kwargs["costs"] = kwargs.pop("factors")
 
                     warnings.warn(
-                        "`jaxls.FactorGraph` has been renamed `jaxls.FactorGraph`",
+                        "`jaxls.FactorGraph` has been renamed `jaxls.LeastSquaresProblem`",
                         DeprecationWarning,
                         stacklevel=2,
                     )
 
-                    return FactorGraph(*args, **kwargs)
+                    return LeastSquaresProblem(
+                        costs=factors, variables=variables
+                    ).analyze(use_onp)
 
             return FactorGraph
 

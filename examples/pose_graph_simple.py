@@ -45,10 +45,10 @@ costs = [
 # This goes through costs, and preprocesses them to enable vectorization of
 # computations. If we have 1000 PriorFactor objects, we stack all of the associated
 # values and perform a batched operation that computes all 1000 residuals.
-graph = jaxls.LeastSquaresProblem.make(costs, vars)
+problem = jaxls.LeastSquaresProblem(costs, vars).analyze()
 
 # Solve the optimization problem.
-solution = graph.solve()
+solution = problem.solve()
 print("All solutions", solution)
 print("Pose 0", solution[vars[0]])
 print("Pose 1", solution[vars[1]])

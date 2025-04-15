@@ -6,7 +6,7 @@ import jax
 from jax import numpy as jnp
 
 if TYPE_CHECKING:
-    from ._core import LeastSquaresProblem
+    from ._core import AnalyzedLeastSquaresProblem
     from ._sparse_matrices import BlockRowSparseMatrix
 
 
@@ -38,7 +38,7 @@ def make_point_jacobi_precoditioner(
 
 
 def make_block_jacobi_precoditioner(
-    graph: LeastSquaresProblem, A_blocksparse: BlockRowSparseMatrix
+    graph: AnalyzedLeastSquaresProblem, A_blocksparse: BlockRowSparseMatrix
 ) -> Callable[[jax.Array], jax.Array]:
     """Returns a block Jacobi preconditioner."""
 

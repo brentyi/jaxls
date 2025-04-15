@@ -22,7 +22,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._core import LeastSquaresProblem
+    from ._core import AnalyzedLeastSquaresProblem
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
@@ -117,7 +117,7 @@ class ConjugateGradientConfig:
 
     def _solve(
         self,
-        problem: LeastSquaresProblem,
+        problem: AnalyzedLeastSquaresProblem,
         A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
@@ -194,7 +194,9 @@ class NonlinearSolver:
     verbose: jdc.Static[bool]
 
     @jdc.jit
-    def solve(self, problem: LeastSquaresProblem, initial_vals: VarValues) -> VarValues:
+    def solve(
+        self, problem: AnalyzedLeastSquaresProblem, initial_vals: VarValues
+    ) -> VarValues:
         vals = initial_vals
         residual_vector = problem.compute_residual_vector(vals)
 
@@ -239,7 +241,7 @@ class NonlinearSolver:
         return state.vals
 
     def step(
-        self, problem: LeastSquaresProblem, state: NonlinearSolverState
+        self, problem: AnalyzedLeastSquaresProblem, state: NonlinearSolverState
     ) -> NonlinearSolverState:
         # Get nonzero values of Jacobian.
         A_blocksparse = problem._compute_jac_values(state.vals)
