@@ -113,8 +113,9 @@ class FactorGraph:
         as the sum of squared terms within this vector."""
         residual_slices = list[jax.Array]()
         for stacked_factor in self.stacked_factors:
+            # Flatten the output of the user-provided compute_residual.
             stacked_residual_slice = jax.vmap(
-                lambda args: stacked_factor.compute_residual(vals, *args)
+                lambda args: stacked_factor.compute_residual_flat(vals, *args)
             )(stacked_factor.args)
             assert len(stacked_residual_slice.shape) == 2
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
@@ -143,12 +144,14 @@ class FactorGraph:
                     "forward": jax.jacfwd,
                     "reverse": jax.jacrev,
                     "auto": jax.jacrev
-                    if factor.residual_dim < val_subset._get_tangent_dim()
+                    if factor.residual_flat_dim < val_subset._get_tangent_dim()
                     else jax.jacfwd,
                 }[factor.jac_mode]
                 return jacfunc(
-                    # The residual function, with respect to to some local delta.
-                    lambda tangent: factor.compute_residual(
+                    # We flatten the output of compute_residual before
+                    # computing Jacobian. The Jacobian is computed with respect
+                    # to the flattened residual.
+                    lambda tangent: factor.compute_residual_flat(
                         val_subset._retract(tangent, self.tangent_ordering),
                         *factor.args,
                     )
@@ -166,7 +169,7 @@ class FactorGraph:
             (num_factor,) = factor._get_batch_axes()
             assert stacked_jac.shape == (
                 num_factor,
-                factor.residual_dim,
+                factor.residual_flat_dim,
                 stacked_jac.shape[-1],  # Tangent dimension.
             )
 
@@ -207,7 +210,7 @@ class FactorGraph:
                 )
             )
 
-            residual_offset += factor.residual_dim * num_factor
+            residual_offset += factor.residual_flat_dim * num_factor
         assert residual_offset == self.residual_dim
 
         bsparse_jacobian = BlockRowSparseMatrix(
@@ -375,18 +378,18 @@ class FactorGraph:
                 == cols.shape
                 == (
                     count_from_group[group_key],
-                    stacked_factor_expanded.residual_dim,
+                    stacked_factor_expanded.residual_flat_dim,
                     rows.shape[-1],
                 )
             )
             rows = rows + (
                 jnp.arange(count_from_group[group_key])[:, None, None]
-                * stacked_factor_expanded.residual_dim
+                * stacked_factor_expanded.residual_flat_dim
             )
             rows = rows + residual_dim_sum
             jac_coords.append((rows.flatten(), cols.flatten()))
             residual_dim_sum += (
-                stacked_factor_expanded.residual_dim * count_from_group[group_key]
+                stacked_factor_expanded.residual_flat_dim * count_from_group[group_key]
             )
 
         jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
@@ -501,24 +504,21 @@ class Factor[*Args]:
         return jax.tree.unflatten(treedef, broadcasted_leaves)
 
 
-@jdc.pytree_dataclass
+@jdc.pytree_dataclass(kw_only=True)
 class _AnalyzedFactor[*Args](Factor[*Args]):
     """Same as `Factor`, but with extra fields."""
 
-    # These need defaults because `jac_mode` has a default.
-    num_variables: jdc.Static[int] = 0
-    sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array] = jdc.field(
-        default_factory=dict
-    )
-    residual_dim: jdc.Static[int] = 0
+    num_variables: jdc.Static[int]
+    sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
+    residual_flat_dim: jdc.Static[int] = 0
+
+    def compute_residual_flat(self, vals: VarValues, *args: *Args) -> jax.Array:
+        return self.compute_residual(vals, *args).flatten()
 
     @staticmethod
     @jdc.jit
     def _make[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
         """Construct a factor for our factor graph."""
-
-        compute_residual = factor.compute_residual
-        args = factor.args
         variables = factor._get_variables()
         assert len(variables) > 0
 
@@ -535,19 +535,15 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
 
         # Cache the residual dimension for this factor.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
-        residual_shape = jax.eval_shape(compute_residual, dummy_vals, *args).shape
-        assert len(residual_shape) == 1, "Residual must be a 1D array."
-        (residual_dim,) = residual_shape
+        residual_dim = onp.prod(
+            jax.eval_shape(factor.compute_residual, dummy_vals, *factor.args).shape
+        )
 
         return _AnalyzedFactor(
-            compute_residual,
-            args=args,
+            **vars(factor),
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
-            residual_dim=residual_dim,
-            jac_mode=factor.jac_mode,
-            jac_custom_fn=factor.jac_custom_fn,
-            name=factor.name,
+            residual_flat_dim=residual_dim,
         )
 
     def _compute_block_sparse_jac_indices(
@@ -574,7 +570,7 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
             )
             col_indices.append(cast(jax.Array, tangent_indices).flatten())
         rows, cols = jnp.meshgrid(
-            jnp.arange(self.residual_dim),
+            jnp.arange(self.residual_flat_dim),
             jnp.concatenate(col_indices, axis=0),
             indexing="ij",
         )

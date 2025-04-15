@@ -74,7 +74,7 @@ def make_block_jacobi_precoditioner(
             ].reshape(
                 (
                     num_factors,
-                    factor.residual_dim,
+                    factor.residual_flat_dim,
                     num_vars,
                     var_type.tangent_dim,
                 )
