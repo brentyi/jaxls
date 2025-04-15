@@ -2,7 +2,16 @@ from __future__ import annotations
 
 import dis
 import functools
-from typing import Any, Callable, Hashable, Iterable, Literal, cast
+from typing import (
+    Any,
+    Callable,
+    Concatenate,
+    Hashable,
+    Iterable,
+    Literal,
+    cast,
+    overload,
+)
 
 import jax
 import jax_dataclasses as jdc
@@ -417,6 +426,11 @@ class FactorGraph:
         )
 
 
+type ResidualFunc[**Args] = Callable[Concatenate[VarValues, Args], jax.Array]
+type JacobianFunc[**Args] = Callable[Concatenate[VarValues, Args], jax.Array]
+type CostFactory[**Args] = Callable[Args, Factor[tuple[Any, ...], dict[str, Any]]]
+
+
 @jdc.pytree_dataclass
 class Factor[*Args]:
     """A single cost in our factor graph. Costs with the same pytree structure
@@ -448,6 +462,88 @@ class Factor[*Args]:
         if self.name is None:
             return self.compute_residual.__name__
         return self.name
+
+    # Simple decorator.
+    @overload
+    @staticmethod
+    def create_factory[**Args_](
+        compute_residual: ResidualFunc[Args_],
+    ) -> CostFactory[Args_]: ...
+
+    # Decorator factory with keyword arguments.
+    @overload
+    @staticmethod
+    def create_factory[**Args_](
+        *,
+        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
+        jac_batch_size: jdc.Static[int | None] = None,
+        jac_custom_fn: jdc.Static[JacobianFunc | None] = None,
+        name: jdc.Static[str | None] = None,
+    ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]]: ...
+
+    @staticmethod
+    def create_factory[**Args_](
+        compute_residual: ResidualFunc[Args_] | None = None,
+        *,
+        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
+        jac_batch_size: jdc.Static[int | None] = None,
+        jac_custom_fn: jdc.Static[JacobianFunc | None] = None,
+        name: jdc.Static[str | None] = None,
+    ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]] | CostFactory[Args_]:
+        """Decorator for creating factors from a residual function.
+
+        Examples:
+
+            @Factor.create_factory
+            def cost1(values: VarValues, var1: SE2Var, var2: int) -> jax.Array:
+                ...
+
+            # Factory will have the same input signature as the wrapped
+            # residual function, but without the `VarValues` argument. The
+            # return type will be `Factor` instead of `jax.Array`.
+            factor = cost1(var1=SE2Var(0), var2=5)
+            assert isinstance(factor, Factor)
+
+        Keyword arguments can also be used for configuration. For example:
+
+            # To enforce forward-mode autodiff for Jacobians.
+            @Factor.create_factory(jac_mode="forward")
+            def cost(...): ...
+
+            # To reduce memory usage.
+            @Factor.create_factory(jac_batch_size=1)
+            def cost(...): ...
+
+        """
+
+        def decorator(
+            compute_residual: Callable[Concatenate[VarValues, Args_], jax.Array],
+        ) -> CostFactory[Args_]:
+            def inner(
+                *args: Args_.args, **kwargs: Args_.kwargs
+            ) -> Factor[tuple[Any, ...], dict[str, Any]]:
+                return Factor(
+                    compute_residual=lambda values, args, kwargs: compute_residual(
+                        values, *args, **kwargs
+                    ),
+                    args=(args, kwargs),
+                    jac_mode=jac_mode,
+                    jac_batch_size=jac_batch_size,
+                    jac_custom_fn=(
+                        lambda values, args, kwargs: cast(
+                            JacobianFunc[Args_], jac_custom_fn
+                        )(values, *args, **kwargs)
+                    )
+                    if jac_custom_fn is not None
+                    else None,
+                    name=name,
+                )
+
+            return inner
+
+        if compute_residual is None:
+            return decorator
+        return decorator(compute_residual)
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")

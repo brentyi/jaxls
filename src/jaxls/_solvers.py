@@ -4,7 +4,6 @@ import functools
 from typing import TYPE_CHECKING, Callable, Hashable, Literal, assert_never, cast
 
 import jax
-import jax.experimental.sparse
 import jax.flatten_util
 import jax_dataclasses as jdc
 import scipy
