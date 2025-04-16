@@ -95,8 +95,8 @@ all elements in the arguments tuple.
 it, and print solutions:
 
 ```python
-graph = jaxls.LeastSquaresProblem.make(costs, pose_vars)
-solution = graph.solve()
+problem = jaxls.LeastSquaresProblem(costs, pose_vars).analyze()
+solution = problem.solve()
 print("All solutions", solution)
 print("Pose 0", solution[pose_vars[0]])
 print("Pose 1", solution[pose_vars[1]])
