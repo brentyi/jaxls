@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from . import utils as utils
 from ._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
 from ._core import Cost as Cost
