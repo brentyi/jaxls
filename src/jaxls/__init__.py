@@ -16,6 +16,9 @@ from ._variables import VarValues as VarValues
 
 # Some shims for backwards compatibility.
 if not TYPE_CHECKING:
+    import sys
+    from typing import Any
+
     # Create a descriptor for Factor that shows a deprecation warning when accessed
     class _FactorDescriptor:
         def __get__(self, obj: Any, objtype: Any = None) -> Any:
