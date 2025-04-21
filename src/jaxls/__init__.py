@@ -25,7 +25,8 @@ if not TYPE_CHECKING:
             utils.print_deprecation_warning(
                 "Import detected for [yellow]jaxls.Factor[/yellow], which has been renamed:",
                 "[yellow]jaxls.Factor[/yellow] has been renamed to [green]jaxls.Cost[/green]. "
-                "We recommend updating to the newer syntax. To suppress this warning, you can also downgrade jaxls: [bold]pip install git+https://github.com/brentyi/jaxls.git@21219e08676e13bb481230907e1cbc486ee284c7[/bold].",
+                "See migration guide at [blue]https://github.com/brentyi/jaxls/pull/36[/blue] for details. "
+                "To suppress this warning, you can also downgrade jaxls: [bold]pip install git+https://github.com/brentyi/jaxls.git@21219e08676e13bb481230907e1cbc486ee284c7[/bold].",
             )
 
             # Standard warning is now handled by print_deprecation_warning
@@ -37,7 +38,8 @@ if not TYPE_CHECKING:
             utils.print_deprecation_warning(
                 "Import detected for [yellow]jaxls.FactorGraph[/yellow], which has been renamed:",
                 "[yellow]jaxls.FactorGraph.make(...)[/yellow] has been replaced with [green]jaxls.LeastSquaresProblem(...).analyze()[/green]. "
-                "We recommend updating to the newer syntax. To suppress this warning, you can also downgrade jaxls: [bold]pip install git+https://github.com/brentyi/jaxls.git@21219e08676e13bb481230907e1cbc486ee284c7[/bold].",
+                "See migration guide at [blue]https://github.com/brentyi/jaxls/pull/36[/blue] for details. "
+                "To suppress this warning, you can also downgrade jaxls: [bold]pip install git+https://github.com/brentyi/jaxls.git@21219e08676e13bb481230907e1cbc486ee284c7[/bold].",
             )
 
             class FactorGraph:
