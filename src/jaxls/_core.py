@@ -56,9 +56,211 @@ def _get_function_signature(func: Callable) -> Hashable:
 
 
 @jdc.pytree_dataclass
-class FactorGraph:
-    stacked_factors: tuple[_AnalyzedFactor, ...]
-    factor_counts: jdc.Static[tuple[int, ...]]
+class LeastSquaresProblem:
+    """We define least squares problem as bipartite graphs, which have two types of nodes:
+
+    - `jaxls.Cost`. These are the terms we want to minimize.
+    - `jaxls.Var`. These are the parameters we want to optimize.
+    """
+
+    costs: Iterable[Cost]
+    variables: Iterable[Var]
+
+    def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
+        """Analyze sparsity pattern of least squares problem. Needed before solving."""
+
+        # Operations using vanilla numpy can be faster.
+        if use_onp:
+            jnp = onp
+        else:
+            from jax import numpy as jnp
+
+        variables = tuple(self.variables)
+        compute_residual_from_hash = dict[Hashable, Callable]()
+        costs = tuple(
+            jdc.replace(
+                cost,
+                compute_residual=compute_residual_from_hash.setdefault(
+                    _get_function_signature(cost.compute_residual),
+                    cost.compute_residual,
+                ),
+            )
+            for cost in self.costs
+        )
+
+        # We're assuming no more than 1 batch axis.
+        num_costs = 0
+        for f in costs:
+            assert len(f._get_batch_axes()) in (0, 1)
+            num_costs += 1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
+
+        num_variables = 0
+        for v in variables:
+            assert isinstance(v.id, int) or len(v.id.shape) in (0, 1)
+            num_variables += (
+                1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
+            )
+        logger.info(
+            "Building optimization problem with {} costs and {} variables.",
+            num_costs,
+            num_variables,
+        )
+
+        # Create storage layout: this describes which parts of our tangent
+        # vector is allocated to each variable.
+        tangent_start_from_var_type = dict[type[Var[Any]], int]()
+
+        def _sort_key(x: Any) -> str:
+            """We're going to sort variable / cost types by name. This should
+            prevent re-compiling when costs or variables are reordered."""
+            return str(x)
+
+        # Count variables of each type.
+        count_from_var_type = dict[type[Var[Any]], int]()
+        for var in variables:
+            if isinstance(var.id, int) or var.id.shape == ():
+                increment = 1
+            else:
+                (increment,) = var.id.shape
+            count_from_var_type[type(var)] = (
+                count_from_var_type.get(type(var), 0) + increment
+            )
+        tangent_dim_sum = 0
+        for var_type in sorted(count_from_var_type.keys(), key=_sort_key):
+            tangent_start_from_var_type[var_type] = tangent_dim_sum
+            tangent_dim_sum += var_type.tangent_dim * count_from_var_type[var_type]
+
+        # Create ordering helper.
+        tangent_ordering = VarTypeOrdering(
+            {
+                var_type: i
+                for i, var_type in enumerate(tangent_start_from_var_type.keys())
+            }
+        )
+
+        # Start by grouping our costs and grabbing a list of (ordered!) variables
+        costs_from_group = dict[Any, list[Cost]]()
+        count_from_group = dict[Any, int]()
+        for cost in costs:
+            # Support broadcasting for cost arguments.
+            cost = cost._broadcast_batch_axes()
+
+            # Each cost is ultimately just a pytree node; in order for a set of
+            # costs to be batchable, they must share the same:
+            group_key: Hashable = (
+                # (1) Treedef. Structure of inputs must match.
+                jax.tree.structure(cost),
+                # (2) Leaf shapes: contained array shapes must match
+                tuple(
+                    leaf.shape if hasattr(leaf, "shape") else ()
+                    for leaf in jax.tree.leaves(cost)
+                ),
+            )
+            costs_from_group.setdefault(group_key, [])
+            count_from_group.setdefault(group_key, 0)
+
+            batch_axes = cost._get_batch_axes()
+            if len(batch_axes) == 0:
+                cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
+                count_from_group[group_key] += 1
+            else:
+                assert len(batch_axes) == 1
+                count_from_group[group_key] += batch_axes[0]
+
+            # Record costs and variables.
+            costs_from_group[group_key].append(cost)
+
+        # Fields we want to populate.
+        stacked_costs = list[_AnalyzedCost]()
+        cost_counts = list[int]()
+        jac_coords = list[tuple[jax.Array, jax.Array]]()
+
+        # Sort variable IDs.
+        sorted_ids_from_var_type = sort_and_stack_vars(variables)
+        del variables
+
+        # Prepare each cost group. We put groups in a consistent order.
+        residual_dim_sum = 0
+        for group_key in sorted(costs_from_group.keys(), key=_sort_key):
+            group = costs_from_group[group_key]
+
+            # Stack cost parameters.
+            stacked_cost: Cost = jax.tree.map(
+                lambda *args: jnp.concatenate(args, axis=0), *group
+            )
+            stacked_cost_expanded: _AnalyzedCost = jax.vmap(_AnalyzedCost._make)(
+                stacked_cost
+            )
+            stacked_costs.append(stacked_cost_expanded)
+            cost_counts.append(count_from_group[group_key])
+
+            logger.info(
+                "Vectorizing group with {} costs, {} variables each: {}",
+                count_from_group[group_key],
+                stacked_costs[-1].num_variables,
+                stacked_costs[-1]._get_name(),
+            )
+
+            # Compute Jacobian coordinates.
+            #
+            # These should be N pairs of (row, col) indices, where rows correspond to
+            # residual indices and columns correspond to tangent vector indices.
+            rows, cols = jax.vmap(
+                functools.partial(
+                    _AnalyzedCost._compute_block_sparse_jac_indices,
+                    tangent_ordering=tangent_ordering,
+                    sorted_ids_from_var_type=sorted_ids_from_var_type,
+                    tangent_start_from_var_type=tangent_start_from_var_type,
+                )
+            )(stacked_cost_expanded)
+            assert (
+                rows.shape
+                == cols.shape
+                == (
+                    count_from_group[group_key],
+                    stacked_cost_expanded.residual_flat_dim,
+                    rows.shape[-1],
+                )
+            )
+            rows = rows + (
+                jnp.arange(count_from_group[group_key])[:, None, None]
+                * stacked_cost_expanded.residual_flat_dim
+            )
+            rows = rows + residual_dim_sum
+            jac_coords.append((rows.flatten(), cols.flatten()))
+            residual_dim_sum += (
+                stacked_cost_expanded.residual_flat_dim * count_from_group[group_key]
+            )
+
+        jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
+            *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
+            shape=(residual_dim_sum, tangent_dim_sum),
+        )
+        csr_indptr = jnp.searchsorted(
+            jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
+        )
+        jac_coords_csr = SparseCsrCoordinates(
+            indices=jac_coords_coo.cols,
+            indptr=cast(jax.Array, csr_indptr),
+            shape=(residual_dim_sum, tangent_dim_sum),
+        )
+        return AnalyzedLeastSquaresProblem(
+            stacked_costs=tuple(stacked_costs),
+            cost_counts=tuple(cost_counts),
+            sorted_ids_from_var_type=sorted_ids_from_var_type,
+            jac_coords_coo=jac_coords_coo,
+            jac_coords_csr=jac_coords_csr,
+            tangent_ordering=tangent_ordering,
+            tangent_start_from_var_type=tangent_start_from_var_type,
+            tangent_dim=tangent_dim_sum,
+            residual_dim=residual_dim_sum,
+        )
+
+
+@jdc.pytree_dataclass
+class AnalyzedLeastSquaresProblem:
+    stacked_costs: tuple[_AnalyzedCost, ...]
+    cost_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
     jac_coords_coo: SparseCooCoordinates
     jac_coords_csr: SparseCsrCoordinates
@@ -115,17 +317,17 @@ class FactorGraph:
             sparse_mode,
             verbose,
         )
-        return solver.solve(graph=self, initial_vals=initial_vals)
+        return solver.solve(problem=self, initial_vals=initial_vals)
 
     def compute_residual_vector(self, vals: VarValues) -> jax.Array:
         """Compute the residual vector. The cost we are optimizing is defined
         as the sum of squared terms within this vector."""
         residual_slices = list[jax.Array]()
-        for stacked_factor in self.stacked_factors:
+        for stacked_cost in self.stacked_costs:
             # Flatten the output of the user-provided compute_residual.
             stacked_residual_slice = jax.vmap(
-                lambda args: stacked_factor.compute_residual_flat(vals, *args)
-            )(stacked_factor.args)
+                lambda args: stacked_cost.compute_residual_flat(vals, *args)
+            )(stacked_cost.args)
             assert len(stacked_residual_slice.shape) == 2
             residual_slices.append(stacked_residual_slice.reshape((-1,)))
         return jnp.concatenate(residual_slices, axis=0)
@@ -134,64 +336,63 @@ class FactorGraph:
         block_rows = list[SparseBlockRow]()
         residual_offset = 0
 
-        for factor in self.stacked_factors:
+        for cost in self.stacked_costs:
             # Shape should be: (count_from_group[group_key], single_residual_dim, sum_of_tangent_dims_of_variables).
-            def compute_jac_with_perturb(factor: _AnalyzedFactor) -> jax.Array:
+            def compute_jac_with_perturb(cost: _AnalyzedCost) -> jax.Array:
                 val_subset = vals._get_subset(
                     {
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
-                        for var_type, ids in factor.sorted_ids_from_var_type.items()
+                        for var_type, ids in cost.sorted_ids_from_var_type.items()
                     },
                     self.tangent_ordering,
                 )
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
-                if factor.jac_custom_fn is not None:
-                    return factor.jac_custom_fn(vals, *factor.args)
+                if cost.jac_custom_fn is not None:
+                    return cost.jac_custom_fn(vals, *cost.args)
 
                 jacfunc = {
                     "forward": jax.jacfwd,
                     "reverse": jax.jacrev,
                     "auto": jax.jacrev
-                    if factor.residual_flat_dim < val_subset._get_tangent_dim()
+                    if cost.residual_flat_dim < val_subset._get_tangent_dim()
                     else jax.jacfwd,
-                }[factor.jac_mode]
+                }[cost.jac_mode]
                 return jacfunc(
                     # We flatten the output of compute_residual before
                     # computing Jacobian. The Jacobian is computed with respect
                     # to the flattened residual.
-                    lambda tangent: factor.compute_residual_flat(
+                    lambda tangent: cost.compute_residual_flat(
                         val_subset._retract(tangent, self.tangent_ordering),
-                        *factor.args,
+                        *cost.args,
                     )
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
-            # Compute Jacobian for each factor.
-            if factor.jac_batch_size is None:
-                stacked_jac = jax.vmap(compute_jac_with_perturb)(factor)
+            # Compute Jacobian for each cost term.
+            if cost.jac_batch_size is None:
+                stacked_jac = jax.vmap(compute_jac_with_perturb)(cost)
             else:
                 # When `batch_size` is `None`, jax.lax.map reduces to a scan
                 # (similar to `batch_size=1`).
                 stacked_jac = jax.lax.map(
-                    compute_jac_with_perturb, factor, batch_size=factor.jac_batch_size
+                    compute_jac_with_perturb, cost, batch_size=cost.jac_batch_size
                 )
-            (num_factor,) = factor._get_batch_axes()
+            (num_costs,) = cost._get_batch_axes()
             assert stacked_jac.shape == (
-                num_factor,
-                factor.residual_flat_dim,
+                num_costs,
+                cost.residual_flat_dim,
                 stacked_jac.shape[-1],  # Tangent dimension.
             )
-
             # Compute block-row representation for sparse Jacobian.
             stacked_jac_start_col = 0
             start_cols = list[jax.Array]()
             block_widths = list[int]()
             for var_type, ids in self.tangent_ordering.ordered_dict_items(
                 # This ordering shouldn't actually matter!
-                factor.sorted_ids_from_var_type
+                cost.sorted_ids_from_var_type
             ):
-                (num_factor_, num_vars) = ids.shape
-                assert num_factor == num_factor_
+                (num_costs_, num_vars) = ids.shape
+                assert num_costs == num_costs_
 
                 # Get one block for each variable.
                 for var_idx in range(ids.shape[-1]):
@@ -203,7 +404,7 @@ class FactorGraph:
                         + self.tangent_start_from_var_type[var_type]
                     )
                     block_widths.append(var_type.tangent_dim)
-                    assert start_cols[-1].shape == (num_factor_,)
+                    assert start_cols[-1].shape == (num_costs_,)
 
                 stacked_jac_start_col = (
                     stacked_jac_start_col + num_vars * var_type.tangent_dim
@@ -219,7 +420,7 @@ class FactorGraph:
                 )
             )
 
-            residual_offset += factor.residual_flat_dim * num_factor
+            residual_offset += cost.residual_flat_dim * num_costs
         assert residual_offset == self.residual_dim
 
         bsparse_jacobian = BlockRowSparseMatrix(
@@ -228,213 +429,30 @@ class FactorGraph:
         )
         return bsparse_jacobian
 
-    @staticmethod
-    def make(
-        factors: Iterable[Factor],
-        variables: Iterable[Var],
-        use_onp: bool = False,
-    ) -> FactorGraph:
-        """Create a factor graph from a set of factors and a set of variables."""
-
-        # Operations using vanilla numpy can be faster.
-        if use_onp:
-            jnp = onp
-        else:
-            from jax import numpy as jnp
-
-        variables = tuple(variables)
-        compute_residual_from_hash = dict[Hashable, Callable]()
-        factors = tuple(
-            jdc.replace(
-                factor,
-                compute_residual=compute_residual_from_hash.setdefault(
-                    _get_function_signature(factor.compute_residual),
-                    factor.compute_residual,
-                ),
-            )
-            for factor in factors
-        )
-
-        # We're assuming no more than 1 batch axis.
-        num_factors = 0
-        for f in factors:
-            assert len(f._get_batch_axes()) in (0, 1)
-            num_factors += (
-                1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
-            )
-
-        num_variables = 0
-        for v in variables:
-            assert isinstance(v.id, int) or len(v.id.shape) in (0, 1)
-            num_variables += (
-                1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
-            )
-        logger.info(
-            "Building graph with {} factors and {} variables.",
-            num_factors,
-            num_variables,
-        )
-
-        # Create storage layout: this describes which parts of our tangent
-        # vector is allocated to each variable.
-        tangent_start_from_var_type = dict[type[Var[Any]], int]()
-
-        def _sort_key(x: Any) -> str:
-            """We're going to sort variable / factor types by name. This should
-            prevent re-compiling when factors or variables are reordered."""
-            return str(x)
-
-        # Count variables of each type.
-        count_from_var_type = dict[type[Var[Any]], int]()
-        for var in variables:
-            if isinstance(var.id, int) or var.id.shape == ():
-                increment = 1
-            else:
-                (increment,) = var.id.shape
-            count_from_var_type[type(var)] = (
-                count_from_var_type.get(type(var), 0) + increment
-            )
-        tangent_dim_sum = 0
-        for var_type in sorted(count_from_var_type.keys(), key=_sort_key):
-            tangent_start_from_var_type[var_type] = tangent_dim_sum
-            tangent_dim_sum += var_type.tangent_dim * count_from_var_type[var_type]
-
-        # Create ordering helper.
-        tangent_ordering = VarTypeOrdering(
-            {
-                var_type: i
-                for i, var_type in enumerate(tangent_start_from_var_type.keys())
-            }
-        )
-
-        # Start by grouping our factors and grabbing a list of (ordered!) variables
-        factors_from_group = dict[Any, list[Factor]]()
-        count_from_group = dict[Any, int]()
-        for factor in factors:
-            # Support broadcasting for factor arguments.
-            factor = factor._broadcast_batch_axes()
-
-            # Each factor is ultimately just a pytree node; in order for a set of
-            # factors to be batchable, they must share the same:
-            group_key: Hashable = (
-                # (1) Treedef. Structure of inputs must match.
-                jax.tree_structure(factor),
-                # (2) Leaf shapes: contained array shapes must match
-                tuple(
-                    leaf.shape if hasattr(leaf, "shape") else ()
-                    for leaf in jax.tree_leaves(factor)
-                ),
-            )
-            factors_from_group.setdefault(group_key, [])
-            count_from_group.setdefault(group_key, 0)
-
-            batch_axes = factor._get_batch_axes()
-            if len(batch_axes) == 0:
-                factor = jax.tree.map(lambda x: jnp.asarray(x)[None], factor)
-                count_from_group[group_key] += 1
-            else:
-                assert len(batch_axes) == 1
-                count_from_group[group_key] += batch_axes[0]
-
-            # Record factor and variables.
-            factors_from_group[group_key].append(factor)
-
-        # Fields we want to populate.
-        stacked_factors = list[_AnalyzedFactor]()
-        factor_counts = list[int]()
-        jac_coords = list[tuple[jax.Array, jax.Array]]()
-
-        # Sort variable IDs.
-        sorted_ids_from_var_type = sort_and_stack_vars(variables)
-        del variables
-
-        # Prepare each factor group. We put groups in a consistent order.
-        residual_dim_sum = 0
-        for group_key in sorted(factors_from_group.keys(), key=_sort_key):
-            group = factors_from_group[group_key]
-
-            # Stack factor parameters.
-            stacked_factor: Factor = jax.tree.map(
-                lambda *args: jnp.concatenate(args, axis=0), *group
-            )
-            stacked_factor_expanded: _AnalyzedFactor = jax.vmap(_AnalyzedFactor._make)(
-                stacked_factor
-            )
-            stacked_factors.append(stacked_factor_expanded)
-            factor_counts.append(count_from_group[group_key])
-
-            logger.info(
-                "Vectorizing group with {} factors, {} variables each: {}",
-                count_from_group[group_key],
-                stacked_factors[-1].num_variables,
-                stacked_factors[-1]._get_name(),
-            )
-
-            # Compute Jacobian coordinates.
-            #
-            # These should be N pairs of (row, col) indices, where rows correspond to
-            # residual indices and columns correspond to tangent vector indices.
-            rows, cols = jax.vmap(
-                functools.partial(
-                    _AnalyzedFactor._compute_block_sparse_jac_indices,
-                    tangent_ordering=tangent_ordering,
-                    sorted_ids_from_var_type=sorted_ids_from_var_type,
-                    tangent_start_from_var_type=tangent_start_from_var_type,
-                )
-            )(stacked_factor_expanded)
-            assert (
-                rows.shape
-                == cols.shape
-                == (
-                    count_from_group[group_key],
-                    stacked_factor_expanded.residual_flat_dim,
-                    rows.shape[-1],
-                )
-            )
-            rows = rows + (
-                jnp.arange(count_from_group[group_key])[:, None, None]
-                * stacked_factor_expanded.residual_flat_dim
-            )
-            rows = rows + residual_dim_sum
-            jac_coords.append((rows.flatten(), cols.flatten()))
-            residual_dim_sum += (
-                stacked_factor_expanded.residual_flat_dim * count_from_group[group_key]
-            )
-
-        jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
-            *jax.tree_map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
-            shape=(residual_dim_sum, tangent_dim_sum),
-        )
-        csr_indptr = jnp.searchsorted(
-            jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
-        )
-        jac_coords_csr = SparseCsrCoordinates(
-            indices=jac_coords_coo.cols,
-            indptr=cast(jax.Array, csr_indptr),
-            shape=(residual_dim_sum, tangent_dim_sum),
-        )
-        return FactorGraph(
-            stacked_factors=tuple(stacked_factors),
-            factor_counts=tuple(factor_counts),
-            sorted_ids_from_var_type=sorted_ids_from_var_type,
-            jac_coords_coo=jac_coords_coo,
-            jac_coords_csr=jac_coords_csr,
-            tangent_ordering=tangent_ordering,
-            tangent_start_from_var_type=tangent_start_from_var_type,
-            tangent_dim=tangent_dim_sum,
-            residual_dim=residual_dim_sum,
-        )
-
 
 type ResidualFunc[**Args] = Callable[Concatenate[VarValues, Args], jax.Array]
 type JacobianFunc[**Args] = Callable[Concatenate[VarValues, Args], jax.Array]
-type CostFactory[**Args] = Callable[Args, Factor[tuple[Any, ...], dict[str, Any]]]
+type CostFactory[**Args] = Callable[Args, Cost[tuple[Any, ...], dict[str, Any]]]
 
 
 @jdc.pytree_dataclass
-class Factor[*Args]:
-    """A single cost in our factor graph. Costs with the same pytree structure
-    will automatically be paralellized."""
+class Cost[*Args]:
+    """A least squares cost term in our optimization problem, defined by a
+    residual function. The cost that this represents is defined as:
+
+         || compute_residual(values, *args) ||_2^2
+
+    where `values` is a `jaxls.VarValues` object.
+
+    Each `Cost.compute_residual` should take at least one argument that inherits
+    from the symbolic variable `jaxls.Var(id)`, where `id` must be a scalar
+    integer.
+
+    To create a batch of costs, a leading batch axis can be added to the
+    arguments passed to `Cost.args`:
+    - The batch axis must be the same for all arguments.
+    -
+    """
 
     compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     args: tuple[*Args]
@@ -454,11 +472,11 @@ class Factor[*Args]:
     shape (residual_dim, sum_of_tangent_dims_of_variables)."""
 
     name: jdc.Static[str | None] = None
-    """Custom name for the factor. This is used for debugging and logging."""
+    """Custom name for the cost. This is used for debugging and logging."""
 
     def _get_name(self) -> str:
-        """Get the name of the factor. If not set, we use
-        `factor.compute_residual.__name__`."""
+        """Get the name of the cost. If not set, we use
+        `cost.compute_residual.__name__`."""
         if self.name is None:
             return self.compute_residual.__name__
         return self.name
@@ -490,19 +508,19 @@ class Factor[*Args]:
         jac_custom_fn: jdc.Static[JacobianFunc | None] = None,
         name: jdc.Static[str | None] = None,
     ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]] | CostFactory[Args_]:
-        """Decorator for creating factors from a residual function.
+        """Decorator for creating costs from a residual function.
 
         Examples:
 
-            @Factor.create_factory
+            @jaxls.Cost.create_factory
             def cost1(values: VarValues, var1: SE2Var, var2: int) -> jax.Array:
                 ...
 
             # Factory will have the same input signature as the wrapped
             # residual function, but without the `VarValues` argument. The
             # return type will be `Factor` instead of `jax.Array`.
-            factor = cost1(var1=SE2Var(0), var2=5)
-            assert isinstance(factor, Factor)
+            cost = cost1(var1=SE2Var(0), var2=5)
+            assert isinstance(cost, jaxls.Cost)
 
         Keyword arguments can also be used for configuration. For example:
 
@@ -521,8 +539,8 @@ class Factor[*Args]:
         ) -> CostFactory[Args_]:
             def inner(
                 *args: Args_.args, **kwargs: Args_.kwargs
-            ) -> Factor[tuple[Any, ...], dict[str, Any]]:
-                return Factor(
+            ) -> Cost[tuple[Any, ...], dict[str, Any]]:
+                return Cost(
                     compute_residual=lambda values, args, kwargs: compute_residual(
                         values, *args, **kwargs
                     ),
@@ -554,13 +572,13 @@ class Factor[*Args]:
         jac_custom_fn: jdc.Static[
             Callable[[VarValues, *Args_], jax.Array] | None
         ] = None,
-    ) -> Factor[*Args_]:
+    ) -> Cost[*Args_]:
         import warnings
 
         warnings.warn(
             "Use Factor() directly instead of Factor.make()", DeprecationWarning
         )
-        return Factor(compute_residual, args, jac_mode, None, jac_custom_fn)
+        return Cost(compute_residual, args, jac_mode, None, jac_custom_fn)
 
     def _get_variables(self) -> tuple[Var, ...]:
         def get_variables(current: Any) -> list[Var]:
@@ -580,12 +598,12 @@ class Factor[*Args]:
 
     def _get_batch_axes(self) -> tuple[int, ...]:
         variables = self._get_variables()
-        assert len(variables) != 0, "No variables found in factor!"
+        assert len(variables) != 0, "No variables found in cost!"
         return jnp.broadcast_shapes(
             *[() if isinstance(v.id, int) else v.id.shape for v in variables]
         )
 
-    def _broadcast_batch_axes(self) -> Factor:
+    def _broadcast_batch_axes(self) -> Cost:
         batch_axes = self._get_batch_axes()
         if batch_axes is None:
             return self
@@ -601,7 +619,7 @@ class Factor[*Args]:
 
 
 @jdc.pytree_dataclass(kw_only=True)
-class _AnalyzedFactor[*Args](Factor[*Args]):
+class _AnalyzedCost[*Args](Cost[*Args]):
     """Same as `Factor`, but with extra fields."""
 
     num_variables: jdc.Static[int]
@@ -613,9 +631,9 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
 
     @staticmethod
     @jdc.jit
-    def _make[*Args_](factor: Factor[*Args_]) -> _AnalyzedFactor[*Args_]:
-        """Construct a factor for our factor graph."""
-        variables = factor._get_variables()
+    def _make[*Args_](cost: Cost[*Args_]) -> _AnalyzedCost[*Args_]:
+        """Construct a cost for our optimization problem."""
+        variables = cost._get_variables()
         assert len(variables) > 0
 
         # Support batch axis.
@@ -627,16 +645,16 @@ class _AnalyzedFactor[*Args](Factor[*Args]):
                     () if isinstance(var.id, int) else var.id.shape
                 ) == batch_axes, "Batch axes of variables do not match."
             if len(batch_axes) == 1:
-                return jax.vmap(_AnalyzedFactor._make)(factor)
+                return jax.vmap(_AnalyzedCost._make)(cost)
 
-        # Cache the residual dimension for this factor.
+        # Cache the residual dimension for this cost.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
         residual_dim = onp.prod(
-            jax.eval_shape(factor.compute_residual, dummy_vals, *factor.args).shape
+            jax.eval_shape(cost.compute_residual, dummy_vals, *cost.args).shape
         )
 
-        return _AnalyzedFactor(
-            **vars(factor),
+        return _AnalyzedCost(
+            **vars(cost),
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_flat_dim=residual_dim,

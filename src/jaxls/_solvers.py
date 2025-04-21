@@ -22,7 +22,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._factor_graph import FactorGraph
+    from ._core import AnalyzedLeastSquaresProblem
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
@@ -61,22 +61,22 @@ def _cholmod_solve_on_host(
         A.coords.indptr.tobytes(),
         A.coords.shape,
     )
-    factor = _cholmod_analyze_cache.get(cache_key, None)
-    if factor is None:
-        factor = sksparse.cholmod.analyze_AAt(A_T_scipy)
-        _cholmod_analyze_cache[cache_key] = factor
+    cost = _cholmod_analyze_cache.get(cache_key, None)
+    if cost is None:
+        cost = sksparse.cholmod.analyze_AAt(A_T_scipy)
+        _cholmod_analyze_cache[cache_key] = cost
 
         max_cache_size = 512
         if len(_cholmod_analyze_cache) > max_cache_size:
             _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
     # Factorize and solve
-    factor = factor.cholesky_AAt(
+    cost = cost.cholesky_AAt(
         A_T_scipy,
         # Some simple linear problems blow up without this 1e-5 term.
         beta=lambd + 1e-5,
     )
-    return factor.solve_A(ATb)
+    return cost.solve_A(ATb)
 
 
 @jdc.pytree_dataclass
@@ -117,7 +117,7 @@ class ConjugateGradientConfig:
 
     def _solve(
         self,
-        graph: FactorGraph,
+        problem: AnalyzedLeastSquaresProblem,
         A_blocksparse: BlockRowSparseMatrix,
         ATA_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
@@ -127,7 +127,7 @@ class ConjugateGradientConfig:
 
         # Preconditioning setup.
         if self.preconditioner == "block_jacobi":
-            preconditioner = make_block_jacobi_precoditioner(graph, A_blocksparse)
+            preconditioner = make_block_jacobi_precoditioner(problem, A_blocksparse)
         elif self.preconditioner == "point_jacobi":
             preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
         elif self.preconditioner is None:
@@ -194,9 +194,11 @@ class NonlinearSolver:
     verbose: jdc.Static[bool]
 
     @jdc.jit
-    def solve(self, graph: FactorGraph, initial_vals: VarValues) -> VarValues:
+    def solve(
+        self, problem: AnalyzedLeastSquaresProblem, initial_vals: VarValues
+    ) -> VarValues:
         vals = initial_vals
-        residual_vector = graph.compute_residual_vector(vals)
+        residual_vector = problem.compute_residual_vector(vals)
 
         state = NonlinearSolverState(
             iterations=0,
@@ -223,7 +225,7 @@ class NonlinearSolver:
         # Optimization.
         state = jax.lax.while_loop(
             cond_fun=lambda state: jnp.logical_not(jnp.any(state.termination_criteria)),
-            body_fun=functools.partial(self.step, graph),
+            body_fun=functools.partial(self.step, problem),
             init_val=state,
         )
         if self.verbose:
@@ -239,10 +241,10 @@ class NonlinearSolver:
         return state.vals
 
     def step(
-        self, graph: FactorGraph, state: NonlinearSolverState
+        self, problem: AnalyzedLeastSquaresProblem, state: NonlinearSolverState
     ) -> NonlinearSolverState:
         # Get nonzero values of Jacobian.
-        A_blocksparse = graph._compute_jac_values(state.vals)
+        A_blocksparse = problem._compute_jac_values(state.vals)
 
         # Get flattened version for COO/CSR matrices.
         jac_values = jnp.concatenate(
@@ -262,14 +264,14 @@ class NonlinearSolver:
             AT_multiply = lambda vec: AT_multiply_(vec)[0]
         elif self.sparse_mode == "coo":
             A_coo = SparseCooMatrix(
-                values=jac_values, coords=graph.jac_coords_coo
+                values=jac_values, coords=problem.jac_coords_coo
             ).as_jax_bcoo()
             AT_coo = A_coo.transpose()
             A_multiply = lambda vec: A_coo @ vec
             AT_multiply = lambda vec: AT_coo @ vec
         elif self.sparse_mode == "csr":
             A_csr = SparseCsrMatrix(
-                values=jac_values, coords=graph.jac_coords_csr
+                values=jac_values, coords=problem.jac_coords_csr
             ).as_jax_bcsr()
             A_multiply = lambda vec: A_csr @ vec
             AT_multiply_ = jax.linear_transpose(
@@ -295,7 +297,7 @@ class NonlinearSolver:
             )
             assert isinstance(state.cg_state, _ConjugateGradientState)
             local_delta, linear_state = cg_config._solve(
-                graph,
+                problem,
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
@@ -305,7 +307,7 @@ class NonlinearSolver:
             )
         elif self.linear_solver == "cholmod":
             # Use CHOLMOD for direct solve.
-            A_csr = SparseCsrMatrix(jac_values, graph.jac_coords_csr)
+            A_csr = SparseCsrMatrix(jac_values, problem.jac_coords_csr)
             local_delta = _cholmod_solve(A_csr, ATb, lambd=state.lambd)
         elif self.linear_solver == "dense_cholesky":
             A_dense = A_blocksparse.to_dense()
@@ -317,7 +319,7 @@ class NonlinearSolver:
         else:
             assert_never(self.linear_solver)
 
-        vals = state.vals._retract(local_delta, graph.tangent_ordering)
+        vals = state.vals._retract(local_delta, problem.tangent_ordering)
         if self.verbose:
             if state.cg_state is None:
                 jax_log(
@@ -343,7 +345,7 @@ class NonlinearSolver:
                     ordered=True,
                 )
             residual_index = 0
-            for f, count in zip(graph.stacked_factors, graph.factor_counts):
+            for f, count in zip(problem.stacked_costs, problem.cost_counts):
                 stacked_dim = count * f.residual_flat_dim
                 partial_cost = jnp.sum(
                     state.residual_vector[residual_index : residual_index + stacked_dim]
@@ -360,7 +362,7 @@ class NonlinearSolver:
                 )
 
         with jdc.copy_and_mutate(state) as state_next:
-            proposed_residual_vector = graph.compute_residual_vector(vals)
+            proposed_residual_vector = problem.compute_residual_vector(vals)
             proposed_cost = jnp.sum(proposed_residual_vector**2)
 
             # Update ATb_norm for Eisenstat-Walker criterion.
@@ -384,7 +386,7 @@ class NonlinearSolver:
                 )
                 accept_flag = step_quality >= self.trust_region.step_quality_min
 
-                state_next.vals = jax.tree_map(
+                state_next.vals = jax.tree.map(
                     lambda proposed, current: jnp.where(accept_flag, proposed, current),
                     vals,
                     state.vals,
@@ -413,7 +415,7 @@ class NonlinearSolver:
                     state,
                     cost_updated=proposed_cost,
                     tangent=local_delta,
-                    tangent_ordering=graph.tangent_ordering,
+                    tangent_ordering=problem.tangent_ordering,
                     ATb=ATb,
                     accept_flag=accept_flag,
                 )

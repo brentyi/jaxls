@@ -6,7 +6,7 @@ import jax
 from jax import numpy as jnp
 
 if TYPE_CHECKING:
-    from ._factor_graph import FactorGraph
+    from ._core import AnalyzedLeastSquaresProblem
     from ._sparse_matrices import BlockRowSparseMatrix
 
 
@@ -38,7 +38,7 @@ def make_point_jacobi_precoditioner(
 
 
 def make_block_jacobi_precoditioner(
-    graph: FactorGraph, A_blocksparse: BlockRowSparseMatrix
+    graph: AnalyzedLeastSquaresProblem, A_blocksparse: BlockRowSparseMatrix
 ) -> Callable[[jax.Array], jax.Array]:
     """Returns a block Jacobi preconditioner."""
 
@@ -54,17 +54,17 @@ def make_block_jacobi_precoditioner(
             + jnp.eye(var_type.tangent_dim) * 1e-6
         )
 
-    assert len(graph.stacked_factors) == len(A_blocksparse.block_rows)
-    for factor, block_row in zip(graph.stacked_factors, A_blocksparse.block_rows):
+    assert len(graph.stacked_costs) == len(A_blocksparse.block_rows)
+    for cost, block_row in zip(graph.stacked_costs, A_blocksparse.block_rows):
         assert block_row.blocks_concat.ndim == 3  # (N_block, rows, cols)
 
         # Current index we're looking at in the blocks_concat array.
         start_concat_col = 0
 
         for var_type, ids in graph.tangent_ordering.ordered_dict_items(
-            factor.sorted_ids_from_var_type
+            cost.sorted_ids_from_var_type
         ):
-            (num_factors, num_vars) = ids.shape
+            (num_costs, num_vars) = ids.shape
             var_type_idx = graph.tangent_ordering.order_from_type[var_type]
 
             # Extract the blocks corresponding to the current variable type.
@@ -73,8 +73,8 @@ def make_block_jacobi_precoditioner(
                 :, :, start_concat_col:end_concat_col
             ].reshape(
                 (
-                    num_factors,
-                    factor.residual_flat_dim,
+                    num_costs,
+                    cost.residual_flat_dim,
                     num_vars,
                     var_type.tangent_dim,
                 )
@@ -83,7 +83,7 @@ def make_block_jacobi_precoditioner(
             # f: factor, r: residual, v: variable, t/a: tangent
             gram_blocks = jnp.einsum("frvt,frva->fvta", A_blocks, A_blocks)
             assert gram_blocks.shape == (
-                num_factors,
+                num_costs,
                 num_vars,
                 var_type.tangent_dim,
                 var_type.tangent_dim,

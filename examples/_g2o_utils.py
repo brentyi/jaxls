@@ -13,7 +13,7 @@ from tqdm.auto import tqdm
 
 @dataclasses.dataclass
 class G2OData:
-    factors: list[jaxls.Factor]
+    costs: list[jaxls.Cost]
     initial_poses: list[jaxlie.MatrixLieGroup]
     pose_vars: list[jaxls.Var]
 
@@ -25,7 +25,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
         lines = [line.strip() for line in file.readlines()]
 
     var_count = 0
-    factors = list[jaxls.Factor]()
+    factors = list[jaxls.Cost]()
     pose_variables = list[jaxls.Var]()
     initial_poses = list[jaxlie.MatrixLieGroup]()
 
@@ -64,7 +64,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             precision_matrix[onp.triu_indices(3)] = precision_matrix_components
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factor = jaxls.Factor(
+            factor = jaxls.Cost(
                 # Passing in arrays like sqrt_precision_matrix as input makes
                 # it possible vectorize factors.
                 (
@@ -126,7 +126,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factor = jaxls.Factor(
+            factor = jaxls.Cost(
                 # Passing in arrays like sqrt_precision_matrix as input makes
                 # it possible for jaxfg vectorize factors.
                 (
@@ -153,7 +153,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             assert False, f"Unexpected line type: {parts[0]}"
 
     # Anchor start pose
-    factor = jaxls.Factor(
+    factor = jaxls.Cost(
         lambda var_values, start_pose: (
             var_values[start_pose].inverse() @ initial_poses[0]
         ).log(),
@@ -162,9 +162,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
     )
     factors.append(factor)
 
-    return G2OData(
-        factors=factors, initial_poses=initial_poses, pose_vars=pose_variables
-    )
+    return G2OData(costs=factors, initial_poses=initial_poses, pose_vars=pose_variables)
 
 
 __all__ = ["G2OData", "parse_g2o"]

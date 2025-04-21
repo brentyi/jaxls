@@ -32,10 +32,12 @@ def main(
         g2o: _g2o_utils.G2OData = _g2o_utils.parse_g2o(g2o_path)
         jax.block_until_ready(g2o)
 
-    # Making graph.
-    with jaxls.utils.stopwatch("Making graph"):
-        graph = jaxls.FactorGraph.make(factors=g2o.factors, variables=g2o.pose_vars)
-        jax.block_until_ready(graph)
+    # Making problem.
+    with jaxls.utils.stopwatch("Analyzing problem"):
+        problem = jaxls.LeastSquaresProblem(
+            costs=g2o.costs, variables=g2o.pose_vars
+        ).analyze()
+        jax.block_until_ready(problem)
 
     with jaxls.utils.stopwatch("Making solver"):
         initial_vals = jaxls.VarValues.make(
@@ -47,13 +49,13 @@ def main(
         jax.block_until_ready(initial_vals)
 
     with jaxls.utils.stopwatch("Running solve"):
-        solution_vals = graph.solve(
+        solution_vals = problem.solve(
             initial_vals, trust_region=None, linear_solver=linear_solver
         )
         jax.block_until_ready(solution_vals)
 
     with jaxls.utils.stopwatch("Running solve (again)"):
-        solution_vals = graph.solve(
+        solution_vals = problem.solve(
             initial_vals, trust_region=None, linear_solver=linear_solver
         )
         jax.block_until_ready(solution_vals)

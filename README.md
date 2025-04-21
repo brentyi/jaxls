@@ -14,8 +14,8 @@ pip install git+https://github.com/brentyi/jaxls.git
 ### Overviews
 
 We provide a factor graph interface for specifying and solving least squares
-problems. **`jaxls`** takes advantage of structure in graphs: repeated factor
-and variable types are vectorized, and sparsity of adjacency is translated into
+problems. **`jaxls`** takes advantage of structure in graphs: repeated cost and
+variable types are vectorized, and sparsity of adjacency is translated into
 sparse matrix operations.
 
 Supported:
@@ -53,29 +53,29 @@ be contiguous.
 pose_vars = [jaxls.SE2Var(0), jaxls.SE2Var(1)]
 ```
 
-**Defining factors.** Factors are defined using a callable cost function and a
+**Defining costs.** Costs are defined using a callable cost function and a
 set of arguments.
 
 ```python
-# Factors take two arguments:
+# Costs take two arguments:
 # - A callable with signature `(jaxls.VarValues, *Args) -> jax.Array`.
 # - A tuple of arguments: the type should be `tuple[*Args]`.
 #
 # All arguments should be PyTree structures. Variable types within the PyTree
 # will be automatically detected.
-factors = [
+costs = [
     # Cost on pose 0.
-    jaxls.Factor(
+    jaxls.Cost(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (pose_vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
     ),
     # Cost on pose 1.
-    jaxls.Factor(
+    jaxls.Cost(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (pose_vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
     ),
     # Cost between poses.
-    jaxls.Factor(
+    jaxls.Cost(
         lambda vals, var0, var1, delta: (
             (vals[var0].inverse() @ vals[var1]) @ delta.inverse()
         ).log(),
@@ -84,7 +84,7 @@ factors = [
 ]
 ```
 
-Factors with similar structure, like the first two in this example, will be
+Costs with similar structure, like the first two in this example, will be
 vectorized under-the-hood.
 
 Batched inputs can also be manually constructed, and are detected by inspecting
@@ -95,8 +95,8 @@ all elements in the arguments tuple.
 it, and print solutions:
 
 ```python
-graph = jaxls.FactorGraph.make(factors, pose_vars)
-solution = graph.solve()
+problem = jaxls.LeastSquaresProblem(costs, pose_vars).analyze()
+solution = problem.solve()
 print("All solutions", solution)
 print("Pose 0", solution[pose_vars[0]])
 print("Pose 1", solution[pose_vars[1]])
