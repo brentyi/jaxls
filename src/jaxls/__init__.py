@@ -23,7 +23,9 @@ if not TYPE_CHECKING:
     class _FactorDescriptor:
         def __get__(self, obj: Any, objtype: Any = None) -> Any:
             utils.print_deprecation_warning(
-                "[bold]jaxls.Factor[/bold] has been renamed to [bold]jaxls.Cost[/bold]"
+                "Import detected for [yellow]jaxls.Factor[/yellow], which has been renamed:",
+                "[yellow]jaxls.Factor[/yellow] has been renamed to [green]jaxls.Cost[/green]. "
+                "We recommend updating to the newer syntax. To suppress this warning, you can also downgrade jaxls: [bold]pip install git+https://github.com/brentyi/jaxls.git@21219e08676e13bb481230907e1cbc486ee284c7[/bold].",
             )
 
             # Standard warning is now handled by print_deprecation_warning
@@ -33,7 +35,9 @@ if not TYPE_CHECKING:
     class _FactorGraphDescriptor:
         def __get__(self, obj: Any, objtype: Any = None) -> Any:
             utils.print_deprecation_warning(
-                "[bold]jaxls.FactorGraph.make(...)[/bold] has been replaced with [bold]jaxls.LeastSquaresProblem(...).analyze()[/bold]"
+                "Import detected for [yellow]jaxls.FactorGraph[/yellow], which has been renamed:",
+                "[yellow]jaxls.FactorGraph.make(...)[/yellow] has been replaced with [green]jaxls.LeastSquaresProblem(...).analyze()[/green]. "
+                "We recommend updating to the newer syntax. To suppress this warning, you can also downgrade jaxls: [bold]pip install git+https://github.com/brentyi/jaxls.git@21219e08676e13bb481230907e1cbc486ee284c7[/bold].",
             )
 
             class FactorGraph:

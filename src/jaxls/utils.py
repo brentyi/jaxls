@@ -29,12 +29,15 @@ def jax_log(fmt: str, *args, **kwargs) -> None:
     jax.debug.callback(partial(_log, fmt), *args, **kwargs)
 
 
-def print_deprecation_warning(message: str, stack_level: int = 2) -> None:
+def print_deprecation_warning(
+    message0: str, message1: str | None = None, stack_level: int = 2
+) -> None:
     """Print a nicely formatted deprecation warning with code context.
 
     Args:
-        message: The deprecation message to display
-        stack_level: Number of frames to go back to find the caller
+        message0: The deprecation message to display. Goes above code.
+        message1: An optional second message to display. Goes under code.
+        stack_level: Number of frames to go back to find the caller.
                     (default: 2, meaning the caller of the caller of this function)
     """
     # Get the caller's frame based on stack_level.
@@ -62,7 +65,7 @@ def print_deprecation_warning(message: str, stack_level: int = 2) -> None:
 
     console = Console(stderr=True)
     panel_content = [
-        Text.from_markup(message, style="red"),
+        Text.from_markup(message0),
         Syntax("# " + filename + ":" + str(lineno), "python"),
     ]
 
@@ -90,6 +93,10 @@ def print_deprecation_warning(message: str, stack_level: int = 2) -> None:
             highlight_lines={highlight_line},  # Highlight the actual code line.
         )
         panel_content.append(syntax)
+
+    # Add the second message if provided.
+    if message1 is not None:
+        panel_content.append(Text.from_markup(message1))
 
     # Create a group with all content.
     content_group = Group(*panel_content)
