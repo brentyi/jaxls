@@ -150,7 +150,7 @@ class Var[T](metaclass=_HashableSortableMeta):
         # Euclidean retraction.
         flat, unravel = flatten_util.ravel_pytree(pytree)
         del flat
-        return cast(T, jax.tree_map(jnp.add, pytree, unravel(delta)))
+        return cast(T, jax.tree.map(jnp.add, pytree, unravel(delta)))
 
 
 @jdc.pytree_dataclass
@@ -205,7 +205,7 @@ class VarValues:
         for var_type, ids in self.ids_from_type.items():
             for i in range(ids.shape[-1]):
                 batch_axes = ids.shape[:-1]
-                val = jax.tree_map(
+                val = jax.tree.map(
                     lambda x: x.take(indices=i, axis=len(batch_axes)),
                     self.vals_from_type[var_type],
                 )
@@ -246,7 +246,7 @@ class VarValues:
                 assert isinstance(ids, int) or len(ids.shape) in (0, 1)
                 vars.append(v)
                 vals.append(
-                    jax.tree_map(
+                    jax.tree.map(
                         (lambda x: x)
                         if isinstance(ids, int) or len(ids.shape) == 0
                         else (
@@ -276,7 +276,7 @@ class VarValues:
         vals_from_type = dict[type[Var[Any]], Any]()
         ids_from_type = dict[type[Var[Any]], jax.Array]()
         for var_type, indices in ordering.ordered_dict_items(indices_from_type):
-            vals_from_type[var_type] = jax.tree_map(
+            vals_from_type[var_type] = jax.tree.map(
                 lambda x: x[indices], self.vals_from_type[var_type]
             )
             ids_from_type[var_type] = self.ids_from_type[var_type][indices]
@@ -389,7 +389,7 @@ def sort_and_stack_vars(
         return ids_sorted_from_type
     else:
         stacked_vals_from_type = {
-            var_type: jax.tree_map(lambda *leafs: jnp.concatenate(leafs, axis=0), *vals)
+            var_type: jax.tree.map(lambda *leafs: jnp.concatenate(leafs, axis=0), *vals)
             for var_type, vals in vals_from_type.items()
         }
         sorted_vals_from_type = {

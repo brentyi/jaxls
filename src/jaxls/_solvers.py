@@ -386,7 +386,7 @@ class NonlinearSolver:
                 )
                 accept_flag = step_quality >= self.trust_region.step_quality_min
 
-                state_next.vals = jax.tree_map(
+                state_next.vals = jax.tree.map(
                     lambda proposed, current: jnp.where(accept_flag, proposed, current),
                     vals,
                     state.vals,

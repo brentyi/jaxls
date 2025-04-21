@@ -17,7 +17,7 @@ import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
-from jax.tree_util import default_registry
+from jax.tree import default_registry
 from loguru import logger
 from typing_extensions import deprecated
 
@@ -149,11 +149,11 @@ class LeastSquaresProblem:
             # costs to be batchable, they must share the same:
             group_key: Hashable = (
                 # (1) Treedef. Structure of inputs must match.
-                jax.tree_structure(cost),
+                jax.tree.structure(cost),
                 # (2) Leaf shapes: contained array shapes must match
                 tuple(
                     leaf.shape if hasattr(leaf, "shape") else ()
-                    for leaf in jax.tree_leaves(cost)
+                    for leaf in jax.tree.leaves(cost)
                 ),
             )
             costs_from_group.setdefault(group_key, [])
@@ -233,7 +233,7 @@ class LeastSquaresProblem:
             )
 
         jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
-            *jax.tree_map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
+            *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
             shape=(residual_dim_sum, tangent_dim_sum),
         )
         csr_indptr = jnp.searchsorted(
