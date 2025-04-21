@@ -44,13 +44,16 @@ def print_deprecation_warning(message: str, stack_level: int = 2) -> None:
             return
         frame = frame.f_back
 
-    if not frame:
+    if frame is None:
         return
 
-    # Get more context (5 lines).
-    frame_info = inspect.getframeinfo(frame, context=5)
+    # Get more context (2 lines).
+    frame_info = inspect.getframeinfo(frame, context=2)
     filename = frame_info.filename
     lineno = frame_info.lineno
+
+    if frame_info.code_context is None:
+        return
 
     from rich.console import Console, Group
     from rich.panel import Panel
@@ -58,16 +61,10 @@ def print_deprecation_warning(message: str, stack_level: int = 2) -> None:
     from rich.text import Text
 
     console = Console(stderr=True)
-
-    # Create the content for the panel.
-    warning_message = Text.from_markup(message, style="yellow")
-
-    # Add a horizontal rule for separation.
-    from rich.rule import Rule
-
-    separator = Rule(style="dim")
-
-    panel_content = [warning_message, separator]
+    panel_content = [
+        Text.from_markup(message, style="red"),
+        Syntax("# " + filename + ":" + str(lineno), "python"),
+    ]
 
     # Add code context if available.
     if frame_info.code_context:
@@ -75,11 +72,11 @@ def print_deprecation_warning(message: str, stack_level: int = 2) -> None:
         code_lines = frame_info.code_context
         start_line = lineno - (len(code_lines) // 2)
 
-        # Insert a comment as the first line of the code context.
-        modified_code_lines = list(code_lines)
+        while start_line < 1:
+            start_line += 1
+            code_lines.pop()
 
-        # Combine into a single string.
-        code = "".join(modified_code_lines)
+        code = "".join(code_lines)
 
         # Calculate the line number that should be highlighted.
         highlight_line = start_line + (lineno - start_line)

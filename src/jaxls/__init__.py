@@ -36,17 +36,9 @@ if not TYPE_CHECKING:
                 "[bold]jaxls.FactorGraph.make(...)[/bold] has been replaced with [bold]jaxls.LeastSquaresProblem(...).analyze()[/bold]"
             )
 
-            # Standard warning is now handled by print_deprecation_warning
-
             class FactorGraph:
                 @staticmethod
                 def make(factors, variables, use_onp=False):
-                    utils.print_deprecation_warning(
-                        "[bold]jaxls.FactorGraph[/bold] has been renamed [bold]jaxls.LeastSquaresProblem[/bold]"
-                    )
-
-                    # Standard warning is now handled by print_deprecation_warning
-
                     return LeastSquaresProblem(
                         costs=factors, variables=variables
                     ).analyze(use_onp)
