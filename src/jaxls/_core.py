@@ -17,7 +17,7 @@ import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
-from jax.tree import default_registry
+from jax.tree_util import default_registry
 from loguru import logger
 from typing_extensions import deprecated
 
