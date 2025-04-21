@@ -319,26 +319,51 @@ class AnalyzedLeastSquaresProblem:
         )
         return solver.solve(problem=self, initial_vals=initial_vals)
 
-    def compute_residual_vector(self, vals: VarValues) -> jax.Array:
+    @overload
+    def compute_residual_vector(
+        self, vals: VarValues, include_jac_cache: Literal[True]
+    ) -> tuple[jax.Array, CustomJacobianCache]: ...
+    @overload
+    def compute_residual_vector(
+        self, vals: VarValues, include_jac_cache: Literal[False] = False
+    ) -> jax.Array | tuple[jax.Array, tuple[CustomJacobianCache, ...]]: ...
+
+    def compute_residual_vector(
+        self, vals: VarValues, include_jac_cache: bool = False
+    ) -> jax.Array | tuple[jax.Array, tuple[CustomJacobianCache, ...]]:
         """Compute the residual vector. The cost we are optimizing is defined
         as the sum of squared terms within this vector."""
         residual_slices = list[jax.Array]()
+        jac_cache = list[CustomJacobianCache]()
         for stacked_cost in self.stacked_costs:
             # Flatten the output of the user-provided compute_residual.
             stacked_residual_slice = jax.vmap(
                 lambda args: stacked_cost.compute_residual_flat(vals, *args)
             )(stacked_cost.args)
-            assert len(stacked_residual_slice.shape) == 2
-            residual_slices.append(stacked_residual_slice.reshape((-1,)))
-        return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_jac_values(self, vals: VarValues) -> BlockRowSparseMatrix:
+            if isinstance(stacked_residual_slice, tuple):
+                assert len(stacked_residual_slice) == 2
+                residual_slices.append(stacked_residual_slice[0])
+                jac_cache.append(stacked_residual_slice[1])
+            else:
+                assert len(stacked_residual_slice.shape) == 2
+                residual_slices.append(stacked_residual_slice.reshape((-1,)))
+                jac_cache.append(None)
+
+        if include_jac_cache:
+            return jnp.concatenate(residual_slices, axis=0), tuple(jac_cache)
+        else:
+            return jnp.concatenate(residual_slices, axis=0)
+
+    def _compute_jac_values(
+        self, vals: VarValues, jac_cache: tuple[CustomJacobianCache, ...]
+    ) -> BlockRowSparseMatrix:
         block_rows = list[SparseBlockRow]()
         residual_offset = 0
 
-        for cost in self.stacked_costs:
+        for i, cost in enumerate(self.stacked_costs):
             # Shape should be: (count_from_group[group_key], single_residual_dim, sum_of_tangent_dims_of_variables).
-            def compute_jac_with_perturb(cost: _AnalyzedCost) -> jax.Array:
+            def compute_jac_with_perturb(cost: _AnalyzedCost, i: int = i) -> jax.Array:
                 val_subset = vals._get_subset(
                     {
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
@@ -349,7 +374,11 @@ class AnalyzedLeastSquaresProblem:
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
                 if cost.jac_custom_fn is not None:
+                    assert jac_cache[i] is not None
                     return cost.jac_custom_fn(vals, *cost.args)
+                if cost.jac_custom_with_cache_fn is not None:
+                    assert jac_cache[i] is not None
+                    return cost.jac_custom_with_cache_fn(vals, jac_cache[i], *cost.args)
 
                 jacfunc = {
                     "forward": jax.jacfwd,
@@ -430,15 +459,49 @@ class AnalyzedLeastSquaresProblem:
         return bsparse_jacobian
 
 
-type ResidualFunc[**Args] = Callable[Concatenate[VarValues, Args], jax.Array]
-type JacobianFunc[**Args] = Callable[Concatenate[VarValues, Args], jax.Array]
-type CostFactory[**Args] = Callable[Args, Cost[tuple[Any, ...], dict[str, Any]]]
+CustomJacobianCache = Any
+
+type ResidualFunc[**Args] = Callable[
+    Concatenate[VarValues, Args],
+    jax.Array,
+]
+type ResidualFuncWithJacCache[**Args] = Callable[
+    Concatenate[VarValues, Args],
+    tuple[jax.Array, CustomJacobianCache],
+]
+
+type JacobianFunc[**Args] = Callable[
+    Concatenate[VarValues, Args],
+    jax.Array,
+]
+type JacobianFuncWithCache[**Args] = Callable[
+    Concatenate[VarValues, CustomJacobianCache, Args],
+    jax.Array,
+]
+
+type CostFactory[**Args] = Callable[
+    Args,
+    Cost[tuple[Any, ...], dict[str, Any]],
+]
 
 
 @jdc.pytree_dataclass
 class Cost[*Args]:
     """A least squares cost term in our optimization problem, defined by a
-    residual function. The cost that this represents is defined as:
+    residual function.
+
+    The recommended way to create a cost is to use the `create_factory` decorator
+    on a function that computes the residual:
+
+
+    ```python
+    @Cost.create_factory
+    def compute_residual(values: VarValues, [...args]) -> jax.Array:
+        # Compute residual vector/array.
+        return residual
+    ```
+
+    The cost that this represents is defined as:
 
          || compute_residual(values, *args) ||_2^2
 
@@ -450,26 +513,55 @@ class Cost[*Args]:
 
     To create a batch of costs, a leading batch axis can be added to the
     arguments passed to `Cost.args`:
-    - The batch axis must be the same for all arguments.
-    -
+    - The batch axis must be the same for all arguments. Leading axes of shape
+      `(1,)` are broadcasted.
+    - The `id` field of each `jaxls.Var` instance must have shape of either
+      `()` (unbatched) or `(batch_size,)` (batched).
     """
 
-    compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
+    compute_residual: jdc.Static[
+        Callable[[VarValues, *Args], jax.Array]
+        | Callable[[VarValues, *Args], tuple[jax.Array, CustomJacobianCache]]
+    ]
+    """Residual computation function. Can either return:
+        1. A residual vector, or
+        2. A tuple, where the tuple values should be (residual, jacobian_cache).
+
+    The latter is useful when custom Jacobian computation benefits from
+    intermediate values computed during the residual computation.
+
+    `jac_custom_with_cache_fn` should be specified in the second case,
+    and will be expected to take arguments in the form `(values,
+    jacobian_cache, *args)`."""
+
     args: tuple[*Args]
+    """Arguments to the residual function. This should include at least one
+    `jaxls.Var` object, which can either in the root of the tuple or nested
+    within a PyTree structure arbitrarily."""
+
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff. Ignored if `jac_custom_fn` is
     specified."""
+
     jac_batch_size: jdc.Static[int | None] = None
     """Batch size for computing Jacobians that can be parallelized. Can be set
     to make tradeoffs between runtime and memory usage.
 
     If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
     one at a time."""
+
     jac_custom_fn: jdc.Static[Callable[[VarValues, *Args], jax.Array] | None] = None
     """Optional custom Jacobian function. If None, we use autodiff. Inputs are
     the same as `compute_residual`. Output is a single 2D Jacobian matrix with
     shape (residual_dim, sum_of_tangent_dims_of_variables)."""
+
+    jac_custom_with_cache_fn: jdc.Static[
+        Callable[[VarValues, CustomJacobianCache, *Args], jax.Array] | None
+    ] = None
+    """Optional custom Jacobian function. The same as `jac_custom_fn`, but
+    should be used when `compute_residual` returns a tuple with
+    cache."""
 
     name: jdc.Static[str | None] = None
     """Custom name for the cost. This is used for debugging and logging."""
@@ -493,21 +585,47 @@ class Cost[*Args]:
     @staticmethod
     def create_factory[**Args_](
         *,
-        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
-        jac_batch_size: jdc.Static[int | None] = None,
-        jac_custom_fn: jdc.Static[JacobianFunc | None] = None,
-        name: jdc.Static[str | None] = None,
+        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
+        jac_batch_size: int | None = None,
+        name: str | None = None,
     ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]]: ...
+
+    # Decorator factory with keyword arguments + custom Jacobian.
+    # `jac_mode` is ignored in this case.
+    @overload
+    @staticmethod
+    def create_factory[**Args_](
+        *,
+        jac_custom_fn: None = None,
+        jac_batch_size: int | None = None,
+        name: str | None = None,
+    ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]]: ...
+
+    # Decorator factory with keyword arguments + custom Jacobian with cache.
+    # `jac_mode` is ignored in this case.
+    @overload
+    @staticmethod
+    def create_factory[**Args_](
+        *,
+        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_],
+        jac_batch_size: int | None = None,
+        name: str | None = None,
+    ) -> Callable[[ResidualFuncWithJacCache[Args_]], CostFactory[Args_]]: ...
 
     @staticmethod
     def create_factory[**Args_](
         compute_residual: ResidualFunc[Args_] | None = None,
         *,
-        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
-        jac_batch_size: jdc.Static[int | None] = None,
-        jac_custom_fn: jdc.Static[JacobianFunc | None] = None,
-        name: jdc.Static[str | None] = None,
-    ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]] | CostFactory[Args_]:
+        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
+        jac_batch_size: int | None = None,
+        jac_custom_fn: JacobianFunc[Args_] | None = None,
+        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_] | None = None,
+        name: str | None = None,
+    ) -> (
+        Callable[[ResidualFunc[Args_]], CostFactory[Args_]]
+        | Callable[[ResidualFuncWithJacCache[Args_]], CostFactory[Args_]]
+        | CostFactory[Args_]
+    ):
         """Decorator for creating costs from a residual function.
 
         Examples:
@@ -553,6 +671,14 @@ class Cost[*Args]:
                         )(values, *args, **kwargs)
                     )
                     if jac_custom_fn is not None
+                    else None,
+                    jac_custom_with_cache_fn=(
+                        lambda values, cache, args, kwargs: cast(
+                            JacobianFuncWithCache[Args_],
+                            jac_custom_with_cache_fn,
+                        )(values, cache, *args, **kwargs)
+                    )
+                    if jac_custom_with_cache_fn is not None
                     else None,
                     name=name,
                 )
@@ -626,8 +752,19 @@ class _AnalyzedCost[*Args](Cost[*Args]):
     sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
     residual_flat_dim: jdc.Static[int] = 0
 
-    def compute_residual_flat(self, vals: VarValues, *args: *Args) -> jax.Array:
-        return self.compute_residual(vals, *args).flatten()
+    def compute_residual_flat(
+        self, vals: VarValues, *args: *Args
+    ) -> jax.Array | tuple[jax.Array, CustomJacobianCache]:
+        out = self.compute_residual(vals, *args)
+
+        # Flatten residual vector.
+        if isinstance(out, tuple):
+            assert len(out) == 2
+            out = (out[0].flatten(), out[1])
+        else:
+            out = out.flatten()
+
+        return out
 
     @staticmethod
     @jdc.jit

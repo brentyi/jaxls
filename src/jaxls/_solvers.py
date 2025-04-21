@@ -10,6 +10,7 @@ import scipy
 import scipy.sparse
 from jax import numpy as jnp
 
+from jaxls._core import CustomJacobianCache
 from jaxls._preconditioning import (
     make_block_jacobi_precoditioner,
     make_point_jacobi_precoditioner,
@@ -176,8 +177,12 @@ class NonlinearSolverState:
     termination_deltas: jax.Array
     lambd: float | jax.Array
 
-    # Conjugate gradient state. Not used for other solvers.
+    jac_cache: tuple[CustomJacobianCache, ...]
+    """Cache used to save intermediate values from `compute_residual_vector`
+    for use in custom Jacobians."""
+
     cg_state: _ConjugateGradientState | None
+    """Conjugate gradient state. Not used for other solvers."""
 
 
 @jdc.pytree_dataclass
@@ -198,7 +203,9 @@ class NonlinearSolver:
         self, problem: AnalyzedLeastSquaresProblem, initial_vals: VarValues
     ) -> VarValues:
         vals = initial_vals
-        residual_vector = problem.compute_residual_vector(vals)
+        residual_vector, jac_cache = problem.compute_residual_vector(
+            vals, include_jac_cache=True
+        )
 
         state = NonlinearSolverState(
             iterations=0,
@@ -220,6 +227,7 @@ class NonlinearSolver:
                     else self.conjugate_gradient_config
                 ).tolerance_max,
             ),
+            jac_cache=jac_cache,
         )
 
         # Optimization.
@@ -243,8 +251,12 @@ class NonlinearSolver:
     def step(
         self, problem: AnalyzedLeastSquaresProblem, state: NonlinearSolverState
     ) -> NonlinearSolverState:
+        # Log optimizer state for debugging.
+        if self.verbose:
+            self._log_state(problem, state)
+
         # Get nonzero values of Jacobian.
-        A_blocksparse = problem._compute_jac_values(state.vals)
+        A_blocksparse = problem._compute_jac_values(state.vals, state.jac_cache)
 
         # Get flattened version for COO/CSR matrices.
         jac_values = jnp.concatenate(
@@ -319,50 +331,11 @@ class NonlinearSolver:
         else:
             assert_never(self.linear_solver)
 
-        vals = state.vals._retract(local_delta, problem.tangent_ordering)
-        if self.verbose:
-            if state.cg_state is None:
-                jax_log(
-                    " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
-                    i=state.iterations,
-                    cost=state.cost,
-                    lambd=state.lambd,
-                    cost_delta=state.termination_deltas[0],
-                    grad_mag=state.termination_deltas[1],
-                    param_delta=state.termination_deltas[2],
-                    ordered=True,
-                )
-            else:
-                jax_log(
-                    " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e} inexact_tol={inexact_tol:.1e}",
-                    i=state.iterations,
-                    cost=state.cost,
-                    lambd=state.lambd,
-                    cost_delta=state.termination_deltas[0],
-                    grad_mag=state.termination_deltas[1],
-                    param_delta=state.termination_deltas[2],
-                    inexact_tol=state.cg_state.eta,
-                    ordered=True,
-                )
-            residual_index = 0
-            for f, count in zip(problem.stacked_costs, problem.cost_counts):
-                stacked_dim = count * f.residual_flat_dim
-                partial_cost = jnp.sum(
-                    state.residual_vector[residual_index : residual_index + stacked_dim]
-                    ** 2
-                )
-                residual_index += stacked_dim
-                jax_log(
-                    "     - "
-                    + f"{f._get_name()}({count}):".ljust(15)
-                    + " {:.5f} (avg {:.5f})",
-                    partial_cost,
-                    partial_cost / stacked_dim,
-                    ordered=True,
-                )
-
+        proposed_vals = state.vals._retract(local_delta, problem.tangent_ordering)
         with jdc.copy_and_mutate(state) as state_next:
-            proposed_residual_vector = problem.compute_residual_vector(vals)
+            proposed_residual_vector, proposed_jac_cache = (
+                problem.compute_residual_vector(proposed_vals, include_jac_cache=True)
+            )
             proposed_cost = jnp.sum(proposed_residual_vector**2)
 
             # Update ATb_norm for Eisenstat-Walker criterion.
@@ -371,7 +344,7 @@ class NonlinearSolver:
 
             # Always accept Gauss-Newton steps.
             if self.trust_region is None:
-                state_next.vals = vals
+                state_next.vals = proposed_vals
                 state_next.residual_vector = proposed_residual_vector
                 state_next.cost = proposed_cost
                 accept_flag = None
@@ -386,27 +359,28 @@ class NonlinearSolver:
                 )
                 accept_flag = step_quality >= self.trust_region.step_quality_min
 
-                state_next.vals = jax.tree.map(
-                    lambda proposed, current: jnp.where(accept_flag, proposed, current),
-                    vals,
-                    state.vals,
-                )
-                state_next.residual_vector = jnp.where(
-                    accept_flag, proposed_residual_vector, state.residual_vector
-                )
-                state_next.cost = jnp.where(accept_flag, proposed_cost, state.cost)
-                state_next.lambd = jnp.where(
-                    accept_flag,
-                    # If accept, decrease damping: note that we *don't* enforce any bounds here
-                    state.lambd / self.trust_region.lambda_factor,
-                    # If reject: increase lambda and enforce bounds
-                    jnp.maximum(
+                # What does the accepted state look like?
+                with jdc.copy_and_mutate(state) as state_accept:
+                    state_accept.vals = proposed_vals
+                    state_accept.residual_vector = proposed_residual_vector
+                    state_accept.cost = proposed_cost
+                    state_accept.jac_cache = proposed_jac_cache
+                    state_accept.lambd = state.lambd / self.trust_region.lambda_factor
+
+                # What does the rejected state look like?
+                with jdc.copy_and_mutate(state) as state_reject:
+                    state_reject.lambd = jnp.maximum(
                         self.trust_region.lambda_min,
                         jnp.minimum(
                             state.lambd * self.trust_region.lambda_factor,
                             self.trust_region.lambda_max,
                         ),
-                    ),
+                    )
+
+                state_next = jax.tree.map(
+                    lambda x, y: jnp.where(accept_flag, x, y),
+                    state_accept,
+                    state_reject,
                 )
 
             # Compute termination criteria.
@@ -423,6 +397,50 @@ class NonlinearSolver:
 
             state_next.iterations += 1
         return state_next
+
+    @staticmethod
+    def _log_state(
+        problem: AnalyzedLeastSquaresProblem, state: NonlinearSolverState
+    ) -> None:
+        if state.cg_state is None:
+            jax_log(
+                " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
+                i=state.iterations,
+                cost=state.cost,
+                lambd=state.lambd,
+                cost_delta=state.termination_deltas[0],
+                grad_mag=state.termination_deltas[1],
+                param_delta=state.termination_deltas[2],
+                ordered=True,
+            )
+        else:
+            jax_log(
+                " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e} inexact_tol={inexact_tol:.1e}",
+                i=state.iterations,
+                cost=state.cost,
+                lambd=state.lambd,
+                cost_delta=state.termination_deltas[0],
+                grad_mag=state.termination_deltas[1],
+                param_delta=state.termination_deltas[2],
+                inexact_tol=state.cg_state.eta,
+                ordered=True,
+            )
+        residual_index = 0
+        for f, count in zip(problem.stacked_costs, problem.cost_counts):
+            stacked_dim = count * f.residual_flat_dim
+            partial_cost = jnp.sum(
+                state.residual_vector[residual_index : residual_index + stacked_dim]
+                ** 2
+            )
+            residual_index += stacked_dim
+            jax_log(
+                "     - "
+                + f"{f._get_name()}({count}):".ljust(15)
+                + " {:.5f} (avg {:.5f})",
+                partial_cost,
+                partial_cost / stacked_dim,
+                ordered=True,
+            )
 
 
 @jdc.pytree_dataclass
