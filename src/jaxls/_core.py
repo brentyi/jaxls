@@ -343,7 +343,7 @@ class AnalyzedLeastSquaresProblem:
 
             if isinstance(compute_residual_out, tuple):
                 assert len(compute_residual_out) == 2
-                residual_slices.append(compute_residual_out[0])
+                residual_slices.append(compute_residual_out[0].reshape((-1,)))
                 jac_cache.append(compute_residual_out[1])
             else:
                 assert len(compute_residual_out.shape) == 2
@@ -374,10 +374,14 @@ class AnalyzedLeastSquaresProblem:
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
                 if cost.jac_custom_fn is not None:
-                    assert jac_cache[i] is not None
+                    assert jac_cache[i] is None, (
+                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
+                    )
                     return cost.jac_custom_fn(vals, *cost.args)
                 if cost.jac_custom_with_cache_fn is not None:
-                    assert jac_cache[i] is not None
+                    assert jac_cache[i] is not None, (
+                        "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
+                    )
                     return cost.jac_custom_with_cache_fn(vals, jac_cache[i], *cost.args)
 
                 jacfunc = {
@@ -793,10 +797,19 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             if len(batch_axes) == 1:
                 return jax.vmap(_AnalyzedCost._make)(cost)
 
+        # Same as `compute_residual`, but removes Jacobian cache if present.
+        def _residual_no_cache(*args, **kwargs) -> jax.Array:
+            residual_out = cost.compute_residual(*args, **kwargs)  # type: ignore
+            if isinstance(residual_out, tuple):
+                assert len(residual_out) == 2
+                return residual_out[0]
+            else:
+                return residual_out
+
         # Cache the residual dimension for this cost.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
         residual_dim = onp.prod(
-            jax.eval_shape(cost.compute_residual, dummy_vals, *cost.args).shape
+            jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
         )
 
         return _AnalyzedCost(
