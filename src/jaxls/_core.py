@@ -337,17 +337,17 @@ class AnalyzedLeastSquaresProblem:
         jac_cache = list[CustomJacobianCache]()
         for stacked_cost in self.stacked_costs:
             # Flatten the output of the user-provided compute_residual.
-            stacked_residual_slice = jax.vmap(
+            compute_residual_out = jax.vmap(
                 lambda args: stacked_cost.compute_residual_flat(vals, *args)
             )(stacked_cost.args)
 
-            if isinstance(stacked_residual_slice, tuple):
-                assert len(stacked_residual_slice) == 2
-                residual_slices.append(stacked_residual_slice[0])
-                jac_cache.append(stacked_residual_slice[1])
+            if isinstance(compute_residual_out, tuple):
+                assert len(compute_residual_out) == 2
+                residual_slices.append(compute_residual_out[0])
+                jac_cache.append(compute_residual_out[1])
             else:
-                assert len(stacked_residual_slice.shape) == 2
-                residual_slices.append(stacked_residual_slice.reshape((-1,)))
+                assert len(compute_residual_out.shape) == 2
+                residual_slices.append(compute_residual_out.reshape((-1,)))
                 jac_cache.append(None)
 
         if include_jac_cache:
