@@ -331,58 +331,64 @@ class NonlinearSolver:
             assert_never(self.linear_solver)
 
         proposed_vals = state.vals._retract(local_delta, problem.tangent_ordering)
-        with jdc.copy_and_mutate(state) as state_next:
-            proposed_residual_vector, proposed_jac_cache = (
-                problem.compute_residual_vector(proposed_vals, include_jac_cache=True)
-            )
-            proposed_cost = jnp.sum(proposed_residual_vector**2)
+        proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
+            proposed_vals, include_jac_cache=True
+        )
+        proposed_cost = jnp.sum(proposed_residual_vector**2)
 
-            # Update ATb_norm for Eisenstat-Walker criterion.
-            if linear_state is not None:
-                state_next.cg_state = linear_state
+        # Always accept Gauss-Newton steps.
+        if self.trust_region is None:
+            with jdc.copy_and_mutate(state) as state_next:
+                # Update ATb_norm for Eisenstat-Walker criterion.
+                if linear_state is not None:
+                    state_next.cg_state = linear_state
 
-            # Always accept Gauss-Newton steps.
-            if self.trust_region is None:
                 state_next.vals = proposed_vals
                 state_next.residual_vector = proposed_residual_vector
                 state_next.cost = proposed_cost
                 accept_flag = None
-            # For Levenberg-Marquardt, we need to evaluate the step quality.
-            else:
-                step_quality = (proposed_cost - state.cost) / (
-                    jnp.sum(
-                        (A_blocksparse.multiply(local_delta) + state.residual_vector)
-                        ** 2
-                    )
-                    - state.cost
+        # For Levenberg-Marquardt, we need to evaluate the step quality.
+        else:
+            step_quality = (proposed_cost - state.cost) / (
+                jnp.sum(
+                    (A_blocksparse.multiply(local_delta) + state.residual_vector) ** 2
                 )
-                accept_flag = step_quality >= self.trust_region.step_quality_min
+                - state.cost
+            )
+            accept_flag = step_quality >= self.trust_region.step_quality_min
 
-                # What does the accepted state look like?
-                with jdc.copy_and_mutate(state) as state_accept:
-                    state_accept.vals = proposed_vals
-                    state_accept.residual_vector = proposed_residual_vector
-                    state_accept.cost = proposed_cost
-                    state_accept.jac_cache = proposed_jac_cache
-                    state_accept.lambd = state.lambd / self.trust_region.lambda_factor
+            # What does the accepted state look like?
+            with jdc.copy_and_mutate(state) as state_accept:
+                # Update ATb_norm for Eisenstat-Walker criterion.
+                if linear_state is not None:
+                    state_accept.cg_state = linear_state
 
-                # What does the rejected state look like?
-                with jdc.copy_and_mutate(state) as state_reject:
-                    state_reject.lambd = jnp.maximum(
-                        self.trust_region.lambda_min,
-                        jnp.minimum(
-                            state.lambd * self.trust_region.lambda_factor,
-                            self.trust_region.lambda_max,
-                        ),
-                    )
+                state_accept.vals = proposed_vals
+                state_accept.residual_vector = proposed_residual_vector
+                state_accept.cost = proposed_cost
+                state_accept.jac_cache = proposed_jac_cache
+                state_accept.lambd = state.lambd / self.trust_region.lambda_factor
 
-                state_next = jax.tree.map(
-                    lambda x, y: jnp.where(accept_flag, x, y),
-                    state_accept,
-                    state_reject,
+            # What does the rejected state look like?
+            with jdc.copy_and_mutate(state) as state_reject:
+                state_reject.lambd = jnp.maximum(
+                    self.trust_region.lambda_min,
+                    jnp.minimum(
+                        state.lambd * self.trust_region.lambda_factor,
+                        self.trust_region.lambda_max,
+                    ),
                 )
 
-            # Compute termination criteria.
+            # Update the state with the accepted or rejected values.
+            state_next = jax.tree.map(
+                lambda x, y: x if (x is y) else jnp.where(accept_flag, x, y),
+                state_accept,
+                state_reject,
+            )
+
+        # Update termination criteria; this happens regardless of whether
+        # updates are accepted.
+        with jdc.copy_and_mutate(state_next) as state_next:
             state_next.termination_criteria, state_next.termination_deltas = (
                 self.termination._check_convergence(
                     state,
@@ -393,7 +399,6 @@ class NonlinearSolver:
                     accept_flag=accept_flag,
                 )
             )
-
             state_next.iterations += 1
         return state_next
 
