@@ -323,6 +323,7 @@ class AnalyzedLeastSquaresProblem:
     def compute_residual_vector(
         self, vals: VarValues, include_jac_cache: Literal[True]
     ) -> tuple[jax.Array, CustomJacobianCache]: ...
+
     @overload
     def compute_residual_vector(
         self, vals: VarValues, include_jac_cache: Literal[False] = False
@@ -374,14 +375,14 @@ class AnalyzedLeastSquaresProblem:
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
                 if cost.jac_custom_fn is not None:
-                    assert jac_cache[i] is None, (
-                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
-                    )
+                    assert (
+                        jac_cache[i] is None
+                    ), "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
                     return cost.jac_custom_fn(vals, *cost.args)
                 if cost.jac_custom_with_cache_fn is not None:
-                    assert jac_cache[i] is not None, (
-                        "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
-                    )
+                    assert (
+                        jac_cache[i] is not None
+                    ), "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
                     return cost.jac_custom_with_cache_fn(vals, jac_cache[i], *cost.args)
 
                 jacfunc = {
