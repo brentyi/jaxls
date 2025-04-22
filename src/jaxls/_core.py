@@ -683,7 +683,7 @@ class Cost[*Args]:
                     else None,
                     jac_custom_with_cache_fn=(
                         lambda values, cache, args, kwargs: cast(
-                            JacobianFuncWithCache[Args_],
+                            JacobianFuncWithCache[Args_, Any],
                             jac_custom_with_cache_fn,
                         )(values, cache, *args, **kwargs)
                     )
