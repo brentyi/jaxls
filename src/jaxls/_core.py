@@ -491,14 +491,21 @@ class Cost[*Args]:
     residual function.
 
     The recommended way to create a cost is to use the `create_factory` decorator
-    on a function that computes the residual:
+    on a function that computes the residual. This will transform the input function
+    into a "factory" functinos that returns `Cost` objects.
 
 
     ```python
-    @Cost.create_factory
+    @jaxls.Cost.create_factory
     def compute_residual(values: VarValues, [...args]) -> jax.Array:
         # Compute residual vector/array.
         return residual
+
+    # `compute_residual()` is now a factory function that returns `jaxls.Cost` objects.
+    problem = jaxls.LeastSquaresProblem(
+        costs=[compute_residual(...), ...],
+        variables=[...],
+    )
     ```
 
     The cost that this represents is defined as:
@@ -527,7 +534,7 @@ class Cost[*Args]:
         1. A residual vector, or
         2. A tuple, where the tuple values should be (residual, jacobian_cache).
 
-    The latter is useful when custom Jacobian computation benefits from
+    The second option is useful when custom Jacobian computation benefits from
     intermediate values computed during the residual computation.
 
     `jac_custom_with_cache_fn` should be specified in the second case,
