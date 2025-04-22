@@ -10,7 +10,6 @@ import scipy
 import scipy.sparse
 from jax import numpy as jnp
 
-from jaxls._core import CustomJacobianCache
 from jaxls._preconditioning import (
     make_block_jacobi_precoditioner,
     make_point_jacobi_precoditioner,
@@ -23,7 +22,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._core import AnalyzedLeastSquaresProblem
+    from ._core import AnalyzedLeastSquaresProblem, CustomJacobianCache
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
