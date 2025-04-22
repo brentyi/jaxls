@@ -465,17 +465,17 @@ type ResidualFunc[**Args] = Callable[
     Concatenate[VarValues, Args],
     jax.Array,
 ]
-type ResidualFuncWithJacCache[**Args] = Callable[
+type ResidualFuncWithJacCache[**Args, TJacobianCache: CustomJacobianCache] = Callable[
     Concatenate[VarValues, Args],
-    tuple[jax.Array, CustomJacobianCache],
+    tuple[jax.Array, TJacobianCache],
 ]
 
 type JacobianFunc[**Args] = Callable[
     Concatenate[VarValues, Args],
     jax.Array,
 ]
-type JacobianFuncWithCache[**Args] = Callable[
-    Concatenate[VarValues, CustomJacobianCache, Args],
+type JacobianFuncWithCache[**Args, TJacobianCache: CustomJacobianCache] = Callable[
+    Concatenate[VarValues, TJacobianCache, Args],
     jax.Array,
 ]
 
@@ -612,12 +612,14 @@ class Cost[*Args]:
     # `jac_mode` is ignored in this case.
     @overload
     @staticmethod
-    def create_factory[**Args_](
+    def create_factory[**Args_, TJacobianCache](
         *,
-        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_],
+        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, TJacobianCache],
         jac_batch_size: int | None = None,
         name: str | None = None,
-    ) -> Callable[[ResidualFuncWithJacCache[Args_]], CostFactory[Args_]]: ...
+    ) -> Callable[
+        [ResidualFuncWithJacCache[Args_, TJacobianCache]], CostFactory[Args_]
+    ]: ...
 
     @staticmethod
     def create_factory[**Args_](
@@ -626,11 +628,11 @@ class Cost[*Args]:
         jac_mode: Literal["auto", "forward", "reverse"] = "auto",
         jac_batch_size: int | None = None,
         jac_custom_fn: JacobianFunc[Args_] | None = None,
-        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_] | None = None,
+        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, Any] | None = None,
         name: str | None = None,
     ) -> (
         Callable[[ResidualFunc[Args_]], CostFactory[Args_]]
-        | Callable[[ResidualFuncWithJacCache[Args_]], CostFactory[Args_]]
+        | Callable[[ResidualFuncWithJacCache[Args_, Any]], CostFactory[Args_]]
         | CostFactory[Args_]
     ):
         """Decorator for creating costs from a residual function.
