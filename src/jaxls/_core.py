@@ -138,28 +138,28 @@ class LeastSquaresProblem:
             }
         )
 
-        # Start by grouping our costs and grabbing a list of (ordered!) variables
+        # Start by grouping our costs and grabbing a list of (ordered!) variables.
         costs_from_group = dict[Any, list[Cost]]()
         count_from_group = dict[Any, int]()
         for cost in costs:
             # Support broadcasting for cost arguments.
             cost = cost._broadcast_batch_axes()
+            batch_axes = cost._get_batch_axes()
 
             # Each cost is ultimately just a pytree node; in order for a set of
             # costs to be batchable, they must share the same:
             group_key: Hashable = (
                 # (1) Treedef. Structure of inputs must match.
                 jax.tree.structure(cost),
-                # (2) Leaf shapes: contained array shapes must match
+                # (2) Leaf shapes: contained array shapes must match (except batch axes).
                 tuple(
-                    leaf.shape if hasattr(leaf, "shape") else ()
+                    leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
                     for leaf in jax.tree.leaves(cost)
                 ),
             )
             costs_from_group.setdefault(group_key, [])
             count_from_group.setdefault(group_key, 0)
 
-            batch_axes = cost._get_batch_axes()
             if len(batch_axes) == 0:
                 cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
                 count_from_group[group_key] += 1
@@ -752,9 +752,21 @@ class Cost[*Args]:
         for leaf in leaves:
             if isinstance(leaf, (int, float)):
                 leaf = jnp.array(leaf)
-            broadcasted_leaves.append(
-                jnp.broadcast_to(leaf, batch_axes + leaf.shape[len(batch_axes) :])
-            )
+            try:
+                broadcasted_leaf = jnp.broadcast_to(
+                    leaf, batch_axes + leaf.shape[len(batch_axes) :]
+                )
+            except ValueError as e:
+                # Create a more informative error message
+                error_msg = (
+                    f"{str(e)}\n"
+                    f"Cost name: '{self._get_name()}'\n"
+                    f"Detected batch axes: {batch_axes}\n"
+                    f"Flattened argument shapes: {[x.shape for x in leaves]}\n"
+                    f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
+                )
+                raise ValueError(error_msg) from e
+            broadcasted_leaves.append(broadcasted_leaf)
         return jax.tree.unflatten(treedef, broadcasted_leaves)
 
 

@@ -53,11 +53,43 @@ be contiguous.
 pose_vars = [jaxls.SE2Var(0), jaxls.SE2Var(1)]
 ```
 
-**Defining costs.** Costs are defined using a callable cost function and a
-set of arguments.
+**Defining costs (decorator).** The recommended way to define a cost is to
+transform a function into a cost factory using the `@jaxls.Cost.create_factory`
+decorator. The transformed function will return a `jaxls.Cost` object.
 
 ```python
-# Costs take two arguments:
+# Defining cost types.
+
+@jaxls.Cost.create_factory
+def prior_cost(
+    vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
+) -> jax.Array:
+    """Prior cost for a pose variable. Penalizes deviations from the target"""
+    return (vals[var] @ target.inverse()).log()
+
+@jaxls.Cost.create_factory
+def between_cost(
+    vals: jaxls.VarValues, delta: jaxlie.SE2, var0: jaxls.SE2Var, var1: jaxls.SE2Var
+) -> jax.Array:
+    """'Between' cost for two pose variables. Penalizes deviations from the delta."""
+    return ((vals[var0].inverse() @ vals[var1]) @ delta.inverse()).log()
+```
+
+```python
+# Instantiating costs.
+costs = [
+    prior_cost(vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
+    prior_cost(vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
+    between_cost(jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0), vars[0], vars[1]),
+]
+```
+
+**Defining costs (directly).** Costs can also be instantiated directly using a
+callable cost function and a set of arguments. Under-the-hood, the `create_factory`
+decorator constructs objects that look like this:
+
+```python
+# Costs take two main arguments:
 # - A callable with signature `(jaxls.VarValues, *Args) -> jax.Array`.
 # - A tuple of arguments: the type should be `tuple[*Args]`.
 #
@@ -88,11 +120,10 @@ Costs with similar structure, like the first two in this example, will be
 vectorized under-the-hood.
 
 Batched inputs can also be manually constructed, and are detected by inspecting
-the shape of variable ID arrays in the input. Just add a leading batch axis to
-all elements in the arguments tuple.
+the shape of variable ID arrays in the input.
 
-**Solving optimization problems.** To set up the optimization problem, solve
-it, and print solutions:
+**Solving optimization problems.** To create the optimization problem, analyze
+it, and solve:
 
 ```python
 problem = jaxls.LeastSquaresProblem(costs, pose_vars).analyze()

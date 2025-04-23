@@ -19,13 +19,13 @@ class G2OData:
 
 
 def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
-    """Parse a G2O file. Creates a list of factors and dictionary of initial poses."""
+    """Parse a G2O file. Creates a list of costs and dictionary of initial poses."""
 
     with open(path) as file:
         lines = [line.strip() for line in file.readlines()]
 
     var_count = 0
-    factors = list[jaxls.Cost]()
+    costs = list[jaxls.Cost]()
     pose_variables = list[jaxls.Var]()
     initial_poses = list[jaxlie.MatrixLieGroup]()
 
@@ -64,9 +64,9 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
             precision_matrix[onp.triu_indices(3)] = precision_matrix_components
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factor = jaxls.Cost(
+            cost = jaxls.Cost(
                 # Passing in arrays like sqrt_precision_matrix as input makes
-                # it possible vectorize factors.
+                # it possible vectorize costs.
                 (
                     lambda values,
                     T_world_a,
@@ -86,7 +86,7 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                 ),
                 jac_mode="forward",
             )
-            factors.append(factor)
+            costs.append(cost)
 
         elif parts[0] == "VERTEX_SE3:QUAT":
             # Create SE(3) variable
@@ -126,9 +126,9 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
             sqrt_precision_matrix = onp.linalg.cholesky(precision_matrix).T
 
-            factor = jaxls.Cost(
+            cost = jaxls.Cost(
                 # Passing in arrays like sqrt_precision_matrix as input makes
-                # it possible for jaxfg vectorize factors.
+                # it possible for jaxfg vectorize costs.
                 (
                     lambda values,
                     T_world_a,
@@ -148,21 +148,21 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                 ),
                 jac_mode="forward",
             )
-            factors.append(factor)
+            costs.append(cost)
         else:
             assert False, f"Unexpected line type: {parts[0]}"
 
     # Anchor start pose
-    factor = jaxls.Cost(
+    cost = jaxls.Cost(
         lambda var_values, start_pose: (
             var_values[start_pose].inverse() @ initial_poses[0]
         ).log(),
         args=(pose_variables[0],),
         jac_mode="reverse",
     )
-    factors.append(factor)
+    costs.append(cost)
 
-    return G2OData(costs=factors, initial_poses=initial_poses, pose_vars=pose_variables)
+    return G2OData(costs=costs, initial_poses=initial_poses, pose_vars=pose_variables)
 
 
 __all__ = ["G2OData", "parse_g2o"]

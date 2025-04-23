@@ -18,20 +18,24 @@ import jaxls
 # accessing values from a VariableAssignments object. (see below)
 vars = (jaxls.SE2Var(0), jaxls.SE2Var(1))
 
-# Create factors: each defines a conditional probability distribution over some
-# variables.
+# Costs take two main arguments:
+# - A callable with signature `(jaxls.VarValues, *Args) -> jax.Array`.
+# - A tuple of arguments: the type should be `tuple[*Args]`.
+#
+# All arguments should be PyTree structures. Variable types within the PyTree
+# will be automatically detected.
 costs = [
-    # Prior factor for pose 0.
+    # Prior cost for pose 0.
     jaxls.Cost(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
     ),
-    # Prior factor for pose 1.
+    # Prior cost for pose 1.
     jaxls.Cost(
         lambda vals, var, init: (vals[var] @ init.inverse()).log(),
         (vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
     ),
-    # "Between" factor.
+    # "Between" cost.
     jaxls.Cost(
         lambda vals, delta, var0, var1: (
             (vals[var0].inverse() @ vals[var1]) @ delta.inverse()
@@ -40,11 +44,11 @@ costs = [
     ),
 ]
 
-# Create our "stacked" factor graph. (this is the only kind of factor graph)
+# Create and analyze the least squares problem.
 #
 # This goes through costs, and preprocesses them to enable vectorization of
-# computations. If we have 1000 PriorFactor objects, we stack all of the associated
-# values and perform a batched operation that computes all 1000 residuals.
+# computations. If we have 1000 prior costs, we will internally stack all of
+# the associated values and batch computations.
 problem = jaxls.LeastSquaresProblem(costs, vars).analyze()
 
 # Solve the optimization problem.

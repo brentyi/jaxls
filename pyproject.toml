@@ -25,6 +25,7 @@ dependencies = [
     "tqdm",
     "matplotlib",
     "rich>=13.0.0",
+    "viser",
 ]
 
 [project.optional-dependencies]
