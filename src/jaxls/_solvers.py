@@ -182,7 +182,7 @@ class NonlinearSolverState:
     cg_state: _ConjugateGradientState | None
     """Conjugate gradient state. Not used for other solvers."""
 
-    jacobian_scaler: jax.Array
+    jacobian_scaler: jax.Array | None
 
 
 @jdc.pytree_dataclass
@@ -228,7 +228,7 @@ class NonlinearSolver:
                 ).tolerance_max,
             ),
             jac_cache=jac_cache,
-            jacobian_scaler=jnp.zeros(problem.tangent_dim),
+            jacobian_scaler=None,
         )
 
         # Optimization.
@@ -265,10 +265,11 @@ class NonlinearSolver:
 
         # Compute Jacobian scaler.
         if first:
-            with jdc.copy_and_mutate(state) as state:
+            with jdc.copy_and_mutate(state, validate=False) as state:
                 state.jacobian_scaler = 1.0 / (
                     1.0 + A_blocksparse.compute_column_norms()
                 )
+        assert state.jacobian_scaler is not None
         A_blocksparse = A_blocksparse.scale_columns(state.jacobian_scaler)
 
         # Get flattened version for COO/CSR matrices.
