@@ -9,7 +9,6 @@ import jax_dataclasses as jdc
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
-
 from jaxls._preconditioning import (
     make_block_jacobi_precoditioner,
     make_point_jacobi_precoditioner,
@@ -38,7 +37,7 @@ def _cholmod_solve(
         A,
         ATb,
         lambd,
-        vectorized=False,
+        vmap_method="sequential",
     )
 
 
@@ -183,6 +182,8 @@ class NonlinearSolverState:
     cg_state: _ConjugateGradientState | None
     """Conjugate gradient state. Not used for other solvers."""
 
+    jacobian_scaler: jax.Array
+
 
 @jdc.pytree_dataclass
 class NonlinearSolver:
@@ -227,12 +228,14 @@ class NonlinearSolver:
                 ).tolerance_max,
             ),
             jac_cache=jac_cache,
+            jacobian_scaler=jnp.zeros(problem.tangent_dim),
         )
 
         # Optimization.
+        state = self.step(problem, state, first=True)
         state = jax.lax.while_loop(
             cond_fun=lambda state: jnp.logical_not(jnp.any(state.termination_criteria)),
-            body_fun=functools.partial(self.step, problem),
+            body_fun=functools.partial(self.step, problem, first=False),
             init_val=state,
         )
         if self.verbose:
@@ -248,7 +251,10 @@ class NonlinearSolver:
         return state.vals
 
     def step(
-        self, problem: AnalyzedLeastSquaresProblem, state: NonlinearSolverState
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        state: NonlinearSolverState,
+        first: bool,
     ) -> NonlinearSolverState:
         # Log optimizer state for debugging.
         if self.verbose:
@@ -256,6 +262,14 @@ class NonlinearSolver:
 
         # Get nonzero values of Jacobian.
         A_blocksparse = problem._compute_jac_values(state.vals, state.jac_cache)
+
+        # Compute Jacobian scaler.
+        if first:
+            with jdc.copy_and_mutate(state) as state:
+                state.jacobian_scaler = 1.0 / (
+                    1.0 + A_blocksparse.compute_column_norms()
+                )
+        A_blocksparse = A_blocksparse.scale_columns(state.jacobian_scaler)
 
         # Get flattened version for COO/CSR matrices.
         jac_values = jnp.concatenate(
@@ -330,7 +344,11 @@ class NonlinearSolver:
         else:
             assert_never(self.linear_solver)
 
-        proposed_vals = state.vals._retract(local_delta, problem.tangent_ordering)
+        scaled_local_delta = local_delta * state.jacobian_scaler
+
+        proposed_vals = state.vals._retract(
+            scaled_local_delta, problem.tangent_ordering
+        )
         proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
             proposed_vals, include_jac_cache=True
         )
@@ -351,7 +369,8 @@ class NonlinearSolver:
         else:
             step_quality = (proposed_cost - state.cost) / (
                 jnp.sum(
-                    (A_blocksparse.multiply(local_delta) + state.residual_vector) ** 2
+                    (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
+                    ** 2
                 )
                 - state.cost
             )
