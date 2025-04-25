@@ -116,6 +116,76 @@ class BlockRowSparseMatrix:
         result = jnp.concatenate(out_slices, axis=0)
         return result
 
+    def compute_column_norms(self) -> jax.Array:
+        """Compute column norms."""
+        squared_sum = jnp.zeros(self.shape[1])
+        for block_row in self.block_rows:
+            # Get slices corresponding to nonzero terms in block-row.
+            (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
+            del block_rows
+
+            assert len(block_row.start_cols) == len(block_row.block_num_cols)
+            block_row_squared_sum = jnp.sum(block_row.blocks_concat**2, axis=-2)
+            assert block_row_squared_sum.shape == (n_block, block_nz_cols)
+            block_nz_col_idx = 0
+            for start_cols, width in zip(
+                block_row.start_cols, block_row.block_num_cols
+            ):
+                # Add squared terms to the correct column in the result.
+                assert start_cols.shape == (block_row.blocks_concat.shape[0],)
+                assert isinstance(width, int)
+                assert squared_sum.shape == (self.shape[1],)
+                assert block_row_squared_sum.shape == (n_block, block_nz_cols)
+                squared_sum = squared_sum.at[
+                    start_cols[:, None] + jnp.arange(width)[None, :]
+                ].add(
+                    block_row_squared_sum[
+                        :, block_nz_col_idx : block_nz_col_idx + width
+                    ]
+                )
+                block_nz_col_idx += width
+        return jnp.sqrt(squared_sum)
+
+    def scale_columns(self, scales: jax.Array) -> BlockRowSparseMatrix:
+        """Scale columns of the matrix by a vector."""
+        assert scales.ndim == 1
+        assert scales.shape[0] == self.shape[1]
+        scaled_block_rows = list[SparseBlockRow]()
+        for block_row in self.block_rows:
+            # Do matrix multiplies for all blocks in block-row.
+            (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
+            del block_rows
+
+            # Get slices corresponding to nonzero terms in block-row.
+            assert len(block_row.start_cols) == len(block_row.block_num_cols)
+            scale_slice_parts = list[jax.Array]()
+            for start_cols, width in zip(
+                block_row.start_cols, block_row.block_num_cols
+            ):
+                assert start_cols.shape == (n_block,)
+                assert isinstance(width, int)
+                slice_part = jax.vmap(
+                    lambda start_col: jax.lax.dynamic_slice_in_dim(
+                        scales, start_index=start_col, slice_size=width, axis=0
+                    )
+                )(start_cols)
+                assert slice_part.shape == (n_block, width)
+                scale_slice_parts.append(slice_part)
+
+            # Concatenate slices to form target slice.
+            scale_slice = jnp.concatenate(scale_slice_parts, axis=1)
+            assert scale_slice.shape == (n_block, block_nz_cols)
+
+            # Scale and append updated block row.
+            with jdc.copy_and_mutate(block_row) as scaled_block_row:
+                scaled_block_row.blocks_concat = (
+                    block_row.blocks_concat * scale_slice[:, None, :]
+                )
+            scaled_block_rows.append(scaled_block_row)
+
+        # Create new matrix with scaled block rows.
+        return BlockRowSparseMatrix(tuple(scaled_block_rows), shape=self.shape)
+
     def to_dense(self) -> jax.Array:
         """Convert to a dense matrix."""
         out = jnp.concatenate(

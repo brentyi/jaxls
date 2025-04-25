@@ -19,7 +19,7 @@ dependencies = [
     "jax>=0.4.0",
     "jaxlib",
     "jaxlie>=1.0.0",
-    "jax_dataclasses>=1.0.0",
+    "jax_dataclasses>=1.6.2",
     "loguru",
     "termcolor",
     "tqdm",

@@ -24,7 +24,7 @@ jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
 
 
 def main(
-    g2o_path: pathlib.Path = pathlib.Path(__file__).parent / "data/input_M3500_g2o.g2o",
+    g2o_path: pathlib.Path = pathlib.Path(__file__).parent / "data/sphere2500.g2o",
     linear_solver: Literal[
         "conjugate_gradient", "cholmod", "dense_cholesky"
     ] = "conjugate_gradient",

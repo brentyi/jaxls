@@ -364,7 +364,9 @@ class AnalyzedLeastSquaresProblem:
 
         for i, cost in enumerate(self.stacked_costs):
             # Shape should be: (count_from_group[group_key], single_residual_dim, sum_of_tangent_dims_of_variables).
-            def compute_jac_with_perturb(cost: _AnalyzedCost, i: int = i) -> jax.Array:
+            def compute_jac_with_perturb(
+                cost: _AnalyzedCost, jac_cache_i: CustomJacobianCache | None = None
+            ) -> jax.Array:
                 val_subset = vals._get_subset(
                     {
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
@@ -375,15 +377,15 @@ class AnalyzedLeastSquaresProblem:
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
                 if cost.jac_custom_fn is not None:
-                    assert jac_cache[i] is None, (
+                    assert jac_cache_i is None, (
                         "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
                     )
                     return cost.jac_custom_fn(vals, *cost.args)
                 if cost.jac_custom_with_cache_fn is not None:
-                    assert jac_cache[i] is not None, (
+                    assert jac_cache_i is not None, (
                         "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
                     )
-                    return cost.jac_custom_with_cache_fn(vals, jac_cache[i], *cost.args)
+                    return cost.jac_custom_with_cache_fn(vals, jac_cache_i, *cost.args)
 
                 jacfunc = {
                     "forward": jax.jacfwd,
@@ -402,14 +404,21 @@ class AnalyzedLeastSquaresProblem:
                     )
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
+            optional_jac_cache_i = (jac_cache[i],) if jac_cache[i] is not None else ()
+
             # Compute Jacobian for each cost term.
             if cost.jac_batch_size is None:
-                stacked_jac = jax.vmap(compute_jac_with_perturb)(cost)
+                stacked_jac = jax.vmap(compute_jac_with_perturb)(
+                    cost, *optional_jac_cache_i
+                )
             else:
                 # When `batch_size` is `None`, jax.lax.map reduces to a scan
                 # (similar to `batch_size=1`).
                 stacked_jac = jax.lax.map(
-                    compute_jac_with_perturb, cost, batch_size=cost.jac_batch_size
+                    compute_jac_with_perturb,
+                    cost,
+                    *optional_jac_cache_i,
+                    batch_size=cost.jac_batch_size,
                 )
             (num_costs,) = cost._get_batch_axes()
             assert stacked_jac.shape == (
