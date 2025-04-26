@@ -1,4 +1,4 @@
-name: Pyright
+name: Formatting
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  pyright:
+  formatting:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -18,7 +18,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,examples]"
-      - name: Run pyright
+          pip install ruff
+      - name: Run ruff
         run: |
-          pyright .
+          ruff check .
+          ruff format --check .

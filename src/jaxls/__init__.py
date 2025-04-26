@@ -15,6 +15,8 @@ from ._solvers import TrustRegionConfig as TrustRegionConfig
 from ._variables import Var as Var
 from ._variables import VarValues as VarValues
 
+__version__ = "0.0.0"
+
 # Some shims for backwards compatibility.
 if not TYPE_CHECKING:
     import sys

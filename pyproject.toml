@@ -1,10 +1,19 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/jaxls/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/jaxls"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jaxls"]
 
 [project]
 name = "jaxls"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Nonlinear least squares with JAX"
 readme = "README.md"
 license = { text="MIT" }
@@ -15,7 +24,6 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "tyro",
     "jax>=0.4.0",
     "jaxlib",
     "jaxlie>=1.0.0",
@@ -23,17 +31,23 @@ dependencies = [
     "loguru",
     "termcolor",
     "tqdm",
-    "matplotlib",
     "rich>=13.0.0",
-    "viser",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pyright>=1.1.308",
-    "scikit-sparse",
     "ruff",
 ]
+examples = [
+    "tyro",
+    "matplotlib",
+    "viser",
+    "scikit-sparse",
+]
+
+[project.urls]
+"GitHub" = "https://github.com/brentyi/jaxls"
 
 [tool.ruff.lint]
 ignore = ["E731"]  # Ignore lambda assignment warnings

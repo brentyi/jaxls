@@ -8,7 +8,7 @@ These are common in classical robotics and computer vision.
 To install on Python 3.12+:
 
 ```bash
-pip install git+https://github.com/brentyi/jaxls.git
+pip install "git+https://github.com/brentyi/jaxls.git[examples]"
 ```
 
 ### Overviews
