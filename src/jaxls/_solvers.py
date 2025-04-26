@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Callable, Hashable, Literal, assert_never, cast
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Hashable,
+    Literal,
+    assert_never,
+    cast,
+    overload,
+)
 
 import jax
 import jax.flatten_util
@@ -9,6 +17,7 @@ import jax_dataclasses as jdc
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
+
 from jaxls._preconditioning import (
     make_block_jacobi_precoditioner,
     make_point_jacobi_precoditioner,
@@ -166,13 +175,20 @@ class ConjugateGradientConfig:
 
 
 @jdc.pytree_dataclass
-class NonlinearSolverState:
-    iterations: int | jax.Array
-    vals: VarValues
-    cost: float | jax.Array
-    residual_vector: jax.Array
+class SolveSummary:
+    iterations: jax.Array
     termination_criteria: jax.Array
     termination_deltas: jax.Array
+    cost_history: jax.Array
+    lambda_history: jax.Array
+
+
+@jdc.pytree_dataclass
+class _NonlinearSolverState:
+    vals: VarValues
+    cost: jax.Array
+    residual_vector: jax.Array
+    summary: SolveSummary
     lambd: float | jax.Array
 
     jac_cache: tuple[CustomJacobianCache, ...]
@@ -198,22 +214,60 @@ class NonlinearSolver:
     sparse_mode: jdc.Static[Literal["blockrow", "coo", "csr"]]
     verbose: jdc.Static[bool]
 
+    @overload
+    def solve(
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        initial_vals: VarValues,
+        return_summary: Literal[False] = False,
+    ) -> VarValues: ...
+
+    @overload
+    def solve(
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        initial_vals: VarValues,
+        return_summary: Literal[True],
+    ) -> tuple[VarValues, SolveSummary]: ...
+
+    @overload
+    def solve(
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        initial_vals: VarValues,
+        return_summary: bool,
+    ) -> VarValues | tuple[VarValues, SolveSummary]: ...
+
     @jdc.jit
     def solve(
-        self, problem: AnalyzedLeastSquaresProblem, initial_vals: VarValues
-    ) -> VarValues:
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        initial_vals: VarValues,
+        return_summary: jdc.Static[bool] = False,
+    ) -> VarValues | tuple[VarValues, SolveSummary]:
         vals = initial_vals
         residual_vector, jac_cache = problem.compute_residual_vector(
             vals, include_jac_cache=True
         )
 
-        state = NonlinearSolverState(
-            iterations=0,
+        initial_cost = jnp.sum(residual_vector**2)
+        cost_history = jnp.zeros(self.termination.max_iterations)
+        cost_history = cost_history.at[0].set(initial_cost)
+        lambda_history = jnp.zeros(self.termination.max_iterations)
+        if self.trust_region is not None:
+            lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
+
+        state = _NonlinearSolverState(
             vals=vals,
-            cost=jnp.sum(residual_vector**2),
+            cost=initial_cost,
             residual_vector=residual_vector,
-            termination_criteria=jnp.array([False, False, False, False]),
-            termination_deltas=jnp.zeros(3),
+            summary=SolveSummary(
+                iterations=jnp.array(0),
+                cost_history=cost_history,
+                lambda_history=lambda_history,
+                termination_criteria=jnp.array([False, False, False, False]),
+                termination_deltas=jnp.zeros(3),
+            ),
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
@@ -234,28 +288,34 @@ class NonlinearSolver:
         # Optimization.
         state = self.step(problem, state, first=True)
         state = jax.lax.while_loop(
-            cond_fun=lambda state: jnp.logical_not(jnp.any(state.termination_criteria)),
+            cond_fun=lambda state: jnp.logical_not(
+                jnp.any(state.summary.termination_criteria)
+            ),
             body_fun=functools.partial(self.step, problem, first=False),
             init_val=state,
         )
         if self.verbose:
             jax_log(
                 "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
-                i=state.iterations,
+                i=state.summary.iterations,
                 cost=state.cost,
-                criteria=state.termination_criteria.astype(jnp.int32),
-                cost_delta=state.termination_deltas[0],
-                grad_mag=state.termination_deltas[1],
-                param_delta=state.termination_deltas[2],
+                criteria=state.summary.termination_criteria.astype(jnp.int32),
+                cost_delta=state.summary.termination_deltas[0],
+                grad_mag=state.summary.termination_deltas[1],
+                param_delta=state.summary.termination_deltas[2],
             )
-        return state.vals
+
+        if return_summary:
+            return state.vals, state.summary
+        else:
+            return state.vals
 
     def step(
         self,
         problem: AnalyzedLeastSquaresProblem,
-        state: NonlinearSolverState,
+        state: _NonlinearSolverState,
         first: bool,
-    ) -> NonlinearSolverState:
+    ) -> _NonlinearSolverState:
         # Log optimizer state for debugging.
         if self.verbose:
             self._log_state(problem, state)
@@ -266,8 +326,8 @@ class NonlinearSolver:
         # Compute Jacobian scaler.
         if first:
             with jdc.copy_and_mutate(state, validate=False) as state:
-                state.jacobian_scaler = 1.0 / (
-                    1.0 + A_blocksparse.compute_column_norms()
+                state.jacobian_scaler = (
+                    1.0 / (1.0 + A_blocksparse.compute_column_norms()) * 0.0 + 1.0
                 )
         assert state.jacobian_scaler is not None
         A_blocksparse = A_blocksparse.scale_columns(state.jacobian_scaler)
@@ -406,46 +466,52 @@ class NonlinearSolver:
                 state_reject,
             )
 
-        # Update termination criteria; this happens regardless of whether
-        # updates are accepted.
+        # Update termination criteria + summary.
         with jdc.copy_and_mutate(state_next) as state_next:
-            state_next.termination_criteria, state_next.termination_deltas = (
-                self.termination._check_convergence(
-                    state,
-                    cost_updated=proposed_cost,
-                    tangent=local_delta,
-                    tangent_ordering=problem.tangent_ordering,
-                    ATb=ATb,
-                    accept_flag=accept_flag,
-                )
+            (
+                state_next.summary.termination_criteria,
+                state_next.summary.termination_deltas,
+            ) = self.termination._check_convergence(
+                state,
+                cost_updated=proposed_cost,
+                tangent=local_delta,
+                tangent_ordering=problem.tangent_ordering,
+                ATb=ATb,
+                accept_flag=accept_flag,
             )
-            state_next.iterations += 1
+            state_next.summary.iterations += 1
+            state_next.summary.cost_history = state_next.summary.cost_history.at[
+                state_next.summary.iterations
+            ].set(state_next.cost)
+            state_next.summary.lambda_history = state_next.summary.lambda_history.at[
+                state_next.summary.iterations
+            ].set(state_next.lambd)
         return state_next
 
     @staticmethod
     def _log_state(
-        problem: AnalyzedLeastSquaresProblem, state: NonlinearSolverState
+        problem: AnalyzedLeastSquaresProblem, state: _NonlinearSolverState
     ) -> None:
         if state.cg_state is None:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
-                i=state.iterations,
+                i=state.summary.iterations,
                 cost=state.cost,
                 lambd=state.lambd,
-                cost_delta=state.termination_deltas[0],
-                grad_mag=state.termination_deltas[1],
-                param_delta=state.termination_deltas[2],
+                cost_delta=state.summary.termination_deltas[0],
+                grad_mag=state.summary.termination_deltas[1],
+                param_delta=state.summary.termination_deltas[2],
                 ordered=True,
             )
         else:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e} inexact_tol={inexact_tol:.1e}",
-                i=state.iterations,
+                i=state.summary.iterations,
                 cost=state.cost,
                 lambd=state.lambd,
-                cost_delta=state.termination_deltas[0],
-                grad_mag=state.termination_deltas[1],
-                param_delta=state.termination_deltas[2],
+                cost_delta=state.summary.termination_deltas[0],
+                grad_mag=state.summary.termination_deltas[1],
+                param_delta=state.summary.termination_deltas[2],
                 inexact_tol=state.cg_state.eta,
                 ordered=True,
             )
@@ -485,7 +551,7 @@ class TrustRegionConfig:
 @jdc.pytree_dataclass
 class TerminationConfig:
     # Termination criteria.
-    max_iterations: int = 100
+    max_iterations: jdc.Static[int] = 100
     cost_tolerance: float = 1e-5
     """We terminate if `|cost change| / cost < cost_tolerance`."""
     gradient_tolerance: float = 1e-4
@@ -498,7 +564,7 @@ class TerminationConfig:
 
     def _check_convergence(
         self,
-        state_prev: NonlinearSolverState,
+        state_prev: _NonlinearSolverState,
         cost_updated: jax.Array,
         tangent: jax.Array,
         tangent_ordering: VarTypeOrdering,
@@ -521,7 +587,7 @@ class TerminationConfig:
             )[0]
         )
         converged_gradient = jnp.where(
-            state_prev.iterations >= self.gradient_tolerance_start_step,
+            state_prev.summary.iterations >= self.gradient_tolerance_start_step,
             gradient_mag < self.gradient_tolerance,
             False,
         )
@@ -538,7 +604,7 @@ class TerminationConfig:
                 converged_cost,
                 converged_gradient,
                 converged_parameters,
-                state_prev.iterations >= (self.max_iterations - 1),
+                state_prev.summary.iterations >= (self.max_iterations - 1),
             ]
         )
 

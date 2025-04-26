@@ -24,6 +24,7 @@ from typing_extensions import deprecated
 from ._solvers import (
     ConjugateGradientConfig,
     NonlinearSolver,
+    SolveSummary,
     TerminationConfig,
     TrustRegionConfig,
 )
@@ -269,6 +270,7 @@ class AnalyzedLeastSquaresProblem:
     tangent_dim: jdc.Static[int]
     residual_dim: jdc.Static[int]
 
+    @overload
     def solve(
         self,
         initial_vals: VarValues | None = None,
@@ -279,7 +281,35 @@ class AnalyzedLeastSquaresProblem:
         termination: TerminationConfig = TerminationConfig(),
         sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
         verbose: bool = True,
-    ) -> VarValues:
+        return_summary: Literal[False] = False,
+    ) -> VarValues: ...
+
+    @overload
+    def solve(
+        self,
+        initial_vals: VarValues | None = None,
+        *,
+        linear_solver: Literal["conjugate_gradient", "cholmod", "dense_cholesky"]
+        | ConjugateGradientConfig = "conjugate_gradient",
+        trust_region: TrustRegionConfig | None = TrustRegionConfig(),
+        termination: TerminationConfig = TerminationConfig(),
+        sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
+        verbose: bool = True,
+        return_summary: Literal[True],
+    ) -> tuple[VarValues, SolveSummary]: ...
+
+    def solve(
+        self,
+        initial_vals: VarValues | None = None,
+        *,
+        linear_solver: Literal["conjugate_gradient", "cholmod", "dense_cholesky"]
+        | ConjugateGradientConfig = "conjugate_gradient",
+        trust_region: TrustRegionConfig | None = TrustRegionConfig(),
+        termination: TerminationConfig = TerminationConfig(),
+        sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
+        verbose: bool = True,
+        return_summary: bool = False,
+    ) -> VarValues | tuple[VarValues, SolveSummary]:
         """Solve the nonlinear least squares problem using either Gauss-Newton
         or Levenberg-Marquardt.
 
@@ -291,6 +321,7 @@ class AnalyzedLeastSquaresProblem:
             sparse_mode: The representation to use for sparse matrix
                 multiplication. Can be "blockrow", "coo", or "csr".
             verbose: Whether to print verbose output during optimization.
+            return_summary: If `True`, return a summary of the solve.
 
         Returns:
             Optimized variable values.
@@ -317,7 +348,9 @@ class AnalyzedLeastSquaresProblem:
             sparse_mode,
             verbose,
         )
-        return solver.solve(problem=self, initial_vals=initial_vals)
+        return solver.solve(
+            problem=self, initial_vals=initial_vals, return_summary=return_summary
+        )
 
     @overload
     def compute_residual_vector(
@@ -377,14 +410,14 @@ class AnalyzedLeastSquaresProblem:
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
                 if cost.jac_custom_fn is not None:
-                    assert jac_cache_i is None, (
-                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
-                    )
+                    assert (
+                        jac_cache_i is None
+                    ), "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
                     return cost.jac_custom_fn(vals, *cost.args)
                 if cost.jac_custom_with_cache_fn is not None:
-                    assert jac_cache_i is not None, (
-                        "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
-                    )
+                    assert (
+                        jac_cache_i is not None
+                    ), "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
                     return cost.jac_custom_with_cache_fn(vals, jac_cache_i, *cost.args)
 
                 jacfunc = {
