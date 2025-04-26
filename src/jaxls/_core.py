@@ -736,7 +736,7 @@ class Cost[*Args]:
                     )
                     if jac_custom_with_cache_fn is not None
                     else None,
-                    name=name,
+                    name=name if name is not None else compute_residual.__name__,
                 )
 
             return inner
