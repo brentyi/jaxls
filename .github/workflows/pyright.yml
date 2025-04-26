@@ -17,8 +17,11 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: |
+          sudo apt update
+          sudo apt install -y libsuitesparse-dev
+          pip install uv
           python -m pip install --upgrade pip
-          pip install -e ".[dev,examples]"
+          uv pip install --system -e ".[dev,examples]"
       - name: Run pyright
         run: |
           pyright .

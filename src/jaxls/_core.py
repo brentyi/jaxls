@@ -410,14 +410,14 @@ class AnalyzedLeastSquaresProblem:
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
                 if cost.jac_custom_fn is not None:
-                    assert (
-                        jac_cache_i is None
-                    ), "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
+                    assert jac_cache_i is None, (
+                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
+                    )
                     return cost.jac_custom_fn(vals, *cost.args)
                 if cost.jac_custom_with_cache_fn is not None:
-                    assert (
-                        jac_cache_i is not None
-                    ), "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
+                    assert jac_cache_i is not None, (
+                        "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
+                    )
                     return cost.jac_custom_with_cache_fn(vals, jac_cache_i, *cost.args)
 
                 jacfunc = {
