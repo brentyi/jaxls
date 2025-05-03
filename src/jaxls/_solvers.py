@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -106,14 +105,14 @@ class ConjugateGradientConfig:
     Walker, 1996."
     """
 
-    tolerance_min: float = 1e-7
-    tolerance_max: float = 1e-2
+    tolerance_min: float | jax.Array = 1e-7
+    tolerance_max: float | jax.Array = 1e-2
 
-    eisenstat_walker_gamma: float = 0.9
+    eisenstat_walker_gamma: float | jax.Array = 0.9
     """Eisenstat-Walker criterion gamma term. Controls how quickly the tolerance
     decreases. Typical values range from 0.5 to 0.9. Higher values lead to more
     aggressive tolerance reduction."""
-    eisenstat_walker_alpha: float = 2.0
+    eisenstat_walker_alpha: float | jax.Array = 2.0
     """ Eisenstat-Walker criterion alpha term. Determines rate at which the
     tolerance changes based on residual reduction. Typical values are 1.5 or
     2.0. Higher values make the tolerance more sensitive to residual changes."""
@@ -287,13 +286,21 @@ class NonlinearSolver:
 
         # Optimization.
         state = self.step(problem, state, first=True)
-        state = jax.lax.while_loop(
-            cond_fun=lambda state: jnp.logical_not(
-                jnp.any(state.summary.termination_criteria)
-            ),
-            body_fun=functools.partial(self.step, problem, first=False),
-            init_val=state,
-        )
+        if self.termination.early_termination:
+            state = jax.lax.while_loop(
+                cond_fun=lambda state: jnp.logical_not(
+                    jnp.any(state.summary.termination_criteria)
+                ),
+                body_fun=lambda state: self.step(problem, state, first=False),
+                init_val=state,
+            )
+        else:
+            state = jax.lax.fori_loop(
+                0,
+                self.termination.max_iterations,
+                body_fun=lambda step, state: self.step(problem, state, first=False),
+                init_val=state,
+            )
         if self.verbose:
             jax_log(
                 "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
@@ -468,17 +475,18 @@ class NonlinearSolver:
 
         # Update termination criteria + summary.
         with jdc.copy_and_mutate(state_next) as state_next:
-            (
-                state_next.summary.termination_criteria,
-                state_next.summary.termination_deltas,
-            ) = self.termination._check_convergence(
-                state,
-                cost_updated=proposed_cost,
-                tangent=local_delta,
-                tangent_ordering=problem.tangent_ordering,
-                ATb=ATb,
-                accept_flag=accept_flag,
-            )
+            if self.termination.early_termination:
+                (
+                    state_next.summary.termination_criteria,
+                    state_next.summary.termination_deltas,
+                ) = self.termination._check_convergence(
+                    state,
+                    cost_updated=proposed_cost,
+                    tangent=local_delta,
+                    tangent_ordering=problem.tangent_ordering,
+                    ATb=ATb,
+                    accept_flag=accept_flag,
+                )
             state_next.summary.iterations += 1
             state_next.summary.cost_history = state_next.summary.cost_history.at[
                 state_next.summary.iterations
@@ -536,15 +544,15 @@ class NonlinearSolver:
 @jdc.pytree_dataclass
 class TrustRegionConfig:
     # Levenberg-Marquardt parameters.
-    lambda_initial: float = 5e-4
+    lambda_initial: float | jax.Array = 5e-4
     """Initial damping factor. Only used for Levenberg-Marquardt."""
-    lambda_factor: float = 2.0
+    lambda_factor: float | jax.Array = 2.0
     """Factor to increase or decrease damping. Only used for Levenberg-Marquardt."""
-    lambda_min: float = 1e-5
+    lambda_min: float | jax.Array = 1e-5
     """Minimum damping factor. Only used for Levenberg-Marquardt."""
-    lambda_max: float = 1e10
+    lambda_max: float | jax.Array = 1e10
     """Maximum damping factor. Only used for Levenberg-Marquardt."""
-    step_quality_min: float = 1e-3
+    step_quality_min: float | jax.Array = 1e-3
     """Minimum step quality for Levenberg-Marquardt. Only used for Levenberg-Marquardt."""
 
 
@@ -552,14 +560,18 @@ class TrustRegionConfig:
 class TerminationConfig:
     # Termination criteria.
     max_iterations: jdc.Static[int] = 100
-    cost_tolerance: float = 1e-5
+    """Maximum number of optimization steps."""
+    early_termination: jdc.Static[bool] = True
+    """If set to `True`, terminate when any of the tolerances are met. If
+    `False`, always run `max_iterations` steps."""
+    cost_tolerance: float | jax.Array = 1e-5
     """We terminate if `|cost change| / cost < cost_tolerance`."""
-    gradient_tolerance: float = 1e-4
+    gradient_tolerance: float | jax.Array = 1e-4
     """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
-    gradient_tolerance_start_step: int = 10
+    gradient_tolerance_start_step: int | jax.Array = 10
     """When to start checking the gradient tolerance condition. Helps solve precision
     issues caused by inexact Newton steps."""
-    parameter_tolerance: float = 1e-6
+    parameter_tolerance: float | jax.Array = 1e-6
     """We terminate if `norm_2(linear delta) < (norm2(x) + parameter_tolerance) * parameter_tolerance`."""
 
     def _check_convergence(

@@ -68,15 +68,21 @@ class Var[T](metaclass=_HashableSortableMeta):
 
     id: jax.Array | int
 
-    # We would ideally annotate with `T` in the ClassVars, but we can't.
-    #
-    # https://github.com/python/typing/discussions/1424
-    default_factory: ClassVar[Callable[[], Any]]
+    _default_factory: ClassVar[Callable[[], Any]]
     """Default value for this variable."""
     tangent_dim: ClassVar[int]
     """Dimension of the tangent space."""
     retract_fn: ClassVar[Callable[[Any, jax.Array], Any]]
     """Retraction function for the manifold. None for Euclidean space."""
+
+    # We wrap `_default_factory` because `ClassVar` types can't be
+    # annotated with type parameters.
+    #
+    # https://github.com/python/typing/discussions/1424
+    @classmethod
+    def default_factory(cls) -> T:
+        """Default value for this variable."""
+        return cls._default_factory()  # type: ignore
 
     def with_value(self, value: T) -> VarWithValue[T]:
         """Assign a value to this variable. Returned value can be used as input
@@ -122,7 +128,7 @@ class Var[T](metaclass=_HashableSortableMeta):
             )
             default_factory = lambda: default
 
-        cls.default_factory = staticmethod(default_factory)  # type: ignore
+        cls._default_factory = staticmethod(default_factory)  # type: ignore
         if retract_fn is not None:
             assert tangent_dim is not None
             cls.tangent_dim = tangent_dim
