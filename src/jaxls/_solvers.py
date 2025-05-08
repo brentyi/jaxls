@@ -296,7 +296,7 @@ class NonlinearSolver:
             )
         else:
             state = jax.lax.fori_loop(
-                0,
+                1,  # Start from 1 since we already did one step!
                 self.termination.max_iterations,
                 body_fun=lambda step, state: self.step(problem, state, first=False),
                 init_val=state,
