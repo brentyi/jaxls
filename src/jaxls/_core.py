@@ -804,7 +804,7 @@ class Cost[*Args]:
                     f"{str(e)}\n"
                     f"Cost name: '{self._get_name()}'\n"
                     f"Detected batch axes: {batch_axes}\n"
-                    f"Flattened argument shapes: {[x.shape for x in leaves]}\n"
+                    f"Flattened argument shapes: {[getattr(x, 'shape', ()) for x in leaves]}\n"
                     f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
                 )
                 raise ValueError(error_msg) from e
