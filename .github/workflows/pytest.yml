@@ -21,8 +21,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
+          sudo apt update
+          sudo apt install -y libsuitesparse-dev
           pip install uv
-          uv pip install --system -e ".[examples]"
+          uv pip install --system -e ".[dev,examples]"
       - name: Test with pytest
         run: |
           pytest
