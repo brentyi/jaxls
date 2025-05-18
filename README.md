@@ -21,7 +21,7 @@ pip install "git+https://github.com/brentyi/jaxls.git[examples]"
 | 3.10 | ⚠️ Supported | Transpiled compatibility layer |
 | <3.10 | ❌ Not supported | |
 
-### Overviews
+### Overview
 
 We provide a factor graph interface for specifying and solving least squares
 problems. **`jaxls`** takes advantage of structure in graphs: repeated cost and
