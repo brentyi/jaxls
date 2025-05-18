@@ -41,6 +41,7 @@ dev = [
     "pyright>=1.1.308",
     "pytest",
     "ruff",
+    "libcst",
 ]
 examples = [
     "tyro",
