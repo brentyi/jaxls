@@ -5,11 +5,21 @@
 **`jaxls`** is a library for solving sparse [NLLS](https://en.wikipedia.org/wiki/Non-linear_least_squares) and [IRLS](https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares) problems in JAX.
 These are common in classical robotics and computer vision.
 
-To install on Python 3.12+:
+To install:
 
 ```bash
 pip install "git+https://github.com/brentyi/jaxls.git[examples]"
 ```
+
+### Python Version Compatibility
+
+| Python Version | Support Status | Notes |
+|---------------|---------------|--------|
+| 3.13 | ✅ Supported | Recommended |
+| 3.12 | ✅ Supported | Recommended |
+| 3.11 | ⚠️ Supported | Transpiled compatibility layer |
+| 3.10 | ⚠️ Supported | Transpiled compatibility layer |
+| <3.10 | ❌ Not supported | |
 
 ### Overviews
 
