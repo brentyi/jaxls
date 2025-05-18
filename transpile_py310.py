@@ -154,9 +154,25 @@ class PythonTranspiler(cst.CSTTransformer):
             return updated_node.with_changes(comment=None)
         return updated_node
     
+    def leave_Comment(self, original_node, updated_node):
+        """Remove standalone comments."""
+        return cst.RemovalSentinel.REMOVE
+    
     def leave_SimpleStatementLine(self, original_node, updated_node):
         """Remove isolated string literals (usually field documentation)."""
         if self._is_docstring_statement(updated_node):
+            return cst.RemovalSentinel.REMOVE
+        
+        # Remove trailing comments from statements
+        if updated_node.trailing_whitespace and updated_node.trailing_whitespace.comment:
+            new_whitespace = updated_node.trailing_whitespace.with_changes(comment=None)
+            return updated_node.with_changes(trailing_whitespace=new_whitespace)
+            
+        return updated_node
+    
+    def leave_EmptyLine(self, original_node, updated_node):
+        """Remove empty lines with only comments."""
+        if updated_node.comment:
             return cst.RemovalSentinel.REMOVE
         return updated_node
     
