@@ -52,6 +52,9 @@ examples = [
 [project.urls]
 "GitHub" = "https://github.com/brentyi/jaxls"
 
+[tool.ruff]
+exclude = ["_py310"]
+
 [tool.ruff.lint]
 ignore = ["E731"]  # Ignore lambda assignment warnings
 
