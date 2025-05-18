@@ -246,6 +246,7 @@ class PythonTranspiler(cst.CSTTransformer):
             needs_class_getitem = needs_class_getitem or generic_found
         
         # Remove docstring
+        new_body = []
         if isinstance(updated_node.body, cst.IndentedBlock):
             new_body = self._remove_docstring(updated_node.body.body)
             updated_node = updated_node.with_changes(
@@ -256,11 +257,15 @@ class PythonTranspiler(cst.CSTTransformer):
         if needs_class_getitem and not self._has_class_getitem(updated_node):
             class_getitem = self._create_class_getitem_method()
             if isinstance(updated_node.body, cst.SimpleStatementSuite):
+                # Convert SimpleStatementSuite body to proper statements
+                statements = [
+                    cst.SimpleStatementLine(body=[stmt]) 
+                    if isinstance(stmt, cst.BaseSmallStatement) 
+                    else stmt 
+                    for stmt in updated_node.body.body
+                ]
                 updated_node = updated_node.with_changes(
-                    body=cst.IndentedBlock(body=[
-                        class_getitem,
-                        *updated_node.body.body
-                    ])
+                    body=cst.IndentedBlock(body=[class_getitem] + statements)
                 )
             else:
                 new_body = [class_getitem, *new_body]
@@ -370,17 +375,15 @@ class PythonTranspiler(cst.CSTTransformer):
         return updated_node
     
     def leave_Call(self, original_node, updated_node):
-        """Handle cast() and assert_never() calls."""
+        """Handle cast() calls."""
         if isinstance(updated_node.func, cst.Name):
             if updated_node.func.value == "cast":
                 # cast(Type, value) -> value
                 if len(updated_node.args) >= 2:
                     return updated_node.args[1].value
-            elif updated_node.func.value == "assert_never":
-                # assert_never(x) -> assert False
-                return cst.Assert(test=cst.Name("False"))
         
         return updated_node
+    
 
 
 def transpile_file(input_path: Path, output_path: Path) -> None:
