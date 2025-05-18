@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strip type annotations from Python source files."""
+"""Strip type annotations, comments, and docstrings from Python source files."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import tyro
 
 
 class TypeStripper(cst.CSTTransformer):
-    """Replace type annotations with Any."""
+    """Replace type annotations with Any and remove comments/docstrings."""
     
     def __init__(self):
         self.needs_any_import = False
@@ -99,110 +99,6 @@ class TypeStripper(cst.CSTTransformer):
         self.needs_any_import = True
         return updated_node.with_changes(annotation=cst.Name("Any"))
 
-    def leave_FunctionDef(self, original_node, updated_node):
-        """Handle function definitions."""
-        # Check if this function has @overload decorator
-        has_overload = any(
-            isinstance(d.decorator, cst.Name) and d.decorator.value == "overload"
-            for d in original_node.decorators
-        )
-        
-        if has_overload:
-            # Mark this function as overloaded and remove it entirely
-            self.overloaded_functions.add(original_node.name.value)
-            return cst.RemovalSentinel.REMOVE
-        
-        # If this function name was previously seen with @overload, it's the implementation
-        # Keep it but remove any overload-related decorators
-        new_decorators = [
-            d for d in updated_node.decorators
-            if not (isinstance(d.decorator, cst.Name) and d.decorator.value == "overload")
-        ]
-        
-        # Also handle PEP 695 style type parameters if present
-        if hasattr(updated_node, 'type_parameters') and updated_node.type_parameters:
-            updated_node = updated_node.with_changes(type_parameters=None)
-        
-        return updated_node.with_changes(decorators=new_decorators)
-
-    def leave_ClassDef(self, original_node, updated_node):
-        """Handle generic classes and class type parameters."""
-        # Track if this class needs __class_getitem__
-        needs_class_getitem = False
-        
-        # Handle PEP 695 generic syntax (Python 3.12+)
-        if hasattr(updated_node, 'type_parameters') and updated_node.type_parameters:
-            # Remove type parameters from class
-            updated_node = updated_node.with_changes(type_parameters=None)
-            needs_class_getitem = True
-        
-        # Handle bases with generics
-        if updated_node.bases:
-            new_bases = []
-            for base in updated_node.bases:
-                if isinstance(base.value, cst.Subscript):
-                    # If base is subscripted (like Generic[T] or Cost[*Args])
-                    if isinstance(base.value.value, cst.Name):
-                        if base.value.value.value == "Generic":
-                            # Skip Generic base entirely
-                            needs_class_getitem = True
-                            continue
-                        else:
-                            # Keep the base class but replace subscript with Any
-                            # Transform Var[jaxlie.SO2] -> Var[Any]
-                            self.needs_any_import = True
-                            needs_class_getitem = True  # This class also needs __class_getitem__
-                            subscripted_base = base.value.with_changes(
-                                slice=[cst.SubscriptElement(slice=cst.Index(value=cst.Name("Any")))]
-                            )
-                            new_bases.append(cst.Arg(subscripted_base))
-                    else:
-                        # For more complex base expressions, keep the base without subscript
-                        new_bases.append(base)
-                else:
-                    new_bases.append(base)
-            
-            # Update the bases if we made changes - but keep keywords intact!
-            updated_node = updated_node.with_changes(bases=new_bases)
-        
-        # Add __class_getitem__ method if the class was generic
-        if needs_class_getitem and not self._has_class_getitem(updated_node):
-            # Create __class_getitem__ method that returns cls
-            class_getitem = cst.FunctionDef(
-                name=cst.Name("__class_getitem__"),
-                params=cst.Parameters(params=[
-                    cst.Param(cst.Name("cls")),
-                    cst.Param(cst.Name("params"))
-                ]),
-                body=cst.IndentedBlock(body=[
-                    cst.SimpleStatementLine(body=[cst.Return(cst.Name("cls"))])
-                ]),
-                decorators=[cst.Decorator(cst.Name("classmethod"))],
-            )
-            
-            # Insert at the beginning of the class body
-            if isinstance(updated_node.body, cst.SimpleStatementSuite):
-                # Need to convert SimpleStatementSuite to IndentedBlock
-                updated_node = updated_node.with_changes(
-                    body=cst.IndentedBlock(body=[
-                        class_getitem,
-                        *updated_node.body.body
-                    ])
-                )
-            else:
-                new_body = [class_getitem, *updated_node.body.body]
-                updated_node = updated_node.with_changes(
-                    body=updated_node.body.with_changes(body=new_body)
-                )
-        
-        return updated_node
-
-    def _has_class_getitem(self, class_node):
-        """Check if the class already has a __class_getitem__ method."""
-        for item in class_node.body.body:
-            if isinstance(item, cst.FunctionDef) and item.name.value == "__class_getitem__":
-                return True
-        return False
 
     def leave_ImportFrom(self, original_node, updated_node):
         """Track and modify typing imports."""
@@ -331,6 +227,226 @@ class TypeStripper(cst.CSTTransformer):
             params=[p.with_changes(annotation=None) for p in updated_node.params.params],
         )
         return updated_node.with_changes(params=new_params)
+    
+    def leave_TrailingWhitespace(self, original_node, updated_node):
+        """Remove comments from trailing whitespace."""
+        if updated_node.comment:
+            return updated_node.with_changes(comment=None)
+        return updated_node
+    
+    def leave_SimpleStatementLine(self, original_node, updated_node):
+        """Remove isolated string literals (field documentation)."""
+        # Check if this is just a string literal (documentation)
+        if len(updated_node.body) == 1 and isinstance(updated_node.body[0], cst.Expr):
+            expr = updated_node.body[0]
+            if isinstance(expr.value, (cst.SimpleString, cst.ConcatenatedString)):
+                # This is a standalone string literal, remove it
+                return cst.RemovalSentinel.REMOVE
+        return updated_node
+    
+    def leave_Module(self, original_node, updated_node):
+        """Remove module docstring."""
+        if updated_node.body:
+            new_body = self._remove_docstring(updated_node.body)
+            return updated_node.with_changes(body=new_body)
+        return updated_node
+    
+    def leave_FunctionDef(self, original_node, updated_node):
+        """Handle function definitions."""
+        # Check if this function has @overload decorator
+        has_overload = any(
+            isinstance(d.decorator, cst.Name) and d.decorator.value == "overload"
+            for d in original_node.decorators
+        )
+        
+        if has_overload:
+            # Mark this function as overloaded and remove it entirely
+            self.overloaded_functions.add(original_node.name.value)
+            return cst.RemovalSentinel.REMOVE
+        
+        # If this function name was previously seen with @overload, it's the implementation
+        # Keep it but remove any overload-related decorators
+        new_decorators = [
+            d for d in updated_node.decorators
+            if not (isinstance(d.decorator, cst.Name) and d.decorator.value == "overload")
+        ]
+        
+        # Also handle PEP 695 style type parameters if present
+        if hasattr(updated_node, 'type_parameters') and updated_node.type_parameters:
+            updated_node = updated_node.with_changes(type_parameters=None)
+        
+        # Remove docstring from function body
+        if isinstance(updated_node.body, cst.IndentedBlock):
+            new_body = self._remove_docstring(updated_node.body.body)
+            updated_node = updated_node.with_changes(
+                body=updated_node.body.with_changes(body=new_body)
+            )
+        
+        return updated_node.with_changes(decorators=new_decorators)
+    
+    def leave_ClassDef(self, original_node, updated_node):
+        """Handle generic classes and class type parameters."""
+        # Track if this class needs __class_getitem__
+        needs_class_getitem = False
+        
+        # Handle PEP 695 generic syntax (Python 3.12+)
+        if hasattr(updated_node, 'type_parameters') and updated_node.type_parameters:
+            # Remove type parameters from class
+            updated_node = updated_node.with_changes(type_parameters=None)
+            needs_class_getitem = True
+        
+        # Handle bases with generics
+        if updated_node.bases:
+            new_bases = []
+            for base in updated_node.bases:
+                if isinstance(base.value, cst.Subscript):
+                    # If base is subscripted (like Generic[T] or Cost[*Args])
+                    if isinstance(base.value.value, cst.Name):
+                        if base.value.value.value == "Generic":
+                            # Skip Generic base entirely
+                            needs_class_getitem = True
+                            continue
+                        else:
+                            # Keep the base class but replace subscript with Any
+                            # Transform Var[jaxlie.SO2] -> Var[Any]
+                            self.needs_any_import = True
+                            needs_class_getitem = True  # This class also needs __class_getitem__
+                            subscripted_base = base.value.with_changes(
+                                slice=[cst.SubscriptElement(slice=cst.Index(value=cst.Name("Any")))]
+                            )
+                            new_bases.append(cst.Arg(subscripted_base))
+                    else:
+                        # For more complex base expressions, keep the base without subscript
+                        new_bases.append(base)
+                else:
+                    new_bases.append(base)
+            
+            # Update the bases if we made changes - but keep keywords intact!
+            updated_node = updated_node.with_changes(bases=new_bases)
+        
+        # Remove docstring from class body
+        if isinstance(updated_node.body, cst.IndentedBlock):
+            new_body = self._remove_docstring(updated_node.body.body)
+            updated_node = updated_node.with_changes(
+                body=updated_node.body.with_changes(body=new_body)
+            )
+        
+        # Add __class_getitem__ method if the class was generic
+        if needs_class_getitem and not self._has_class_getitem(updated_node):
+            # Create __class_getitem__ method that returns cls
+            class_getitem = cst.FunctionDef(
+                name=cst.Name("__class_getitem__"),
+                params=cst.Parameters(params=[
+                    cst.Param(cst.Name("cls")),
+                    cst.Param(cst.Name("params"))
+                ]),
+                body=cst.IndentedBlock(body=[
+                    cst.SimpleStatementLine(body=[cst.Return(cst.Name("cls"))])
+                ]),
+                decorators=[cst.Decorator(cst.Name("classmethod"))],
+            )
+            
+            # Insert at the beginning of the class body
+            if isinstance(updated_node.body, cst.SimpleStatementSuite):
+                # Need to convert SimpleStatementSuite to IndentedBlock
+                updated_node = updated_node.with_changes(
+                    body=cst.IndentedBlock(body=[
+                        class_getitem,
+                        *updated_node.body.body
+                    ])
+                )
+            else:
+                new_body = [class_getitem, *new_body]
+                updated_node = updated_node.with_changes(
+                    body=updated_node.body.with_changes(body=new_body)
+                )
+        
+        return updated_node
+    
+    def _remove_docstring(self, body_list):
+        """Remove docstring from a list of statements."""
+        if not body_list:
+            return body_list
+        
+        new_body = []
+        skip_next_string = True  # Skip the first string if it's a docstring
+        
+        for stmt in body_list:
+            # Check if this is a string literal expression (potential docstring)
+            if isinstance(stmt, cst.SimpleStatementLine):
+                if len(stmt.body) == 1 and isinstance(stmt.body[0], cst.Expr):
+                    expr = stmt.body[0]
+                    if isinstance(expr.value, (cst.SimpleString, cst.ConcatenatedString)):
+                        # This is a string literal
+                        if skip_next_string:
+                            # Skip it (it's a docstring)
+                            skip_next_string = False
+                            continue
+                        else:
+                            # Not a docstring, keep it
+                            new_body.append(stmt)
+                    else:
+                        # Not a string literal
+                        new_body.append(stmt)
+                        skip_next_string = False
+                else:
+                    # Multiple statements or not an expression
+                    new_body.append(stmt)
+                    skip_next_string = False
+            else:
+                # Not a simple statement line
+                new_body.append(stmt)
+                skip_next_string = False
+        
+        return new_body
+    
+    def leave_AnnAssign(self, original_node, updated_node):
+        """Replace type annotations with Any in annotated assignments."""
+        
+        # Continue with normal annotation replacement...
+        # Special case: if the annotation contains ClassVar or jdc.Static, keep it but replace the inner type
+        if updated_node.annotation and isinstance(updated_node.annotation.annotation, cst.Subscript):
+            subscript = updated_node.annotation.annotation
+            if isinstance(subscript.value, cst.Name) and subscript.value.value == "ClassVar":
+                self.needs_any_import = True
+                # Replace ClassVar[T] with ClassVar[Any]
+                new_annotation = cst.Annotation(
+                    annotation=subscript.with_changes(
+                        slice=[cst.SubscriptElement(slice=cst.Index(value=cst.Name("Any")))]
+                    )
+                )
+                return updated_node.with_changes(annotation=new_annotation)
+            elif isinstance(subscript.value, cst.Attribute):
+                # Check for jdc.Static[T], typing.ClassVar[T], etc.
+                attr = subscript.value
+                # Debug print
+                # print(f"AnnAssign: found attribute {attr.attr.value if isinstance(attr.attr, cst.Name) else 'unknown'}")
+                if (isinstance(attr.attr, cst.Name) and 
+                    attr.attr.value in ["Static", "ClassVar"]):
+                    self.needs_any_import = True
+                    # Replace Mod.Attr[T] with Mod.Attr[Any]
+                    new_annotation = cst.Annotation(
+                        annotation=subscript.with_changes(
+                            slice=[cst.SubscriptElement(slice=cst.Index(value=cst.Name("Any")))]
+                        )
+                    )
+                    return updated_node.with_changes(annotation=new_annotation)
+        
+        # Otherwise, replace with Any
+        self.needs_any_import = True
+        if updated_node.value is None:
+            # x: int -> x: Any
+            return updated_node.with_changes(annotation=cst.Annotation(annotation=cst.Name("Any")))
+        else:
+            # x: int = 5 -> x: Any = 5
+            return updated_node.with_changes(annotation=cst.Annotation(annotation=cst.Name("Any")))
+    
+    def _has_class_getitem(self, class_node):
+        """Check if the class already has a __class_getitem__ method."""
+        for item in class_node.body.body:
+            if isinstance(item, cst.FunctionDef) and item.name.value == "__class_getitem__":
+                return True
+        return False
 
 
 def strip_types_from_file(input_path: Path, output_path: Path) -> None:
