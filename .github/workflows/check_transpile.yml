@@ -19,33 +19,25 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install libcst ruff
+          pip install uv
+          uv pip install --system -e ".[dev]"
           
       - name: Run transpiler
         run: |
-          # First, remove any existing test directory
-          rm -rf src/jaxls/_py310_test
+          python transpile_py310.py
           
-          # Run the transpiler
-          python transpile_py310.py src/jaxls src/jaxls/_py310_test
-          
-      - name: Compare transpiled output
+      - name: Check for changes
         run: |
-          # Use diff with specific flags for better comparison
-          # -r: recursive
-          # -q: brief output (only show which files differ)
-          # --exclude: exclude __pycache__ directories
-          if ! diff -rq --exclude="__pycache__" src/jaxls/_py310 src/jaxls/_py310_test; then
+          # Check if there are any changes to the transpiled files
+          if ! git diff --quiet src/jaxls/_py310/; then
             echo "Error: Transpiled code is out of date!"
-            echo "Differences found:"
-            diff -ru --exclude="__pycache__" src/jaxls/_py310 src/jaxls/_py310_test || true
+            echo "Changes detected:"
+            git diff --stat src/jaxls/_py310/
             echo ""
-            echo "Please run: python transpile_py310.py src/jaxls src/jaxls/_py310"
+            echo "Differences:"
+            git diff src/jaxls/_py310/
+            echo ""
+            echo "Please run: python transpile_py310.py"
             exit 1
           fi
           echo "Transpiled code is up to date!"
-          
-      - name: Cleanup
-        if: always()
-        run: |
-          rm -rf src/jaxls/_py310_test

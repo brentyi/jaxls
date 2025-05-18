@@ -635,6 +635,7 @@ def transpile_directory(input_dir: Path, output_dir: Path) -> None:
         relative_path = py_file.relative_to(input_dir)
         output_path = output_dir / relative_path
         if py_file.name == "__init__.py":
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("")
             continue
         transpile_file(py_file, output_path)
@@ -655,16 +656,11 @@ def transpile_directory(input_dir: Path, output_dir: Path) -> None:
         print(f"Copied: {file_path} -> {output_path}")
 
 
-def main(
-    input_dir: Path,
-    output_dir: Path,
-) -> None:
-    """Transpile Python source files to Python 3.10 compatibility.
-
-    Args:
-        input_dir: Directory containing Python files to process.
-        output_dir: Directory where transpiled files will be written.
-    """
+def main() -> None:
+    """Transpile Python source files to Python 3.10 compatibility."""
+    input_dir = Path("./src/jaxls")
+    output_dir = Path("./src/jaxls/_py310")
+    
     if not input_dir.exists():
         print(f"Error: Input directory '{input_dir}' does not exist")
         return
@@ -707,12 +703,4 @@ def main(
 
 
 if __name__ == "__main__":
-    # For testing
-    import sys
-
-    if len(sys.argv) > 1:
-        input_dir = Path(sys.argv[1])
-        output_dir = Path(sys.argv[2])
-        main(input_dir, output_dir)
-    else:
-        main(Path("./src/jaxls"), output_dir=Path("./src/jaxls/_py310"))
+    main()
