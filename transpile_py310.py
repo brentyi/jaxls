@@ -660,7 +660,7 @@ def main() -> None:
     """Transpile Python source files to Python 3.10 compatibility."""
     input_dir = Path("./src/jaxls")
     output_dir = Path("./src/jaxls/_py310")
-    
+
     if not input_dir.exists():
         print(f"Error: Input directory '{input_dir}' does not exist")
         return
