@@ -17,8 +17,10 @@ dynamic = ["version"]
 description = "Nonlinear least squares with JAX"
 readme = "README.md"
 license = { text="MIT" }
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
@@ -37,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyright>=1.1.308",
+    "pytest",
     "ruff",
 ]
 examples = [
@@ -51,3 +54,6 @@ examples = [
 
 [tool.ruff.lint]
 ignore = ["E731"]  # Ignore lambda assignment warnings
+
+[tool.pyright]
+exclude = ["transpile_py310.py", "**/_py310/**"]
