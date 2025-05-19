@@ -650,7 +650,7 @@ class Cost[*Args]:
     @staticmethod
     def create_factory[**Args_](
         *,
-        jac_custom_fn: None = None,
+        jac_custom_fn: JacobianFunc[Args_],
         jac_batch_size: int | None = None,
         name: str | None = None,
     ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]]: ...

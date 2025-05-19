@@ -626,36 +626,6 @@ def add_any_import(tree):
     return tree.with_changes(body=new_body)
 
 
-def transpile_directory(input_dir: Path, output_dir: Path) -> None:
-    """Transpile all Python files in directory."""
-    python_files = list(input_dir.glob("**/*.py"))
-    print(f"Found {len(python_files)} Python files to process")
-
-    for py_file in python_files:
-        relative_path = py_file.relative_to(input_dir)
-        output_path = output_dir / relative_path
-        if py_file.name == "__init__.py":
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text("")
-            continue
-        transpile_file(py_file, output_path)
-
-    # Copy non-Python files
-    non_python_files = []
-    for file_path in input_dir.glob("**/*"):
-        if file_path.is_file() and not file_path.suffix == ".py":
-            non_python_files.append(file_path)
-
-    print(f"Found {len(non_python_files)} non-Python files to copy")
-
-    for file_path in non_python_files:
-        relative_path = file_path.relative_to(input_dir)
-        output_path = output_dir / relative_path
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(file_path, output_path)
-        print(f"Copied: {file_path} -> {output_path}")
-
-
 def main() -> None:
     """Transpile Python source files to Python 3.10 compatibility."""
     input_dir = Path("./src/jaxls")
@@ -670,7 +640,20 @@ def main() -> None:
         return
 
     print(f"Transpiling {input_dir} to {output_dir}")
-    transpile_directory(input_dir, output_dir)
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    python_files = list(input_dir.glob("**/*.py"))
+    print(f"Found {len(python_files)} Python files to process")
+
+    for py_file in python_files:
+        relative_path = py_file.relative_to(input_dir)
+        output_path = output_dir / relative_path
+        if py_file.name == "__init__.py":
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("")
+            continue
+        transpile_file(py_file, output_path)
 
     # Run ruff check --fix and ruff format on the output directory
     import subprocess
