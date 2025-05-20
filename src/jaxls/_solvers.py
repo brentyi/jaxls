@@ -17,11 +17,10 @@ import scipy
 import scipy.sparse
 from jax import numpy as jnp
 
-from jaxls._preconditioning import (
+from ._preconditioning import (
     make_block_jacobi_precoditioner,
     make_point_jacobi_precoditioner,
 )
-
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
@@ -328,7 +327,9 @@ class NonlinearSolver:
             self._log_state(problem, state)
 
         # Get nonzero values of Jacobian.
-        A_blocksparse = problem._compute_jac_values(state.vals, state.jac_cache)
+        from ._jacobians import compute_problem_jacobian
+
+        A_blocksparse = compute_problem_jacobian(problem, state.vals, state.jac_cache)
 
         # Compute Jacobian scaler.
         if first:
