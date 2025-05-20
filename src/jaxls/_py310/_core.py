@@ -8,6 +8,7 @@ import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
+from jax.flatten_util import ravel_pytree
 from jax.tree_util import default_registry
 from loguru import logger
 from typing_extensions import deprecated
@@ -307,13 +308,62 @@ class AnalyzedLeastSquaresProblem:
                     )
                     return cost.jac_custom_with_cache_fn(vals, jac_cache_i, *cost.args)
 
-                jacfunc = {
-                    "forward": jax.jacfwd,
-                    "reverse": jax.jacrev,
-                    "auto": jax.jacrev
-                    if cost.residual_flat_dim < val_subset._get_tangent_dim()
-                    else jax.jacfwd,
-                }[cost.jac_mode]
+                if cost.jac_mode == "central_difference":
+                    assert jac_cache_i is None, (
+                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used!"
+                    )
+                    tangent_eps = list()
+                    for (
+                        var_type,
+                        stacked_vals,
+                    ) in self.tangent_ordering.ordered_dict_items(
+                        val_subset.vals_from_type
+                    ):
+                        (num_vars,) = val_subset.ids_from_type[var_type].shape
+                        flat_vals = jax.vmap(lambda x: ravel_pytree(x)[0])(stacked_vals)
+                        assert flat_vals.shape[0] == num_vars
+                        var_norms = jnp.linalg.norm(flat_vals, axis=-1, keepdims=True)
+                        tangent_eps.append(
+                            jnp.broadcast_to(
+                                var_norms * 1e-6 + 1e-6,
+                                (num_vars, var_type.tangent_dim),
+                            )
+                        )
+                    tangent_eps, _ = ravel_pytree(tangent_eps)
+                    assert tangent_eps.shape == (val_subset._get_tangent_dim(),)
+                    tangent_eps_pair = jnp.stack([tangent_eps, -tangent_eps], axis=0)
+                    assert tangent_eps_pair.shape == (2, val_subset._get_tangent_dim())
+                    samples = jax.vmap(
+                        lambda eps_dense: jax.vmap(
+                            lambda eps_dim: cost.compute_residual_flat(
+                                val_subset._retract(eps_dim, self.tangent_ordering),
+                                *cost.args,
+                            ),
+                            out_axes=1,
+                        )(jnp.diagflat(eps_dense))
+                    )(tangent_eps_pair)
+                    assert isinstance(samples, jax.Array)
+                    assert samples.shape == (
+                        2,
+                        cost.residual_flat_dim,
+                        val_subset._get_tangent_dim(),
+                    )
+                    return (samples[0] - samples[1]) / (2 * tangent_eps[None, :])
+
+                match cost.jac_mode:
+                    case "forward":
+                        jacfunc = jax.jacfwd
+                    case "reverse":
+                        jacfunc = jax.jacrev
+                    case "auto":
+                        jacfunc = (
+                            jax.jacrev
+                            if cost.residual_flat_dim < val_subset._get_tangent_dim()
+                            else jax.jacfwd
+                        )
+                    case _:
+                        assert_never(cost.jac_mode)
+
                 return jacfunc(
                     lambda tangent: cost.compute_residual_flat(
                         val_subset._retract(tangent, self.tangent_ordering),
