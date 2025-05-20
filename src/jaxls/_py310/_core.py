@@ -8,6 +8,7 @@ import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
+from jax.flatten_util import ravel_pytree
 from jax.tree_util import default_registry
 from loguru import logger
 from typing_extensions import deprecated
@@ -311,55 +312,43 @@ class AnalyzedLeastSquaresProblem:
                     assert jac_cache_i is None, (
                         "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used!"
                     )
-                    tangent_eps_all = list()
+                    tangent_eps = list()
                     for (
                         var_type,
-                        stacked_val,
+                        stacked_vals,
                     ) in self.tangent_ordering.ordered_dict_items(
                         val_subset.vals_from_type
                     ):
                         (num_vars,) = val_subset.ids_from_type[var_type].shape
-                        per_var_norm = (
-                            jnp.linalg.norm(
-                                jnp.concatenate(
-                                    [
-                                        leaf.reshape((num_vars, -1))
-                                        for leaf in jax.tree.leaves(stacked_val)
-                                    ],
-                                    axis=-1,
-                                ),
-                                axis=-1,
-                                keepdims=True,
+                        flat_vals = jax.vmap(lambda x: ravel_pytree(x)[0])(stacked_vals)
+                        assert flat_vals.shape[0] == num_vars
+                        var_norms = jnp.linalg.norm(flat_vals, axis=-1, keepdims=True)
+                        tangent_eps.append(
+                            jnp.broadcast_to(
+                                var_norms * 1e-6 + 1e-6,
+                                (num_vars, var_type.tangent_dim),
                             )
-                            * 1e-4
-                            + 1e-4
                         )
-                        tangent_eps_all.append(
-                            per_var_norm[:, None]
-                            * jnp.ones((num_vars, var_type.tangent_dim))
-                        )
-                    tangent_eps_all = jnp.concatenate(
-                        [x.flatten() for x in tangent_eps_all]
+                    tangent_eps, _ = ravel_pytree(tangent_eps)
+                    assert tangent_eps.shape == (val_subset._get_tangent_dim(),)
+                    tangent_eps_pair = jnp.stack([tangent_eps, -tangent_eps], axis=0)
+                    assert tangent_eps_pair.shape == (2, val_subset._get_tangent_dim())
+                    samples = jax.vmap(
+                        lambda eps_dense: jax.vmap(
+                            lambda eps_dim: cost.compute_residual_flat(
+                                val_subset._retract(eps_dim, self.tangent_ordering),
+                                *cost.args,
+                            ),
+                            out_axes=1,
+                        )(jnp.diagflat(eps_dense))
+                    )(tangent_eps_pair)
+                    assert isinstance(samples, jax.Array)
+                    assert samples.shape == (
+                        2,
+                        cost.residual_flat_dim,
+                        val_subset._get_tangent_dim(),
                     )
-                    assert tangent_eps_all.shape == (val_subset._get_tangent_dim(),)
-
-                    def compute_delta_row(tangent_eps: Any) -> Any:
-                        cost_a = cost.compute_residual_flat(
-                            val_subset._retract(tangent_eps, self.tangent_ordering),
-                            *cost.args,
-                        )
-                        cost_b = cost.compute_residual_flat(
-                            val_subset._retract(-tangent_eps, self.tangent_ordering),
-                            *cost.args,
-                        )
-                        assert isinstance(cost_a, jax.Array)
-                        assert isinstance(cost_b, jax.Array)
-                        return cost_a - cost_b
-
-                    return jax.vmap(compute_delta_row, out_axes=1)(
-                        jnp.eye(val_subset._get_tangent_dim())
-                        * tangent_eps_all[None, :]
-                    ) / (2 * tangent_eps_all[None, :])
+                    return (samples[0] - samples[1]) / (2 * tangent_eps[None, :])
 
                 match cost.jac_mode:
                     case "forward":
