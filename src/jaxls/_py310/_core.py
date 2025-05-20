@@ -307,13 +307,74 @@ class AnalyzedLeastSquaresProblem:
                     )
                     return cost.jac_custom_with_cache_fn(vals, jac_cache_i, *cost.args)
 
-                jacfunc = {
-                    "forward": jax.jacfwd,
-                    "reverse": jax.jacrev,
-                    "auto": jax.jacrev
-                    if cost.residual_flat_dim < val_subset._get_tangent_dim()
-                    else jax.jacfwd,
-                }[cost.jac_mode]
+                if cost.jac_mode == "central_difference":
+                    assert jac_cache_i is None, (
+                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used!"
+                    )
+                    tangent_eps_all = list()
+                    for (
+                        var_type,
+                        stacked_val,
+                    ) in self.tangent_ordering.ordered_dict_items(
+                        val_subset.vals_from_type
+                    ):
+                        (num_vars,) = val_subset.ids_from_type[var_type].shape
+                        per_var_norm = (
+                            jnp.linalg.norm(
+                                jnp.concatenate(
+                                    [
+                                        leaf.reshape((num_vars, -1))
+                                        for leaf in jax.tree.leaves(stacked_val)
+                                    ],
+                                    axis=-1,
+                                ),
+                                axis=-1,
+                                keepdims=True,
+                            )
+                            * 1e-4
+                            + 1e-4
+                        )
+                        tangent_eps_all.append(
+                            per_var_norm[:, None]
+                            * jnp.ones((num_vars, var_type.tangent_dim))
+                        )
+                    tangent_eps_all = jnp.concatenate(
+                        [x.flatten() for x in tangent_eps_all]
+                    )
+                    assert tangent_eps_all.shape == (val_subset._get_tangent_dim(),)
+
+                    def compute_delta_row(tangent_eps: Any) -> Any:
+                        cost_a = cost.compute_residual_flat(
+                            val_subset._retract(tangent_eps, self.tangent_ordering),
+                            *cost.args,
+                        )
+                        cost_b = cost.compute_residual_flat(
+                            val_subset._retract(-tangent_eps, self.tangent_ordering),
+                            *cost.args,
+                        )
+                        assert isinstance(cost_a, jax.Array)
+                        assert isinstance(cost_b, jax.Array)
+                        return cost_a - cost_b
+
+                    return jax.vmap(compute_delta_row, out_axes=1)(
+                        jnp.eye(val_subset._get_tangent_dim())
+                        * tangent_eps_all[None, :]
+                    ) / (2 * tangent_eps_all[None, :])
+
+                match cost.jac_mode:
+                    case "forward":
+                        jacfunc = jax.jacfwd
+                    case "reverse":
+                        jacfunc = jax.jacrev
+                    case "auto":
+                        jacfunc = (
+                            jax.jacrev
+                            if cost.residual_flat_dim < val_subset._get_tangent_dim()
+                            else jax.jacfwd
+                        )
+                    case _:
+                        assert_never(cost.jac_mode)
+
                 return jacfunc(
                     lambda tangent: cost.compute_residual_flat(
                         val_subset._retract(tangent, self.tangent_ordering),
