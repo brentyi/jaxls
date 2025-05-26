@@ -473,11 +473,23 @@ class Cost[*Args]:
     within a PyTree structure arbitrarily."""
 
     jac_mode: jdc.Static[
-        Literal["auto", "forward", "reverse", "central_difference"]
+        Literal[
+            "auto",
+            "forward",
+            "reverse",
+            "central_difference",
+            "richardson_extrapolation",
+        ]
     ] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff. Ignored if `jac_custom_fn` is
-    specified."""
+    specified.
+    
+    Numeric differentiation options:
+    - "central_difference": Standard two-point formula with a single step size h
+    - "richardson_extrapolation": Applies Richardson extrapolation to central differences
+      with multiple step sizes (h, h/2, h/4, h/8) to achieve higher-order accuracy
+      (up to O(h^8) compared to O(h^2) for standard central differences)"""
 
     jac_batch_size: jdc.Static[int | None] = None
     """Batch size for computing Jacobians that can be parallelized. Can be set
@@ -520,7 +532,13 @@ class Cost[*Args]:
     @staticmethod
     def create_factory[**Args_](
         *,
-        jac_mode: Literal["auto", "forward", "reverse", "central_difference"] = "auto",
+        jac_mode: Literal[
+            "auto",
+            "forward",
+            "reverse",
+            "central_difference",
+            "richardson_extrapolation",
+        ] = "auto",
         jac_batch_size: int | None = None,
         name: str | None = None,
     ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]]: ...
@@ -553,7 +571,13 @@ class Cost[*Args]:
     def create_factory[**Args_](
         compute_residual: ResidualFunc[Args_] | None = None,
         *,
-        jac_mode: Literal["auto", "forward", "reverse", "central_difference"] = "auto",
+        jac_mode: Literal[
+            "auto",
+            "forward",
+            "reverse",
+            "central_difference",
+            "richardson_extrapolation",
+        ] = "auto",
         jac_batch_size: int | None = None,
         jac_custom_fn: JacobianFunc[Args_] | None = None,
         jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, Any] | None = None,
