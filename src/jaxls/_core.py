@@ -28,12 +28,7 @@ from ._solvers import (
     TerminationConfig,
     TrustRegionConfig,
 )
-from ._sparse_matrices import (
-    BlockRowSparseMatrix,
-    SparseBlockRow,
-    SparseCooCoordinates,
-    SparseCsrCoordinates,
-)
+from ._sparse_matrices import SparseCooCoordinates, SparseCsrCoordinates
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
@@ -172,7 +167,7 @@ class LeastSquaresProblem:
             costs_from_group[group_key].append(cost)
 
         # Fields we want to populate.
-        stacked_costs = list[_AnalyzedCost]()
+        stacked_costs = list[AnalyzedCost]()
         cost_counts = list[int]()
         jac_coords = list[tuple[jax.Array, jax.Array]]()
 
@@ -189,7 +184,7 @@ class LeastSquaresProblem:
             stacked_cost: Cost = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
-            stacked_cost_expanded: _AnalyzedCost = jax.vmap(_AnalyzedCost._make)(
+            stacked_cost_expanded: AnalyzedCost = jax.vmap(AnalyzedCost._make)(
                 stacked_cost
             )
             stacked_costs.append(stacked_cost_expanded)
@@ -208,7 +203,7 @@ class LeastSquaresProblem:
             # residual indices and columns correspond to tangent vector indices.
             rows, cols = jax.vmap(
                 functools.partial(
-                    _AnalyzedCost._compute_block_sparse_jac_indices,
+                    AnalyzedCost._compute_block_sparse_jac_indices,
                     tangent_ordering=tangent_ordering,
                     sorted_ids_from_var_type=sorted_ids_from_var_type,
                     tangent_start_from_var_type=tangent_start_from_var_type,
@@ -260,7 +255,7 @@ class LeastSquaresProblem:
 
 @jdc.pytree_dataclass
 class AnalyzedLeastSquaresProblem:
-    stacked_costs: tuple[_AnalyzedCost, ...]
+    stacked_costs: tuple[AnalyzedCost, ...]
     cost_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
     jac_coords_coo: SparseCooCoordinates
@@ -389,122 +384,6 @@ class AnalyzedLeastSquaresProblem:
         else:
             return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_jac_values(
-        self, vals: VarValues, jac_cache: tuple[CustomJacobianCache, ...]
-    ) -> BlockRowSparseMatrix:
-        block_rows = list[SparseBlockRow]()
-        residual_offset = 0
-
-        for i, cost in enumerate(self.stacked_costs):
-            # Shape should be: (count_from_group[group_key], single_residual_dim, sum_of_tangent_dims_of_variables).
-            def compute_jac_with_perturb(
-                cost: _AnalyzedCost, jac_cache_i: CustomJacobianCache | None = None
-            ) -> jax.Array:
-                val_subset = vals._get_subset(
-                    {
-                        var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
-                        for var_type, ids in cost.sorted_ids_from_var_type.items()
-                    },
-                    self.tangent_ordering,
-                )
-
-                # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
-                if cost.jac_custom_fn is not None:
-                    assert jac_cache_i is None, (
-                        "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
-                    )
-                    return cost.jac_custom_fn(vals, *cost.args)
-                if cost.jac_custom_with_cache_fn is not None:
-                    assert jac_cache_i is not None, (
-                        "`jac_custom_with_cache_fn` was specified, but no cache was returned by `compute_residual`!"
-                    )
-                    return cost.jac_custom_with_cache_fn(vals, jac_cache_i, *cost.args)
-
-                jacfunc = {
-                    "forward": jax.jacfwd,
-                    "reverse": jax.jacrev,
-                    "auto": jax.jacrev
-                    if cost.residual_flat_dim < val_subset._get_tangent_dim()
-                    else jax.jacfwd,
-                }[cost.jac_mode]
-                return jacfunc(
-                    # We flatten the output of compute_residual before
-                    # computing Jacobian. The Jacobian is computed with respect
-                    # to the flattened residual.
-                    lambda tangent: cost.compute_residual_flat(
-                        val_subset._retract(tangent, self.tangent_ordering),
-                        *cost.args,
-                    )
-                )(jnp.zeros((val_subset._get_tangent_dim(),)))
-
-            optional_jac_cache_i = (jac_cache[i],) if jac_cache[i] is not None else ()
-
-            # Compute Jacobian for each cost term.
-            if cost.jac_batch_size is None:
-                stacked_jac = jax.vmap(compute_jac_with_perturb)(
-                    cost, *optional_jac_cache_i
-                )
-            else:
-                # When `batch_size` is `None`, jax.lax.map reduces to a scan
-                # (similar to `batch_size=1`).
-                stacked_jac = jax.lax.map(
-                    compute_jac_with_perturb,
-                    cost,
-                    *optional_jac_cache_i,
-                    batch_size=cost.jac_batch_size,
-                )
-            (num_costs,) = cost._get_batch_axes()
-            assert stacked_jac.shape == (
-                num_costs,
-                cost.residual_flat_dim,
-                stacked_jac.shape[-1],  # Tangent dimension.
-            )
-            # Compute block-row representation for sparse Jacobian.
-            stacked_jac_start_col = 0
-            start_cols = list[jax.Array]()
-            block_widths = list[int]()
-            for var_type, ids in self.tangent_ordering.ordered_dict_items(
-                # This ordering shouldn't actually matter!
-                cost.sorted_ids_from_var_type
-            ):
-                (num_costs_, num_vars) = ids.shape
-                assert num_costs == num_costs_
-
-                # Get one block for each variable.
-                for var_idx in range(ids.shape[-1]):
-                    start_cols.append(
-                        jnp.searchsorted(
-                            self.sorted_ids_from_var_type[var_type], ids[..., var_idx]
-                        )
-                        * var_type.tangent_dim
-                        + self.tangent_start_from_var_type[var_type]
-                    )
-                    block_widths.append(var_type.tangent_dim)
-                    assert start_cols[-1].shape == (num_costs_,)
-
-                stacked_jac_start_col = (
-                    stacked_jac_start_col + num_vars * var_type.tangent_dim
-                )
-            assert stacked_jac.shape[-1] == stacked_jac_start_col
-
-            block_rows.append(
-                SparseBlockRow(
-                    num_cols=self.tangent_dim,
-                    start_cols=tuple(start_cols),
-                    block_num_cols=tuple(block_widths),
-                    blocks_concat=stacked_jac,
-                )
-            )
-
-            residual_offset += cost.residual_flat_dim * num_costs
-        assert residual_offset == self.residual_dim
-
-        bsparse_jacobian = BlockRowSparseMatrix(
-            block_rows=tuple(block_rows),
-            shape=(self.residual_dim, self.tangent_dim),
-        )
-        return bsparse_jacobian
-
 
 CustomJacobianCache = Any
 
@@ -593,10 +472,24 @@ class Cost[*Args]:
     `jaxls.Var` object, which can either in the root of the tuple or nested
     within a PyTree structure arbitrarily."""
 
-    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
+    jac_mode: jdc.Static[
+        Literal[
+            "auto",
+            "forward",
+            "reverse",
+            "central_difference",
+            "richardson_extrapolation",
+        ]
+    ] = "auto"
     """Depending on the function being differentiated, it may be faster to use
     forward-mode or reverse-mode autodiff. Ignored if `jac_custom_fn` is
-    specified."""
+    specified.
+    
+    Numeric differentiation options:
+    - "central_difference": Standard two-point formula with a single step size h
+    - "richardson_extrapolation": Applies Richardson extrapolation to central differences
+      with multiple step sizes (h, h/2, h/4, h/8) to achieve higher-order accuracy
+      (up to O(h^8) compared to O(h^2) for standard central differences)"""
 
     jac_batch_size: jdc.Static[int | None] = None
     """Batch size for computing Jacobians that can be parallelized. Can be set
@@ -639,7 +532,13 @@ class Cost[*Args]:
     @staticmethod
     def create_factory[**Args_](
         *,
-        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
+        jac_mode: Literal[
+            "auto",
+            "forward",
+            "reverse",
+            "central_difference",
+            "richardson_extrapolation",
+        ] = "auto",
         jac_batch_size: int | None = None,
         name: str | None = None,
     ) -> Callable[[ResidualFunc[Args_]], CostFactory[Args_]]: ...
@@ -672,7 +571,13 @@ class Cost[*Args]:
     def create_factory[**Args_](
         compute_residual: ResidualFunc[Args_] | None = None,
         *,
-        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
+        jac_mode: Literal[
+            "auto",
+            "forward",
+            "reverse",
+            "central_difference",
+            "richardson_extrapolation",
+        ] = "auto",
         jac_batch_size: int | None = None,
         jac_custom_fn: JacobianFunc[Args_] | None = None,
         jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, Any] | None = None,
@@ -813,7 +718,7 @@ class Cost[*Args]:
 
 
 @jdc.pytree_dataclass(kw_only=True)
-class _AnalyzedCost[*Args](Cost[*Args]):
+class AnalyzedCost[*Args](Cost[*Args]):
     """Same as `Factor`, but with extra fields."""
 
     num_variables: jdc.Static[int]
@@ -836,7 +741,7 @@ class _AnalyzedCost[*Args](Cost[*Args]):
 
     @staticmethod
     @jdc.jit
-    def _make[*Args_](cost: Cost[*Args_]) -> _AnalyzedCost[*Args_]:
+    def _make[*Args_](cost: Cost[*Args_]) -> AnalyzedCost[*Args_]:
         """Construct a cost for our optimization problem."""
         variables = cost._get_variables()
         assert len(variables) > 0
@@ -850,7 +755,7 @@ class _AnalyzedCost[*Args](Cost[*Args]):
                     () if isinstance(var.id, int) else var.id.shape
                 ) == batch_axes, "Batch axes of variables do not match."
             if len(batch_axes) == 1:
-                return jax.vmap(_AnalyzedCost._make)(cost)
+                return jax.vmap(AnalyzedCost._make)(cost)
 
         # Same as `compute_residual`, but removes Jacobian cache if present.
         def _residual_no_cache(*args, **kwargs) -> jax.Array:
@@ -867,7 +772,7 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
         )
 
-        return _AnalyzedCost(
+        return AnalyzedCost(
             **vars(cost),
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),

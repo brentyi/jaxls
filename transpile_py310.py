@@ -109,6 +109,19 @@ class PythonTranspiler(cst.CSTTransformer):
         if original_node.names:
             new_names = self._filter_typing_imports(original_node.names)
             if new_names:
+                # Check if we need to change import source for Python 3.10 compatibility
+                needs_typing_extensions = any(
+                    isinstance(name, cst.ImportAlias)
+                    and name.name.value == "assert_never"
+                    for name in new_names
+                )
+
+                if needs_typing_extensions and original_node.module.value == "typing":
+                    # Change from typing to typing_extensions
+                    updated_node = updated_node.with_changes(
+                        module=cst.Name("typing_extensions")
+                    )
+
                 return self._fix_import_commas(updated_node, new_names)
             else:
                 return cst.RemovalSentinel.REMOVE
@@ -172,7 +185,6 @@ class PythonTranspiler(cst.CSTTransformer):
             "TypeVarTuple",
             "ParamSpec",
             "Concatenate",
-            "assert_never",
             "Optional",
             "NotRequired",
             "Required",
@@ -188,6 +200,7 @@ class PythonTranspiler(cst.CSTTransformer):
             "Callable",
             "Hashable",
             "Iterable",
+            "assert_never",
         }
 
         new_names = []

@@ -17,11 +17,10 @@ import scipy
 import scipy.sparse
 from jax import numpy as jnp
 
-from jaxls._preconditioning import (
+from ._preconditioning import (
     make_block_jacobi_precoditioner,
     make_point_jacobi_precoditioner,
 )
-
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
@@ -133,14 +132,15 @@ class ConjugateGradientConfig:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
 
         # Preconditioning setup.
-        if self.preconditioner == "block_jacobi":
-            preconditioner = make_block_jacobi_precoditioner(problem, A_blocksparse)
-        elif self.preconditioner == "point_jacobi":
-            preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
-        elif self.preconditioner is None:
-            preconditioner = lambda x: x
-        else:
-            assert_never(self.preconditioner)
+        match self.preconditioner:
+            case "block_jacobi":
+                preconditioner = make_block_jacobi_precoditioner(problem, A_blocksparse)
+            case "point_jacobi":
+                preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
+            case None:
+                preconditioner = lambda x: x
+            case _:
+                assert_never(self.preconditioner)
 
         # Calculate tolerance using Eisenstat-Walker criterion.
         ATb_norm = jnp.linalg.norm(ATb)
@@ -328,7 +328,9 @@ class NonlinearSolver:
             self._log_state(problem, state)
 
         # Get nonzero values of Jacobian.
-        A_blocksparse = problem._compute_jac_values(state.vals, state.jac_cache)
+        from ._jacobians import compute_problem_jacobian
+
+        A_blocksparse = compute_problem_jacobian(problem, state.vals, state.jac_cache)
 
         # Compute Jacobian scaler.
         if first:
@@ -349,68 +351,67 @@ class NonlinearSolver:
         )
 
         # linear_transpose() will return a tuple, with one element per primal.
-        if self.sparse_mode == "blockrow":
-            A_multiply = A_blocksparse.multiply
-            AT_multiply_ = jax.linear_transpose(
-                A_multiply, jnp.zeros((A_blocksparse.shape[1],))
-            )
-            AT_multiply = lambda vec: AT_multiply_(vec)[0]
-        elif self.sparse_mode == "coo":
-            A_coo = SparseCooMatrix(
-                values=jac_values, coords=problem.jac_coords_coo
-            ).as_jax_bcoo()
-            AT_coo = A_coo.transpose()
-            A_multiply = lambda vec: A_coo @ vec
-            AT_multiply = lambda vec: AT_coo @ vec
-        elif self.sparse_mode == "csr":
-            A_csr = SparseCsrMatrix(
-                values=jac_values, coords=problem.jac_coords_csr
-            ).as_jax_bcsr()
-            A_multiply = lambda vec: A_csr @ vec
-            AT_multiply_ = jax.linear_transpose(
-                A_multiply, jnp.zeros((A_blocksparse.shape[1],))
-            )
-            AT_multiply = lambda vec: AT_multiply_(vec)[0]
-        else:
-            assert_never(self.sparse_mode)
+        match self.sparse_mode:
+            case "blockrow":
+                A_multiply = A_blocksparse.multiply
+                AT_multiply_ = jax.linear_transpose(
+                    A_multiply, jnp.zeros((A_blocksparse.shape[1],))
+                )
+                AT_multiply = lambda vec: AT_multiply_(vec)[0]
+            case "coo":
+                A_coo = SparseCooMatrix(
+                    values=jac_values, coords=problem.jac_coords_coo
+                ).as_jax_bcoo()
+                AT_coo = A_coo.transpose()
+                A_multiply = lambda vec: A_coo @ vec
+                AT_multiply = lambda vec: AT_coo @ vec
+            case "csr":
+                A_csr = SparseCsrMatrix(
+                    values=jac_values, coords=problem.jac_coords_csr
+                ).as_jax_bcsr()
+                A_multiply = lambda vec: A_csr @ vec
+                AT_multiply_ = jax.linear_transpose(
+                    A_multiply, jnp.zeros((A_blocksparse.shape[1],))
+                )
+                AT_multiply = lambda vec: AT_multiply_(vec)[0]
+            case _:
+                assert_never(self.sparse_mode)
 
         # Compute right-hand side of normal equation.
         ATb = -AT_multiply(state.residual_vector)
 
         linear_state = None
-        if (
-            isinstance(self.linear_solver, ConjugateGradientConfig)
-            or self.linear_solver == "conjugate_gradient"
-        ):
-            # Use default CG config is specified as a string, otherwise use the provided config.
-            cg_config = (
-                ConjugateGradientConfig()
-                if self.linear_solver == "conjugate_gradient"
-                else self.linear_solver
-            )
-            assert isinstance(state.cg_state, _ConjugateGradientState)
-            local_delta, linear_state = cg_config._solve(
-                problem,
-                A_blocksparse,
-                # We could also use (lambd * ATA_diagonals * vec) for
-                # scale-invariant damping. But this is hard to match with CHOLMOD.
-                lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
-                ATb=ATb,
-                prev_linear_state=state.cg_state,
-            )
-        elif self.linear_solver == "cholmod":
-            # Use CHOLMOD for direct solve.
-            A_csr = SparseCsrMatrix(jac_values, problem.jac_coords_csr)
-            local_delta = _cholmod_solve(A_csr, ATb, lambd=state.lambd)
-        elif self.linear_solver == "dense_cholesky":
-            A_dense = A_blocksparse.to_dense()
-            ATA = A_dense.T @ A_dense
-            diag_idx = jnp.arange(ATA.shape[0])
-            ATA = ATA.at[diag_idx, diag_idx].add(state.lambd)
-            cho_factor = jax.scipy.linalg.cho_factor(ATA)
-            local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
-        else:
-            assert_never(self.linear_solver)
+        match self.linear_solver:
+            case ConjugateGradientConfig() | "conjugate_gradient":
+                # Use default CG config is specified as a string, otherwise use the provided config.
+                cg_config = (
+                    ConjugateGradientConfig()
+                    if self.linear_solver == "conjugate_gradient"
+                    else self.linear_solver
+                )
+                assert isinstance(state.cg_state, _ConjugateGradientState)
+                local_delta, linear_state = cg_config._solve(
+                    problem,
+                    A_blocksparse,
+                    # We could also use (lambd * ATA_diagonals * vec) for
+                    # scale-invariant damping. But this is hard to match with CHOLMOD.
+                    lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
+                    ATb=ATb,
+                    prev_linear_state=state.cg_state,
+                )
+            case "cholmod":
+                # Use CHOLMOD for direct solve.
+                A_csr = SparseCsrMatrix(jac_values, problem.jac_coords_csr)
+                local_delta = _cholmod_solve(A_csr, ATb, lambd=state.lambd)
+            case "dense_cholesky":
+                A_dense = A_blocksparse.to_dense()
+                ATA = A_dense.T @ A_dense
+                diag_idx = jnp.arange(ATA.shape[0])
+                ATA = ATA.at[diag_idx, diag_idx].add(state.lambd)
+                cho_factor = jax.scipy.linalg.cho_factor(ATA)
+                local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
+            case _:
+                assert_never(self.linear_solver)
 
         scaled_local_delta = local_delta * state.jacobian_scaler
 
