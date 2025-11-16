@@ -46,9 +46,156 @@ def _get_function_signature(func: Any) -> Any:
 
 
 @jdc.pytree_dataclass
+class Constraint:
+    compute_constraint: jdc.Static[Any]
+
+    args: Any
+
+    constraint_type: jdc.Static[Any] = "equality"
+
+    name: jdc.Static[Any] = None
+
+    def _get_variables(self) -> Any:
+        def get_variables(current: Any) -> Any:
+            children_and_meta = default_registry.flatten_one_level(current)
+            if children_and_meta is None:
+                return []
+            variables = []
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    variables.append(child)
+                else:
+                    variables.extend(get_variables(child))
+            return variables
+
+        return tuple(get_variables(self.args))
+
+
+@jdc.pytree_dataclass
+class AugmentedLagrangianConfig:
+    penalty_initial: Any = 1.0
+    penalty_factor: Any = 10.0
+    penalty_max: Any = 1e6
+
+    outer_iterations: Any = 10
+    constraint_tolerance: Any = 1e-6
+
+
+@jdc.pytree_dataclass
 class LeastSquaresProblem:
     costs: Any
     variables: Any
+
+    def solve_with_constraints(
+        self,
+        constraints: Any,
+        initial_vals: Any = None,
+        *,
+        augmented_lagrangian: Any = AugmentedLagrangianConfig(),
+        linear_solver: Any = "conjugate_gradient",
+        trust_region: Any = TrustRegionConfig(),
+        termination: Any = TerminationConfig(),
+        sparse_mode: Any = "blockrow",
+        verbose: Any = True,
+    ) -> Any:
+        constraints = tuple(constraints)
+        if len(constraints) == 0:
+            return self.analyze().solve(
+                initial_vals=initial_vals,
+                linear_solver=linear_solver,
+                trust_region=trust_region,
+                termination=termination,
+                sparse_mode=sparse_mode,
+                verbose=verbose,
+            )
+
+        if initial_vals is None:
+            initial_vals = VarValues.make(self.variables)
+
+        vals = initial_vals
+        penalty = augmented_lagrangian.penalty_initial
+
+        constraint_values = [c.compute_constraint(vals, *c.args) for c in constraints]
+        multipliers = [jnp.zeros_like(cv) for cv in constraint_values]
+
+        for outer_iter in range(augmented_lagrangian.outer_iterations):
+            al_costs = []
+            for i, constraint in enumerate(constraints):
+                lam = multipliers[i]
+                mu = penalty
+
+                def make_al_residual(
+                    lambda_val: Any,
+                    mu_val: Any,
+                    constraint_fn: Any,
+                    constraint_type: Any,
+                ) -> Any:
+                    def al_residual(values: Any, *args) -> Any:
+                        c = constraint_fn(values, *args)
+                        if constraint_type == "equality":
+                            return jnp.sqrt(mu_val / 2.0) * (c + lambda_val / mu_val)
+                        else:
+                            return jnp.sqrt(mu_val / 2.0) * jnp.maximum(
+                                0.0, c + lambda_val / mu_val
+                            )
+
+                    return al_residual
+
+                al_residual_fn = make_al_residual(
+                    lam, mu, constraint.compute_constraint, constraint.constraint_type
+                )
+                al_cost = Cost(
+                    compute_residual=al_residual_fn,
+                    args=constraint.args,
+                )
+                al_costs.append(al_cost)
+
+            augmented_problem = LeastSquaresProblem(
+                costs=tuple(self.costs) + tuple(al_costs), variables=self.variables
+            ).analyze()
+
+            vals = augmented_problem.solve(
+                initial_vals=vals,
+                linear_solver=linear_solver,
+                trust_region=trust_region,
+                termination=termination,
+                sparse_mode=sparse_mode,
+                verbose=verbose,
+            )
+
+            constraint_values = [
+                c.compute_constraint(vals, *c.args) for c in constraints
+            ]
+            max_violation = 0.0
+
+            for i, (constraint, c_val) in enumerate(
+                zip(constraints, constraint_values)
+            ):
+                if constraint.constraint_type == "equality":
+                    violation = jnp.max(jnp.abs(c_val))
+                    multipliers[i] = multipliers[i] + penalty * c_val
+                else:
+                    violation = jnp.max(jnp.maximum(0.0, c_val))
+                    multipliers[i] = jnp.maximum(0.0, multipliers[i] + penalty * c_val)
+
+                max_violation = max(max_violation, float(violation))
+
+            if verbose:
+                logger.info(
+                    f"AL iteration {outer_iter}: max_violation={max_violation:.2e}, penalty={penalty:.2e}"
+                )
+
+            if max_violation < augmented_lagrangian.constraint_tolerance:
+                if verbose:
+                    logger.info("Constraints satisfied!")
+                break
+
+            penalty = min(
+                penalty * augmented_lagrangian.penalty_factor,
+                augmented_lagrangian.penalty_max,
+            )
+
+        return vals
 
     def analyze(self, use_onp: Any = False) -> Any:
         if use_onp:

@@ -5,12 +5,19 @@ import jax
 import jax.numpy as jnp
 import jaxls
 
+
+# Define a simple scalar variable type for testing
+class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array([0.0])):
+    """Simple 1D scalar variable."""
+    pass
+
+
 # Simple test: minimize ||x - target||^2 subject to x >= lower_bound
 def test_simple_constraint():
     print("Testing simple inequality constraint...")
 
     # Create a simple scalar variable
-    x_var = jaxls.Var(id=0, default_value=jnp.array([0.0]))
+    x_var = ScalarVar(id=0)
 
     # Cost: try to get close to -5.0
     @jaxls.Cost.create_factory
@@ -61,8 +68,8 @@ def test_equality_constraint():
     print("Testing equality constraint...")
 
     # Create two scalar variables
-    x_var = jaxls.Var(id=0, default_value=jnp.array([1.0]))
-    y_var = jaxls.Var(id=1, default_value=jnp.array([1.0]))
+    x_var = ScalarVar(id=0)
+    y_var = ScalarVar(id=1)
 
     # Cost: minimize (x-3)^2 + (y-4)^2
     @jaxls.Cost.create_factory

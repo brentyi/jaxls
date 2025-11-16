@@ -96,6 +96,23 @@ class Constraint:
 
 
 @jdc.pytree_dataclass
+class AugmentedLagrangianConfig:
+    """Configuration for augmented Lagrangian method for constraints."""
+
+    penalty_initial: float | jax.Array = 1.0
+    """Initial penalty parameter μ."""
+    penalty_factor: float | jax.Array = 10.0
+    """Factor to increase penalty parameter each outer iteration."""
+    penalty_max: float | jax.Array = 1e6
+    """Maximum penalty parameter."""
+
+    outer_iterations: int = 10
+    """Maximum number of outer iterations for multiplier updates."""
+    constraint_tolerance: float | jax.Array = 1e-6
+    """Convergence tolerance for constraint satisfaction."""
+
+
+@jdc.pytree_dataclass
 class LeastSquaresProblem:
     """We define least squares problem as bipartite graphs, which have two types of nodes:
 
@@ -162,38 +179,31 @@ class LeastSquaresProblem:
             for i, constraint in enumerate(constraints):
                 lam = multipliers[i]
                 mu = penalty
-                ctype = constraint.constraint_type
-                cfn = constraint.compute_constraint
-                cargs = constraint.args
 
-                # Create AL cost using closure
-                def make_al_cost(
+                # Create Cost directly with the constraint args
+                # We use a lambda to capture the current values of lam, mu, etc.
+                def make_al_residual(
                     lambda_val: jax.Array,
                     mu_val: float,
                     constraint_fn: Callable,
-                    constraint_args: tuple,
                     constraint_type: str,
-                ) -> Cost:
-                    @Cost.create_factory
-                    def al_residual(
-                        values: VarValues,
-                        lam: jax.Array = lambda_val,
-                        mu: float = mu_val,
-                        cfn: Callable = constraint_fn,
-                        cargs: tuple = constraint_args,
-                        ctype: str = constraint_type,
-                    ) -> jax.Array:
-                        c = cfn(values, *cargs)
-                        if ctype == "equality":
+                ) -> Callable:
+                    def al_residual(values: VarValues, *args) -> jax.Array:
+                        c = constraint_fn(values, *args)
+                        if constraint_type == "equality":
                             # AL for equality: sqrt(mu/2) * (c + lambda/mu)
-                            return jnp.sqrt(mu / 2.0) * (c + lam / mu)
+                            return jnp.sqrt(mu_val / 2.0) * (c + lambda_val / mu_val)
                         else:
                             # AL for inequality: sqrt(mu/2) * max(0, c + lambda/mu)
-                            return jnp.sqrt(mu / 2.0) * jnp.maximum(0.0, c + lam / mu)
+                            return jnp.sqrt(mu_val / 2.0) * jnp.maximum(0.0, c + lambda_val / mu_val)
+                    return al_residual
 
-                    return al_residual()
-
-                al_costs.append(make_al_cost(lam, mu, cfn, cargs, ctype))
+                al_residual_fn = make_al_residual(lam, mu, constraint.compute_constraint, constraint.constraint_type)
+                al_cost = Cost(
+                    compute_residual=al_residual_fn,
+                    args=constraint.args,
+                )
+                al_costs.append(al_cost)
 
             # Solve with original costs + AL penalty terms
             augmented_problem = LeastSquaresProblem(
@@ -429,23 +439,6 @@ class LeastSquaresProblem:
             tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
         )
-
-
-@jdc.pytree_dataclass
-class AugmentedLagrangianConfig:
-    """Configuration for augmented Lagrangian method for constraints."""
-
-    penalty_initial: float | jax.Array = 1.0
-    """Initial penalty parameter μ."""
-    penalty_factor: float | jax.Array = 10.0
-    """Factor to increase penalty parameter each outer iteration."""
-    penalty_max: float | jax.Array = 1e6
-    """Maximum penalty parameter."""
-
-    outer_iterations: int = 10
-    """Maximum number of outer iterations for multiplier updates."""
-    constraint_tolerance: float | jax.Array = 1e-6
-    """Convergence tolerance for constraint satisfaction."""
 
 
 @jdc.pytree_dataclass
