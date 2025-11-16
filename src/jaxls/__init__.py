@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING or sys.version_info >= (3, 12):
     from . import utils as utils
     from ._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
+    from ._core import AugmentedLagrangianConfig as AugmentedLagrangianConfig
+    from ._core import Constraint as Constraint
     from ._core import Cost as Cost
     from ._core import LeastSquaresProblem as LeastSquaresProblem
     from ._lie_group_variables import SE2Var as SE2Var
@@ -19,6 +21,8 @@ if TYPE_CHECKING or sys.version_info >= (3, 12):
 elif sys.version_info >= (3, 10):
     from ._py310 import utils as utils
     from ._py310._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
+    from ._py310._core import AugmentedLagrangianConfig as AugmentedLagrangianConfig
+    from ._py310._core import Constraint as Constraint
     from ._py310._core import Cost as Cost
     from ._py310._core import LeastSquaresProblem as LeastSquaresProblem
     from ._py310._lie_group_variables import SE2Var as SE2Var

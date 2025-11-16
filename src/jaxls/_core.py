@@ -57,6 +57,45 @@ def _get_function_signature(func: Callable) -> Hashable:
 
 
 @jdc.pytree_dataclass
+class Constraint:
+    """A constraint in the optimization problem.
+
+    Equality constraint: c(x) = 0
+    Inequality constraint: c(x) <= 0
+
+    Similar to Cost, but returns constraint values instead of residuals.
+    """
+
+    compute_constraint: jdc.Static[Callable[[VarValues, Any], jax.Array]]
+    """Constraint function. Returns constraint values that should equal 0 (equality)
+    or be <= 0 (inequality)."""
+
+    args: tuple[Any, ...]
+    """Arguments to the constraint function."""
+
+    constraint_type: jdc.Static[Literal["equality", "inequality"]] = "equality"
+    """Type of constraint: 'equality' for c(x)=0, 'inequality' for c(x)<=0."""
+
+    name: jdc.Static[str | None] = None
+    """Optional name for debugging."""
+
+    def _get_variables(self) -> tuple[Var, ...]:
+        """Extract variables from constraint arguments."""
+        def get_variables(current: Any) -> list[Var]:
+            children_and_meta = default_registry.flatten_one_level(current)
+            if children_and_meta is None:
+                return []
+            variables = []
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    variables.append(child)
+                else:
+                    variables.extend(get_variables(child))
+            return variables
+        return tuple(get_variables(self.args))
+
+
+@jdc.pytree_dataclass
 class LeastSquaresProblem:
     """We define least squares problem as bipartite graphs, which have two types of nodes:
 
@@ -66,6 +105,140 @@ class LeastSquaresProblem:
 
     costs: Iterable[Cost]
     variables: Iterable[Var]
+
+    def solve_with_constraints(
+        self,
+        constraints: Iterable[Constraint],
+        initial_vals: VarValues | None = None,
+        *,
+        augmented_lagrangian: AugmentedLagrangianConfig = AugmentedLagrangianConfig(),
+        linear_solver: Literal["conjugate_gradient", "cholmod", "dense_cholesky"]
+        | ConjugateGradientConfig = "conjugate_gradient",
+        trust_region: TrustRegionConfig | None = TrustRegionConfig(),
+        termination: TerminationConfig = TerminationConfig(),
+        sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
+        verbose: bool = True,
+    ) -> VarValues:
+        """Solve the problem with constraints using augmented Lagrangian method.
+
+        Args:
+            constraints: List of Constraint objects.
+            initial_vals: Initial variable values.
+            augmented_lagrangian: AL configuration.
+            linear_solver: Linear solver to use.
+            trust_region: Trust region configuration.
+            termination: Termination criteria.
+            sparse_mode: Sparse matrix mode.
+            verbose: Print progress.
+
+        Returns:
+            Optimized variable values.
+        """
+        constraints = tuple(constraints)
+        if len(constraints) == 0:
+            return self.analyze().solve(
+                initial_vals=initial_vals,
+                linear_solver=linear_solver,
+                trust_region=trust_region,
+                termination=termination,
+                sparse_mode=sparse_mode,
+                verbose=verbose,
+            )
+
+        if initial_vals is None:
+            initial_vals = VarValues.make(self.variables)
+
+        vals = initial_vals
+        penalty = augmented_lagrangian.penalty_initial
+
+        # Initialize multipliers
+        constraint_values = [c.compute_constraint(vals, *c.args) for c in constraints]
+        multipliers = [jnp.zeros_like(cv) for cv in constraint_values]
+
+        # Augmented Lagrangian outer loop
+        for outer_iter in range(augmented_lagrangian.outer_iterations):
+            # Create AL penalty costs
+            al_costs = []
+            for i, constraint in enumerate(constraints):
+                lam = multipliers[i]
+                mu = penalty
+                ctype = constraint.constraint_type
+                cfn = constraint.compute_constraint
+                cargs = constraint.args
+
+                # Create AL cost using closure
+                def make_al_cost(
+                    lambda_val: jax.Array,
+                    mu_val: float,
+                    constraint_fn: Callable,
+                    constraint_args: tuple,
+                    constraint_type: str,
+                ) -> Cost:
+                    @Cost.create_factory
+                    def al_residual(
+                        values: VarValues,
+                        lam: jax.Array = lambda_val,
+                        mu: float = mu_val,
+                        cfn: Callable = constraint_fn,
+                        cargs: tuple = constraint_args,
+                        ctype: str = constraint_type,
+                    ) -> jax.Array:
+                        c = cfn(values, *cargs)
+                        if ctype == "equality":
+                            # AL for equality: sqrt(mu/2) * (c + lambda/mu)
+                            return jnp.sqrt(mu / 2.0) * (c + lam / mu)
+                        else:
+                            # AL for inequality: sqrt(mu/2) * max(0, c + lambda/mu)
+                            return jnp.sqrt(mu / 2.0) * jnp.maximum(0.0, c + lam / mu)
+
+                    return al_residual()
+
+                al_costs.append(make_al_cost(lam, mu, cfn, cargs, ctype))
+
+            # Solve with original costs + AL penalty terms
+            augmented_problem = LeastSquaresProblem(
+                costs=tuple(self.costs) + tuple(al_costs), variables=self.variables
+            ).analyze()
+
+            vals = augmented_problem.solve(
+                initial_vals=vals,
+                linear_solver=linear_solver,
+                trust_region=trust_region,
+                termination=termination,
+                sparse_mode=sparse_mode,
+                verbose=verbose,
+            )
+
+            # Update multipliers
+            constraint_values = [c.compute_constraint(vals, *c.args) for c in constraints]
+            max_violation = 0.0
+
+            for i, (constraint, c_val) in enumerate(zip(constraints, constraint_values)):
+                if constraint.constraint_type == "equality":
+                    violation = jnp.max(jnp.abs(c_val))
+                    multipliers[i] = multipliers[i] + penalty * c_val
+                else:
+                    violation = jnp.max(jnp.maximum(0.0, c_val))
+                    multipliers[i] = jnp.maximum(0.0, multipliers[i] + penalty * c_val)
+
+                max_violation = max(max_violation, float(violation))
+
+            if verbose:
+                logger.info(
+                    f"AL iteration {outer_iter}: max_violation={max_violation:.2e}, penalty={penalty:.2e}"
+                )
+
+            if max_violation < augmented_lagrangian.constraint_tolerance:
+                if verbose:
+                    logger.info("Constraints satisfied!")
+                break
+
+            penalty = min(
+                penalty * augmented_lagrangian.penalty_factor,
+                augmented_lagrangian.penalty_max,
+            )
+
+        return vals
 
     def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving."""
@@ -256,6 +429,23 @@ class LeastSquaresProblem:
             tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
         )
+
+
+@jdc.pytree_dataclass
+class AugmentedLagrangianConfig:
+    """Configuration for augmented Lagrangian method for constraints."""
+
+    penalty_initial: float | jax.Array = 1.0
+    """Initial penalty parameter μ."""
+    penalty_factor: float | jax.Array = 10.0
+    """Factor to increase penalty parameter each outer iteration."""
+    penalty_max: float | jax.Array = 1e6
+    """Maximum penalty parameter."""
+
+    outer_iterations: int = 10
+    """Maximum number of outer iterations for multiplier updates."""
+    constraint_tolerance: float | jax.Array = 1e-6
+    """Convergence tolerance for constraint satisfaction."""
 
 
 @jdc.pytree_dataclass
