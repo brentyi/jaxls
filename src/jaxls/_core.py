@@ -22,6 +22,8 @@ from loguru import logger
 from typing_extensions import deprecated
 
 from ._solvers import (
+    AugmentedLagrangianConfig,
+    AugmentedLagrangianSolver,
     ConjugateGradientConfig,
     NonlinearSolver,
     SolveSummary,
@@ -62,10 +64,12 @@ class LeastSquaresProblem:
 
     - `jaxls.Cost`. These are the terms we want to minimize.
     - `jaxls.Var`. These are the parameters we want to optimize.
+    - `jaxls.Constraint`. These are equality constraints that must be satisfied.
     """
 
     costs: Iterable[Cost]
     variables: Iterable[Var]
+    constraints: Iterable[Constraint] = ()
 
     def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving."""
@@ -245,6 +249,62 @@ class LeastSquaresProblem:
             indptr=cast(jax.Array, csr_indptr),
             shape=(residual_dim_sum, tangent_dim_sum),
         )
+
+        # Process constraints.
+        constraints = tuple(self.constraints)
+        stacked_constraints = list[_AnalyzedConstraint]()
+        constraint_counts = list[int]()
+
+        if len(constraints) > 0:
+            # Group constraints by structure.
+            constraints_from_group = dict[Any, list[Constraint]]()
+            constraint_count_from_group = dict[Any, int]()
+            for constraint in constraints:
+                # Support broadcasting for constraint arguments.
+                constraint = constraint._broadcast_batch_axes()
+                batch_axes = constraint._get_batch_axes()
+
+                # Group key for batching constraints.
+                group_key: Hashable = (
+                    jax.tree.structure(constraint),
+                    tuple(
+                        leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
+                        for leaf in jax.tree.leaves(constraint)
+                    ),
+                )
+                constraints_from_group.setdefault(group_key, [])
+                constraint_count_from_group.setdefault(group_key, 0)
+
+                if len(batch_axes) == 0:
+                    constraint = jax.tree.map(lambda x: jnp.asarray(x)[None], constraint)
+                    constraint_count_from_group[group_key] += 1
+                else:
+                    assert len(batch_axes) == 1
+                    constraint_count_from_group[group_key] += batch_axes[0]
+
+                constraints_from_group[group_key].append(constraint)
+
+            # Stack and analyze each constraint group.
+            for group_key in sorted(constraints_from_group.keys(), key=_sort_key):
+                group = constraints_from_group[group_key]
+
+                # Stack constraint parameters.
+                stacked_constraint: Constraint = jax.tree.map(
+                    lambda *args: jnp.concatenate(args, axis=0), *group
+                )
+                stacked_constraint_expanded: _AnalyzedConstraint = jax.vmap(
+                    _AnalyzedConstraint._make
+                )(stacked_constraint)
+                stacked_constraints.append(stacked_constraint_expanded)
+                constraint_counts.append(constraint_count_from_group[group_key])
+
+                logger.info(
+                    "Vectorizing constraint group with {} constraints, {} variables each: {}",
+                    constraint_count_from_group[group_key],
+                    stacked_constraints[-1].num_variables,
+                    stacked_constraints[-1]._get_name(),
+                )
+
         return AnalyzedLeastSquaresProblem(
             stacked_costs=tuple(stacked_costs),
             cost_counts=tuple(cost_counts),
@@ -255,6 +315,8 @@ class LeastSquaresProblem:
             tangent_start_from_var_type=tangent_start_from_var_type,
             tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
+            stacked_constraints=tuple(stacked_constraints),
+            constraint_counts=tuple(constraint_counts),
         )
 
 
@@ -269,6 +331,8 @@ class AnalyzedLeastSquaresProblem:
     tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
     tangent_dim: jdc.Static[int]
     residual_dim: jdc.Static[int]
+    stacked_constraints: tuple[_AnalyzedConstraint, ...] = ()
+    constraint_counts: jdc.Static[tuple[int, ...]] = ()
 
     @overload
     def solve(
@@ -281,6 +345,7 @@ class AnalyzedLeastSquaresProblem:
         termination: TerminationConfig = TerminationConfig(),
         sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
         verbose: bool = True,
+        augmented_lagrangian: AugmentedLagrangianConfig | None = None,
         return_summary: Literal[False] = False,
     ) -> VarValues: ...
 
@@ -295,6 +360,7 @@ class AnalyzedLeastSquaresProblem:
         termination: TerminationConfig = TerminationConfig(),
         sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
         verbose: bool = True,
+        augmented_lagrangian: AugmentedLagrangianConfig | None = None,
         return_summary: Literal[True],
     ) -> tuple[VarValues, SolveSummary]: ...
 
@@ -308,10 +374,14 @@ class AnalyzedLeastSquaresProblem:
         termination: TerminationConfig = TerminationConfig(),
         sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
         verbose: bool = True,
+        augmented_lagrangian: AugmentedLagrangianConfig | None = None,
         return_summary: bool = False,
     ) -> VarValues | tuple[VarValues, SolveSummary]:
         """Solve the nonlinear least squares problem using either Gauss-Newton
         or Levenberg-Marquardt.
+
+        For constrained problems (with equality constraints), the Augmented
+        Lagrangian method will be automatically used.
 
         Args:
             initial_vals: Initial values for the variables. If None, default values will be used.
@@ -321,6 +391,9 @@ class AnalyzedLeastSquaresProblem:
             sparse_mode: The representation to use for sparse matrix
                 multiplication. Can be "blockrow", "coo", or "csr".
             verbose: Whether to print verbose output during optimization.
+            augmented_lagrangian: Configuration for Augmented Lagrangian method.
+                Only used if constraints are present. If None and constraints
+                exist, a default configuration will be used.
             return_summary: If `True`, return a summary of the solve.
 
         Returns:
@@ -331,26 +404,65 @@ class AnalyzedLeastSquaresProblem:
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
 
-        # In our internal API, linear_solver needs to always be a string. The
-        # conjugate gradient config is a separate field. This is more
-        # convenient to implement, because then the former can be static while
-        # the latter is a pytree.
-        conjugate_gradient_config = None
-        if isinstance(linear_solver, ConjugateGradientConfig):
-            conjugate_gradient_config = linear_solver
-            linear_solver = "conjugate_gradient"
+        # Check if we have constraints.
+        has_constraints = len(self.stacked_constraints) > 0
 
-        solver = NonlinearSolver(
-            linear_solver,
-            trust_region,
-            termination,
-            conjugate_gradient_config,
-            sparse_mode,
-            verbose,
-        )
-        return solver.solve(
-            problem=self, initial_vals=initial_vals, return_summary=return_summary
-        )
+        if has_constraints:
+            # Use Augmented Lagrangian solver for constrained problems.
+            if augmented_lagrangian is None:
+                augmented_lagrangian = AugmentedLagrangianConfig()
+
+            # In our internal API, linear_solver needs to always be a string. The
+            # conjugate gradient config is a separate field. This is more
+            # convenient to implement, because then the former can be static while
+            # the latter is a pytree.
+            conjugate_gradient_config = None
+            if isinstance(linear_solver, ConjugateGradientConfig):
+                conjugate_gradient_config = linear_solver
+                linear_solver = "conjugate_gradient"
+
+            # Create inner solver for unconstrained subproblems.
+            inner_solver = NonlinearSolver(
+                linear_solver,
+                trust_region,
+                termination,
+                conjugate_gradient_config,
+                sparse_mode,
+                verbose,
+            )
+
+            # Create Augmented Lagrangian solver.
+            al_solver = AugmentedLagrangianSolver(
+                config=augmented_lagrangian,
+                inner_solver=inner_solver,
+                verbose=verbose,
+            )
+
+            return al_solver.solve(
+                problem=self, initial_vals=initial_vals, return_summary=return_summary
+            )
+        else:
+            # Use standard solver for unconstrained problems.
+            # In our internal API, linear_solver needs to always be a string. The
+            # conjugate gradient config is a separate field. This is more
+            # convenient to implement, because then the former can be static while
+            # the latter is a pytree.
+            conjugate_gradient_config = None
+            if isinstance(linear_solver, ConjugateGradientConfig):
+                conjugate_gradient_config = linear_solver
+                linear_solver = "conjugate_gradient"
+
+            solver = NonlinearSolver(
+                linear_solver,
+                trust_region,
+                termination,
+                conjugate_gradient_config,
+                sparse_mode,
+                verbose,
+            )
+            return solver.solve(
+                problem=self, initial_vals=initial_vals, return_summary=return_summary
+            )
 
     @overload
     def compute_residual_vector(
@@ -388,6 +500,23 @@ class AnalyzedLeastSquaresProblem:
             return jnp.concatenate(residual_slices, axis=0), tuple(jac_cache)
         else:
             return jnp.concatenate(residual_slices, axis=0)
+
+    def compute_constraint_values(self, vals: VarValues) -> jax.Array:
+        """Compute all constraint values. For equality constraints, these
+        should all be zero at a feasible solution."""
+        if len(self.stacked_constraints) == 0:
+            # No constraints: return empty array.
+            return jnp.array([])
+
+        constraint_slices = list[jax.Array]()
+        for stacked_constraint in self.stacked_constraints:
+            # Flatten the output of the user-provided compute_constraint.
+            constraint_vals = jax.vmap(
+                lambda args: stacked_constraint.compute_constraint_flat(vals, *args)
+            )(stacked_constraint.args)
+            constraint_slices.append(constraint_vals.reshape((-1,)))
+
+        return jnp.concatenate(constraint_slices, axis=0)
 
     def _compute_jac_values(
         self, vals: VarValues, jac_cache: tuple[CustomJacobianCache, ...]
@@ -903,3 +1032,233 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             indexing="ij",
         )
         return rows, cols
+
+
+# Type aliases for constraints.
+type ConstraintFunc[**Args] = Callable[
+    Concatenate[VarValues, Args],
+    jax.Array,
+]
+
+type ConstraintFactory[**Args] = Callable[
+    Args,
+    Constraint[tuple[Any, ...], dict[str, Any]],
+]
+
+
+@jdc.pytree_dataclass
+class Constraint[*Args]:
+    """A constraint in our optimization problem.
+
+    Similar to Cost, but represents a constraint function h(x) that should
+    equal zero (for equality constraints).
+
+    The recommended way to create a constraint is to use the `create_factory`
+    decorator on a function that computes the constraint value.
+
+    ```python
+    @jaxls.Constraint.create_factory(constraint_type="equals_zero")
+    def compute_constraint(values: VarValues, [...args]) -> jax.Array:
+        # Compute constraint value.
+        # For equality constraints, this should equal zero.
+        return constraint_value
+
+    # `compute_constraint()` is now a factory function that returns `jaxls.Constraint` objects.
+    problem = jaxls.LeastSquaresProblem(
+        costs=[...],
+        variables=[...],
+        constraints=[compute_constraint(...), ...],
+    )
+    ```
+
+    Each `Constraint.compute_constraint` should take at least one argument that inherits
+    from the symbolic variable `jaxls.Var(id)`, where `id` must be a scalar
+    integer.
+
+    To create a batch of constraints, a leading batch axis can be added to the
+    arguments passed to `Constraint.args`:
+    - The batch axis must be the same for all arguments. Leading axes of shape
+      `(1,)` are broadcasted.
+    - The `id` field of each `jaxls.Var` instance must have shape of either
+      `()` (unbatched) or `(batch_size,)` (batched).
+    """
+
+    compute_constraint: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
+    """Constraint computation function. Should return a vector where each element
+    should equal zero for equality constraints."""
+
+    args: tuple[*Args]
+    """Arguments to the constraint function. This should include at least one
+    `jaxls.Var` object, which can either in the root of the tuple or nested
+    within a PyTree structure arbitrarily."""
+
+    constraint_type: jdc.Static[Literal["equals_zero"]]
+    """Type of constraint. Currently only 'equals_zero' is supported."""
+
+    name: jdc.Static[str | None] = None
+    """Custom name for the constraint. This is used for debugging and logging."""
+
+    def _get_name(self) -> str:
+        """Get the name of the constraint. If not set, we use
+        `constraint.compute_constraint.__name__`."""
+        if self.name is None:
+            return self.compute_constraint.__name__
+        return self.name
+
+    @overload
+    @staticmethod
+    def create_factory[**Args_](
+        compute_constraint: ConstraintFunc[Args_],
+        *,
+        constraint_type: Literal["equals_zero"] = "equals_zero",
+    ) -> ConstraintFactory[Args_]: ...
+
+    @overload
+    @staticmethod
+    def create_factory[**Args_](
+        *,
+        constraint_type: Literal["equals_zero"] = "equals_zero",
+        name: str | None = None,
+    ) -> Callable[[ConstraintFunc[Args_]], ConstraintFactory[Args_]]: ...
+
+    @staticmethod
+    def create_factory[**Args_](
+        compute_constraint: ConstraintFunc[Args_] | None = None,
+        *,
+        constraint_type: Literal["equals_zero"] = "equals_zero",
+        name: str | None = None,
+    ) -> (
+        Callable[[ConstraintFunc[Args_]], ConstraintFactory[Args_]]
+        | ConstraintFactory[Args_]
+    ):
+        """Decorator for creating constraints from a constraint function.
+
+        Examples:
+            @jaxls.Constraint.create_factory(constraint_type="equals_zero")
+            def constraint1(values: VarValues, var1: SE2Var, target: float) -> jax.Array:
+                # Fix variable to target value.
+                return values[var1].translation()[0] - target
+
+            # Factory will have the same input signature as the wrapped
+            # constraint function, but without the `VarValues` argument. The
+            # return type will be `Constraint` instead of `jax.Array`.
+            constraint = constraint1(var1=SE2Var(0), target=5.0)
+            assert isinstance(constraint, jaxls.Constraint)
+        """
+
+        def decorator(
+            compute_constraint: Callable[Concatenate[VarValues, Args_], jax.Array],
+        ) -> ConstraintFactory[Args_]:
+            def inner(
+                *args: Args_.args, **kwargs: Args_.kwargs
+            ) -> Constraint[tuple[Any, ...], dict[str, Any]]:
+                return Constraint(
+                    compute_constraint=lambda values, args, kwargs: compute_constraint(
+                        values, *args, **kwargs
+                    ),
+                    args=(args, kwargs),
+                    constraint_type=constraint_type,
+                    name=name if name is not None else compute_constraint.__name__,
+                )
+
+            return inner
+
+        if compute_constraint is None:
+            return decorator
+        return decorator(compute_constraint)
+
+    def _get_variables(self) -> tuple[Var, ...]:
+        def get_variables(current: Any) -> list[Var]:
+            children_and_meta = default_registry.flatten_one_level(current)
+            if children_and_meta is None:
+                return []
+
+            variables = []
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    variables.append(child)
+                else:
+                    variables.extend(get_variables(child))
+            return variables
+
+        return tuple(get_variables(self.args))
+
+    def _get_batch_axes(self) -> tuple[int, ...]:
+        variables = self._get_variables()
+        assert len(variables) != 0, "No variables found in constraint!"
+        return jnp.broadcast_shapes(
+            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
+        )
+
+    def _broadcast_batch_axes(self) -> Constraint:
+        batch_axes = self._get_batch_axes()
+        if batch_axes is None:
+            return self
+        leaves, treedef = jax.tree.flatten(self)
+        broadcasted_leaves = []
+        for leaf in leaves:
+            if isinstance(leaf, (int, float)):
+                leaf = jnp.array(leaf)
+            try:
+                broadcasted_leaf = jnp.broadcast_to(
+                    leaf, batch_axes + leaf.shape[len(batch_axes) :]
+                )
+            except ValueError as e:
+                # Create a more informative error message
+                error_msg = (
+                    f"{str(e)}\n"
+                    f"Constraint name: '{self._get_name()}'\n"
+                    f"Detected batch axes: {batch_axes}\n"
+                    f"Flattened argument shapes: {[getattr(x, 'shape', ()) for x in leaves]}\n"
+                    f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
+                )
+                raise ValueError(error_msg) from e
+            broadcasted_leaves.append(broadcasted_leaf)
+        return jax.tree.unflatten(treedef, broadcasted_leaves)
+
+
+@jdc.pytree_dataclass(kw_only=True)
+class _AnalyzedConstraint[*Args](Constraint[*Args]):
+    """Same as `Constraint`, but with extra fields."""
+
+    num_variables: jdc.Static[int]
+    sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
+    constraint_flat_dim: jdc.Static[int] = 0
+
+    def compute_constraint_flat(
+        self, vals: VarValues, *args: *Args
+    ) -> jax.Array:
+        out = self.compute_constraint(vals, *args)
+        # Flatten constraint vector.
+        return out.flatten()
+
+    @staticmethod
+    @jdc.jit
+    def _make[*Args_](constraint: Constraint[*Args_]) -> _AnalyzedConstraint[*Args_]:
+        """Construct an analyzed constraint."""
+        variables = constraint._get_variables()
+        assert len(variables) > 0
+
+        # Support batch axis.
+        if not isinstance(variables[0].id, int):
+            batch_axes = variables[0].id.shape
+            assert len(batch_axes) in (0, 1)
+            for var in variables[1:]:
+                assert (
+                    () if isinstance(var.id, int) else var.id.shape
+                ) == batch_axes, "Batch axes of variables do not match."
+            if len(batch_axes) == 1:
+                return jax.vmap(_AnalyzedConstraint._make)(constraint)
+
+        # Cache the constraint dimension.
+        dummy_vals = jax.eval_shape(VarValues.make, variables)
+        constraint_dim = onp.prod(
+            jax.eval_shape(constraint.compute_constraint, dummy_vals, *constraint.args).shape
+        )
+
+        return _AnalyzedConstraint(
+            **vars(constraint),
+            num_variables=len(variables),
+            sorted_ids_from_var_type=sort_and_stack_vars(variables),
+            constraint_flat_dim=constraint_dim,
+        )

@@ -34,6 +34,11 @@ Supported:
 - Optimization on manifolds.
   - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
+- **Equality constraints** via Augmented Lagrangian method.
+  - Automatic conversion to penalty-based formulation.
+  - Adaptive penalty parameter scheduling.
+  - Supports batched constraints.
+  - **Note:** For simple equality constraints between variables (e.g., `x₁ = x₂`), reparameterizing the problem to eliminate redundant variables typically results in better conditioning and faster convergence. Augmented Lagrangian is most useful for nonlinear constraints where direct variable elimination is not straightforward.
 - Linear subproblem solvers:
   - Sparse iterative with Conjugate Gradient.
     - Preconditioning: block and point Jacobi.
