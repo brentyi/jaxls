@@ -78,7 +78,7 @@ def _cholmod_solve_on_host(
         if len(_cholmod_analyze_cache) > max_cache_size:
             _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
-    # Factorize and solve
+    # Factorize and solve.
     cost = cost.cholesky_AAt(
         A_T_scipy,
         # Some simple linear problems blow up without this 1e-5 term.
@@ -753,7 +753,6 @@ class AugmentedLagrangianSolver:
 
         original_costs = []
         for stacked_cost, count in zip(problem.stacked_costs, problem.cost_counts):
-            # Keep the stacked cost as-is
             original_costs.append(
                 Cost(
                     compute_residual=stacked_cost.compute_residual,
@@ -794,10 +793,9 @@ class AugmentedLagrangianSolver:
         """
         from ._core import LeastSquaresProblem, create_augmented_constraint_cost
 
-        # Create augmented costs for each constraint group
         constraint_costs = []
         constraint_dims = []
-        constraint_is_inequality = []  # Track which constraints are inequalities
+        constraint_is_inequality = []
 
         for i, (stacked_constraint, constraint_count) in enumerate(
             zip(problem.stacked_constraints, problem.constraint_counts)
@@ -809,17 +807,13 @@ class AugmentedLagrangianSolver:
                 stacked_constraint.constraint_type == "leq_zero"
             )
 
-            # Create augmented cost that accepts AugmentedLagrangianParams
             cost = create_augmented_constraint_cost(stacked_constraint, i, total_dim)
             constraint_costs.append(cost)
 
-        # Extract original costs
         original_costs = self._extract_original_costs(problem)
-
-        # Extract variables
         variables = self._extract_variables(problem)
 
-        # Create and analyze combined problem (ONE TIME ONLY!)
+        # Create and analyze combined problem once.
         if self.verbose:
             jax_log("Pre-analyzing augmented problem structure (one-time cost)...")
 
@@ -828,11 +822,10 @@ class AugmentedLagrangianSolver:
             variables=variables,
         ).analyze()
 
-        # Initialize AL params with zeros/ones (will be updated in loop)
+        # Initialize AL params (will be updated in loop).
         from ._core import AugmentedLagrangianParams
 
         lagrange_mult_arrays = tuple(jnp.zeros(dim) for dim in constraint_dims)
-        # Per-constraint penalties: one penalty value per constraint element
         penalty_param_arrays = tuple(jnp.ones(dim) for dim in constraint_dims)
         al_params = AugmentedLagrangianParams(
             lagrange_multipliers=lagrange_mult_arrays,
@@ -896,9 +889,7 @@ class AugmentedLagrangianSolver:
         # Initialize Lagrange multipliers (zeros, as recommended by literature).
         lagrange_multipliers = jnp.zeros(constraint_dim)
 
-        # Compute initial snorm (complementarity measure) and csupn (constraint violation).
-        # For initial state, lambdas are zero, so snorm = csupn for equalities,
-        # and snorm = |min(-g, 0)| = |max(g, 0)| for violated inequalities.
+        # Compute initial snorm and csupn. With λ=0, snorm = csupn for equalities.
         initial_snorm, initial_csupn = self._compute_snorm_csupn(
             problem, h_vals, lagrange_multipliers
         )
@@ -913,8 +904,7 @@ class AugmentedLagrangianSolver:
                 residual_vector = residual_vector_result
             initial_cost = jnp.sum(residual_vector**2)
 
-            # Compute sum of squared constraint violations
-            # For inequalities, only count violated constraints (g > 0)
+            # Sum of squared violations. For inequalities, only count g > 0.
             sum_c_squared = jnp.array(0.0)
             offset = 0
             for i, stacked_constraint in enumerate(problem.stacked_constraints):
@@ -924,12 +914,10 @@ class AugmentedLagrangianSolver:
                 h_slice = h_vals[offset : offset + total_dim]
 
                 if stacked_constraint.constraint_type == "leq_zero":
-                    # Only count violated inequalities
                     sum_c_squared = sum_c_squared + jnp.sum(
                         0.5 * jnp.maximum(0.0, h_slice) ** 2
                     )
                 else:
-                    # Count all equality constraint values
                     sum_c_squared = sum_c_squared + jnp.sum(0.5 * h_slice**2)
                 offset += total_dim
 
@@ -947,9 +935,7 @@ class AugmentedLagrangianSolver:
         # Initialize per-constraint penalties (all same initially).
         penalty_params = jnp.full(constraint_dim, penalty_initial)
 
-        # PRE-ANALYZE augmented problem structure ONCE (major optimization!)
-        # This converts constraints to parameterized costs and analyzes the combined problem.
-        # The structure is fixed; only lagrange_multipliers and penalty_params will vary.
+        # Pre-analyze augmented problem structure once.
         augmented_structure = self._analyze_augmented_problem(problem, constraint_dim)
 
         if self.verbose:
@@ -961,7 +947,7 @@ class AugmentedLagrangianSolver:
                 dim=constraint_dim,
             )
 
-        # Pre-allocate history arrays for outer loop (JIT-friendly).
+        # Pre-allocate history arrays.
         max_outer = self.config.max_iterations
         constraint_violation_history = jnp.zeros(max_outer)
         constraint_violation_history = constraint_violation_history.at[0].set(
@@ -971,7 +957,6 @@ class AugmentedLagrangianSolver:
         penalty_history = penalty_history.at[0].set(penalty_initial)
         inner_iterations_count = jnp.zeros(max_outer, dtype=jnp.int32)
 
-        # Pre-allocate inner_summary with fixed-size arrays based on inner solver max iterations.
         max_inner = self.inner_solver.termination.max_iterations
         initial_summary = SolveSummary(
             iterations=jnp.array(0, dtype=jnp.int32),
@@ -981,14 +966,13 @@ class AugmentedLagrangianSolver:
             termination_deltas=jnp.zeros(3),
         )
 
-        # Create initial state.
         state = _AugmentedLagrangianState(
             vals=initial_vals,
             lagrange_multipliers=lagrange_multipliers,
             penalty_params=penalty_params,
             snorm=initial_snorm,
-            snorm_prev=initial_snorm,  # Set prev = current initially
-            constraint_values_prev=h_vals,  # Initial constraint values for per-constraint progress
+            snorm_prev=initial_snorm,
+            constraint_values_prev=h_vals,
             constraint_violation=initial_csupn,
             initial_snorm=initial_snorm,
             outer_iteration=0,
@@ -998,16 +982,8 @@ class AugmentedLagrangianSolver:
             inner_iterations_count=inner_iterations_count,
         )
 
-        # Run outer loop using while_loop for JIT compilation.
         def cond_fn(state: _AugmentedLagrangianState) -> jax.Array:
-            """Continue if not converged and under max iterations.
-
-            ALGENCAN convergence: max(snorm, csupn) <= tol_abs AND snorm/snorm0 < tol_rel
-
-            We always run at least one iteration to optimize the cost even when
-            constraints are initially satisfied (e.g., inactive inequality constraints).
-            """
-            # Always run at least one iteration
+            """Check convergence. Always run at least one iteration."""
             first_iteration = state.outer_iteration < 1
 
             converged_absolute = (
