@@ -23,17 +23,14 @@ from jaxls._preconditioning import (
 )
 
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
-
-if TYPE_CHECKING:
-    from ._core import Cost
-    from ._variables import Var
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._core import AnalyzedLeastSquaresProblem, CustomJacobianCache
+    from ._core import AnalyzedLeastSquaresProblem, Cost, CustomJacobianCache
+    from ._variables import Var
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}

@@ -34,7 +34,9 @@ Supported:
 - Optimization on manifolds.
   - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- **Equality constraints** via Augmented Lagrangian method.
+- **Equality and inequality constraints** via Augmented Lagrangian method.
+  - Equality constraints: `h(x) = 0` with `constraint_type="eq_zero"`
+  - Inequality constraints: `g(x) ≤ 0` with `constraint_type="leq_zero"`
   - Automatic conversion to penalty-based formulation.
   - Adaptive penalty parameter scheduling.
   - Supports batched constraints.

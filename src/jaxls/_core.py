@@ -1128,24 +1128,28 @@ type ConstraintFactory[**Args] = Callable[
 class Constraint[*Args]:
     """A constraint in our optimization problem.
 
-    Similar to Cost, but represents a constraint function h(x) that should
-    equal zero (for equality constraints).
+    Supports two types of constraints:
+    - Equality constraints: `h(x) = 0` with `constraint_type="eq_zero"` (default)
+    - Inequality constraints: `g(x) ≤ 0` with `constraint_type="leq_zero"`
 
     The recommended way to create a constraint is to use the `create_factory`
     decorator on a function that computes the constraint value.
 
     ```python
+    # Equality constraint: h(x) = 0
     @jaxls.Constraint.create_factory(constraint_type="eq_zero")
-    def compute_constraint(values: VarValues, [...args]) -> jax.Array:
-        # Compute constraint value.
-        # For equality constraints, this should equal zero.
-        return constraint_value
+    def equality_constraint(values: VarValues, [...args]) -> jax.Array:
+        return values[var] - target  # Should equal zero
 
-    # `compute_constraint()` is now a factory function that returns `jaxls.Constraint` objects.
+    # Inequality constraint: g(x) ≤ 0
+    @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+    def inequality_constraint(values: VarValues, [...args]) -> jax.Array:
+        return values[var] - upper_bound  # Should be ≤ 0
+
     problem = jaxls.LeastSquaresProblem(
         costs=[...],
         variables=[...],
-        constraints=[compute_constraint(...), ...],
+        constraints=[equality_constraint(...), inequality_constraint(...), ...],
     )
     ```
 
