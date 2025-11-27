@@ -276,7 +276,9 @@ class LeastSquaresProblem:
                 constraint_count_from_group.setdefault(group_key, 0)
 
                 if len(batch_axes) == 0:
-                    constraint = jax.tree.map(lambda x: jnp.asarray(x)[None], constraint)
+                    constraint = jax.tree.map(
+                        lambda x: jnp.asarray(x)[None], constraint
+                    )
                     constraint_count_from_group[group_key] += 1
                 else:
                     assert len(batch_axes) == 1
@@ -321,6 +323,21 @@ class LeastSquaresProblem:
 
 
 @jdc.pytree_dataclass
+class AugmentedLagrangianParams:
+    """Parameters for augmented Lagrangian constraint costs.
+
+    Each constraint group gets its own lagrange multiplier array.
+    The penalty parameter is shared across all constraints.
+    """
+
+    lagrange_multipliers: tuple[jax.Array, ...]
+    """Lagrange multipliers for each constraint group."""
+
+    penalty_param: jax.Array
+    """Penalty parameter (scalar), shared across all constraints."""
+
+
+@jdc.pytree_dataclass
 class AnalyzedLeastSquaresProblem:
     stacked_costs: tuple[_AnalyzedCost, ...]
     cost_counts: jdc.Static[tuple[int, ...]]
@@ -333,6 +350,8 @@ class AnalyzedLeastSquaresProblem:
     residual_dim: jdc.Static[int]
     stacked_constraints: tuple[_AnalyzedConstraint, ...] = ()
     constraint_counts: jdc.Static[tuple[int, ...]] = ()
+    augmented_lagrangian_params: AugmentedLagrangianParams | None = None
+    """Parameters for augmented Lagrangian costs. None if no constraints."""
 
     @overload
     def solve(
@@ -482,10 +501,23 @@ class AnalyzedLeastSquaresProblem:
         residual_slices = list[jax.Array]()
         jac_cache = list[CustomJacobianCache]()
         for stacked_cost in self.stacked_costs:
-            # Flatten the output of the user-provided compute_residual.
-            compute_residual_out = jax.vmap(
-                lambda args: stacked_cost.compute_residual_flat(vals, *args)
-            )(stacked_cost.args)
+            # Check if this is an augmented constraint cost
+            is_augmented = (
+                stacked_cost.name is not None and "augmented_" in stacked_cost.name
+            )
+
+            if is_augmented and self.augmented_lagrangian_params is not None:
+                # Pass AL params to augmented constraint costs
+                compute_residual_out = jax.vmap(
+                    lambda args: stacked_cost.compute_residual_flat(
+                        vals, *args, al_params=self.augmented_lagrangian_params
+                    )
+                )(stacked_cost.args)
+            else:
+                # Standard path - no additional params
+                compute_residual_out = jax.vmap(
+                    lambda args: stacked_cost.compute_residual_flat(vals, *args)
+                )(stacked_cost.args)
 
             if isinstance(compute_residual_out, tuple):
                 assert len(compute_residual_out) == 2
@@ -556,15 +588,29 @@ class AnalyzedLeastSquaresProblem:
                     if cost.residual_flat_dim < val_subset._get_tangent_dim()
                     else jax.jacfwd,
                 }[cost.jac_mode]
-                return jacfunc(
-                    # We flatten the output of compute_residual before
-                    # computing Jacobian. The Jacobian is computed with respect
-                    # to the flattened residual.
-                    lambda tangent: cost.compute_residual_flat(
-                        val_subset._retract(tangent, self.tangent_ordering),
-                        *cost.args,
-                    )
-                )(jnp.zeros((val_subset._get_tangent_dim(),)))
+
+                # Check if this is an augmented constraint cost
+                is_augmented = cost.name is not None and "augmented_" in cost.name
+
+                if is_augmented and self.augmented_lagrangian_params is not None:
+                    # Pass AL params when computing Jacobian
+                    return jacfunc(
+                        lambda tangent: cost.compute_residual_flat(
+                            val_subset._retract(tangent, self.tangent_ordering),
+                            *cost.args,
+                            al_params=self.augmented_lagrangian_params,
+                        )
+                    )(jnp.zeros((val_subset._get_tangent_dim(),)))
+                else:
+                    return jacfunc(
+                        # We flatten the output of compute_residual before
+                        # computing Jacobian. The Jacobian is computed with respect
+                        # to the flattened residual.
+                        lambda tangent: cost.compute_residual_flat(
+                            val_subset._retract(tangent, self.tangent_ordering),
+                            *cost.args,
+                        )
+                    )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
             optional_jac_cache_i = (jac_cache[i],) if jac_cache[i] is not None else ()
 
@@ -748,6 +794,12 @@ class Cost[*Args]:
 
     name: jdc.Static[str | None] = None
     """Custom name for the cost. This is used for debugging and logging."""
+
+    # Metadata for augmented Lagrangian constraint costs
+    _al_constraint_index: jdc.Static[int | None] = None
+    """Internal: constraint index for augmented Lagrangian costs."""
+    _al_total_dim: jdc.Static[int | None] = None
+    """Internal: total multiplier dimension for augmented Lagrangian costs."""
 
     def _get_name(self) -> str:
         """Get the name of the cost. If not set, we use
@@ -950,9 +1002,9 @@ class _AnalyzedCost[*Args](Cost[*Args]):
     residual_flat_dim: jdc.Static[int] = 0
 
     def compute_residual_flat(
-        self, vals: VarValues, *args: *Args
+        self, vals: VarValues, *args: *Args, **kwargs
     ) -> jax.Array | tuple[jax.Array, CustomJacobianCache]:
-        out = self.compute_residual(vals, *args)
+        out = self.compute_residual(vals, *args, **kwargs)
 
         # Flatten residual vector.
         if isinstance(out, tuple):
@@ -992,9 +1044,35 @@ class _AnalyzedCost[*Args](Cost[*Args]):
 
         # Cache the residual dimension for this cost.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
-        residual_dim = onp.prod(
-            jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
-        )
+
+        # Check if this is an augmented constraint cost (needs AL params)
+        is_augmented = cost._al_constraint_index is not None
+
+        if is_augmented:
+            # Use metadata fields instead of parsing name
+            constraint_index = cost._al_constraint_index
+            total_dim = cost._al_total_dim
+
+            # Create dummy AL params with the correct total dimension for this constraint
+            dummy_lagrange_mults = [
+                jnp.zeros(total_dim) for _ in range(constraint_index + 1)
+            ]
+            dummy_al_params = AugmentedLagrangianParams(
+                lagrange_multipliers=tuple(dummy_lagrange_mults),
+                penalty_param=jnp.array(1.0),
+            )
+            residual_dim = onp.prod(
+                jax.eval_shape(
+                    _residual_no_cache,
+                    dummy_vals,
+                    *cost.args,
+                    al_params=dummy_al_params,
+                ).shape
+            )
+        else:
+            residual_dim = onp.prod(
+                jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
+            )
 
         return _AnalyzedCost(
             **vars(cost),
@@ -1057,7 +1135,7 @@ class Constraint[*Args]:
     decorator on a function that computes the constraint value.
 
     ```python
-    @jaxls.Constraint.create_factory(constraint_type="equals_zero")
+    @jaxls.Constraint.create_factory(constraint_type="eq_zero")
     def compute_constraint(values: VarValues, [...args]) -> jax.Array:
         # Compute constraint value.
         # For equality constraints, this should equal zero.
@@ -1092,8 +1170,11 @@ class Constraint[*Args]:
     `jaxls.Var` object, which can either in the root of the tuple or nested
     within a PyTree structure arbitrarily."""
 
-    constraint_type: jdc.Static[Literal["equals_zero"]]
-    """Type of constraint. Currently only 'equals_zero' is supported."""
+    constraint_type: jdc.Static[Literal["eq_zero", "leq_zero"]]
+    """Type of constraint. Supported types:
+    - 'eq_zero': h(x) = 0 (equality constraint)
+    - 'leq_zero': g(x) ≤ 0 (inequality constraint)
+    """
 
     name: jdc.Static[str | None] = None
     """Custom name for the constraint. This is used for debugging and logging."""
@@ -1110,14 +1191,14 @@ class Constraint[*Args]:
     def create_factory[**Args_](
         compute_constraint: ConstraintFunc[Args_],
         *,
-        constraint_type: Literal["equals_zero"] = "equals_zero",
+        constraint_type: Literal["eq_zero", "leq_zero"] = "eq_zero",
     ) -> ConstraintFactory[Args_]: ...
 
     @overload
     @staticmethod
     def create_factory[**Args_](
         *,
-        constraint_type: Literal["equals_zero"] = "equals_zero",
+        constraint_type: Literal["eq_zero", "leq_zero"] = "eq_zero",
         name: str | None = None,
     ) -> Callable[[ConstraintFunc[Args_]], ConstraintFactory[Args_]]: ...
 
@@ -1125,7 +1206,7 @@ class Constraint[*Args]:
     def create_factory[**Args_](
         compute_constraint: ConstraintFunc[Args_] | None = None,
         *,
-        constraint_type: Literal["equals_zero"] = "equals_zero",
+        constraint_type: Literal["eq_zero", "leq_zero"] = "eq_zero",
         name: str | None = None,
     ) -> (
         Callable[[ConstraintFunc[Args_]], ConstraintFactory[Args_]]
@@ -1134,15 +1215,22 @@ class Constraint[*Args]:
         """Decorator for creating constraints from a constraint function.
 
         Examples:
-            @jaxls.Constraint.create_factory(constraint_type="equals_zero")
-            def constraint1(values: VarValues, var1: SE2Var, target: float) -> jax.Array:
+            # Equality constraint: h(x) = 0
+            @jaxls.Constraint.create_factory(constraint_type="eq_zero")
+            def equality_constraint(values: VarValues, var1: SE2Var, target: float) -> jax.Array:
                 # Fix variable to target value.
                 return values[var1].translation()[0] - target
+
+            # Inequality constraint: g(x) ≤ 0
+            @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+            def inequality_constraint(values: VarValues, var1: ScalarVar, max_val: float) -> jax.Array:
+                # Variable must be less than or equal to max_val
+                return values[var1] - max_val
 
             # Factory will have the same input signature as the wrapped
             # constraint function, but without the `VarValues` argument. The
             # return type will be `Constraint` instead of `jax.Array`.
-            constraint = constraint1(var1=SE2Var(0), target=5.0)
+            constraint = equality_constraint(var1=SE2Var(0), target=5.0)
             assert isinstance(constraint, jaxls.Constraint)
         """
 
@@ -1225,9 +1313,7 @@ class _AnalyzedConstraint[*Args](Constraint[*Args]):
     sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
     constraint_flat_dim: jdc.Static[int] = 0
 
-    def compute_constraint_flat(
-        self, vals: VarValues, *args: *Args
-    ) -> jax.Array:
+    def compute_constraint_flat(self, vals: VarValues, *args: *Args) -> jax.Array:
         out = self.compute_constraint(vals, *args)
         # Flatten constraint vector.
         return out.flatten()
@@ -1253,7 +1339,9 @@ class _AnalyzedConstraint[*Args](Constraint[*Args]):
         # Cache the constraint dimension.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
         constraint_dim = onp.prod(
-            jax.eval_shape(constraint.compute_constraint, dummy_vals, *constraint.args).shape
+            jax.eval_shape(
+                constraint.compute_constraint, dummy_vals, *constraint.args
+            ).shape
         )
 
         return _AnalyzedConstraint(
@@ -1262,3 +1350,65 @@ class _AnalyzedConstraint[*Args](Constraint[*Args]):
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             constraint_flat_dim=constraint_dim,
         )
+
+
+def create_augmented_constraint_cost(
+    constraint: _AnalyzedConstraint,
+    constraint_index: int,
+    total_dim: int,
+) -> Cost:
+    """Create a cost from a constraint for Augmented Lagrangian method.
+
+    This creates a Cost object that converts a constraint into an augmented
+    Lagrangian residual.
+
+    For equality constraints h(x) = 0:
+        r = sqrt(ρ) * (h(x) + λ/ρ)
+
+    For inequality constraints g(x) ≤ 0:
+        r = sqrt(ρ) * max(0, g(x) + λ/ρ)
+
+    where λ (Lagrange multipliers) and ρ (penalty parameter) are passed
+    via the AugmentedLagrangianParams structure.
+
+    Args:
+        constraint: The analyzed constraint to convert.
+        constraint_index: Index of this constraint group (for accessing the right lambda array).
+        total_dim: Total dimension of lagrange multipliers for this constraint group
+                   (constraint_count * constraint_flat_dim).
+
+    Returns:
+        A Cost object that accepts AugmentedLagrangianParams.
+    """
+
+    is_inequality = constraint.constraint_type == "leq_zero"
+
+    def augmented_residual_fn(
+        vals: VarValues,
+        *args,
+        al_params: AugmentedLagrangianParams,
+    ) -> jax.Array:
+        """Compute augmented constraint residual."""
+        constraint_val = constraint.compute_constraint_flat(vals, *args)
+        lambdas = al_params.lagrange_multipliers[constraint_index]
+        penalty_param = al_params.penalty_param
+
+        # For inequality constraints: only penalize when violated (max formulation)
+        # For equality constraints: always penalize deviation
+        if is_inequality:
+            # g(x) ≤ 0: penalize only when g(x) + λ/ρ > 0
+            return jnp.sqrt(penalty_param) * jnp.maximum(
+                0.0, constraint_val + lambdas / penalty_param
+            )
+        else:
+            # h(x) = 0: always penalize
+            return jnp.sqrt(penalty_param) * (constraint_val + lambdas / penalty_param)
+
+    # Store metadata for shape inference
+    return Cost(
+        compute_residual=augmented_residual_fn,  # type: ignore
+        args=constraint.args,
+        name=f"augmented_{constraint._get_name()}",
+        _al_constraint_index=constraint_index,
+        _al_total_dim=total_dim,
+    )

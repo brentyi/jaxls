@@ -23,6 +23,10 @@ from jaxls._preconditioning import (
 )
 
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
+
+if TYPE_CHECKING:
+    from ._core import Cost
+    from ._variables import Var
 from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
@@ -653,7 +657,7 @@ class AugmentedLagrangianConfig:
     tolerance_relative: float | jax.Array = 1e-4
     """Relative tolerance for constraint violation: ||h(x)|| / ||h(x0)|| < tol_rel."""
 
-    max_iterations: jdc.Static[int] = 20
+    max_iterations: jdc.Static[int] = 50
     """Maximum number of augmented Lagrangian iterations (outer loop)."""
 
     inner_tolerance_factor: float | jax.Array = 0.1
@@ -688,6 +692,16 @@ class _AugmentedLagrangianState:
     inner_summary: SolveSummary
     """Summary from most recent inner solver iteration."""
 
+    # History arrays for outer loop (pre-allocated for JIT)
+    constraint_violation_history: jax.Array
+    """History of constraint violations. Shape: (max_outer_iterations,)"""
+
+    penalty_history: jax.Array
+    """History of penalty parameters. Shape: (max_outer_iterations,)"""
+
+    inner_iterations_count: jax.Array
+    """Number of inner iterations per outer iteration. Shape: (max_outer_iterations,)"""
+
 
 @jdc.pytree_dataclass
 class AugmentedLagrangianSolver:
@@ -712,6 +726,106 @@ class AugmentedLagrangianSolver:
 
     verbose: jdc.Static[bool]
     """Whether to print verbose logging information."""
+
+    def _extract_original_costs(
+        self, problem: AnalyzedLeastSquaresProblem
+    ) -> list[Cost]:
+        """Extract original Cost objects from analyzed problem.
+
+        We need to recreate Cost objects from the analyzed problem to combine
+        with augmented constraint costs and re-analyze.
+        """
+        from ._core import Cost
+
+        original_costs = []
+        for stacked_cost, count in zip(problem.stacked_costs, problem.cost_counts):
+            # Keep the stacked cost as-is
+            original_costs.append(
+                Cost(
+                    compute_residual=stacked_cost.compute_residual,
+                    args=stacked_cost.args,
+                    jac_mode=stacked_cost.jac_mode,
+                    jac_batch_size=stacked_cost.jac_batch_size,
+                    jac_custom_fn=stacked_cost.jac_custom_fn,
+                    jac_custom_with_cache_fn=stacked_cost.jac_custom_with_cache_fn,
+                    name=stacked_cost.name,
+                )
+            )
+        return original_costs
+
+    def _extract_variables(self, problem: AnalyzedLeastSquaresProblem) -> list[Var]:
+        """Extract variable objects from analyzed problem."""
+
+        variables = []
+        for var_type, ids in problem.sorted_ids_from_var_type.items():
+            for var_id in ids:
+                variables.append(var_type(int(var_id)))
+        return variables
+
+    def _analyze_augmented_problem(
+        self, problem: AnalyzedLeastSquaresProblem, constraint_dim: int
+    ) -> AnalyzedLeastSquaresProblem:
+        """Pre-analyze augmented problem structure once.
+
+        Creates parameterized augmented costs with external parameter references,
+        then analyzes the combined problem. The structure is fixed; only the
+        lagrange_multipliers and penalty_param values will vary during optimization.
+
+        Args:
+            problem: Original analyzed problem with constraints.
+            constraint_dim: Total dimension of all constraints.
+
+        Returns:
+            Analyzed augmented problem with external params initialized to zeros.
+        """
+        from ._core import LeastSquaresProblem, create_augmented_constraint_cost
+
+        # Create augmented costs for each constraint group
+        constraint_costs = []
+        constraint_dims = []
+        constraint_is_inequality = []  # Track which constraints are inequalities
+
+        for i, (stacked_constraint, constraint_count) in enumerate(
+            zip(problem.stacked_constraints, problem.constraint_counts)
+        ):
+            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+            constraint_dims.append(total_dim)
+            constraint_is_inequality.append(
+                stacked_constraint.constraint_type == "leq_zero"
+            )
+
+            # Create augmented cost that accepts AugmentedLagrangianParams
+            cost = create_augmented_constraint_cost(stacked_constraint, i, total_dim)
+            constraint_costs.append(cost)
+
+        # Extract original costs
+        original_costs = self._extract_original_costs(problem)
+
+        # Extract variables
+        variables = self._extract_variables(problem)
+
+        # Create and analyze combined problem (ONE TIME ONLY!)
+        if self.verbose:
+            jax_log("Pre-analyzing augmented problem structure (one-time cost)...")
+
+        augmented = LeastSquaresProblem(
+            costs=original_costs + constraint_costs,
+            variables=variables,
+        ).analyze()
+
+        # Initialize AL params with zeros (will be updated in loop)
+        from ._core import AugmentedLagrangianParams
+
+        lagrange_mult_arrays = tuple(jnp.zeros(dim) for dim in constraint_dims)
+        al_params = AugmentedLagrangianParams(
+            lagrange_multipliers=lagrange_mult_arrays,
+            penalty_param=jnp.array(1.0),
+        )
+
+        augmented = jdc.replace(augmented, augmented_lagrangian_params=al_params)
+
+        return augmented
 
     @overload
     def solve(
@@ -780,6 +894,11 @@ class AugmentedLagrangianSolver:
         else:
             penalty_param = self.config.penalty_initial
 
+        # PRE-ANALYZE augmented problem structure ONCE (major optimization!)
+        # This converts constraints to parameterized costs and analyzes the combined problem.
+        # The structure is fixed; only lagrange_multipliers and penalty_param will vary.
+        augmented_structure = self._analyze_augmented_problem(problem, constraint_dim)
+
         if self.verbose:
             jax_log(
                 "Augmented Lagrangian: initial violation={violation:.4e}, penalty={penalty:.4e}, constraint_dim={dim}",
@@ -787,6 +906,26 @@ class AugmentedLagrangianSolver:
                 penalty=penalty_param,
                 dim=constraint_dim,
             )
+
+        # Pre-allocate history arrays for outer loop (JIT-friendly).
+        max_outer = self.config.max_iterations
+        constraint_violation_history = jnp.zeros(max_outer)
+        constraint_violation_history = constraint_violation_history.at[0].set(
+            initial_violation
+        )
+        penalty_history = jnp.zeros(max_outer)
+        penalty_history = penalty_history.at[0].set(penalty_param)
+        inner_iterations_count = jnp.zeros(max_outer, dtype=jnp.int32)
+
+        # Pre-allocate inner_summary with fixed-size arrays based on inner solver max iterations.
+        max_inner = self.inner_solver.termination.max_iterations
+        initial_summary = SolveSummary(
+            iterations=jnp.array(0, dtype=jnp.int32),
+            cost_history=jnp.zeros(max_inner),
+            lambda_history=jnp.zeros(max_inner),
+            termination_criteria=jnp.array([False, False, False, False]),
+            termination_deltas=jnp.zeros(3),
+        )
 
         # Create initial state.
         state = _AugmentedLagrangianState(
@@ -796,42 +935,51 @@ class AugmentedLagrangianSolver:
             constraint_violation=initial_violation,
             initial_violation=initial_violation,
             outer_iteration=0,
-            inner_summary=SolveSummary(
-                iterations=jnp.array(0),
-                cost_history=jnp.zeros(0),
-                lambda_history=jnp.zeros(0),
-                termination_criteria=jnp.array([False, False, False, False]),
-                termination_deltas=jnp.zeros(3),
-            ),
+            inner_summary=initial_summary,
+            constraint_violation_history=constraint_violation_history,
+            penalty_history=penalty_history,
+            inner_iterations_count=inner_iterations_count,
         )
 
-        # Run outer loop.
-        converged_absolute = False
-        converged_relative = False
-        for _ in range(self.config.max_iterations):
-            state = self._step(problem, state)
-
-            # Check convergence.
-            converged_absolute = state.constraint_violation < self.config.tolerance_absolute
+        # Run outer loop using while_loop for JIT compilation.
+        def cond_fn(state: _AugmentedLagrangianState) -> jax.Array:
+            """Continue if not converged and under max iterations."""
+            converged_absolute = (
+                state.constraint_violation < self.config.tolerance_absolute
+            )
             converged_relative = (
                 state.constraint_violation / state.initial_violation
                 < self.config.tolerance_relative
             )
+            converged = converged_absolute & converged_relative
+            under_max_iters = state.outer_iteration < self.config.max_iterations
+            return ~converged & under_max_iters
 
+        def body_fn(state: _AugmentedLagrangianState) -> _AugmentedLagrangianState:
+            """Perform one outer iteration."""
+            return self._step(problem, augmented_structure, state)
+
+        state = jax.lax.while_loop(cond_fn, body_fn, state)
+
+        # Check final convergence for logging.
+        converged_absolute = state.constraint_violation < self.config.tolerance_absolute
+        converged_relative = (
+            state.constraint_violation / state.initial_violation
+            < self.config.tolerance_relative
+        )
+
+        if self.verbose:
             if converged_absolute and converged_relative:
-                if self.verbose:
-                    jax_log(
-                        "Augmented Lagrangian converged @ outer iteration {i}: violation={violation:.4e}",
-                        i=state.outer_iteration,
-                        violation=state.constraint_violation,
-                    )
-                break
-
-        if self.verbose and not (converged_absolute and converged_relative):
-            jax_log(
-                "Augmented Lagrangian: max iterations reached. Final violation={violation:.4e}",
-                violation=state.constraint_violation,
-            )
+                jax_log(
+                    "Augmented Lagrangian converged @ outer iteration {i}: violation={violation:.4e}",
+                    i=state.outer_iteration,
+                    violation=state.constraint_violation,
+                )
+            else:
+                jax_log(
+                    "Augmented Lagrangian: max iterations reached. Final violation={violation:.4e}",
+                    violation=state.constraint_violation,
+                )
 
         if return_summary:
             return state.vals, state.inner_summary
@@ -841,25 +989,49 @@ class AugmentedLagrangianSolver:
     def _step(
         self,
         problem: AnalyzedLeastSquaresProblem,
+        augmented_structure: AnalyzedLeastSquaresProblem,
         state: _AugmentedLagrangianState,
     ) -> _AugmentedLagrangianState:
         """Perform one outer iteration of the Augmented Lagrangian method.
 
         Args:
-            problem: The analyzed least squares problem with constraints.
+            problem: Original problem with constraints (for constraint evaluation).
+            augmented_structure: Pre-analyzed augmented problem with parameterized costs.
             state: Current state of the Augmented Lagrangian solver.
 
         Returns:
             Updated state after one outer iteration.
         """
-        # Create augmented problem by converting constraints to costs.
-        augmented_problem = self._create_augmented_problem(
-            problem, state.lagrange_multipliers, state.penalty_param
+        # Update AL params in the pre-analyzed augmented problem.
+        # Split flat lagrange_multipliers into tuple of arrays for each constraint group.
+        from ._core import AugmentedLagrangianParams
+
+        lambda_arrays = []
+        lambda_offset = 0
+        for (
+            lambda_array
+        ) in augmented_structure.augmented_lagrangian_params.lagrange_multipliers:
+            dim = lambda_array.shape[0]
+            lambda_arrays.append(
+                state.lagrange_multipliers[lambda_offset : lambda_offset + dim]
+            )
+            lambda_offset += dim
+
+        al_params = AugmentedLagrangianParams(
+            lagrange_multipliers=tuple(lambda_arrays),
+            penalty_param=state.penalty_param,
+        )
+
+        augmented_problem = jdc.replace(
+            augmented_structure,
+            augmented_lagrangian_params=al_params,
         )
 
         # Solve inner unconstrained problem.
         # Adjust inner solver tolerance based on constraint violation.
-        inner_tolerance = self.config.inner_tolerance_factor * state.constraint_violation
+        inner_tolerance = (
+            self.config.inner_tolerance_factor * state.constraint_violation
+        )
         inner_termination = jdc.replace(
             self.inner_solver.termination,
             cost_tolerance=jnp.maximum(inner_tolerance, 1e-8),
@@ -874,17 +1046,41 @@ class AugmentedLagrangianSolver:
             augmented_problem, state.vals, return_summary=True
         )
 
-        # Evaluate constraints at new solution.
+        # Evaluate constraints at new solution using ORIGINAL problem
         h_vals = problem.compute_constraint_values(vals_updated)
         constraint_violation = jnp.linalg.norm(h_vals)
 
         # Update Lagrange multipliers: λ_new = λ_old + ρ * h(x)
-        lagrange_multipliers_updated = state.lagrange_multipliers + state.penalty_param * h_vals
+        # For inequality constraints, project multipliers to be non-negative
+        lagrange_multipliers_updated = (
+            state.lagrange_multipliers + state.penalty_param * h_vals
+        )
+
+        # Project inequality constraint multipliers to be non-negative
+        # For each constraint group, check if it's an inequality and project if needed
+        lambda_offset = 0
+        lambda_arrays_projected = []
+        for i, stacked_constraint in enumerate(problem.stacked_constraints):
+            constraint_count = problem.constraint_counts[i]
+            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+
+            lambda_slice = lagrange_multipliers_updated[
+                lambda_offset : lambda_offset + total_dim
+            ]
+
+            # For inequality constraints, multipliers must be non-negative
+            if stacked_constraint.constraint_type == "leq_zero":
+                lambda_slice = jnp.maximum(0.0, lambda_slice)
+
+            lambda_arrays_projected.append(lambda_slice)
+            lambda_offset += total_dim
+
+        lagrange_multipliers_updated = jnp.concatenate(lambda_arrays_projected)
 
         # Update penalty parameter if constraint violation didn't decrease enough.
-        violation_reduction = (
-            (state.constraint_violation - constraint_violation) /
-            (state.constraint_violation + 1e-10)
+        violation_reduction = (state.constraint_violation - constraint_violation) / (
+            state.constraint_violation + 1e-10
         )
         penalty_updated = jnp.where(
             violation_reduction < self.config.violation_reduction_threshold,
@@ -906,122 +1102,24 @@ class AugmentedLagrangianSolver:
                 ordered=True,
             )
 
-        return _AugmentedLagrangianState(
+        # Update state. We cannot use copy_and_mutate for inner_summary because
+        # it contains variable-length history arrays. Instead, we use jdc.replace.
+        next_idx = state.outer_iteration + 1
+
+        return jdc.replace(
+            state,
             vals=vals_updated,
             lagrange_multipliers=lagrange_multipliers_updated,
             penalty_param=penalty_updated,
             constraint_violation=constraint_violation,
-            initial_violation=state.initial_violation,
             outer_iteration=state.outer_iteration + 1,
             inner_summary=inner_summary,
+            # Update history arrays with indexed writes for JIT compatibility.
+            constraint_violation_history=state.constraint_violation_history.at[
+                next_idx
+            ].set(constraint_violation),
+            penalty_history=state.penalty_history.at[next_idx].set(penalty_updated),
+            inner_iterations_count=state.inner_iterations_count.at[next_idx].set(
+                inner_summary.iterations
+            ),
         )
-
-    def _create_augmented_problem(
-        self,
-        problem: AnalyzedLeastSquaresProblem,
-        lagrange_multipliers: jax.Array,
-        penalty_param: float | jax.Array,
-    ) -> AnalyzedLeastSquaresProblem:
-        """Create augmented problem by adding constraint residuals to costs.
-
-        For each constraint h_i(x), we add a residual:
-            r_i = sqrt(ρ) * (h_i(x) + λ_i / ρ)
-
-        This converts the augmented Lagrangian:
-            L(x, λ, ρ) = f(x) + λᵀh(x) + (ρ/2)||h(x)||²
-
-        Into an unconstrained least squares problem:
-            min ||[r_original; r_constraint]||²
-
-        Args:
-            problem: Original problem with constraints.
-            lagrange_multipliers: Current Lagrange multipliers.
-            penalty_param: Current penalty parameter.
-
-        Returns:
-            Augmented problem with constraints converted to costs.
-        """
-        from ._core import Cost, LeastSquaresProblem
-
-        # Convert each stacked constraint to a Cost.
-        # Track offset into lagrange_multipliers array.
-        lambda_offset = 0
-        constraint_costs = []
-
-        for stacked_constraint in problem.stacked_constraints:
-            # Dimension of each constraint instance.
-            constraint_flat_dim = stacked_constraint.constraint_flat_dim
-
-            # Get slice of multipliers for this constraint group.
-            # Each constraint in the args has its own multiplier slice.
-            num_constraints = stacked_constraint.args[0][0].id.shape[0] if not isinstance(
-                stacked_constraint.args[0][0].id, int
-            ) else 1
-
-            total_constraint_dim = num_constraints * constraint_flat_dim
-
-            lambda_slice = lagrange_multipliers[
-                lambda_offset : lambda_offset + total_constraint_dim
-            ]
-
-            # Create augmented cost function.
-            # We capture constraint, lambda_slice, and penalty_param in the closure.
-            def make_augmented_cost(constraint, lambdas, rho):
-                """Factory to create augmented cost with captured parameters."""
-
-                def augmented_residual_fn(vals, *args):
-                    """Compute augmented constraint residual: sqrt(ρ) * (h(x) + λ/ρ)"""
-                    h_val = constraint.compute_constraint_flat(vals, *args)
-                    return jnp.sqrt(rho) * (h_val + lambdas / rho)
-
-                return Cost(
-                    compute_residual=augmented_residual_fn,
-                    args=constraint.args,
-                )
-
-            constraint_costs.append(
-                make_augmented_cost(stacked_constraint, lambda_slice, penalty_param)
-            )
-
-            lambda_offset += total_constraint_dim
-
-        # Extract variables from original problem.
-        variables = []
-        for var_type in problem.sorted_ids_from_var_type.keys():
-            ids = problem.sorted_ids_from_var_type[var_type]
-            for var_id in ids:
-                variables.append(var_type(var_id))
-
-        # Combine original costs and constraint costs, then re-analyze.
-        # Note: This is inefficient (re-analysis every outer iteration), but correct.
-        # Future optimization: cache and reuse sparsity structure.
-        # Extract original costs from analyzed problem (we need the original Cost objects).
-        original_costs = []
-        cost_offset = 0
-        for analyzed_cost, count in zip(problem.stacked_costs, problem.cost_counts):
-            for i in range(count):
-                # Extract individual cost from stacked analyzed cost.
-                # We need to slice the args properly.
-                def extract_cost_at_index(analyzed, idx):
-                    """Extract a single Cost from a stacked _AnalyzedCost."""
-                    # Get args for this specific index.
-                    single_args = jax.tree.map(lambda x: x[idx], analyzed.args)
-                    return Cost(
-                        compute_residual=analyzed.compute_residual,
-                        args=single_args,
-                        jac_mode=analyzed.jac_mode,
-                        jac_batch_size=analyzed.jac_batch_size,
-                        jac_custom_fn=analyzed.jac_custom_fn,
-                        jac_custom_with_cache_fn=analyzed.jac_custom_with_cache_fn,
-                        name=analyzed.name,
-                    )
-
-                original_costs.append(extract_cost_at_index(analyzed_cost, i))
-
-        augmented_problem_unanalyzed = LeastSquaresProblem(
-            costs=original_costs + constraint_costs,
-            variables=variables,
-            constraints=(),  # No constraints in augmented problem
-        )
-
-        return augmented_problem_unanalyzed.analyze()
