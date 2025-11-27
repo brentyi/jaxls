@@ -251,7 +251,20 @@ class LeastSquaresProblem:
         )
 
         # Process constraints.
-        constraints = tuple(self.constraints)
+        # Deduplicate compute_constraint functions (same as we do for costs).
+        # This ensures constraints with the same function signature share the same
+        # function object, allowing them to be batched together.
+        compute_constraint_from_hash = dict[Hashable, Callable]()
+        constraints = tuple(
+            jdc.replace(
+                constraint,
+                compute_constraint=compute_constraint_from_hash.setdefault(
+                    _get_function_signature(constraint.compute_constraint),
+                    constraint.compute_constraint,
+                ),
+            )
+            for constraint in self.constraints
+        )
         stacked_constraints = list[_AnalyzedConstraint]()
         constraint_counts = list[int]()
 
@@ -324,17 +337,18 @@ class LeastSquaresProblem:
 
 @jdc.pytree_dataclass
 class AugmentedLagrangianParams:
-    """Parameters for augmented Lagrangian constraint costs.
+    """Parameters for augmented Lagrangian constraint costs (ALGENCAN-style).
 
-    Each constraint group gets its own lagrange multiplier array.
-    The penalty parameter is shared across all constraints.
+    Each constraint group gets its own lagrange multiplier array and
+    per-constraint penalty parameter array.
     """
 
     lagrange_multipliers: tuple[jax.Array, ...]
     """Lagrange multipliers for each constraint group."""
 
-    penalty_param: jax.Array
-    """Penalty parameter (scalar), shared across all constraints."""
+    penalty_params: tuple[jax.Array, ...]
+    """Per-constraint penalty parameters for each constraint group.
+    Each array has shape (constraint_count * constraint_flat_dim,)."""
 
 
 @jdc.pytree_dataclass
@@ -508,6 +522,7 @@ class AnalyzedLeastSquaresProblem:
 
             if is_augmented and self.augmented_lagrangian_params is not None:
                 # Pass AL params to augmented constraint costs
+                # The args include instance_indices as the last element for slicing AL params
                 compute_residual_out = jax.vmap(
                     lambda args: stacked_cost.compute_residual_flat(
                         vals, *args, al_params=self.augmented_lagrangian_params
@@ -594,6 +609,7 @@ class AnalyzedLeastSquaresProblem:
 
                 if is_augmented and self.augmented_lagrangian_params is not None:
                     # Pass AL params when computing Jacobian
+                    # The args include instance_index as the last element for slicing AL params
                     return jacfunc(
                         lambda tangent: cost.compute_residual_flat(
                             val_subset._retract(tangent, self.tangent_ordering),
@@ -1052,14 +1068,19 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             # Use metadata fields instead of parsing name
             constraint_index = cost._al_constraint_index
             total_dim = cost._al_total_dim
+            assert constraint_index is not None and total_dim is not None
 
             # Create dummy AL params with the correct total dimension for this constraint
             dummy_lagrange_mults = [
                 jnp.zeros(total_dim) for _ in range(constraint_index + 1)
             ]
+            # Per-constraint penalties: same structure as multipliers
+            dummy_penalty_params = [
+                jnp.ones(total_dim) for _ in range(constraint_index + 1)
+            ]
             dummy_al_params = AugmentedLagrangianParams(
                 lagrange_multipliers=tuple(dummy_lagrange_mults),
-                penalty_param=jnp.array(1.0),
+                penalty_params=tuple(dummy_penalty_params),
             )
             residual_dim = onp.prod(
                 jax.eval_shape(
@@ -1361,23 +1382,23 @@ def create_augmented_constraint_cost(
     constraint_index: int,
     total_dim: int,
 ) -> Cost:
-    """Create a cost from a constraint for Augmented Lagrangian method.
+    """Create a cost from a constraint for Augmented Lagrangian method (ALGENCAN-style).
 
     This creates a Cost object that converts a constraint into an augmented
-    Lagrangian residual.
+    Lagrangian residual with per-constraint penalty parameters.
 
     For equality constraints h(x) = 0:
-        r = sqrt(ρ) * (h(x) + λ/ρ)
+        r = sqrt(rho_i) * (h(x) + lambda_i/rho_i)
 
-    For inequality constraints g(x) ≤ 0:
-        r = sqrt(ρ) * max(0, g(x) + λ/ρ)
+    For inequality constraints g(x) <= 0:
+        r = sqrt(rho_i) * max(0, g(x) + lambda_i/rho_i)
 
-    where λ (Lagrange multipliers) and ρ (penalty parameter) are passed
-    via the AugmentedLagrangianParams structure.
+    where lambda_i (Lagrange multipliers) and rho_i (per-constraint penalty parameters)
+    are passed via the AugmentedLagrangianParams structure.
 
     Args:
         constraint: The analyzed constraint to convert.
-        constraint_index: Index of this constraint group (for accessing the right lambda array).
+        constraint_index: Index of this constraint group (for accessing the right arrays).
         total_dim: Total dimension of lagrange multipliers for this constraint group
                    (constraint_count * constraint_flat_dim).
 
@@ -1386,32 +1407,57 @@ def create_augmented_constraint_cost(
     """
 
     is_inequality = constraint.constraint_type == "leq_zero"
+    constraint_flat_dim = constraint.constraint_flat_dim
 
     def augmented_residual_fn(
         vals: VarValues,
-        *args,
+        *args_with_index,
         al_params: AugmentedLagrangianParams,
     ) -> jax.Array:
-        """Compute augmented constraint residual."""
+        """Compute augmented constraint residual with per-constraint penalty.
+
+        The last element of args is instance_index, used to slice into the
+        lambdas/rho arrays when this function is vmapped over batched constraints.
+        """
+        # Split args: last element is instance_index, rest are constraint args
+        args = args_with_index[:-1]
+        instance_index = args_with_index[-1]
         constraint_val = constraint.compute_constraint_flat(vals, *args)
-        lambdas = al_params.lagrange_multipliers[constraint_index]
-        penalty_param = al_params.penalty_param
+
+        # Get lambdas/rho for this specific instance
+        # lambdas/rho are stored flat: [inst0_dim0, inst0_dim1, inst1_dim0, inst1_dim1, ...]
+        start_idx = instance_index * constraint_flat_dim
+        lambdas = jax.lax.dynamic_slice(
+            al_params.lagrange_multipliers[constraint_index],
+            (start_idx,),
+            (constraint_flat_dim,),
+        )
+        rho = jax.lax.dynamic_slice(
+            al_params.penalty_params[constraint_index],
+            (start_idx,),
+            (constraint_flat_dim,),
+        )
 
         # For inequality constraints: only penalize when violated (max formulation)
         # For equality constraints: always penalize deviation
         if is_inequality:
-            # g(x) ≤ 0: penalize only when g(x) + λ/ρ > 0
-            return jnp.sqrt(penalty_param) * jnp.maximum(
-                0.0, constraint_val + lambdas / penalty_param
-            )
+            # g(x) <= 0: penalize only when g(x) + lambda/rho > 0
+            return jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
         else:
             # h(x) = 0: always penalize
-            return jnp.sqrt(penalty_param) * (constraint_val + lambdas / penalty_param)
+            return jnp.sqrt(rho) * (constraint_val + lambdas / rho)
+
+    # Determine constraint count from total_dim and flat_dim
+    constraint_count = total_dim // constraint_flat_dim
+
+    # Add instance indices to args for proper slicing during vmap
+    # The args already have batch dimension from the stacked constraint
+    instance_indices = jnp.arange(constraint_count)
 
     # Store metadata for shape inference
     return Cost(
         compute_residual=augmented_residual_fn,  # type: ignore
-        args=constraint.args,
+        args=(*constraint.args, instance_indices),
         name=f"augmented_{constraint._get_name()}",
         _al_constraint_index=constraint_index,
         _al_total_dim=total_dim,

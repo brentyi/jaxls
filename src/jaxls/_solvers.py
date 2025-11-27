@@ -636,23 +636,33 @@ class TerminationConfig:
 
 @jdc.pytree_dataclass
 class AugmentedLagrangianConfig:
-    """Configuration for Augmented Lagrangian method for constrained optimization."""
+    """Configuration for Augmented Lagrangian method for constrained optimization.
+
+    This implementation follows the ALGENCAN algorithm by Birgin & Martinez.
+    Key features:
+    - Per-constraint penalty parameters
+    - Complementarity-based progress measure (snorm)
+    - Safeguarded Lagrange multiplier updates
+    """
 
     penalty_initial: float | jax.Array | jdc.Static[Literal["auto"]] = "auto"
-    """Initial penalty parameter. If 'auto', scales as initial_cost / 100."""
+    """Initial penalty parameter. If 'auto', uses ALGENCAN formula:
+    rho = 10 * max(1, |f|) / max(1, 0.5 * sum(c^2))"""
 
     penalty_factor: float | jax.Array = 10.0
-    """Factor to multiply penalty parameter when constraint violation stagnates.
-    Based on literature, typical values range from 2 to 10."""
+    """Factor to multiply penalty parameter when progress stagnates (rhomult in ALGENCAN)."""
 
-    penalty_max: float | jax.Array = 1e8
-    """Maximum penalty parameter to prevent numerical issues."""
+    penalty_max: float | jax.Array = 1e20
+    """Maximum penalty parameter (rhomax in ALGENCAN)."""
+
+    penalty_min: float | jax.Array = 1e-8
+    """Minimum penalty parameter (rhoinimin in ALGENCAN)."""
 
     tolerance_absolute: float | jax.Array = 1e-6
-    """Absolute tolerance for constraint violation: ||h(x)|| < tol_abs."""
+    """Absolute tolerance for constraint violation: max(snorm, csupn) < tol_abs."""
 
     tolerance_relative: float | jax.Array = 1e-4
-    """Relative tolerance for constraint violation: ||h(x)|| / ||h(x0)|| < tol_rel."""
+    """Relative tolerance for constraint violation: snorm / snorm0 < tol_rel."""
 
     max_iterations: jdc.Static[int] = 50
     """Maximum number of augmented Lagrangian iterations (outer loop)."""
@@ -660,28 +670,42 @@ class AugmentedLagrangianConfig:
     inner_tolerance_factor: float | jax.Array = 0.1
     """Inner NLLS solver tolerance as fraction of current constraint violation."""
 
-    violation_reduction_threshold: float | jax.Array = 0.25
-    """Increase penalty if constraint violation doesn't reduce by this fraction."""
+    violation_reduction_threshold: float | jax.Array = 0.5
+    """Increase penalty if snorm doesn't reduce by this fraction (rhofrac in ALGENCAN).
+    If snorm > rhofrac * snorm_prev, penalty is increased."""
+
+    lambda_min: float | jax.Array = -1e20
+    """Minimum safeguarded Lagrange multiplier (lammin in ALGENCAN)."""
+
+    lambda_max: float | jax.Array = 1e20
+    """Maximum safeguarded Lagrange multiplier (lammax in ALGENCAN)."""
 
 
 @jdc.pytree_dataclass
 class _AugmentedLagrangianState:
-    """State for outer Augmented Lagrangian loop."""
+    """State for outer Augmented Lagrangian loop (ALGENCAN-style)."""
 
     vals: VarValues
     """Current variable values."""
 
     lagrange_multipliers: jax.Array
-    """Lagrange multipliers for each constraint."""
+    """Lagrange multipliers for each constraint (flat array)."""
 
-    penalty_param: float | jax.Array
-    """Current penalty parameter (ρ in literature, μ in ALGENCAN)."""
+    penalty_params: jax.Array
+    """Per-constraint penalty parameters (rho_i). Shape: (constraint_dim,)"""
+
+    snorm: jax.Array
+    """Complementarity measure (ALGENCAN snorm). For equality: |h(x)|,
+    for inequality: |min(-g(x), lambda)|. Uses infinity-norm."""
+
+    snorm_prev: jax.Array
+    """Previous snorm for progress checking."""
 
     constraint_violation: jax.Array
-    """Current constraint violation ||h(x)||."""
+    """Current constraint violation max|h(x)| (csupn in ALGENCAN, infinity-norm)."""
 
-    initial_violation: jax.Array
-    """Initial constraint violation ||h(x0)|| for relative tolerance."""
+    initial_snorm: jax.Array
+    """Initial snorm for relative tolerance."""
 
     outer_iteration: int
     """Current outer iteration number."""
@@ -694,7 +718,7 @@ class _AugmentedLagrangianState:
     """History of constraint violations. Shape: (max_outer_iterations,)"""
 
     penalty_history: jax.Array
-    """History of penalty parameters. Shape: (max_outer_iterations,)"""
+    """History of max penalty parameter. Shape: (max_outer_iterations,)"""
 
     inner_iterations_count: jax.Array
     """Number of inner iterations per outer iteration. Shape: (max_outer_iterations,)"""
@@ -811,13 +835,15 @@ class AugmentedLagrangianSolver:
             variables=variables,
         ).analyze()
 
-        # Initialize AL params with zeros (will be updated in loop)
+        # Initialize AL params with zeros/ones (will be updated in loop)
         from ._core import AugmentedLagrangianParams
 
         lagrange_mult_arrays = tuple(jnp.zeros(dim) for dim in constraint_dims)
+        # Per-constraint penalties: one penalty value per constraint element
+        penalty_param_arrays = tuple(jnp.ones(dim) for dim in constraint_dims)
         al_params = AugmentedLagrangianParams(
             lagrange_multipliers=lagrange_mult_arrays,
-            penalty_param=jnp.array(1.0),
+            penalty_params=penalty_param_arrays,
         )
 
         augmented = jdc.replace(augmented, augmented_lagrangian_params=al_params)
@@ -854,7 +880,7 @@ class AugmentedLagrangianSolver:
         initial_vals: VarValues,
         return_summary: jdc.Static[bool] = False,
     ) -> VarValues | tuple[VarValues, SolveSummary]:
-        """Solve constrained optimization problem using Augmented Lagrangian.
+        """Solve constrained optimization problem using Augmented Lagrangian (ALGENCAN-style).
 
         Args:
             problem: The analyzed least squares problem with constraints.
@@ -870,37 +896,75 @@ class AugmentedLagrangianSolver:
             "Use NonlinearSolver for unconstrained problems."
         )
 
-        # Compute initial constraint violation.
+        # Compute initial constraint values.
         h_vals = problem.compute_constraint_values(initial_vals)
         constraint_dim = len(h_vals)
-        initial_violation = jnp.linalg.norm(h_vals)
 
         # Initialize Lagrange multipliers (zeros, as recommended by literature).
         lagrange_multipliers = jnp.zeros(constraint_dim)
 
-        # Initialize penalty parameter.
+        # Compute initial snorm (complementarity measure) and csupn (constraint violation).
+        # For initial state, lambdas are zero, so snorm = csupn for equalities,
+        # and snorm = |min(-g, 0)| = |max(g, 0)| for violated inequalities.
+        initial_snorm, initial_csupn = self._compute_snorm_csupn(
+            problem, h_vals, lagrange_multipliers
+        )
+
+        # Initialize penalty parameter using ALGENCAN formula.
         if self.config.penalty_initial == "auto":
-            # Auto-scale based on initial cost.
+            # ALGENCAN formula: rho = 10 * max(1, |f|) / max(1, 0.5 * sum(c^2))
             residual_vector_result = problem.compute_residual_vector(initial_vals)
             if isinstance(residual_vector_result, tuple):
                 residual_vector = residual_vector_result[0]
             else:
                 residual_vector = residual_vector_result
             initial_cost = jnp.sum(residual_vector**2)
-            penalty_param = initial_cost / 100.0
+
+            # Compute sum of squared constraint violations
+            # For inequalities, only count violated constraints (g > 0)
+            sum_c_squared = jnp.array(0.0)
+            offset = 0
+            for i, stacked_constraint in enumerate(problem.stacked_constraints):
+                constraint_count = problem.constraint_counts[i]
+                constraint_flat_dim = stacked_constraint.constraint_flat_dim
+                total_dim = constraint_count * constraint_flat_dim
+                h_slice = h_vals[offset : offset + total_dim]
+
+                if stacked_constraint.constraint_type == "leq_zero":
+                    # Only count violated inequalities
+                    sum_c_squared = sum_c_squared + jnp.sum(
+                        0.5 * jnp.maximum(0.0, h_slice) ** 2
+                    )
+                else:
+                    # Count all equality constraint values
+                    sum_c_squared = sum_c_squared + jnp.sum(0.5 * h_slice**2)
+                offset += total_dim
+
+            penalty_initial = (
+                10.0
+                * jnp.maximum(1.0, jnp.abs(initial_cost))
+                / jnp.maximum(1.0, sum_c_squared)
+            )
+            penalty_initial = jnp.clip(
+                penalty_initial, self.config.penalty_min, self.config.penalty_max
+            )
         else:
-            penalty_param = self.config.penalty_initial
+            penalty_initial = self.config.penalty_initial
+
+        # Initialize per-constraint penalties (all same initially).
+        penalty_params = jnp.full(constraint_dim, penalty_initial)
 
         # PRE-ANALYZE augmented problem structure ONCE (major optimization!)
         # This converts constraints to parameterized costs and analyzes the combined problem.
-        # The structure is fixed; only lagrange_multipliers and penalty_param will vary.
+        # The structure is fixed; only lagrange_multipliers and penalty_params will vary.
         augmented_structure = self._analyze_augmented_problem(problem, constraint_dim)
 
         if self.verbose:
             jax_log(
-                "Augmented Lagrangian: initial violation={violation:.4e}, penalty={penalty:.4e}, constraint_dim={dim}",
-                violation=initial_violation,
-                penalty=penalty_param,
+                "Augmented Lagrangian: initial snorm={snorm:.4e}, csupn={csupn:.4e}, penalty={penalty:.4e}, constraint_dim={dim}",
+                snorm=initial_snorm,
+                csupn=initial_csupn,
+                penalty=penalty_initial,
                 dim=constraint_dim,
             )
 
@@ -908,10 +972,10 @@ class AugmentedLagrangianSolver:
         max_outer = self.config.max_iterations
         constraint_violation_history = jnp.zeros(max_outer)
         constraint_violation_history = constraint_violation_history.at[0].set(
-            initial_violation
+            initial_csupn
         )
         penalty_history = jnp.zeros(max_outer)
-        penalty_history = penalty_history.at[0].set(penalty_param)
+        penalty_history = penalty_history.at[0].set(penalty_initial)
         inner_iterations_count = jnp.zeros(max_outer, dtype=jnp.int32)
 
         # Pre-allocate inner_summary with fixed-size arrays based on inner solver max iterations.
@@ -928,9 +992,11 @@ class AugmentedLagrangianSolver:
         state = _AugmentedLagrangianState(
             vals=initial_vals,
             lagrange_multipliers=lagrange_multipliers,
-            penalty_param=penalty_param,
-            constraint_violation=initial_violation,
-            initial_violation=initial_violation,
+            penalty_params=penalty_params,
+            snorm=initial_snorm,
+            snorm_prev=initial_snorm,  # Set prev = current initially
+            constraint_violation=initial_csupn,
+            initial_snorm=initial_snorm,
             outer_iteration=0,
             inner_summary=initial_summary,
             constraint_violation_history=constraint_violation_history,
@@ -940,17 +1006,27 @@ class AugmentedLagrangianSolver:
 
         # Run outer loop using while_loop for JIT compilation.
         def cond_fn(state: _AugmentedLagrangianState) -> jax.Array:
-            """Continue if not converged and under max iterations."""
+            """Continue if not converged and under max iterations.
+
+            ALGENCAN convergence: max(snorm, csupn) <= tol_abs AND snorm/snorm0 < tol_rel
+
+            We always run at least one iteration to optimize the cost even when
+            constraints are initially satisfied (e.g., inactive inequality constraints).
+            """
+            # Always run at least one iteration
+            first_iteration = state.outer_iteration < 1
+
             converged_absolute = (
-                state.constraint_violation < self.config.tolerance_absolute
+                jnp.maximum(state.snorm, state.constraint_violation)
+                < self.config.tolerance_absolute
             )
             converged_relative = (
-                state.constraint_violation / state.initial_violation
+                state.snorm / (state.initial_snorm + 1e-10)
                 < self.config.tolerance_relative
             )
             converged = converged_absolute & converged_relative
             under_max_iters = state.outer_iteration < self.config.max_iterations
-            return ~converged & under_max_iters
+            return (first_iteration | ~converged) & under_max_iters
 
         def body_fn(state: _AugmentedLagrangianState) -> _AugmentedLagrangianState:
             """Perform one outer iteration."""
@@ -959,23 +1035,28 @@ class AugmentedLagrangianSolver:
         state = jax.lax.while_loop(cond_fn, body_fn, state)
 
         # Check final convergence for logging.
-        converged_absolute = state.constraint_violation < self.config.tolerance_absolute
+        converged_absolute = (
+            jnp.maximum(state.snorm, state.constraint_violation)
+            < self.config.tolerance_absolute
+        )
         converged_relative = (
-            state.constraint_violation / state.initial_violation
+            state.snorm / (state.initial_snorm + 1e-10)
             < self.config.tolerance_relative
         )
 
         if self.verbose:
             if converged_absolute and converged_relative:
                 jax_log(
-                    "Augmented Lagrangian converged @ outer iteration {i}: violation={violation:.4e}",
+                    "Augmented Lagrangian converged @ outer iteration {i}: snorm={snorm:.4e}, csupn={csupn:.4e}",
                     i=state.outer_iteration,
-                    violation=state.constraint_violation,
+                    snorm=state.snorm,
+                    csupn=state.constraint_violation,
                 )
             else:
                 jax_log(
-                    "Augmented Lagrangian: max iterations reached. Final violation={violation:.4e}",
-                    violation=state.constraint_violation,
+                    "Augmented Lagrangian: max iterations reached. Final snorm={snorm:.4e}, csupn={csupn:.4e}",
+                    snorm=state.snorm,
+                    csupn=state.constraint_violation,
                 )
 
         if return_summary:
@@ -983,13 +1064,61 @@ class AugmentedLagrangianSolver:
         else:
             return state.vals
 
+    def _compute_snorm_csupn(
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        h_vals: jax.Array,
+        lagrange_multipliers: jax.Array,
+    ) -> tuple[jax.Array, jax.Array]:
+        """Compute ALGENCAN's complementarity measure (snorm) and constraint violation (csupn).
+
+        snorm: For equality: |h(x)|, for inequality: |min(-g(x), lambda)|
+        csupn: max|h(x)| for equalities, max(0, g(x)) for inequalities
+
+        Both use infinity-norm.
+        """
+        snorm_parts = []
+        csupn_parts = []
+        offset = 0
+
+        for i, stacked_constraint in enumerate(problem.stacked_constraints):
+            constraint_count = problem.constraint_counts[i]
+            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+            h_slice = h_vals[offset : offset + total_dim]
+            lambda_slice = lagrange_multipliers[offset : offset + total_dim]
+
+            if stacked_constraint.constraint_type == "leq_zero":
+                # Inequality g(x) <= 0
+                # snorm: KKT complementarity |min(-g(x), lambda)|
+                comp = jnp.minimum(-h_slice, lambda_slice)
+                snorm_parts.append(jnp.max(jnp.abs(comp)))
+                # csupn: violation max(0, g(x))
+                csupn_parts.append(jnp.max(jnp.maximum(0.0, h_slice)))
+            else:
+                # Equality h(x) = 0
+                # snorm = |h(x)|
+                snorm_parts.append(jnp.max(jnp.abs(h_slice)))
+                # csupn = |h(x)|
+                csupn_parts.append(jnp.max(jnp.abs(h_slice)))
+
+            offset += total_dim
+
+        # Handle empty case
+        if len(snorm_parts) == 0:
+            return jnp.array(0.0), jnp.array(0.0)
+
+        snorm = jnp.max(jnp.array(snorm_parts))
+        csupn = jnp.max(jnp.array(csupn_parts))
+        return snorm, csupn
+
     def _step(
         self,
         problem: AnalyzedLeastSquaresProblem,
         augmented_structure: AnalyzedLeastSquaresProblem,
         state: _AugmentedLagrangianState,
     ) -> _AugmentedLagrangianState:
-        """Perform one outer iteration of the Augmented Lagrangian method.
+        """Perform one outer iteration of the Augmented Lagrangian method (ALGENCAN-style).
 
         Args:
             problem: Original problem with constraints (for constraint evaluation).
@@ -1000,23 +1129,26 @@ class AugmentedLagrangianSolver:
             Updated state after one outer iteration.
         """
         # Update AL params in the pre-analyzed augmented problem.
-        # Split flat lagrange_multipliers into tuple of arrays for each constraint group.
+        # Split flat arrays into tuple of arrays for each constraint group.
         from ._core import AugmentedLagrangianParams
 
+        assert augmented_structure.augmented_lagrangian_params is not None
         lambda_arrays = []
-        lambda_offset = 0
+        penalty_arrays = []
+        offset = 0
         for (
             lambda_array
         ) in augmented_structure.augmented_lagrangian_params.lagrange_multipliers:
             dim = lambda_array.shape[0]
             lambda_arrays.append(
-                state.lagrange_multipliers[lambda_offset : lambda_offset + dim]
+                state.lagrange_multipliers[offset : offset + dim]
             )
-            lambda_offset += dim
+            penalty_arrays.append(state.penalty_params[offset : offset + dim])
+            offset += dim
 
         al_params = AugmentedLagrangianParams(
             lagrange_multipliers=tuple(lambda_arrays),
-            penalty_param=state.penalty_param,
+            penalty_params=tuple(penalty_arrays),
         )
 
         augmented_problem = jdc.replace(
@@ -1025,10 +1157,8 @@ class AugmentedLagrangianSolver:
         )
 
         # Solve inner unconstrained problem.
-        # Adjust inner solver tolerance based on constraint violation.
-        inner_tolerance = (
-            self.config.inner_tolerance_factor * state.constraint_violation
-        )
+        # Adjust inner solver tolerance based on snorm (ALGENCAN uses snorm for this).
+        inner_tolerance = self.config.inner_tolerance_factor * state.snorm
         inner_termination = jdc.replace(
             self.inner_solver.termination,
             cost_tolerance=jnp.maximum(inner_tolerance, 1e-8),
@@ -1045,77 +1175,98 @@ class AugmentedLagrangianSolver:
 
         # Evaluate constraints at new solution using ORIGINAL problem
         h_vals = problem.compute_constraint_values(vals_updated)
-        constraint_violation = jnp.linalg.norm(h_vals)
 
-        # Update Lagrange multipliers: λ_new = λ_old + ρ * h(x)
-        # For inequality constraints, project multipliers to be non-negative
+        # Update Lagrange multipliers: lambda_new = lambda_old + rho_i * h(x)
+        # Use per-constraint penalty parameters
         lagrange_multipliers_updated = (
-            state.lagrange_multipliers + state.penalty_param * h_vals
+            state.lagrange_multipliers + state.penalty_params * h_vals
         )
 
-        # Project inequality constraint multipliers to be non-negative
-        # For each constraint group, check if it's an inequality and project if needed
-        lambda_offset = 0
+        # Project inequality constraint multipliers to be non-negative,
+        # then apply safeguard bounds [lambda_min, lambda_max]
+        offset = 0
         lambda_arrays_projected = []
         for i, stacked_constraint in enumerate(problem.stacked_constraints):
             constraint_count = problem.constraint_counts[i]
             constraint_flat_dim = stacked_constraint.constraint_flat_dim
             total_dim = constraint_count * constraint_flat_dim
 
-            lambda_slice = lagrange_multipliers_updated[
-                lambda_offset : lambda_offset + total_dim
-            ]
+            lambda_slice = lagrange_multipliers_updated[offset : offset + total_dim]
 
             # For inequality constraints, multipliers must be non-negative
             if stacked_constraint.constraint_type == "leq_zero":
                 lambda_slice = jnp.maximum(0.0, lambda_slice)
 
+            # Apply safeguard bounds (ALGENCAN lammin/lammax)
+            lambda_slice = jnp.clip(
+                lambda_slice, self.config.lambda_min, self.config.lambda_max
+            )
+
             lambda_arrays_projected.append(lambda_slice)
-            lambda_offset += total_dim
+            offset += total_dim
 
         lagrange_multipliers_updated = jnp.concatenate(lambda_arrays_projected)
 
-        # Update penalty parameter if constraint violation didn't decrease enough.
-        violation_reduction = (state.constraint_violation - constraint_violation) / (
-            state.constraint_violation + 1e-10
+        # Compute snorm (complementarity) and csupn (constraint violation) at new point
+        snorm_new, csupn_new = self._compute_snorm_csupn(
+            problem, h_vals, lagrange_multipliers_updated
         )
-        penalty_updated = jnp.where(
-            violation_reduction < self.config.violation_reduction_threshold,
+
+        # ALGENCAN-style penalty update based on snorm progress.
+        # If snorm > rhofrac * snorm_prev (less than 50% improvement), increase penalty.
+        insufficient_progress = (
+            snorm_new > self.config.violation_reduction_threshold * state.snorm_prev
+        )
+
+        # Rhorestart: check if inner solver hit max iterations without good convergence.
+        # This indicates the inner problem was difficult, so we increase penalty more.
+        inner_hit_max_iters = inner_summary.termination_criteria[3]  # max_iterations flag
+        inner_made_progress = inner_summary.termination_criteria[0]  # cost_tolerance flag
+
+        # If inner solver failed (hit max iters without converging), do rhorestart
+        rhorestart_needed = inner_hit_max_iters & ~inner_made_progress
+
+        # Update per-constraint penalties
+        penalty_params_updated = jnp.where(
+            insufficient_progress | rhorestart_needed,
             jnp.minimum(
-                state.penalty_param * self.config.penalty_factor,
+                state.penalty_params * self.config.penalty_factor,
                 self.config.penalty_max,
             ),
-            state.penalty_param,
+            state.penalty_params,
         )
 
         if self.verbose:
             jax_log(
-                " AL outer iter {i}: violation={violation:.4e}, penalty={penalty:.4e}, inner_iters={inner_iters}, reduction={reduction:.2%}",
+                " AL outer iter {i}: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}, inner_iters={inner_iters}",
                 i=state.outer_iteration,
-                violation=constraint_violation,
-                penalty=penalty_updated,
+                snorm=snorm_new,
+                csupn=csupn_new,
+                max_rho=jnp.max(penalty_params_updated),
                 inner_iters=inner_summary.iterations,
-                reduction=violation_reduction,
                 ordered=True,
             )
 
-        # Update state. We cannot use copy_and_mutate for inner_summary because
-        # it contains variable-length history arrays. Instead, we use jdc.replace.
+        # Update state.
         next_idx = state.outer_iteration + 1
 
         return jdc.replace(
             state,
             vals=vals_updated,
             lagrange_multipliers=lagrange_multipliers_updated,
-            penalty_param=penalty_updated,
-            constraint_violation=constraint_violation,
+            penalty_params=penalty_params_updated,
+            snorm=snorm_new,
+            snorm_prev=state.snorm,  # Current snorm becomes prev for next iteration
+            constraint_violation=csupn_new,
             outer_iteration=state.outer_iteration + 1,
             inner_summary=inner_summary,
             # Update history arrays with indexed writes for JIT compatibility.
             constraint_violation_history=state.constraint_violation_history.at[
                 next_idx
-            ].set(constraint_violation),
-            penalty_history=state.penalty_history.at[next_idx].set(penalty_updated),
+            ].set(csupn_new),
+            penalty_history=state.penalty_history.at[next_idx].set(
+                jnp.max(penalty_params_updated)
+            ),
             inner_iterations_count=state.inner_iterations_count.at[next_idx].set(
                 inner_summary.iterations
             ),

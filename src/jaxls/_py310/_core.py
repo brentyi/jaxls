@@ -205,7 +205,20 @@ class LeastSquaresProblem:
             shape=(residual_dim_sum, tangent_dim_sum),
         )
 
-        constraints = tuple(self.constraints)
+        # Deduplicate compute_constraint functions (same as we do for costs).
+        # This ensures constraints with the same function signature share the same
+        # function object, allowing them to be batched together.
+        compute_constraint_from_hash: dict = dict()
+        constraints = tuple(
+            jdc.replace(
+                constraint,
+                compute_constraint=compute_constraint_from_hash.setdefault(
+                    _get_function_signature(constraint.compute_constraint),
+                    constraint.compute_constraint,
+                ),
+            )
+            for constraint in self.constraints
+        )
         stacked_constraints = list()
         constraint_counts = list()
 
@@ -910,26 +923,45 @@ def create_augmented_constraint_cost(
     total_dim: Any,
 ) -> Any:
     is_inequality = constraint.constraint_type == "leq_zero"
+    constraint_flat_dim = constraint.constraint_flat_dim
 
     def augmented_residual_fn(
         vals: Any,
-        *args,
+        *args_with_index,
         al_params: Any,
     ) -> Any:
+        # Split args: last element is instance_index, rest are constraint args
+        args = args_with_index[:-1]
+        instance_index = args_with_index[-1]
         constraint_val = constraint.compute_constraint_flat(vals, *args)
-        lambdas = al_params.lagrange_multipliers[constraint_index]
-        penalty_param = al_params.penalty_param
+
+        # Get lambdas/rho for this specific instance
+        start_idx = instance_index * constraint_flat_dim
+        lambdas = jax.lax.dynamic_slice(
+            al_params.lagrange_multipliers[constraint_index],
+            (start_idx,),
+            (constraint_flat_dim,),
+        )
+        rho = jax.lax.dynamic_slice(
+            al_params.penalty_params[constraint_index],
+            (start_idx,),
+            (constraint_flat_dim,),
+        )
 
         if is_inequality:
-            return jnp.sqrt(penalty_param) * jnp.maximum(
-                0.0, constraint_val + lambdas / penalty_param
-            )
+            return jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
         else:
-            return jnp.sqrt(penalty_param) * (constraint_val + lambdas / penalty_param)
+            return jnp.sqrt(rho) * (constraint_val + lambdas / rho)
+
+    # Determine constraint count from total_dim and flat_dim
+    constraint_count = total_dim // constraint_flat_dim
+
+    # Add instance indices to args for proper slicing during vmap
+    instance_indices = jnp.arange(constraint_count)
 
     return Cost(
         compute_residual=augmented_residual_fn,
-        args=constraint.args,
+        args=(*constraint.args, instance_indices),
         name=f"augmented_{constraint._get_name()}",
         _al_constraint_index=constraint_index,
         _al_total_dim=total_dim,
