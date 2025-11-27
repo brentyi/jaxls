@@ -13,6 +13,8 @@ from loguru import logger
 from typing_extensions import deprecated
 
 from ._solvers import (
+    AugmentedLagrangianConfig,
+    AugmentedLagrangianSolver,
     ConjugateGradientConfig,
     NonlinearSolver,
     TerminationConfig,
@@ -49,6 +51,7 @@ def _get_function_signature(func: Any) -> Any:
 class LeastSquaresProblem:
     costs: Any
     variables: Any
+    constraints: Any = ()
 
     def analyze(self, use_onp: Any = False) -> Any:
         if use_onp:
@@ -201,6 +204,58 @@ class LeastSquaresProblem:
             indptr=csr_indptr,
             shape=(residual_dim_sum, tangent_dim_sum),
         )
+
+        constraints = tuple(self.constraints)
+        stacked_constraints = list()
+        constraint_counts = list()
+
+        if len(constraints) > 0:
+            constraints_from_group = dict()
+            constraint_count_from_group = dict()
+            for constraint in constraints:
+                constraint = constraint._broadcast_batch_axes()
+                batch_axes = constraint._get_batch_axes()
+
+                group_key: Any = (
+                    jax.tree.structure(constraint),
+                    tuple(
+                        leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
+                        for leaf in jax.tree.leaves(constraint)
+                    ),
+                )
+                constraints_from_group.setdefault(group_key, [])
+                constraint_count_from_group.setdefault(group_key, 0)
+
+                if len(batch_axes) == 0:
+                    constraint = jax.tree.map(
+                        lambda x: jnp.asarray(x)[None], constraint
+                    )
+                    constraint_count_from_group[group_key] += 1
+                else:
+                    assert len(batch_axes) == 1
+                    constraint_count_from_group[group_key] += batch_axes[0]
+
+                constraints_from_group[group_key].append(constraint)
+
+            for group_key in sorted(constraints_from_group.keys(), key=_sort_key):
+                group = constraints_from_group[group_key]
+
+                stacked_constraint: Any = jax.tree.map(
+                    lambda *args: jnp.concatenate(args, axis=0), *group
+                )
+                stacked_constraint_expanded: Any = jax.vmap(_AnalyzedConstraint._make)(
+                    stacked_constraint
+                )
+                stacked_constraints.append(stacked_constraint_expanded)
+                constraint_counts.append(constraint_count_from_group[group_key])
+
+                logger.info(
+                    "Vectorizing constraint group with {} constraints, {} variables each: {}",
+                    constraint_count_from_group[group_key],
+                    stacked_constraints[-1].num_variables,
+                    stacked_constraints[-1]._get_name(),
+                )
+
         return AnalyzedLeastSquaresProblem(
             stacked_costs=tuple(stacked_costs),
             cost_counts=tuple(cost_counts),
@@ -211,7 +266,16 @@ class LeastSquaresProblem:
             tangent_start_from_var_type=tangent_start_from_var_type,
             tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
+            stacked_constraints=tuple(stacked_constraints),
+            constraint_counts=tuple(constraint_counts),
         )
+
+
+@jdc.pytree_dataclass
+class AugmentedLagrangianParams:
+    lagrange_multipliers: Any
+
+    penalty_param: Any
 
 
 @jdc.pytree_dataclass
@@ -225,6 +289,9 @@ class AnalyzedLeastSquaresProblem:
     tangent_start_from_var_type: jdc.Static[Any]
     tangent_dim: jdc.Static[Any]
     residual_dim: jdc.Static[Any]
+    stacked_constraints: Any = ()
+    constraint_counts: jdc.Static[Any] = ()
+    augmented_lagrangian_params: Any = None
 
     def solve(
         self,
@@ -235,6 +302,7 @@ class AnalyzedLeastSquaresProblem:
         termination: Any = TerminationConfig(),
         sparse_mode: Any = "blockrow",
         verbose: Any = True,
+        augmented_lagrangian: Any = None,
         return_summary: Any = False,
     ) -> Any:
         if initial_vals is None:
@@ -242,30 +310,71 @@ class AnalyzedLeastSquaresProblem:
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
 
-        conjugate_gradient_config = None
-        if isinstance(linear_solver, ConjugateGradientConfig):
-            conjugate_gradient_config = linear_solver
-            linear_solver = "conjugate_gradient"
+        has_constraints = len(self.stacked_constraints) > 0
 
-        solver = NonlinearSolver(
-            linear_solver,
-            trust_region,
-            termination,
-            conjugate_gradient_config,
-            sparse_mode,
-            verbose,
-        )
-        return solver.solve(
-            problem=self, initial_vals=initial_vals, return_summary=return_summary
-        )
+        if has_constraints:
+            if augmented_lagrangian is None:
+                augmented_lagrangian = AugmentedLagrangianConfig()
+
+            conjugate_gradient_config = None
+            if isinstance(linear_solver, ConjugateGradientConfig):
+                conjugate_gradient_config = linear_solver
+                linear_solver = "conjugate_gradient"
+
+            inner_solver = NonlinearSolver(
+                linear_solver,
+                trust_region,
+                termination,
+                conjugate_gradient_config,
+                sparse_mode,
+                verbose,
+            )
+
+            al_solver = AugmentedLagrangianSolver(
+                config=augmented_lagrangian,
+                inner_solver=inner_solver,
+                verbose=verbose,
+            )
+
+            return al_solver.solve(
+                problem=self, initial_vals=initial_vals, return_summary=return_summary
+            )
+        else:
+            conjugate_gradient_config = None
+            if isinstance(linear_solver, ConjugateGradientConfig):
+                conjugate_gradient_config = linear_solver
+                linear_solver = "conjugate_gradient"
+
+            solver = NonlinearSolver(
+                linear_solver,
+                trust_region,
+                termination,
+                conjugate_gradient_config,
+                sparse_mode,
+                verbose,
+            )
+            return solver.solve(
+                problem=self, initial_vals=initial_vals, return_summary=return_summary
+            )
 
     def compute_residual_vector(self, vals: Any, include_jac_cache: Any = False) -> Any:
         residual_slices = list()
         jac_cache = list()
         for stacked_cost in self.stacked_costs:
-            compute_residual_out = jax.vmap(
-                lambda args: stacked_cost.compute_residual_flat(vals, *args)
-            )(stacked_cost.args)
+            is_augmented = (
+                stacked_cost.name is not None and "augmented_" in stacked_cost.name
+            )
+
+            if is_augmented and self.augmented_lagrangian_params is not None:
+                compute_residual_out = jax.vmap(
+                    lambda args: stacked_cost.compute_residual_flat(
+                        vals, *args, al_params=self.augmented_lagrangian_params
+                    )
+                )(stacked_cost.args)
+            else:
+                compute_residual_out = jax.vmap(
+                    lambda args: stacked_cost.compute_residual_flat(vals, *args)
+                )(stacked_cost.args)
 
             if isinstance(compute_residual_out, tuple):
                 assert len(compute_residual_out) == 2
@@ -280,6 +389,19 @@ class AnalyzedLeastSquaresProblem:
             return jnp.concatenate(residual_slices, axis=0), tuple(jac_cache)
         else:
             return jnp.concatenate(residual_slices, axis=0)
+
+    def compute_constraint_values(self, vals: Any) -> Any:
+        if len(self.stacked_constraints) == 0:
+            return jnp.array([])
+
+        constraint_slices = list()
+        for stacked_constraint in self.stacked_constraints:
+            constraint_vals = jax.vmap(
+                lambda args: stacked_constraint.compute_constraint_flat(vals, *args)
+            )(stacked_constraint.args)
+            constraint_slices.append(constraint_vals.reshape((-1,)))
+
+        return jnp.concatenate(constraint_slices, axis=0)
 
     def _compute_jac_values(self, vals: Any, jac_cache: Any) -> Any:
         block_rows = list()
@@ -314,12 +436,24 @@ class AnalyzedLeastSquaresProblem:
                     if cost.residual_flat_dim < val_subset._get_tangent_dim()
                     else jax.jacfwd,
                 }[cost.jac_mode]
-                return jacfunc(
-                    lambda tangent: cost.compute_residual_flat(
-                        val_subset._retract(tangent, self.tangent_ordering),
-                        *cost.args,
-                    )
-                )(jnp.zeros((val_subset._get_tangent_dim(),)))
+
+                is_augmented = cost.name is not None and "augmented_" in cost.name
+
+                if is_augmented and self.augmented_lagrangian_params is not None:
+                    return jacfunc(
+                        lambda tangent: cost.compute_residual_flat(
+                            val_subset._retract(tangent, self.tangent_ordering),
+                            *cost.args,
+                            al_params=self.augmented_lagrangian_params,
+                        )
+                    )(jnp.zeros((val_subset._get_tangent_dim(),)))
+                else:
+                    return jacfunc(
+                        lambda tangent: cost.compute_residual_flat(
+                            val_subset._retract(tangent, self.tangent_ordering),
+                            *cost.args,
+                        )
+                    )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
             optional_jac_cache_i = (jac_cache[i],) if jac_cache[i] is not None else ()
 
@@ -404,6 +538,9 @@ class Cost:
     jac_custom_with_cache_fn: jdc.Static[Any] = None
 
     name: jdc.Static[Any] = None
+
+    _al_constraint_index: jdc.Static[Any] = None
+    _al_total_dim: jdc.Static[Any] = None
 
     def _get_name(self) -> Any:
         if self.name is None:
@@ -528,8 +665,8 @@ class _AnalyzedCost(Cost[Any]):
     sorted_ids_from_var_type: Any
     residual_flat_dim: jdc.Static[Any] = 0
 
-    def compute_residual_flat(self, vals: Any, *args: Any) -> Any:
-        out = self.compute_residual(vals, *args)
+    def compute_residual_flat(self, vals: Any, *args: Any, **kwargs) -> Any:
+        out = self.compute_residual(vals, *args, **kwargs)
 
         if isinstance(out, tuple):
             assert len(out) == 2
@@ -564,9 +701,32 @@ class _AnalyzedCost(Cost[Any]):
                 return residual_out
 
         dummy_vals = jax.eval_shape(VarValues.make, variables)
-        residual_dim = onp.prod(
-            jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
-        )
+
+        is_augmented = cost._al_constraint_index is not None
+
+        if is_augmented:
+            constraint_index = cost._al_constraint_index
+            total_dim = cost._al_total_dim
+
+            dummy_lagrange_mults = [
+                jnp.zeros(total_dim) for _ in range(constraint_index + 1)
+            ]
+            dummy_al_params = AugmentedLagrangianParams(
+                lagrange_multipliers=tuple(dummy_lagrange_mults),
+                penalty_param=jnp.array(1.0),
+            )
+            residual_dim = onp.prod(
+                jax.eval_shape(
+                    _residual_no_cache,
+                    dummy_vals,
+                    *cost.args,
+                    al_params=dummy_al_params,
+                ).shape
+            )
+        else:
+            residual_dim = onp.prod(
+                jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
+            )
 
         return _AnalyzedCost(
             **vars(cost),
@@ -602,3 +762,175 @@ class _AnalyzedCost(Cost[Any]):
             indexing="ij",
         )
         return rows, cols
+
+
+@jdc.pytree_dataclass
+class Constraint:
+    @classmethod
+    def __class_getitem__(cls, params):
+        return cls
+
+    compute_constraint: jdc.Static[Any]
+
+    args: Any
+
+    constraint_type: jdc.Static[Any]
+
+    name: jdc.Static[Any] = None
+
+    def _get_name(self) -> Any:
+        if self.name is None:
+            return self.compute_constraint.__name__
+        return self.name
+
+    @staticmethod
+    def create_factory(
+        compute_constraint: Any = None,
+        *,
+        constraint_type: Any = "eq_zero",
+        name: Any = None,
+    ) -> Any:
+        def decorator(
+            compute_constraint: Any,
+        ) -> Any:
+            def inner(*args: Any, **kwargs: Any) -> Any:
+                return Constraint(
+                    compute_constraint=lambda values, args, kwargs: compute_constraint(
+                        values, *args, **kwargs
+                    ),
+                    args=(args, kwargs),
+                    constraint_type=constraint_type,
+                    name=name if name is not None else compute_constraint.__name__,
+                )
+
+            return inner
+
+        if compute_constraint is None:
+            return decorator
+        return decorator(compute_constraint)
+
+    def _get_variables(self) -> Any:
+        def get_variables(current: Any) -> Any:
+            children_and_meta = default_registry.flatten_one_level(current)
+            if children_and_meta is None:
+                return []
+
+            variables = []
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    variables.append(child)
+                else:
+                    variables.extend(get_variables(child))
+            return variables
+
+        return tuple(get_variables(self.args))
+
+    def _get_batch_axes(self) -> Any:
+        variables = self._get_variables()
+        assert len(variables) != 0, "No variables found in constraint!"
+        return jnp.broadcast_shapes(
+            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
+        )
+
+    def _broadcast_batch_axes(self) -> Any:
+        batch_axes = self._get_batch_axes()
+        if batch_axes is None:
+            return self
+        leaves, treedef = jax.tree.flatten(self)
+        broadcasted_leaves = []
+        for leaf in leaves:
+            if isinstance(leaf, (int, float)):
+                leaf = jnp.array(leaf)
+            try:
+                broadcasted_leaf = jnp.broadcast_to(
+                    leaf, batch_axes + leaf.shape[len(batch_axes) :]
+                )
+            except ValueError as e:
+                error_msg = (
+                    f"{str(e)}\n"
+                    f"Constraint name: '{self._get_name()}'\n"
+                    f"Detected batch axes: {batch_axes}\n"
+                    f"Flattened argument shapes: {[getattr(x, 'shape', ()) for x in leaves]}\n"
+                    f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
+                )
+                raise ValueError(error_msg) from e
+            broadcasted_leaves.append(broadcasted_leaf)
+        return jax.tree.unflatten(treedef, broadcasted_leaves)
+
+
+@jdc.pytree_dataclass(kw_only=True)
+class _AnalyzedConstraint(Constraint[Any]):
+    @classmethod
+    def __class_getitem__(cls, params):
+        return cls
+
+    num_variables: jdc.Static[Any]
+    sorted_ids_from_var_type: Any
+    constraint_flat_dim: jdc.Static[Any] = 0
+
+    def compute_constraint_flat(self, vals: Any, *args: Any) -> Any:
+        out = self.compute_constraint(vals, *args)
+
+        return out.flatten()
+
+    @staticmethod
+    @jdc.jit
+    def _make(constraint: Any) -> Any:
+        variables = constraint._get_variables()
+        assert len(variables) > 0
+
+        if not isinstance(variables[0].id, int):
+            batch_axes = variables[0].id.shape
+            assert len(batch_axes) in (0, 1)
+            for var in variables[1:]:
+                assert (
+                    () if isinstance(var.id, int) else var.id.shape
+                ) == batch_axes, "Batch axes of variables do not match."
+            if len(batch_axes) == 1:
+                return jax.vmap(_AnalyzedConstraint._make)(constraint)
+
+        dummy_vals = jax.eval_shape(VarValues.make, variables)
+        constraint_dim = onp.prod(
+            jax.eval_shape(
+                constraint.compute_constraint, dummy_vals, *constraint.args
+            ).shape
+        )
+
+        return _AnalyzedConstraint(
+            **vars(constraint),
+            num_variables=len(variables),
+            sorted_ids_from_var_type=sort_and_stack_vars(variables),
+            constraint_flat_dim=constraint_dim,
+        )
+
+
+def create_augmented_constraint_cost(
+    constraint: Any,
+    constraint_index: Any,
+    total_dim: Any,
+) -> Any:
+    is_inequality = constraint.constraint_type == "leq_zero"
+
+    def augmented_residual_fn(
+        vals: Any,
+        *args,
+        al_params: Any,
+    ) -> Any:
+        constraint_val = constraint.compute_constraint_flat(vals, *args)
+        lambdas = al_params.lagrange_multipliers[constraint_index]
+        penalty_param = al_params.penalty_param
+
+        if is_inequality:
+            return jnp.sqrt(penalty_param) * jnp.maximum(
+                0.0, constraint_val + lambdas / penalty_param
+            )
+        else:
+            return jnp.sqrt(penalty_param) * (constraint_val + lambdas / penalty_param)
+
+    return Cost(
+        compute_residual=augmented_residual_fn,
+        args=constraint.args,
+        name=f"augmented_{constraint._get_name()}",
+        _al_constraint_index=constraint_index,
+        _al_total_dim=total_dim,
+    )

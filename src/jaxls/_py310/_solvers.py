@@ -508,3 +508,347 @@ class TerminationConfig:
             )
 
         return term_flags, jnp.array([cost_reldelta, gradient_mag, param_delta])
+
+
+@jdc.pytree_dataclass
+class AugmentedLagrangianConfig:
+    penalty_initial: Any = "auto"
+
+    penalty_factor: Any = 10.0
+
+    penalty_max: Any = 1e8
+
+    tolerance_absolute: Any = 1e-6
+
+    tolerance_relative: Any = 1e-4
+
+    max_iterations: jdc.Static[Any] = 50
+
+    inner_tolerance_factor: Any = 0.1
+
+    violation_reduction_threshold: Any = 0.25
+
+
+@jdc.pytree_dataclass
+class _AugmentedLagrangianState:
+    vals: Any
+
+    lagrange_multipliers: Any
+
+    penalty_param: Any
+
+    constraint_violation: Any
+
+    initial_violation: Any
+
+    outer_iteration: Any
+
+    inner_summary: Any
+
+    constraint_violation_history: Any
+
+    penalty_history: Any
+
+    inner_iterations_count: Any
+
+
+@jdc.pytree_dataclass
+class AugmentedLagrangianSolver:
+    config: Any
+
+    inner_solver: Any
+
+    verbose: jdc.Static[Any]
+
+    def _extract_original_costs(self, problem: Any) -> Any:
+        from ._core import Cost
+
+        original_costs = []
+        for stacked_cost, count in zip(problem.stacked_costs, problem.cost_counts):
+            original_costs.append(
+                Cost(
+                    compute_residual=stacked_cost.compute_residual,
+                    args=stacked_cost.args,
+                    jac_mode=stacked_cost.jac_mode,
+                    jac_batch_size=stacked_cost.jac_batch_size,
+                    jac_custom_fn=stacked_cost.jac_custom_fn,
+                    jac_custom_with_cache_fn=stacked_cost.jac_custom_with_cache_fn,
+                    name=stacked_cost.name,
+                )
+            )
+        return original_costs
+
+    def _extract_variables(self, problem: Any) -> Any:
+        variables = []
+        for var_type, ids in problem.sorted_ids_from_var_type.items():
+            for var_id in ids:
+                variables.append(var_type(int(var_id)))
+        return variables
+
+    def _analyze_augmented_problem(self, problem: Any, constraint_dim: Any) -> Any:
+        from ._core import LeastSquaresProblem, create_augmented_constraint_cost
+
+        constraint_costs = []
+        constraint_dims = []
+        constraint_is_inequality = []
+
+        for i, (stacked_constraint, constraint_count) in enumerate(
+            zip(problem.stacked_constraints, problem.constraint_counts)
+        ):
+            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+            constraint_dims.append(total_dim)
+            constraint_is_inequality.append(
+                stacked_constraint.constraint_type == "leq_zero"
+            )
+
+            cost = create_augmented_constraint_cost(stacked_constraint, i, total_dim)
+            constraint_costs.append(cost)
+
+        original_costs = self._extract_original_costs(problem)
+
+        variables = self._extract_variables(problem)
+
+        if self.verbose:
+            jax_log("Pre-analyzing augmented problem structure (one-time cost)...")
+
+        augmented = LeastSquaresProblem(
+            costs=original_costs + constraint_costs,
+            variables=variables,
+        ).analyze()
+
+        from ._core import AugmentedLagrangianParams
+
+        lagrange_mult_arrays = tuple(jnp.zeros(dim) for dim in constraint_dims)
+        al_params = AugmentedLagrangianParams(
+            lagrange_multipliers=lagrange_mult_arrays,
+            penalty_param=jnp.array(1.0),
+        )
+
+        augmented = jdc.replace(augmented, augmented_lagrangian_params=al_params)
+
+        return augmented
+
+    def solve(
+        self,
+        problem: Any,
+        initial_vals: Any,
+        return_summary: jdc.Static[Any] = False,
+    ) -> Any:
+        assert len(problem.stacked_constraints) > 0, (
+            "AugmentedLagrangianSolver requires constraints. "
+            "Use NonlinearSolver for unconstrained problems."
+        )
+
+        h_vals = problem.compute_constraint_values(initial_vals)
+        constraint_dim = len(h_vals)
+        initial_violation = jnp.linalg.norm(h_vals)
+
+        lagrange_multipliers = jnp.zeros(constraint_dim)
+
+        if self.config.penalty_initial == "auto":
+            residual_vector_result = problem.compute_residual_vector(initial_vals)
+            if isinstance(residual_vector_result, tuple):
+                residual_vector = residual_vector_result[0]
+            else:
+                residual_vector = residual_vector_result
+            initial_cost = jnp.sum(residual_vector**2)
+            penalty_param = initial_cost / 100.0
+        else:
+            penalty_param = self.config.penalty_initial
+
+        augmented_structure = self._analyze_augmented_problem(problem, constraint_dim)
+
+        if self.verbose:
+            jax_log(
+                "Augmented Lagrangian: initial violation={violation:.4e}, penalty={penalty:.4e}, constraint_dim={dim}",
+                violation=initial_violation,
+                penalty=penalty_param,
+                dim=constraint_dim,
+            )
+
+        max_outer = self.config.max_iterations
+        constraint_violation_history = jnp.zeros(max_outer)
+        constraint_violation_history = constraint_violation_history.at[0].set(
+            initial_violation
+        )
+        penalty_history = jnp.zeros(max_outer)
+        penalty_history = penalty_history.at[0].set(penalty_param)
+        inner_iterations_count = jnp.zeros(max_outer, dtype=jnp.int32)
+
+        max_inner = self.inner_solver.termination.max_iterations
+        initial_summary = SolveSummary(
+            iterations=jnp.array(0, dtype=jnp.int32),
+            cost_history=jnp.zeros(max_inner),
+            lambda_history=jnp.zeros(max_inner),
+            termination_criteria=jnp.array([False, False, False, False]),
+            termination_deltas=jnp.zeros(3),
+        )
+
+        state = _AugmentedLagrangianState(
+            vals=initial_vals,
+            lagrange_multipliers=lagrange_multipliers,
+            penalty_param=penalty_param,
+            constraint_violation=initial_violation,
+            initial_violation=initial_violation,
+            outer_iteration=0,
+            inner_summary=initial_summary,
+            constraint_violation_history=constraint_violation_history,
+            penalty_history=penalty_history,
+            inner_iterations_count=inner_iterations_count,
+        )
+
+        def cond_fn(state: Any) -> Any:
+            converged_absolute = (
+                state.constraint_violation < self.config.tolerance_absolute
+            )
+            converged_relative = (
+                state.constraint_violation / state.initial_violation
+                < self.config.tolerance_relative
+            )
+            converged = converged_absolute & converged_relative
+            under_max_iters = state.outer_iteration < self.config.max_iterations
+            return ~converged & under_max_iters
+
+        def body_fn(state: Any) -> Any:
+            return self._step(problem, augmented_structure, state)
+
+        state = jax.lax.while_loop(cond_fn, body_fn, state)
+
+        converged_absolute = state.constraint_violation < self.config.tolerance_absolute
+        converged_relative = (
+            state.constraint_violation / state.initial_violation
+            < self.config.tolerance_relative
+        )
+
+        if self.verbose:
+            if converged_absolute and converged_relative:
+                jax_log(
+                    "Augmented Lagrangian converged @ outer iteration {i}: violation={violation:.4e}",
+                    i=state.outer_iteration,
+                    violation=state.constraint_violation,
+                )
+            else:
+                jax_log(
+                    "Augmented Lagrangian: max iterations reached. Final violation={violation:.4e}",
+                    violation=state.constraint_violation,
+                )
+
+        if return_summary:
+            return state.vals, state.inner_summary
+        else:
+            return state.vals
+
+    def _step(
+        self,
+        problem: Any,
+        augmented_structure: Any,
+        state: Any,
+    ) -> Any:
+        from ._core import AugmentedLagrangianParams
+
+        lambda_arrays = []
+        lambda_offset = 0
+        for (
+            lambda_array
+        ) in augmented_structure.augmented_lagrangian_params.lagrange_multipliers:
+            dim = lambda_array.shape[0]
+            lambda_arrays.append(
+                state.lagrange_multipliers[lambda_offset : lambda_offset + dim]
+            )
+            lambda_offset += dim
+
+        al_params = AugmentedLagrangianParams(
+            lagrange_multipliers=tuple(lambda_arrays),
+            penalty_param=state.penalty_param,
+        )
+
+        augmented_problem = jdc.replace(
+            augmented_structure,
+            augmented_lagrangian_params=al_params,
+        )
+
+        inner_tolerance = (
+            self.config.inner_tolerance_factor * state.constraint_violation
+        )
+        inner_termination = jdc.replace(
+            self.inner_solver.termination,
+            cost_tolerance=jnp.maximum(inner_tolerance, 1e-8),
+            gradient_tolerance=jnp.maximum(inner_tolerance, 1e-8),
+        )
+        inner_solver_updated = jdc.replace(
+            self.inner_solver,
+            termination=inner_termination,
+        )
+
+        vals_updated, inner_summary = inner_solver_updated.solve(
+            augmented_problem, state.vals, return_summary=True
+        )
+
+        h_vals = problem.compute_constraint_values(vals_updated)
+        constraint_violation = jnp.linalg.norm(h_vals)
+
+        lagrange_multipliers_updated = (
+            state.lagrange_multipliers + state.penalty_param * h_vals
+        )
+
+        lambda_offset = 0
+        lambda_arrays_projected = []
+        for i, stacked_constraint in enumerate(problem.stacked_constraints):
+            constraint_count = problem.constraint_counts[i]
+            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+
+            lambda_slice = lagrange_multipliers_updated[
+                lambda_offset : lambda_offset + total_dim
+            ]
+
+            if stacked_constraint.constraint_type == "leq_zero":
+                lambda_slice = jnp.maximum(0.0, lambda_slice)
+
+            lambda_arrays_projected.append(lambda_slice)
+            lambda_offset += total_dim
+
+        lagrange_multipliers_updated = jnp.concatenate(lambda_arrays_projected)
+
+        violation_reduction = (state.constraint_violation - constraint_violation) / (
+            state.constraint_violation + 1e-10
+        )
+        penalty_updated = jnp.where(
+            violation_reduction < self.config.violation_reduction_threshold,
+            jnp.minimum(
+                state.penalty_param * self.config.penalty_factor,
+                self.config.penalty_max,
+            ),
+            state.penalty_param,
+        )
+
+        if self.verbose:
+            jax_log(
+                " AL outer iter {i}: violation={violation:.4e}, penalty={penalty:.4e}, inner_iters={inner_iters}, reduction={reduction:.2%}",
+                i=state.outer_iteration,
+                violation=constraint_violation,
+                penalty=penalty_updated,
+                inner_iters=inner_summary.iterations,
+                reduction=violation_reduction,
+                ordered=True,
+            )
+
+        next_idx = state.outer_iteration + 1
+
+        return jdc.replace(
+            state,
+            vals=vals_updated,
+            lagrange_multipliers=lagrange_multipliers_updated,
+            penalty_param=penalty_updated,
+            constraint_violation=constraint_violation,
+            outer_iteration=state.outer_iteration + 1,
+            inner_summary=inner_summary,
+            constraint_violation_history=state.constraint_violation_history.at[
+                next_idx
+            ].set(constraint_violation),
+            penalty_history=state.penalty_history.at[next_idx].set(penalty_updated),
+            inner_iterations_count=state.inner_iterations_count.at[next_idx].set(
+                inner_summary.iterations
+            ),
+        )
