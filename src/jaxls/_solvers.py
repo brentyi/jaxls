@@ -764,16 +764,11 @@ class AugmentedLagrangianSolver:
         return original_costs
 
     def _extract_variables(self, problem: AnalyzedLeastSquaresProblem) -> list:
-        """Extract variable objects from analyzed problem.
-
-        Note: This is called once before the JIT boundary, so var_id values
-        are concrete (not traced).
-        """
-
+        """Extract variable objects from analyzed problem."""
         variables = []
         for var_type, ids in problem.sorted_ids_from_var_type.items():
             for var_id in ids:
-                variables.append(var_type(int(var_id)))
+                variables.append(var_type(var_id))
         return variables
 
     def _analyze_augmented_problem(
