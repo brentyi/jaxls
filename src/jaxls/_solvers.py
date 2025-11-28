@@ -29,8 +29,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._core import AnalyzedLeastSquaresProblem, Cost, CustomJacobianCache
-    from ._variables import Var
+    from ._core import AnalyzedLeastSquaresProblem, CustomJacobianCache
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
@@ -741,9 +740,7 @@ class AugmentedLagrangianSolver:
     verbose: jdc.Static[bool]
     """Whether to print verbose logging information."""
 
-    def _extract_original_costs(
-        self, problem: AnalyzedLeastSquaresProblem
-    ) -> list[Cost]:
+    def _extract_original_costs(self, problem: AnalyzedLeastSquaresProblem) -> list:
         """Extract original Cost objects from analyzed problem.
 
         We need to recreate Cost objects from the analyzed problem to combine
@@ -752,7 +749,7 @@ class AugmentedLagrangianSolver:
         from ._core import Cost
 
         original_costs = []
-        for stacked_cost, count in zip(problem.stacked_costs, problem.cost_counts):
+        for stacked_cost in problem.stacked_costs:
             original_costs.append(
                 Cost(
                     compute_residual=stacked_cost.compute_residual,
@@ -766,8 +763,12 @@ class AugmentedLagrangianSolver:
             )
         return original_costs
 
-    def _extract_variables(self, problem: AnalyzedLeastSquaresProblem) -> list[Var]:
-        """Extract variable objects from analyzed problem."""
+    def _extract_variables(self, problem: AnalyzedLeastSquaresProblem) -> list:
+        """Extract variable objects from analyzed problem.
+
+        Note: This is called once before the JIT boundary, so var_id values
+        are concrete (not traced).
+        """
 
         variables = []
         for var_type, ids in problem.sorted_ids_from_var_type.items():
@@ -780,51 +781,36 @@ class AugmentedLagrangianSolver:
     ) -> AnalyzedLeastSquaresProblem:
         """Pre-analyze augmented problem structure once.
 
-        Creates parameterized augmented costs with external parameter references,
-        then analyzes the combined problem. The structure is fixed; only the
-        lagrange_multipliers and penalty_param values will vary during optimization.
+        Creates augmented costs from constraints with AL params baked in, then
+        re-analyzes the combined problem. The structure is fixed; only the
+        al_params on each augmented cost will vary during optimization.
 
         Args:
             problem: Original analyzed problem with constraints.
             constraint_dim: Total dimension of all constraints.
 
         Returns:
-            Analyzed augmented problem with external params initialized to zeros.
+            Analyzed augmented problem with AL params initialized.
         """
-        from ._core import LeastSquaresProblem, create_augmented_constraint_cost
+        from ._core import (
+            AugmentedLagrangianParams,
+            LeastSquaresProblem,
+            create_augmented_constraint_cost,
+        )
 
-        constraint_costs = []
+        # Build initial AL params and augmented costs.
         constraint_dims = []
-        constraint_is_inequality = []
+        constraint_costs = []
 
         for i, (stacked_constraint, constraint_count) in enumerate(
             zip(problem.stacked_constraints, problem.constraint_counts)
         ):
-            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            # stacked_constraint is now _AnalyzedCost
+            constraint_flat_dim = stacked_constraint.residual_flat_dim
             total_dim = constraint_count * constraint_flat_dim
             constraint_dims.append(total_dim)
-            constraint_is_inequality.append(
-                stacked_constraint.constraint_type == "leq_zero"
-            )
 
-            cost = create_augmented_constraint_cost(stacked_constraint, i, total_dim)
-            constraint_costs.append(cost)
-
-        original_costs = self._extract_original_costs(problem)
-        variables = self._extract_variables(problem)
-
-        # Create and analyze combined problem once.
-        if self.verbose:
-            jax_log("Pre-analyzing augmented problem structure (one-time cost)...")
-
-        augmented = LeastSquaresProblem(
-            costs=original_costs + constraint_costs,
-            variables=variables,
-        ).analyze()
-
-        # Initialize AL params (will be updated in loop).
-        from ._core import AugmentedLagrangianParams
-
+        # Create initial AL params.
         lagrange_mult_arrays = tuple(jnp.zeros(dim) for dim in constraint_dims)
         penalty_param_arrays = tuple(jnp.ones(dim) for dim in constraint_dims)
         al_params = AugmentedLagrangianParams(
@@ -832,7 +818,30 @@ class AugmentedLagrangianSolver:
             penalty_params=penalty_param_arrays,
         )
 
-        augmented = jdc.replace(augmented, augmented_lagrangian_params=al_params)
+        # Create augmented costs from constraints.
+        for i, (stacked_constraint, constraint_count) in enumerate(
+            zip(problem.stacked_constraints, problem.constraint_counts)
+        ):
+            constraint_flat_dim = stacked_constraint.residual_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+
+            augmented_cost = create_augmented_constraint_cost(
+                stacked_constraint, i, total_dim, al_params
+            )
+            constraint_costs.append(augmented_cost)
+
+        # Extract original costs and variables for re-analysis.
+        original_costs = self._extract_original_costs(problem)
+        variables = self._extract_variables(problem)
+
+        if self.verbose:
+            jax_log("Pre-analyzing augmented problem structure (one-time cost)...")
+
+        # Re-analyze the combined problem to get correct Jacobian structure.
+        augmented = LeastSquaresProblem(
+            costs=original_costs + constraint_costs,
+            variables=variables,
+        ).analyze()
 
         return augmented
 
@@ -909,7 +918,7 @@ class AugmentedLagrangianSolver:
             offset = 0
             for i, stacked_constraint in enumerate(problem.stacked_constraints):
                 constraint_count = problem.constraint_counts[i]
-                constraint_flat_dim = stacked_constraint.constraint_flat_dim
+                constraint_flat_dim = stacked_constraint.residual_flat_dim
                 total_dim = constraint_count * constraint_flat_dim
                 h_slice = h_vals[offset : offset + total_dim]
 
@@ -1010,8 +1019,7 @@ class AugmentedLagrangianSolver:
             < self.config.tolerance_absolute
         )
         converged_relative = (
-            state.snorm / (state.initial_snorm + 1e-10)
-            < self.config.tolerance_relative
+            state.snorm / (state.initial_snorm + 1e-10) < self.config.tolerance_relative
         )
 
         if self.verbose:
@@ -1047,7 +1055,7 @@ class AugmentedLagrangianSolver:
 
         for i, stacked_constraint in enumerate(problem.stacked_constraints):
             constraint_count = problem.constraint_counts[i]
-            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            constraint_flat_dim = stacked_constraint.residual_flat_dim
             total_dim = constraint_count * constraint_flat_dim
             h_slice = h_vals[offset : offset + total_dim]
             lambda_slice = lagrange_multipliers[offset : offset + total_dim]
@@ -1082,7 +1090,7 @@ class AugmentedLagrangianSolver:
 
         for i, stacked_constraint in enumerate(problem.stacked_constraints):
             constraint_count = problem.constraint_counts[i]
-            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            constraint_flat_dim = stacked_constraint.residual_flat_dim
             total_dim = constraint_count * constraint_flat_dim
             h_slice = h_vals[offset : offset + total_dim]
 
@@ -1111,20 +1119,25 @@ class AugmentedLagrangianSolver:
         Returns:
             Updated state after one outer iteration.
         """
-        # Update AL params in pre-analyzed problem. Split flat arrays into per-group tuples.
+        # Update AL params on each augmented cost.
+        # Split flat arrays into per-constraint-group tuples.
         from ._core import AugmentedLagrangianParams
 
-        assert augmented_structure.augmented_lagrangian_params is not None
+        # Compute constraint dims from the original problem.
+        constraint_dims = []
+        for i, (stacked_constraint, constraint_count) in enumerate(
+            zip(problem.stacked_constraints, problem.constraint_counts)
+        ):
+            constraint_flat_dim = stacked_constraint.residual_flat_dim
+            total_dim = constraint_count * constraint_flat_dim
+            constraint_dims.append(total_dim)
+
+        # Build lambda/penalty arrays for each constraint group.
         lambda_arrays = []
         penalty_arrays = []
         offset = 0
-        for (
-            lambda_array
-        ) in augmented_structure.augmented_lagrangian_params.lagrange_multipliers:
-            dim = lambda_array.shape[0]
-            lambda_arrays.append(
-                state.lagrange_multipliers[offset : offset + dim]
-            )
+        for dim in constraint_dims:
+            lambda_arrays.append(state.lagrange_multipliers[offset : offset + dim])
             penalty_arrays.append(state.penalty_params[offset : offset + dim])
             offset += dim
 
@@ -1133,9 +1146,35 @@ class AugmentedLagrangianSolver:
             penalty_params=tuple(penalty_arrays),
         )
 
+        # Update al_params on each augmented cost (the costs added from constraints).
+        # Original costs are first, augmented costs are appended after.
+        # We need to broadcast al_params to match the batch dimension of each cost.
+        num_original_costs = len(problem.stacked_costs)
+        updated_costs = list(augmented_structure.stacked_costs[:num_original_costs])
+
+        constraint_idx = 0
+        for cost in augmented_structure.stacked_costs[num_original_costs:]:
+            # Get constraint count from the cost's batch axes
+            (constraint_count,) = cost._get_batch_axes()
+
+            # Broadcast al_params to have batch dimension (constraint_count,)
+            def broadcast_to_batch(arr: jax.Array) -> jax.Array:
+                return jnp.broadcast_to(arr, (constraint_count,) + arr.shape)
+
+            al_params_broadcasted = AugmentedLagrangianParams(
+                lagrange_multipliers=tuple(
+                    broadcast_to_batch(arr) for arr in al_params.lagrange_multipliers
+                ),
+                penalty_params=tuple(
+                    broadcast_to_batch(arr) for arr in al_params.penalty_params
+                ),
+            )
+            updated_costs.append(jdc.replace(cost, al_params=al_params_broadcasted))
+            constraint_idx += 1
+
         augmented_problem = jdc.replace(
             augmented_structure,
-            augmented_lagrangian_params=al_params,
+            stacked_costs=tuple(updated_costs),
         )
 
         # Solve inner unconstrained problem. Tolerance scales with snorm.
@@ -1167,7 +1206,7 @@ class AugmentedLagrangianSolver:
         lambda_arrays_projected = []
         for i, stacked_constraint in enumerate(problem.stacked_constraints):
             constraint_count = problem.constraint_counts[i]
-            constraint_flat_dim = stacked_constraint.constraint_flat_dim
+            constraint_flat_dim = stacked_constraint.residual_flat_dim
             total_dim = constraint_count * constraint_flat_dim
 
             lambda_slice = lagrange_multipliers_updated[offset : offset + total_dim]

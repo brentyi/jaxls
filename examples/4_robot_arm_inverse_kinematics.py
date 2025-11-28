@@ -37,18 +37,11 @@ def forward_kinematics(
     """
     L1, L2, L3 = link_lengths
 
-    # Base at origin
     base = jnp.array([0.0, 0.0])
-
-    # First joint
     joint1 = base + jnp.array([L1 * jnp.cos(theta1), L1 * jnp.sin(theta1)])
-
-    # Second joint
     joint2 = joint1 + jnp.array(
         [L2 * jnp.cos(theta1 + theta2), L2 * jnp.sin(theta1 + theta2)]
     )
-
-    # End effector
     end_effector = joint2 + jnp.array(
         [L3 * jnp.cos(theta1 + theta2 + theta3), L3 * jnp.sin(theta1 + theta2 + theta3)]
     )
@@ -71,20 +64,13 @@ def visualize_robot_arm(
         theta1, theta2, theta3, link_lengths
     )
 
-    # Convert to 3D (planar arm in XY plane)
     def to_3d(pos: jax.Array) -> tuple[float, float, float]:
         return (float(pos[0]), float(pos[1]), 0.0)
 
-    # Draw links as cylinders
     positions = [base, joint1, joint2, end_effector]
     for i in range(3):
         start = onp.array(to_3d(positions[i]))
         end = onp.array(to_3d(positions[i + 1]))
-        mid = (start + end) / 2
-        direction = end - start
-        length = float(onp.linalg.norm(direction))
-
-        # Create line segment for each link
         server.scene.add_line_segments(
             f"/{name}/link_{i}",
             points=onp.array([[start, end]]),
@@ -92,7 +78,6 @@ def visualize_robot_arm(
             line_width=4.0,
         )
 
-    # Draw joints as spheres
     for i, pos in enumerate(positions):
         server.scene.add_icosphere(
             f"/{name}/joint_{i}",
@@ -100,8 +85,6 @@ def visualize_robot_arm(
             position=to_3d(pos),
             color=color,
         )
-
-    # Draw end effector marker
     server.scene.add_icosphere(
         f"/{name}/end_effector",
         radius=link_radius * 3,
@@ -118,7 +101,6 @@ def main():
     print("=" * 70)
     print()
 
-    # Define link lengths
     link_lengths = (1.0, 1.0, 0.5)
     L1, L2, L3 = link_lengths
     print("Robot configuration:")
@@ -126,7 +108,6 @@ def main():
     print(f"  Maximum reach: {sum(link_lengths)}m")
     print()
 
-    # Create joint angle variables
     class AngleVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
         """Joint angle variable (radians)."""
 
@@ -134,8 +115,7 @@ def main():
 
     joint_angles = [AngleVar(i) for i in range(3)]
 
-    # Define costs: prefer configuration close to zero angles (straight arm)
-    default_angle = jnp.pi / 4  # 45 degrees
+    default_angle = jnp.pi / 4
 
     @jaxls.Cost.create_factory
     def joint_prior_cost(
@@ -150,7 +130,6 @@ def main():
         joint_prior_cost(joint_angles[2], default_angle),
     ]
 
-    # Define end effector constraint
     @jaxls.Constraint.create_factory
     def end_effector_constraint(
         vals: jaxls.VarValues,
@@ -167,7 +146,6 @@ def main():
         _, _, _, ee_pos = forward_kinematics(vals[j1], vals[j2], vals[j3], link_lengths)
         return ee_pos - target_pos
 
-    # Target end effector position
     target_ee = jnp.array([2.0, 0.5])
     target_distance = jnp.linalg.norm(target_ee)
 
@@ -179,7 +157,6 @@ def main():
         print("WARNING: Target is outside reachable workspace!")
         return
 
-    # Build constrained problem
     problem = jaxls.LeastSquaresProblem(
         costs=costs,
         variables=joint_angles,
@@ -190,7 +167,6 @@ def main():
         ],
     ).analyze()
 
-    # Initial configuration: straight arm pointing right
     initial_vals = jaxls.VarValues.make(
         [
             joint_angles[0].with_value(jnp.array(0.0)),
@@ -199,7 +175,6 @@ def main():
         ]
     )
 
-    # Compute initial end effector position
     _, _, _, initial_ee = forward_kinematics(0.0, 0.0, 0.0, link_lengths)
     initial_error = jnp.linalg.norm(initial_ee - target_ee)
 
@@ -209,7 +184,6 @@ def main():
     print(f"  Error: {initial_error:.4f}m")
     print()
 
-    # Solve constrained problem
     print("Solving constrained inverse kinematics...")
     print("  Using Augmented Lagrangian method")
     print()
@@ -221,7 +195,6 @@ def main():
     print("=" * 70)
     print()
 
-    # Extract solution angles
     theta1_sol = float(solution[joint_angles[0]])
     theta2_sol = float(solution[joint_angles[1]])
     theta3_sol = float(solution[joint_angles[2]])
@@ -232,7 +205,6 @@ def main():
     print(f"  θ₃ = {theta3_sol:7.4f} rad ({jnp.rad2deg(theta3_sol):6.2f}°)")
     print()
 
-    # Verify end effector position
     _, _, _, final_ee = forward_kinematics(
         theta1_sol, theta2_sol, theta3_sol, link_lengths
     )
@@ -244,19 +216,16 @@ def main():
     print(f"  Error:    {final_error:.6f}m")
     print()
 
-    # Verify constraint satisfaction
     constraint_violation = problem.compute_constraint_values(solution)
     print(f"Constraint violation: {jnp.linalg.norm(constraint_violation):.6e}")
     print()
 
-    # Compute cost improvement
     print("Cost comparison:")
     print(f"  Initial error:      {initial_error:.4f}m")
     print(f"  Final error:        {final_error:.6f}m")
     print(f"  Improvement:        {initial_error - final_error:.4f}m")
     print()
 
-    # Also solve unconstrained problem for comparison
     print("=" * 70)
     print("Comparison: Unconstrained Optimization")
     print("=" * 70)
@@ -289,16 +258,13 @@ def main():
     print("The constraint successfully guides the arm to reach the target!")
     print()
 
-    # Viser visualization
     print("Starting Viser visualization server...")
     server = viser.ViserServer()
 
-    # Visualize initial configuration (blue)
+    # Initial (blue), constrained (green), unconstrained (red).
     visualize_robot_arm(
         server, "initial", 0.0, 0.0, 0.0, link_lengths, color=(100, 100, 200)
     )
-
-    # Visualize constrained solution (green)
     visualize_robot_arm(
         server,
         "constrained",
@@ -308,8 +274,6 @@ def main():
         link_lengths,
         color=(0, 200, 0),
     )
-
-    # Visualize unconstrained solution (red)
     visualize_robot_arm(
         server,
         "unconstrained",
@@ -320,15 +284,13 @@ def main():
         color=(200, 100, 100),
     )
 
-    # Visualize target position (yellow)
+    # Target (yellow).
     server.scene.add_icosphere(
         "/target",
         radius=0.08,
         position=(float(target_ee[0]), float(target_ee[1]), 0.0),
         color=(255, 255, 0),
     )
-
-    # Add ground plane reference
     server.scene.add_grid("/grid", width=4.0, height=3.0, cell_size=0.5)
 
     print("Visualization server running at http://localhost:8080")

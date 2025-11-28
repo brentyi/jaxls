@@ -26,14 +26,12 @@ def main():
     print("=" * 70)
     print()
 
-    # Create waypoint variables (2D positions)
     class WaypointVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(2)):
         """2D waypoint position."""
 
     num_waypoints = 50
     waypoints = [WaypointVar(i) for i in range(num_waypoints)]
 
-    # Define start and goal positions
     start = jnp.array([0.0, 0.0])
     goal = jnp.array([4.0, 0.0])
 
@@ -43,8 +41,7 @@ def main():
     print(f"  Waypoints: {num_waypoints}")
     print()
 
-    # Define obstacles (center position and radius)
-    # Obstacles are positioned to block the straight-line path
+    # Obstacles positioned to block the straight-line path.
     obstacles = [
         (jnp.array([1.0, 0.3]), 0.6),  # Obstacle 1: blocks waypoint 1
         (jnp.array([3.0, -0.3]), 0.6),  # Obstacle 2: blocks waypoint 3
@@ -57,7 +54,7 @@ def main():
         )
     print()
 
-    # Smoothness cost - minimize distance between consecutive waypoints
+    # Smoothness cost: minimize distance between consecutive waypoints.
     @jaxls.Cost.create_factory
     def smoothness_cost(
         vals: jaxls.VarValues, wp1: WaypointVar, wp2: WaypointVar
@@ -65,7 +62,6 @@ def main():
         """Cost penalizes large gaps between waypoints."""
         return vals[wp1] - vals[wp2]
 
-    # Fix waypoint constraint - all non-Var args must be arrays with same shape
     @jaxls.Constraint.create_factory(constraint_type="eq_zero")
     def fix_waypoint(
         vals: jaxls.VarValues, waypoint: WaypointVar, target: jax.Array
@@ -73,13 +69,12 @@ def main():
         """Equality constraint: waypoint = target."""
         return vals[waypoint] - target
 
-    # Obstacle avoidance constraint - all non-Var args must be arrays with same shape
     @jaxls.Constraint.create_factory(constraint_type="leq_zero")
     def obstacle_avoidance(
         vals: jaxls.VarValues,
         waypoint: WaypointVar,
         obstacle_center: jax.Array,
-        obstacle_radius: jax.Array,  # Must be array, not float, for batching
+        obstacle_radius: jax.Array,
     ) -> jax.Array:
         """Inequality: waypoint must be outside obstacle circle.
 
@@ -90,32 +85,29 @@ def main():
         dist_sq = jnp.sum((wp_pos - obstacle_center) ** 2)
         return jnp.array([obstacle_radius**2 - dist_sq])
 
-    # Build costs
     costs = []
     for i in range(num_waypoints - 1):
         costs.append(smoothness_cost(waypoints[i], waypoints[i + 1]))
 
-    # Build constraints
     constraints = [
         fix_waypoint(waypoints[0], start),
         fix_waypoint(waypoints[-1], goal),
     ]
 
-    # Add obstacle avoidance for intermediate waypoints (not start/goal)
+    # Add obstacle avoidance for intermediate waypoints.
     for i in range(1, num_waypoints - 1):
         for obs_center, obs_radius in obstacles:
             constraints.append(
                 obstacle_avoidance(waypoints[i], obs_center, jnp.array(obs_radius))
             )
 
-    # Build and solve problem
     problem = jaxls.LeastSquaresProblem(
         costs=costs,
         variables=waypoints,
         constraints=constraints,
     ).analyze()
 
-    # Initial guess: straight line from start to goal
+    # Initial guess: straight line from start to goal.
     initial_vals = jaxls.VarValues.make(
         [
             waypoint.with_value(start + (goal - start) * i / (num_waypoints - 1))
@@ -128,11 +120,9 @@ def main():
         pos = initial_vals[wp]
         print(f"  Waypoint {i}: ({pos[0]:.2f}, {pos[1]:.2f})")
 
-    # Check initial violations
+    # Check initial violations. First 4 values are equality constraints.
     initial_constraint_vals = problem.compute_constraint_values(initial_vals)
-    # First 4 values are equality constraints (2 per fixed waypoint)
-    # Remaining are inequality constraints
-    initial_violations = initial_constraint_vals[4:]  # Skip equality constraints
+    initial_violations = initial_constraint_vals[4:]
     print()
     print(
         f"Initial obstacle constraint violations: {jnp.sum(initial_violations > 0)} / {len(initial_violations)}"
@@ -156,7 +146,7 @@ def main():
 
     print()
 
-    # Check which constraints are active
+    # Check which constraints are active.
     final_constraint_vals = problem.compute_constraint_values(solution)
     inequality_constraints = final_constraint_vals[4:]
 
@@ -182,7 +172,6 @@ def main():
 
     print()
 
-    # Verify all constraints are satisfied
     violations = jnp.sum(inequality_constraints > 1e-3)
     print(f"Final constraint violations: {violations} / {len(inequality_constraints)}")
 
@@ -190,7 +179,6 @@ def main():
         print("✓ All obstacles successfully avoided!")
     print()
 
-    # Calculate path statistics
     path_length = 0.0
     for i in range(num_waypoints - 1):
         seg_length = jnp.linalg.norm(
@@ -218,15 +206,13 @@ def main():
     print("This is a common pattern in robotics for collision-free motion planning!")
     print()
 
-    # Viser visualization
     print("Starting Viser visualization server...")
     server = viser.ViserServer()
 
-    # Convert to 3D positions (XY plane at Z=0)
     def to_3d(pos: jax.Array) -> tuple[float, float, float]:
         return (float(pos[0]), float(pos[1]), 0.0)
 
-    # Visualize initial path (blue, dashed effect with segments)
+    # Initial path (blue).
     initial_positions = onp.array(
         [onp.array(to_3d(initial_vals[wp])) for wp in waypoints]
     )
@@ -245,7 +231,7 @@ def main():
             color=(100, 100, 200),
         )
 
-    # Visualize optimized path (green)
+    # Optimized path (green).
     solution_positions = onp.array([onp.array(to_3d(solution[wp])) for wp in waypoints])
     server.scene.add_line_segments(
         "/solution/path",
@@ -262,10 +248,8 @@ def main():
             color=(0, 200, 0),
         )
 
-    # Visualize obstacles (red transparent spheres)
+    # Obstacles (red).
     for i, (center, radius) in enumerate(obstacles):
-        # Draw obstacle as a disk (circle in XY plane)
-        # Use multiple line segments to create a circle
         num_segments = 32
         angles = onp.linspace(0, 2 * onp.pi, num_segments + 1)
         circle_points = onp.array(
@@ -284,7 +268,6 @@ def main():
             colors=(200, 50, 50),
             line_width=3.0,
         )
-        # Add center marker
         server.scene.add_icosphere(
             f"/obstacle_{i}/center",
             radius=0.02,
@@ -292,7 +275,7 @@ def main():
             color=(200, 50, 50),
         )
 
-    # Visualize start and goal markers
+    # Start and goal markers.
     server.scene.add_icosphere(
         "/start",
         radius=0.05,
@@ -307,7 +290,6 @@ def main():
         color=(255, 255, 0),
     )
 
-    # Add grid for reference
     server.scene.add_grid("/grid", width=5.0, height=2.0, cell_size=0.5)
 
     print("Visualization server running at http://localhost:8080")

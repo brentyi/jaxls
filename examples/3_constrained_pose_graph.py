@@ -67,8 +67,7 @@ def main():
         ),
     ]
 
-    # GPS measurement: pose 2 is at position (2.5, 1.0).
-    # This contradicts the noisy priors!
+    # GPS measurement says pose 2 is at (2.5, 1.0). Contradicts noisy priors.
     constraints = [position_constraint(pose_vars[2], jnp.array([2.5, 1.0]))]
 
     print("=" * 60)
@@ -146,11 +145,9 @@ def main():
     print("The constraint successfully pulls Pose 2 to match the GPS measurement!")
     print()
 
-    # Viser visualization
     print("Starting Viser visualization server...")
     server = viser.ViserServer()
 
-    # Get initial poses (before optimization) - use random offsets for visualization
     initial_vals = jaxls.VarValues.make(
         [
             pose_vars[0].with_value(jaxlie.SE2.from_xy_theta(-0.2, 0.1, 0.1)),
@@ -159,21 +156,16 @@ def main():
         ]
     )
 
-    # Collect poses for visualization
     initial_poses = [initial_vals[var] for var in pose_vars]
     constrained_poses = [solution[var] for var in pose_vars]
     unconstrained_poses = [unconstrained_solution[var] for var in pose_vars]
 
-    # Helper to extract position from SE2
     def get_position_3d(pose: jaxlie.SE2) -> tuple[float, float, float]:
         t = pose.translation()
         return (float(t[0]), float(t[1]), 0.0)
 
-    # Helper to get quaternion from SE2 rotation (lifted to 3D)
     def get_quaternion(pose: jaxlie.SE2) -> tuple[float, float, float, float]:
-        # SE2 rotation is around Z axis, lift to 3D quaternion
         angle = float(pose.rotation().log()[0])
-        # Quaternion for rotation around Z: [cos(a/2), 0, 0, sin(a/2)]
         return (
             float(onp.cos(angle / 2)),
             0.0,
@@ -181,7 +173,7 @@ def main():
             float(onp.sin(angle / 2)),
         )
 
-    # Visualize initial poses (blue)
+    # Initial poses (blue).
     init_positions = onp.array([get_position_3d(p) for p in initial_poses])
     init_wxyzs = onp.array([get_quaternion(p) for p in initial_poses])
     server.scene.add_batched_axes(
@@ -198,7 +190,7 @@ def main():
         line_width=2.0,
     )
 
-    # Visualize constrained solution (green)
+    # Constrained solution (green).
     constrained_positions = onp.array([get_position_3d(p) for p in constrained_poses])
     constrained_wxyzs = onp.array([get_quaternion(p) for p in constrained_poses])
     server.scene.add_batched_axes(
@@ -217,7 +209,7 @@ def main():
         line_width=3.0,
     )
 
-    # Visualize unconstrained solution (red)
+    # Unconstrained solution (red).
     unconstrained_positions = onp.array(
         [get_position_3d(p) for p in unconstrained_poses]
     )
@@ -238,7 +230,7 @@ def main():
         line_width=2.0,
     )
 
-    # Visualize GPS constraint target (yellow sphere)
+    # GPS target (yellow).
     gps_target = jnp.array([2.5, 1.0])
     server.scene.add_icosphere(
         "/gps_target",
