@@ -524,8 +524,6 @@ class AugmentedLagrangianConfig:
 
     max_iterations: jdc.Static[Any] = 50
 
-    inner_tolerance_factor: Any = 0.1
-
     violation_reduction_threshold: Any = 0.25
 
 

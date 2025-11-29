@@ -658,9 +658,6 @@ class AugmentedLagrangianConfig:
     max_iterations: jdc.Static[int] = 50
     """Maximum outer loop iterations."""
 
-    inner_tolerance_factor: float | jax.Array = 0.1
-    """Inner solver tolerance as fraction of current snorm."""
-
     violation_reduction_threshold: float | jax.Array = 0.5
     """Increase penalty if violation doesn't reduce by this fraction."""
 
@@ -714,6 +711,9 @@ class _AugmentedLagrangianState:
 
     inner_iterations_count: jax.Array
     """Inner iteration counts, shape (max_outer_iterations,)."""
+
+    epsopk: jax.Array
+    """Current inner solver tolerance (ALGENCAN-style adaptive)."""
 
 
 @jdc.pytree_dataclass
@@ -970,6 +970,10 @@ class AugmentedLagrangianSolver:
             termination_deltas=jnp.zeros(3),
         )
 
+        # Initialize inner tolerance (ALGENCAN-style: start with sqrt of target).
+        base_gradient_tol = self.inner_solver.termination.gradient_tolerance
+        initial_epsopk = jnp.sqrt(base_gradient_tol)
+
         state = _AugmentedLagrangianState(
             vals=initial_vals,
             lagrange_multipliers=lagrange_multipliers,
@@ -984,6 +988,7 @@ class AugmentedLagrangianSolver:
             constraint_violation_history=constraint_violation_history,
             penalty_history=penalty_history,
             inner_iterations_count=inner_iterations_count,
+            epsopk=initial_epsopk,
         )
 
         def cond_fn(state: _AugmentedLagrangianState) -> jax.Array:
@@ -1172,12 +1177,11 @@ class AugmentedLagrangianSolver:
             stacked_costs=tuple(updated_costs),
         )
 
-        # Solve inner unconstrained problem. Tolerance scales with snorm.
-        inner_tolerance = self.config.inner_tolerance_factor * state.snorm
+        # Solve inner unconstrained problem using ALGENCAN-style adaptive tolerance.
         inner_termination = jdc.replace(
             self.inner_solver.termination,
-            cost_tolerance=jnp.maximum(inner_tolerance, 1e-6),
-            gradient_tolerance=jnp.maximum(inner_tolerance, 1e-6),
+            cost_tolerance=state.epsopk,
+            gradient_tolerance=state.epsopk,
         )
         inner_solver_updated = jdc.replace(
             self.inner_solver,
@@ -1250,14 +1254,33 @@ class AugmentedLagrangianSolver:
             state.penalty_params,
         )
 
+        # Update inner tolerance for next iteration (ALGENCAN-style).
+        # Only tighten when making progress on both feasibility AND optimality.
+        nlpsupn = inner_summary.termination_deltas[1]  # gradient magnitude
+        base_tol = self.inner_solver.termination.gradient_tolerance
+        sqrt_base_tol = jnp.sqrt(base_tol)
+        sqrt_constraint_tol = jnp.sqrt(self.config.tolerance_absolute)
+
+        should_tighten = jnp.logical_and(
+            snorm_new <= sqrt_constraint_tol,
+            nlpsupn <= sqrt_base_tol,
+        )
+        epsopk_candidate = jnp.minimum(0.5 * nlpsupn, 0.1 * state.epsopk)
+        epsopk_new = jnp.where(
+            should_tighten,
+            jnp.maximum(epsopk_candidate, base_tol),
+            state.epsopk,
+        )
+
         if self.verbose:
             jax_log(
-                " AL outer iter {i}: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}, inner_iters={inner_iters}",
+                " AL outer iter {i}: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}, inner_iters={inner_iters}, epsopk={epsopk:.4e}",
                 i=state.outer_iteration,
                 snorm=snorm_new,
                 csupn=csupn_new,
                 max_rho=jnp.max(penalty_params_updated),
                 inner_iters=inner_summary.iterations,
+                epsopk=epsopk_new,
                 ordered=True,
             )
 
@@ -1282,4 +1305,5 @@ class AugmentedLagrangianSolver:
             inner_iterations_count=state.inner_iterations_count.at[next_idx].set(
                 inner_summary.iterations
             ),
+            epsopk=epsopk_new,
         )

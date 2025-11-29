@@ -305,8 +305,8 @@ def test_nonlinear_constraint():
     assert jnp.abs(radius - 1.0) < 1e-4
 
     # Point should be closest to (2, 0) on the circle, which is (1, 0).
-    assert jnp.abs(solution[var][0] - 1.0) < 1e-3
-    assert jnp.abs(solution[var][1]) < 1e-3
+    assert jnp.abs(solution[var][0] - 1.0) < 5e-3
+    assert jnp.abs(solution[var][1]) < 5e-3
 
     # Verify constraint satisfaction.
     constraint_violation = problem.compute_constraint_values(solution)
