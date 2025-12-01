@@ -194,7 +194,6 @@ class _LmInnerState:
     proposed_jac_cache: tuple[CustomJacobianCache, ...]
     local_delta: jax.Array
     linear_state: _ConjugateGradientState | None
-    iteration: jax.Array
 
 
 @jdc.pytree_dataclass
@@ -405,10 +404,10 @@ class NonlinearSolver:
             )
             - state.cost
         )
-        accepted = jnp.where(
-            self.trust_region is not None,
-            step_quality >= self.trust_region.step_quality_min,
-            True,  # Gauss-Newton always accepts
+        accepted = (
+            step_quality >= self.trust_region.step_quality_min
+            if self.trust_region is not None
+            else True
         )
 
         return _LmInnerState(
@@ -420,7 +419,6 @@ class NonlinearSolver:
             proposed_jac_cache=proposed_jac_cache,
             local_delta=local_delta,
             linear_state=linear_state,
-            iteration=jnp.array(0),
         )
 
     def step(
@@ -510,12 +508,15 @@ class NonlinearSolver:
                     inner_state.lambd * self.trust_region.lambda_factor,
                     self.trust_region.lambda_max,
                 )
-                result = self._solve_and_evaluate(
-                    problem, state, A_blocksparse, A_multiply, AT_multiply, ATb, lambd_next
+                return self._solve_and_evaluate(
+                    problem,
+                    state,
+                    A_blocksparse,
+                    A_multiply,
+                    AT_multiply,
+                    ATb,
+                    lambd_next,
                 )
-                with jdc.copy_and_mutate(result) as result:
-                    result.iteration = inner_state.iteration + 1
-                return result
 
             # Inner loop: keep trying larger lambdas until accepted or lambda maxed out
             inner_state_final = jax.lax.while_loop(
@@ -525,14 +526,20 @@ class NonlinearSolver:
                 ),
                 body_fun=lm_inner_step,
                 init_val=self._solve_and_evaluate(
-                    problem, state, A_blocksparse, A_multiply, AT_multiply, ATb, state.lambd
+                    problem,
+                    state,
+                    A_blocksparse,
+                    A_multiply,
+                    AT_multiply,
+                    ATb,
+                    state.lambd,
                 ),
             )
 
             local_delta = inner_state_final.local_delta
             accept_flag = inner_state_final.accepted
 
-            # Decrease lambda if step was good, keep current lambda if we maxed out
+            # Decrease lambda if step was good.
             lambd_next = jnp.where(
                 accept_flag,
                 inner_state_final.lambd / self.trust_region.lambda_factor,
@@ -663,12 +670,12 @@ class TerminationConfig:
     ) -> tuple[jax.Array, jax.Array]:
         """Check for convergence!"""
 
-        # Cost tolerance
+        # Cost tolerance.
         cost_absdelta = jnp.abs(cost_updated - state_prev.cost)
         cost_reldelta = cost_absdelta / state_prev.cost
         converged_cost = cost_reldelta < self.cost_tolerance
 
-        # Gradient tolerance
+        # Gradient tolerance.
         flat_vals = jax.flatten_util.ravel_pytree(state_prev.vals)[0]
         gradient_mag = jnp.max(
             flat_vals
@@ -682,7 +689,7 @@ class TerminationConfig:
             False,
         )
 
-        # Parameter tolerance
+        # Parameter tolerance.
         param_delta = jnp.linalg.norm(jnp.abs(tangent)) / (
             jnp.linalg.norm(flat_vals) + self.parameter_tolerance
         )
