@@ -99,9 +99,9 @@ Features include:
     - Fast for small problems.
   - Sparse Cholesky, on CPU. (CHOLMOD)
 - Augmented Langrangian solver for constrained problems.
-  - Equality constraints: `h(x) = 0` with `mode="eq_zero"`
-  - Inequality constraints: `g(x) ≤ 0` with `mode="leq_zero"`
-  - Greater-than constraints: `g(x) ≥ 0` with `mode="geq_zero"`
+  - Equality constraints: `h(x) = 0`
+  - Inequality constraints: `g(x) ≤ 0`
+  - Greater-than constraints: `g(x) ≥ 0`
   - Automatic conversion to penalty-based formulation + adaptive penalties.
 
 `jaxls` borrows heavily from libraries like
