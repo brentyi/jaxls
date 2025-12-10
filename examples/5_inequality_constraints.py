@@ -131,8 +131,7 @@ def main():
 
     print("Solving with obstacle avoidance constraints...")
     print()
-
-    solution = problem.solve(initial_vals=initial_vals)
+    solution = jax.jit(problem.solve)(initial_vals=initial_vals)
 
     print("=" * 70)
     print("Solution")

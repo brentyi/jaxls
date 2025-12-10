@@ -8,10 +8,9 @@ coordinates, loop closure, etc.
 import jax
 import jax.numpy as jnp
 import jaxlie
+import jaxls
 import numpy as onp
 import viser
-
-import jaxls
 
 
 def lift_se2_to_se3(pose: jaxlie.SE2) -> jaxlie.SE3:
@@ -92,7 +91,7 @@ def main():
     print()
 
     # Solve the constrained problem.
-    solution = problem.solve(verbose=True)
+    solution = jax.jit(problem.solve)()
 
     print()
     print("=" * 60)
@@ -123,7 +122,7 @@ def main():
         variables=pose_vars,
     ).analyze()
 
-    unconstrained_solution = unconstrained_problem.solve(verbose=False)
+    unconstrained_solution = jax.jit(unconstrained_problem.solve)()
 
     print("Unconstrained solution (no GPS constraint):")
     for i, var in enumerate(pose_vars):

@@ -187,7 +187,7 @@ def main():
     print("Solving constrained inverse kinematics...")
     print("  Using Augmented Lagrangian method")
     print()
-    solution = problem.solve(initial_vals=initial_vals, verbose=True)
+    solution = jax.jit(problem.solve)(initial_vals)
 
     print()
     print("=" * 70)
@@ -235,10 +235,7 @@ def main():
         costs=costs,
         variables=joint_angles,
     ).analyze()
-
-    unconstrained_solution = unconstrained_problem.solve(
-        initial_vals=initial_vals, verbose=False
-    )
+    unconstrained_solution = jax.jit(unconstrained_problem.solve)(initial_vals)
 
     theta1_unc = float(unconstrained_solution[joint_angles[0]])
     theta2_unc = float(unconstrained_solution[joint_angles[1]])
