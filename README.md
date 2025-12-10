@@ -34,12 +34,11 @@ Supported:
 - Optimization on manifolds.
   - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- **Equality and inequality constraints** via Augmented Lagrangian method.
+- Equality and inequality constraints via Augmented Lagrangian method.
   - Equality constraints: `h(x) = 0` with `constraint_type="eq_zero"`
   - Inequality constraints: `g(x) ≤ 0` with `constraint_type="leq_zero"`
   - Automatic conversion to penalty-based formulation.
   - Adaptive penalty parameter scheduling.
-  - Supports batched constraints.
 - Linear subproblem solvers:
   - Sparse iterative with Conjugate Gradient.
     - Preconditioning: block and point Jacobi.
@@ -138,15 +137,55 @@ vectorized under-the-hood.
 Batched inputs can also be manually constructed, and are detected by inspecting
 the shape of variable ID arrays in the input.
 
+**Defining constraints.** Constraints enforce conditions on the solution using
+an Augmented Lagrangian method. Two types are supported:
+
+- Equality constraints: `h(x) = 0` with `constraint_type="eq_zero"`
+- Inequality constraints: `g(x) ≤ 0` with `constraint_type="leq_zero"`
+
+```python
+# Equality constraint: fix position to a target.
+@jaxls.Constraint.create_factory(constraint_type="eq_zero")
+def position_constraint(
+    vals: jaxls.VarValues, var: jaxls.SE2Var, target_xy: jax.Array
+) -> jax.Array:
+    return vals[var].translation() - target_xy
+
+# Inequality constraint: stay outside a circular obstacle.
+@jaxls.Constraint.create_factory(constraint_type="leq_zero")
+def obstacle_avoidance(
+    vals: jaxls.VarValues,
+    var: jaxls.SE2Var,
+    obstacle_center: jax.Array,
+    obstacle_radius: float,
+) -> jax.Array:
+    # Constraint: r^2 - ||p - c||^2 <= 0 ensures ||p - c|| >= r
+    pos = vals[var].translation()
+    dist_sq = jnp.sum((pos - obstacle_center) ** 2)
+    return jnp.array([obstacle_radius**2 - dist_sq])
+```
+
+```python
+# Instantiating constraints.
+constraints = [
+    position_constraint(pose_vars[0], jnp.array([0.0, 0.0])),
+    obstacle_avoidance(pose_vars[1], jnp.array([1.0, 0.0]), 0.5),
+]
+```
+
 **Solving optimization problems.** To create the optimization problem, analyze
 it, and solve:
 
 ```python
+# Unconstrained problem.
 problem = jaxls.LeastSquaresProblem(costs, pose_vars).analyze()
 solution = problem.solve()
-print("All solutions", solution)
 print("Pose 0", solution[pose_vars[0]])
 print("Pose 1", solution[pose_vars[1]])
+
+# With constraints.
+problem = jaxls.LeastSquaresProblem(costs, pose_vars, constraints).analyze()
+solution = problem.solve()
 ```
 
 ### CHOLMOD setup

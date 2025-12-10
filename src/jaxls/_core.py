@@ -3,6 +3,7 @@ from __future__ import annotations
 import dis
 import functools
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Concatenate,
@@ -22,14 +23,18 @@ from loguru import logger
 from typing_extensions import deprecated
 
 from ._solvers import (
-    AugmentedLagrangianConfig,
-    AugmentedLagrangianSolver,
     ConjugateGradientConfig,
     NonlinearSolver,
     SolveSummary,
     TerminationConfig,
     TrustRegionConfig,
 )
+
+if TYPE_CHECKING:
+    from ._augmented_lagrangian import (
+        AugmentedLagrangianConfig,
+        AugmentedLagrangianParams,
+    )
 from ._sparse_matrices import (
     BlockRowSparseMatrix,
     SparseBlockRow,
@@ -338,22 +343,6 @@ class LeastSquaresProblem:
 
 
 @jdc.pytree_dataclass
-class AugmentedLagrangianParams:
-    """Parameters for augmented Lagrangian constraint costs (ALGENCAN-style).
-
-    Each constraint group gets its own lagrange multiplier array and
-    per-constraint penalty parameter array.
-    """
-
-    lagrange_multipliers: tuple[jax.Array, ...]
-    """Lagrange multipliers for each constraint group."""
-
-    penalty_params: tuple[jax.Array, ...]
-    """Per-constraint penalty parameters for each constraint group.
-    Each array has shape (constraint_count * constraint_flat_dim,)."""
-
-
-@jdc.pytree_dataclass
 class AnalyzedLeastSquaresProblem:
     stacked_costs: tuple[_AnalyzedCost, ...]
     cost_counts: jdc.Static[tuple[int, ...]]
@@ -443,6 +432,12 @@ class AnalyzedLeastSquaresProblem:
 
         if has_constraints:
             # Use Augmented Lagrangian solver for constrained problems.
+            # Import here to avoid circular imports.
+            from ._augmented_lagrangian import (
+                AugmentedLagrangianConfig,
+                AugmentedLagrangianSolver,
+            )
+
             if augmented_lagrangian is None:
                 augmented_lagrangian = AugmentedLagrangianConfig()
 
@@ -1327,116 +1322,3 @@ class Constraint[*Args](_CostBase[*Args]):
 
     # Methods _get_name, _get_variables, _get_batch_axes, _broadcast_batch_axes
     # are inherited from _CostBase
-
-
-# _AnalyzedConstraint is no longer needed - use _AnalyzedCost._make(constraint) instead
-
-
-def create_augmented_constraint_cost(
-    analyzed_constraint: _AnalyzedCost,
-    constraint_index: int,
-    total_dim: int,
-    al_params: AugmentedLagrangianParams,
-) -> _AnalyzedCost:
-    """Create an augmented cost from a constraint for Augmented Lagrangian method.
-
-    This creates an _AnalyzedCost object that converts a constraint into an augmented
-    Lagrangian residual with per-constraint penalty parameters.
-
-    For equality constraints h(x) = 0:
-        r = sqrt(rho_i) * (h(x) + lambda_i/rho_i)
-
-    For inequality constraints g(x) <= 0:
-        r = sqrt(rho_i) * max(0, g(x) + lambda_i/rho_i)
-
-    where lambda_i (Lagrange multipliers) and rho_i (per-constraint penalty parameters)
-    are stored in the returned _AnalyzedCost's al_params field.
-
-    Args:
-        analyzed_constraint: The analyzed constraint (as _AnalyzedCost) to convert.
-        constraint_index: Index of this constraint group (for accessing the right arrays).
-        total_dim: Total dimension of lagrange multipliers for this constraint group
-                   (constraint_count * constraint_flat_dim).
-        al_params: Initial Augmented Lagrangian parameters.
-
-    Returns:
-        An _AnalyzedCost with al_params set.
-    """
-
-    is_inequality = analyzed_constraint.constraint_type == "leq_zero"
-    constraint_flat_dim = analyzed_constraint.residual_flat_dim
-
-    def augmented_residual_fn(
-        vals: VarValues,
-        *args_with_index_and_params,
-    ) -> jax.Array:
-        """Compute augmented constraint residual with per-constraint penalty.
-
-        The second-to-last element of args is instance_index, the last is al_params.
-        """
-        # Split args: last is al_params, second-to-last is instance_index
-        args = args_with_index_and_params[:-2]
-        instance_index = args_with_index_and_params[-2]
-        al_params_inner: AugmentedLagrangianParams = args_with_index_and_params[-1]
-
-        # Compute constraint value using the original constraint function
-        constraint_val = analyzed_constraint.compute_residual(vals, *args).flatten()
-
-        # Get lambdas/rho for this specific instance
-        # lambdas/rho are stored flat: [inst0_dim0, inst0_dim1, inst1_dim0, inst1_dim1, ...]
-        start_idx = instance_index * constraint_flat_dim
-        lambdas = jax.lax.dynamic_slice(
-            al_params_inner.lagrange_multipliers[constraint_index],
-            (start_idx,),
-            (constraint_flat_dim,),
-        )
-        rho = jax.lax.dynamic_slice(
-            al_params_inner.penalty_params[constraint_index],
-            (start_idx,),
-            (constraint_flat_dim,),
-        )
-
-        # For inequality constraints: only penalize when violated (max formulation)
-        # For equality constraints: always penalize deviation
-        if is_inequality:
-            # g(x) <= 0: penalize only when g(x) + lambda/rho > 0
-            return jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
-        else:
-            # h(x) = 0: always penalize
-            return jnp.sqrt(rho) * (constraint_val + lambdas / rho)
-
-    # Determine constraint count from total_dim and flat_dim
-    constraint_count = total_dim // constraint_flat_dim
-
-    # Add instance indices to args for proper slicing during vmap
-    instance_indices = jnp.arange(constraint_count)
-
-    # Broadcast al_params to have batch dimension (constraint_count,).
-    # This ensures that when the cost object is vmapped, each instance gets the
-    # full al_params (vmap will select the same values for each instance).
-    def broadcast_to_batch(arr: jax.Array) -> jax.Array:
-        return jnp.broadcast_to(arr, (constraint_count,) + arr.shape)
-
-    al_params_broadcasted = AugmentedLagrangianParams(
-        lagrange_multipliers=tuple(
-            broadcast_to_batch(arr) for arr in al_params.lagrange_multipliers
-        ),
-        penalty_params=tuple(
-            broadcast_to_batch(arr) for arr in al_params.penalty_params
-        ),
-    )
-
-    return _AnalyzedCost(
-        compute_residual=augmented_residual_fn,  # type: ignore
-        args=(*analyzed_constraint.args, instance_indices),
-        jac_mode="auto",
-        jac_batch_size=None,
-        jac_custom_fn=None,
-        jac_custom_with_cache_fn=None,
-        name=f"augmented_{analyzed_constraint._get_name()}",
-        num_variables=analyzed_constraint.num_variables,
-        sorted_ids_from_var_type=analyzed_constraint.sorted_ids_from_var_type,
-        residual_flat_dim=constraint_flat_dim,
-        constraint_type=analyzed_constraint.constraint_type,
-        al_params=al_params_broadcasted,
-    )

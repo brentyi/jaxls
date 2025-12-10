@@ -3,6 +3,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING or sys.version_info >= (3, 12):
     from . import utils as utils
+    from ._augmented_lagrangian import (
+        AugmentedLagrangianConfig as AugmentedLagrangianConfig,
+    )
     from ._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
     from ._core import Constraint as Constraint
     from ._core import Cost as Cost
@@ -11,7 +14,6 @@ if TYPE_CHECKING or sys.version_info >= (3, 12):
     from ._lie_group_variables import SE3Var as SE3Var
     from ._lie_group_variables import SO2Var as SO2Var
     from ._lie_group_variables import SO3Var as SO3Var
-    from ._solvers import AugmentedLagrangianConfig as AugmentedLagrangianConfig
     from ._solvers import ConjugateGradientConfig as ConjugateGradientConfig
     from ._solvers import SolveSummary as SolveSummary
     from ._solvers import TerminationConfig as TerminationConfig
