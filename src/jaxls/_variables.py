@@ -342,11 +342,11 @@ def sort_and_stack_vars(
 ) -> tuple[dict[type[Var[Any]], jax.Array], dict[type[Var[Any]], Any]]: ...
 
 
-def sort_and_stack_vars(
-    variables: tuple[Var, ...], values: tuple[Any, ...] | None = None
+def sort_and_stack_vars[T](
+    variables: tuple[Var, ...], values: tuple[T, ...] | None = None
 ) -> (
     dict[type[Var[Any]], jax.Array]
-    | tuple[dict[type[Var[Any]], jax.Array], dict[type[Var[Any]], Any]]
+    | tuple[dict[type[Var[Any]], jax.Array], dict[type[Var[Any]], T]]
 ):
     """Sort variables by ID, ascending. If `values` is specified, returns a
     (sorted ID mapping, value mapping) tuple. Otherwise, only returns the ID

@@ -647,14 +647,18 @@ class TrustRegionConfig:
 class TerminationConfig:
     # Termination criteria.
     max_iterations: jdc.Static[int] = 100
-    """Maximum number of optimization steps."""
+    """Maximum number of optimization steps. For constrained problems, this is
+    the maximum iterations per inner solve (not total iterations)."""
     early_termination: jdc.Static[bool] = True
     """If set to `True`, terminate when any of the tolerances are met. If
     `False`, always run `max_iterations` steps."""
     cost_tolerance: float | jax.Array = 1e-5
-    """We terminate if `|cost change| / cost < cost_tolerance`."""
+    """We terminate if `|cost change| / cost < cost_tolerance`. For constrained
+    problems, this acts as a floor for the adaptive inner solver tolerance."""
     gradient_tolerance: float | jax.Array = 1e-4
-    """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`."""
+    """We terminate if `norm_inf(x - rplus(x, linear delta)) < gradient_tolerance`.
+    For constrained problems, this acts as a floor for the adaptive inner solver
+    tolerance."""
     gradient_tolerance_start_step: int | jax.Array = 10
     """When to start checking the gradient tolerance condition. Helps solve precision
     issues caused by inexact Newton steps."""

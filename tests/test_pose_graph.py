@@ -7,14 +7,14 @@ def test_pose_graph_decorator_syntax():
     """Test pose graph optimization using decorator-based cost syntax."""
     vars = (jaxls.SE2Var(0), jaxls.SE2Var(1))
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def prior_cost(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
     ) -> jax.Array:
         """Prior cost for a pose variable. Penalizes deviations from the target"""
         return (vals[var] @ target.inverse()).log()
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def between_cost(
         vals: jaxls.VarValues, delta: jaxlie.SE2, var0: jaxls.SE2Var, var1: jaxls.SE2Var
     ) -> jax.Array:
@@ -92,13 +92,13 @@ def test_decorator_and_direct_syntax_equivalence():
     vars = (jaxls.SE2Var(0), jaxls.SE2Var(1))
 
     # Decorator syntax
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def prior_cost(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
     ) -> jax.Array:
         return (vals[var] @ target.inverse()).log()
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def between_cost(
         vals: jaxls.VarValues, delta: jaxlie.SE2, var0: jaxls.SE2Var, var1: jaxls.SE2Var
     ) -> jax.Array:
