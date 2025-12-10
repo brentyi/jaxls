@@ -13,8 +13,6 @@ from loguru import logger
 from typing_extensions import deprecated
 
 from ._solvers import (
-    AugmentedLagrangianConfig,
-    AugmentedLagrangianSolver,
     ConjugateGradientConfig,
     NonlinearSolver,
     TerminationConfig,
@@ -61,16 +59,16 @@ class LeastSquaresProblem:
 
         variables = tuple(self.variables)
         compute_residual_from_hash = dict()
-        costs = tuple(
-            jdc.replace(
-                cost,
-                compute_residual=compute_residual_from_hash.setdefault(
+
+        def _deduplicate_compute_residual(cost: Any) -> Any:
+            with jdc.copy_and_mutate(cost) as cost_copy:
+                cost_copy.compute_residual = compute_residual_from_hash.setdefault(
                     _get_function_signature(cost.compute_residual),
                     cost.compute_residual,
-                ),
-            )
-            for cost in self.costs
-        )
+                )
+            return cost_copy
+
+        costs = tuple(_deduplicate_compute_residual(cost) for cost in self.costs)
 
         num_costs = 0
         for f in costs:
@@ -206,14 +204,19 @@ class LeastSquaresProblem:
         )
 
         compute_constraint_from_hash = dict()
+
+        def _deduplicate_compute_constraint(constraint: Any) -> Any:
+            with jdc.copy_and_mutate(constraint) as constraint_copy:
+                constraint_copy.compute_constraint = (
+                    compute_constraint_from_hash.setdefault(
+                        _get_function_signature(constraint.compute_constraint),
+                        constraint.compute_constraint,
+                    )
+                )
+            return constraint_copy
+
         constraints = tuple(
-            jdc.replace(
-                constraint,
-                compute_constraint=compute_constraint_from_hash.setdefault(
-                    _get_function_signature(constraint.compute_constraint),
-                    constraint.compute_constraint,
-                ),
-            )
+            _deduplicate_compute_constraint(constraint)
             for constraint in self.constraints
         )
 
@@ -284,13 +287,6 @@ class LeastSquaresProblem:
 
 
 @jdc.pytree_dataclass
-class AugmentedLagrangianParams:
-    lagrange_multipliers: Any
-
-    penalty_params: Any
-
-
-@jdc.pytree_dataclass
 class AnalyzedLeastSquaresProblem:
     stacked_costs: Any
     cost_counts: jdc.Static[Any]
@@ -325,6 +321,11 @@ class AnalyzedLeastSquaresProblem:
         has_constraints = len(self.stacked_constraints) > 0
 
         if has_constraints:
+            from ._augmented_lagrangian import (
+                AugmentedLagrangianConfig,
+                AugmentedLagrangianSolver,
+            )
+
             if augmented_lagrangian is None:
                 augmented_lagrangian = AugmentedLagrangianConfig()
 
@@ -851,71 +852,3 @@ class Constraint(_CostBase[Any]):
         if compute_constraint is None:
             return decorator
         return decorator(compute_constraint)
-
-
-def create_augmented_constraint_cost(
-    analyzed_constraint: Any,
-    constraint_index: Any,
-    total_dim: Any,
-    al_params: Any,
-) -> Any:
-    is_inequality = analyzed_constraint.constraint_type == "leq_zero"
-    constraint_flat_dim = analyzed_constraint.residual_flat_dim
-
-    def augmented_residual_fn(
-        vals: Any,
-        *args_with_index_and_params,
-    ) -> Any:
-        args = args_with_index_and_params[:-2]
-        instance_index = args_with_index_and_params[-2]
-        al_params_inner: Any = args_with_index_and_params[-1]
-
-        constraint_val = analyzed_constraint.compute_residual(vals, *args).flatten()
-
-        start_idx = instance_index * constraint_flat_dim
-        lambdas = jax.lax.dynamic_slice(
-            al_params_inner.lagrange_multipliers[constraint_index],
-            (start_idx,),
-            (constraint_flat_dim,),
-        )
-        rho = jax.lax.dynamic_slice(
-            al_params_inner.penalty_params[constraint_index],
-            (start_idx,),
-            (constraint_flat_dim,),
-        )
-
-        if is_inequality:
-            return jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
-        else:
-            return jnp.sqrt(rho) * (constraint_val + lambdas / rho)
-
-    constraint_count = total_dim // constraint_flat_dim
-
-    instance_indices = jnp.arange(constraint_count)
-
-    def broadcast_to_batch(arr: Any) -> Any:
-        return jnp.broadcast_to(arr, (constraint_count,) + arr.shape)
-
-    al_params_broadcasted = AugmentedLagrangianParams(
-        lagrange_multipliers=tuple(
-            broadcast_to_batch(arr) for arr in al_params.lagrange_multipliers
-        ),
-        penalty_params=tuple(
-            broadcast_to_batch(arr) for arr in al_params.penalty_params
-        ),
-    )
-
-    return _AnalyzedCost(
-        compute_residual=augmented_residual_fn,
-        args=(*analyzed_constraint.args, instance_indices),
-        jac_mode="auto",
-        jac_batch_size=None,
-        jac_custom_fn=None,
-        jac_custom_with_cache_fn=None,
-        name=f"augmented_{analyzed_constraint._get_name()}",
-        num_variables=analyzed_constraint.num_variables,
-        sorted_ids_from_var_type=analyzed_constraint.sorted_ids_from_var_type,
-        residual_flat_dim=constraint_flat_dim,
-        constraint_type=analyzed_constraint.constraint_type,
-        al_params=al_params_broadcasted,
-    )

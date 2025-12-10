@@ -87,16 +87,16 @@ class LeastSquaresProblem:
 
         variables = tuple(self.variables)
         compute_residual_from_hash = dict[Hashable, Callable]()
-        costs = tuple(
-            jdc.replace(
-                cost,
-                compute_residual=compute_residual_from_hash.setdefault(
+
+        def _deduplicate_compute_residual(cost: Cost) -> Cost:
+            with jdc.copy_and_mutate(cost) as cost_copy:
+                cost_copy.compute_residual = compute_residual_from_hash.setdefault(
                     _get_function_signature(cost.compute_residual),
                     cost.compute_residual,
-                ),
-            )
-            for cost in self.costs
-        )
+                )
+            return cost_copy
+
+        costs = tuple(_deduplicate_compute_residual(cost) for cost in self.costs)
 
         # We're assuming no more than 1 batch axis.
         num_costs = 0
@@ -260,14 +260,19 @@ class LeastSquaresProblem:
         # This ensures constraints with the same function signature share the same
         # function object, allowing them to be batched together.
         compute_constraint_from_hash = dict[Hashable, Callable]()
+
+        def _deduplicate_compute_constraint(constraint: Constraint) -> Constraint:
+            with jdc.copy_and_mutate(constraint) as constraint_copy:
+                constraint_copy.compute_constraint = (
+                    compute_constraint_from_hash.setdefault(
+                        _get_function_signature(constraint.compute_constraint),
+                        constraint.compute_constraint,
+                    )
+                )
+            return constraint_copy
+
         constraints = tuple(
-            jdc.replace(
-                constraint,
-                compute_constraint=compute_constraint_from_hash.setdefault(
-                    _get_function_signature(constraint.compute_constraint),
-                    constraint.compute_constraint,
-                ),
-            )
+            _deduplicate_compute_constraint(constraint)
             for constraint in self.constraints
         )
         # Constraints are now stored as _AnalyzedCost objects

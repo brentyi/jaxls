@@ -561,24 +561,26 @@ class AugmentedLagrangianSolver:
                     broadcast_to_batch(arr) for arr in al_params.penalty_params
                 ),
             )
-            updated_costs.append(jdc.replace(cost, al_params=al_params_broadcasted))
+            with jdc.copy_and_mutate(cost) as cost_copy:
+                cost_copy.al_params = al_params_broadcasted
+            updated_costs.append(cost_copy)
             constraint_idx += 1
 
-        augmented_problem = jdc.replace(
-            augmented_structure,
-            stacked_costs=tuple(updated_costs),
-        )
+        with jdc.copy_and_mutate(augmented_structure) as augmented_problem:
+            augmented_problem.stacked_costs = tuple(updated_costs)
 
         # Solve inner unconstrained problem using ALGENCAN-style adaptive tolerance.
-        inner_termination = jdc.replace(
-            self.inner_solver.termination,
-            cost_tolerance=state.epsopk,
-            gradient_tolerance=state.epsopk,
-        )
-        inner_solver_updated = jdc.replace(
-            self.inner_solver,
-            termination=inner_termination,
-        )
+        # Use maximum of adaptive epsopk and user-specified tolerances: this respects
+        # ALGENCAN's loose-to-tight schedule while using user tolerances as a floor.
+        with jdc.copy_and_mutate(self.inner_solver.termination) as inner_termination:
+            inner_termination.cost_tolerance = jnp.maximum(
+                state.epsopk, self.inner_solver.termination.cost_tolerance
+            )
+            inner_termination.gradient_tolerance = jnp.maximum(
+                state.epsopk, self.inner_solver.termination.gradient_tolerance
+            )
+        with jdc.copy_and_mutate(self.inner_solver) as inner_solver_updated:
+            inner_solver_updated.termination = inner_termination
 
         vals_updated, inner_summary = inner_solver_updated.solve(
             augmented_problem, state.vals, return_summary=True
@@ -677,28 +679,27 @@ class AugmentedLagrangianSolver:
             )
 
         next_idx = state.outer_iteration + 1
-        return jdc.replace(
-            state,
-            vals=vals_updated,
-            lagrange_multipliers=lagrange_multipliers_updated,
-            penalty_params=penalty_params_updated,
-            snorm=snorm_new,
-            snorm_prev=state.snorm,
-            constraint_values_prev=h_vals,
-            constraint_violation=csupn_new,
-            outer_iteration=state.outer_iteration + 1,
-            inner_summary=inner_summary,
-            constraint_violation_history=state.constraint_violation_history.at[
-                next_idx
-            ].set(csupn_new),
-            penalty_history=state.penalty_history.at[next_idx].set(
+        with jdc.copy_and_mutate(state) as state_updated:
+            state_updated.vals = vals_updated
+            state_updated.lagrange_multipliers = lagrange_multipliers_updated
+            state_updated.penalty_params = penalty_params_updated
+            state_updated.snorm = snorm_new
+            state_updated.snorm_prev = state.snorm
+            state_updated.constraint_values_prev = h_vals
+            state_updated.constraint_violation = csupn_new
+            state_updated.outer_iteration = state.outer_iteration + 1
+            state_updated.inner_summary = inner_summary
+            state_updated.constraint_violation_history = (
+                state.constraint_violation_history.at[next_idx].set(csupn_new)
+            )
+            state_updated.penalty_history = state.penalty_history.at[next_idx].set(
                 jnp.max(penalty_params_updated)
-            ),
-            inner_iterations_count=state.inner_iterations_count.at[next_idx].set(
-                inner_summary.iterations
-            ),
-            epsopk=epsopk_new,
-        )
+            )
+            state_updated.inner_iterations_count = state.inner_iterations_count.at[
+                next_idx
+            ].set(inner_summary.iterations)
+            state_updated.epsopk = epsopk_new
+        return state_updated
 
 
 def create_augmented_constraint_cost(
