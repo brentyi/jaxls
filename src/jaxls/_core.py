@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import dis
 import functools
 from typing import (
@@ -20,7 +21,7 @@ import numpy as onp
 from jax import numpy as jnp
 from jax.tree_util import default_registry
 from loguru import logger
-from typing_extensions import deprecated
+from typing_extensions import Self, deprecated
 
 from ._solvers import (
     ConjugateGradientConfig,
@@ -31,10 +32,8 @@ from ._solvers import (
 )
 
 if TYPE_CHECKING:
-    from ._augmented_lagrangian import (
-        AugmentedLagrangianConfig,
-        AugmentedLagrangianParams,
-    )
+    from ._augmented_lagrangian import AugmentedLagrangianConfig
+
 from ._sparse_matrices import (
     BlockRowSparseMatrix,
     SparseBlockRow,
@@ -242,7 +241,8 @@ class LeastSquaresProblem:
                 stacked_cost_expanded.residual_flat_dim * count_from_group[group_key]
             )
 
-        jac_coords_coo: SparseCooCoordinates = SparseCooCoordinates(
+        # Handle case with no costs (constraint-only problems).
+        jac_coords_coo = SparseCooCoordinates(
             *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
             shape=(residual_dim_sum, tangent_dim_sum),
         )
@@ -256,23 +256,25 @@ class LeastSquaresProblem:
         )
 
         # Process constraints.
-        # Deduplicate compute_constraint functions (same as we do for costs).
+        # Deduplicate compute_residual functions (same as we do for costs).
         # This ensures constraints with the same function signature share the same
         # function object, allowing them to be batched together.
-        compute_constraint_from_hash = dict[Hashable, Callable]()
+        compute_residual_from_hash_constraints = dict[Hashable, Callable]()
 
-        def _deduplicate_compute_constraint(constraint: Constraint) -> Constraint:
+        def _deduplicate_compute_residual_constraint(
+            constraint: Constraint,
+        ) -> Constraint:
             with jdc.copy_and_mutate(constraint) as constraint_copy:
-                constraint_copy.compute_constraint = (
-                    compute_constraint_from_hash.setdefault(
-                        _get_function_signature(constraint.compute_constraint),
-                        constraint.compute_constraint,
+                constraint_copy.compute_residual = (
+                    compute_residual_from_hash_constraints.setdefault(
+                        _get_function_signature(constraint.compute_residual),
+                        constraint.compute_residual,
                     )
                 )
             return constraint_copy
 
         constraints = tuple(
-            _deduplicate_compute_constraint(constraint)
+            _deduplicate_compute_residual_constraint(constraint)
             for constraint in self.constraints
         )
         # Constraints are now stored as _AnalyzedCost objects
@@ -536,12 +538,10 @@ class AnalyzedLeastSquaresProblem:
         else:
             return jnp.concatenate(residual_slices, axis=0)
 
-    def compute_constraint_values(self, vals: VarValues) -> jax.Array:
-        """Compute all constraint values. For equality constraints, these
-        should all be zero at a feasible solution."""
+    def _compute_constraint_values(self, vals: VarValues) -> tuple[jax.Array, ...]:
+        """Compute constraint values, one array per constraint group."""
         if len(self.stacked_constraints) == 0:
-            # No constraints: return empty array.
-            return jnp.array([])
+            return ()
 
         constraint_slices = list[jax.Array]()
         for stacked_constraint in self.stacked_constraints:
@@ -552,6 +552,16 @@ class AnalyzedLeastSquaresProblem:
             )(stacked_constraint)
             constraint_slices.append(constraint_vals.reshape((-1,)))
 
+        return tuple(constraint_slices)
+
+    def compute_constraint_values(self, vals: VarValues) -> jax.Array:
+        """Compute all constraint values as a flat array.
+
+        For equality constraints, these should all be zero at a feasible solution.
+        """
+        constraint_slices = self._compute_constraint_values(vals)
+        if len(constraint_slices) == 0:
+            return jnp.array([])
         return jnp.concatenate(constraint_slices, axis=0)
 
     def _compute_jac_values(
@@ -673,7 +683,7 @@ class AnalyzedLeastSquaresProblem:
 CustomJacobianCache = Any
 
 
-class _CostBase[*Args]:
+class _CostBase[*Args](abc.ABC):
     """Base class for cost-like terms (costs and constraints).
 
     This class provides shared functionality for both `Cost` and `Constraint`,
@@ -683,18 +693,15 @@ class _CostBase[*Args]:
     on the concrete subclasses.
     """
 
-    # Fields are defined on subclasses - this class just provides methods
+    # Fields expected on subclasses.
+    compute_residual: Any
     args: tuple[*Args]
-    name: jdc.Static[str | None]
+    name: str | None
 
     def _get_name(self) -> str:
         """Get the name. If not set, falls back to the function name."""
         if self.name is None:
-            # Subclass must have compute_residual or compute_constraint
-            func = getattr(self, "compute_residual", None) or getattr(
-                self, "compute_constraint", None
-            )
-            return func.__name__
+            return self.compute_residual.__name__
         return self.name
 
     def _get_variables(self) -> tuple[Var, ...]:
@@ -723,7 +730,7 @@ class _CostBase[*Args]:
             *[() if isinstance(v.id, int) else v.id.shape for v in variables]
         )
 
-    def _broadcast_batch_axes(self) -> _CostBase:
+    def _broadcast_batch_axes(self) -> Self:
         """Broadcast all args to consistent batch axes."""
         batch_axes = self._get_batch_axes()
         if batch_axes is None:
@@ -1004,9 +1011,6 @@ class Cost[*Args](_CostBase[*Args]):
             jac_custom_fn=jac_custom_fn,
         )
 
-    # Methods _get_name, _get_variables, _get_batch_axes, _broadcast_batch_axes
-    # are inherited from _CostBase
-
 
 @jdc.pytree_dataclass(kw_only=True)
 class _AnalyzedCost[*Args](Cost[*Args]):
@@ -1024,18 +1028,10 @@ class _AnalyzedCost[*Args](Cost[*Args]):
     constraint_type: jdc.Static[Literal["eq_zero", "leq_zero"] | None] = None
     """None for regular costs, 'eq_zero'/'leq_zero' for constraints."""
 
-    # AL params storage (replaces **kwargs)
-    al_params: AugmentedLagrangianParams | None = None
-    """Augmented Lagrangian params for augmented constraint costs. None for regular costs."""
-
     def compute_residual_flat(
         self, vals: VarValues, *args: *Args
     ) -> jax.Array | tuple[jax.Array, CustomJacobianCache]:
-        # For augmented costs, pass al_params to compute_residual
-        if self.al_params is not None:
-            out = self.compute_residual(vals, *args, self.al_params)
-        else:
-            out = self.compute_residual(vals, *args)
+        out = self.compute_residual(vals, *args)
 
         # Flatten residual vector.
         if isinstance(out, tuple):
@@ -1074,13 +1070,12 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             dummy_vals = jax.eval_shape(VarValues.make, variables)
             constraint_dim = onp.prod(
                 jax.eval_shape(
-                    constraint.compute_constraint, dummy_vals, *constraint.args
+                    constraint.compute_residual, dummy_vals, *constraint.args
                 ).shape
             )
 
             return _AnalyzedCost(
-                # Use compute_constraint as compute_residual
-                compute_residual=constraint.compute_constraint,
+                compute_residual=constraint.compute_residual,
                 args=constraint.args,
                 jac_mode="auto",
                 jac_batch_size=None,
@@ -1091,7 +1086,6 @@ class _AnalyzedCost[*Args](Cost[*Args]):
                 sorted_ids_from_var_type=sort_and_stack_vars(variables),
                 residual_flat_dim=constraint_dim,
                 constraint_type=constraint.constraint_type,
-                al_params=None,
             )
 
         # Handle Cost -> _AnalyzedCost conversion
@@ -1121,21 +1115,11 @@ class _AnalyzedCost[*Args](Cost[*Args]):
 
         # Cache the residual dimension for this cost.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
+        residual_dim = onp.prod(
+            jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
+        )
 
-        # For augmented costs, pass al_params when computing residual shape.
-        al_params = getattr(cost, "al_params", None)
-        if al_params is not None:
-            residual_dim = onp.prod(
-                jax.eval_shape(
-                    _residual_no_cache, dummy_vals, *cost.args, al_params
-                ).shape
-            )
-        else:
-            residual_dim = onp.prod(
-                jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
-            )
-
-        # Preserve al_params and constraint_type if set on the input cost
+        # Preserve constraint_type if set on the input cost
         # (for augmented costs being re-analyzed).
         constraint_type = getattr(cost, "constraint_type", None)
 
@@ -1151,7 +1135,6 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_flat_dim=residual_dim,
             constraint_type=constraint_type,
-            al_params=al_params,
         )
 
     def _compute_block_sparse_jac_indices(
@@ -1226,7 +1209,7 @@ class Constraint[*Args](_CostBase[*Args]):
     )
     ```
 
-    Each `Constraint.compute_constraint` should take at least one argument that inherits
+    Each `Constraint.compute_residual` should take at least one argument that inherits
     from the symbolic variable `jaxls.Var(id)`, where `id` must be a scalar
     integer.
 
@@ -1238,7 +1221,7 @@ class Constraint[*Args](_CostBase[*Args]):
       `()` (unbatched) or `(batch_size,)` (batched).
     """
 
-    compute_constraint: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
+    compute_residual: jdc.Static[Callable[[VarValues, *Args], jax.Array]]
     """Constraint computation function. Should return a vector where each element
     should equal zero for equality constraints."""
 
@@ -1259,7 +1242,7 @@ class Constraint[*Args](_CostBase[*Args]):
     @overload
     @staticmethod
     def create_factory[**Args_](
-        compute_constraint: ConstraintFunc[Args_],
+        compute_residual: ConstraintFunc[Args_],
         *,
         constraint_type: Literal["eq_zero", "leq_zero"] = "eq_zero",
     ) -> ConstraintFactory[Args_]: ...
@@ -1274,7 +1257,7 @@ class Constraint[*Args](_CostBase[*Args]):
 
     @staticmethod
     def create_factory[**Args_](
-        compute_constraint: ConstraintFunc[Args_] | None = None,
+        compute_residual: ConstraintFunc[Args_] | None = None,
         *,
         constraint_type: Literal["eq_zero", "leq_zero"] = "eq_zero",
         name: str | None = None,
@@ -1305,25 +1288,22 @@ class Constraint[*Args](_CostBase[*Args]):
         """
 
         def decorator(
-            compute_constraint: Callable[Concatenate[VarValues, Args_], jax.Array],
+            compute_residual: Callable[Concatenate[VarValues, Args_], jax.Array],
         ) -> ConstraintFactory[Args_]:
             def inner(
                 *args: Args_.args, **kwargs: Args_.kwargs
             ) -> Constraint[tuple[Any, ...], dict[str, Any]]:
                 return Constraint(
-                    compute_constraint=lambda values, args, kwargs: compute_constraint(
+                    compute_residual=lambda values, args, kwargs: compute_residual(
                         values, *args, **kwargs
                     ),
                     args=(args, kwargs),
                     constraint_type=constraint_type,
-                    name=name if name is not None else compute_constraint.__name__,
+                    name=name if name is not None else compute_residual.__name__,
                 )
 
             return inner
 
-        if compute_constraint is None:
+        if compute_residual is None:
             return decorator
-        return decorator(compute_constraint)
-
-    # Methods _get_name, _get_variables, _get_batch_axes, _broadcast_batch_axes
-    # are inherited from _CostBase
+        return decorator(compute_residual)

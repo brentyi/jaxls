@@ -203,20 +203,20 @@ class LeastSquaresProblem:
             shape=(residual_dim_sum, tangent_dim_sum),
         )
 
-        compute_constraint_from_hash = dict()
+        compute_residual_from_hash_constraints = dict()
 
-        def _deduplicate_compute_constraint(constraint: Any) -> Any:
+        def _deduplicate_compute_residual_constraint(constraint: Any) -> Any:
             with jdc.copy_and_mutate(constraint) as constraint_copy:
-                constraint_copy.compute_constraint = (
-                    compute_constraint_from_hash.setdefault(
-                        _get_function_signature(constraint.compute_constraint),
-                        constraint.compute_constraint,
+                constraint_copy.compute_residual = (
+                    compute_residual_from_hash_constraints.setdefault(
+                        _get_function_signature(constraint.compute_residual),
+                        constraint.compute_residual,
                     )
                 )
             return constraint_copy
 
         constraints = tuple(
-            _deduplicate_compute_constraint(constraint)
+            _deduplicate_compute_residual_constraint(constraint)
             for constraint in self.constraints
         )
 
@@ -515,15 +515,13 @@ class _CostBase:
     def __class_getitem__(cls, params):
         return cls
 
+    compute_residual: Any
     args: Any
     name: jdc.Static[Any]
 
     def _get_name(self) -> Any:
         if self.name is None:
-            func = getattr(self, "compute_residual", None) or getattr(
-                self, "compute_constraint", None
-            )
-            return func.__name__
+            return self.compute_residual.__name__
         return self.name
 
     def _get_variables(self) -> Any:
@@ -712,12 +710,12 @@ class _AnalyzedCost(Cost[Any]):
             dummy_vals = jax.eval_shape(VarValues.make, variables)
             constraint_dim = onp.prod(
                 jax.eval_shape(
-                    constraint.compute_constraint, dummy_vals, *constraint.args
+                    constraint.compute_residual, dummy_vals, *constraint.args
                 ).shape
             )
 
             return _AnalyzedCost(
-                compute_residual=constraint.compute_constraint,
+                compute_residual=constraint.compute_residual,
                 args=constraint.args,
                 jac_mode="auto",
                 jac_batch_size=None,
@@ -819,7 +817,7 @@ class Constraint(_CostBase[Any]):
     def __class_getitem__(cls, params):
         return cls
 
-    compute_constraint: jdc.Static[Any]
+    compute_residual: jdc.Static[Any]
 
     args: Any
 
@@ -829,26 +827,26 @@ class Constraint(_CostBase[Any]):
 
     @staticmethod
     def create_factory(
-        compute_constraint: Any = None,
+        compute_residual: Any = None,
         *,
         constraint_type: Any = "eq_zero",
         name: Any = None,
     ) -> Any:
         def decorator(
-            compute_constraint: Any,
+            compute_residual: Any,
         ) -> Any:
             def inner(*args: Any, **kwargs: Any) -> Any:
                 return Constraint(
-                    compute_constraint=lambda values, args, kwargs: compute_constraint(
+                    compute_residual=lambda values, args, kwargs: compute_residual(
                         values, *args, **kwargs
                     ),
                     args=(args, kwargs),
                     constraint_type=constraint_type,
-                    name=name if name is not None else compute_constraint.__name__,
+                    name=name if name is not None else compute_residual.__name__,
                 )
 
             return inner
 
-        if compute_constraint is None:
+        if compute_residual is None:
             return decorator
-        return decorator(compute_constraint)
+        return decorator(compute_residual)
