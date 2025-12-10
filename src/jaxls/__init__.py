@@ -6,8 +6,8 @@ if TYPE_CHECKING or sys.version_info >= (3, 12):
     from ._augmented_lagrangian import (
         AugmentedLagrangianConfig as AugmentedLagrangianConfig,
     )
+    from ._constraints import Constraint as Constraint
     from ._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
-    from ._core import Constraint as Constraint
     from ._core import Cost as Cost
     from ._core import LeastSquaresProblem as LeastSquaresProblem
     from ._lie_group_variables import SE2Var as SE2Var

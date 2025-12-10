@@ -1,20 +1,13 @@
 from __future__ import annotations
-
 from typing import Any
 
 import jax
 import jax_dataclasses as jdc
 from jax import numpy as jnp
 
+from ._constraints import AugmentedLagrangianParams
 from ._solvers import SolveSummary
 from .utils import jax_log
-
-
-@jdc.pytree_dataclass
-class AugmentedLagrangianParams:
-    lagrange_multipliers: Any
-
-    penalty_params: Any
 
 
 @jdc.pytree_dataclass
@@ -48,11 +41,11 @@ class _AugmentedLagrangianState:
 
     penalty_params: Any
 
+    constraint_values_prev: Any
+
     snorm: Any
 
     snorm_prev: Any
-
-    constraint_values_prev: Any
 
     constraint_violation: Any
 
@@ -79,90 +72,23 @@ class AugmentedLagrangianSolver:
 
     verbose: jdc.Static[Any]
 
-    def _extract_original_costs(self, problem: Any) -> Any:
-        from ._core import Cost
-
-        original_costs = []
-        for stacked_cost in problem.stacked_costs:
-            original_costs.append(
-                Cost(
-                    compute_residual=stacked_cost.compute_residual,
-                    args=stacked_cost.args,
-                    jac_mode=stacked_cost.jac_mode,
-                    jac_batch_size=stacked_cost.jac_batch_size,
-                    jac_custom_fn=stacked_cost.jac_custom_fn,
-                    jac_custom_with_cache_fn=stacked_cost.jac_custom_with_cache_fn,
-                    name=stacked_cost.name,
-                )
-            )
-        return original_costs
-
-    def _extract_variables(self, problem: Any) -> Any:
-        variables = []
-        for var_type, ids in problem.sorted_ids_from_var_type.items():
-            for var_id in ids:
-                variables.append(var_type(var_id))
-        return variables
-
-    def _analyze_augmented_problem(self, problem: Any, constraint_dim: Any) -> Any:
-        from ._core import LeastSquaresProblem
-
-        constraint_dims = []
-        constraint_costs = []
-
-        for i, (stacked_constraint, constraint_count) in enumerate(
-            zip(problem.stacked_constraints, problem.constraint_counts)
-        ):
-            constraint_flat_dim = stacked_constraint.residual_flat_dim
-            total_dim = constraint_count * constraint_flat_dim
-            constraint_dims.append(total_dim)
-
-        lagrange_mult_arrays = tuple(jnp.zeros(dim) for dim in constraint_dims)
-        penalty_param_arrays = tuple(jnp.ones(dim) for dim in constraint_dims)
-        al_params = AugmentedLagrangianParams(
-            lagrange_multipliers=lagrange_mult_arrays,
-            penalty_params=penalty_param_arrays,
-        )
-
-        for i, (stacked_constraint, constraint_count) in enumerate(
-            zip(problem.stacked_constraints, problem.constraint_counts)
-        ):
-            constraint_flat_dim = stacked_constraint.residual_flat_dim
-            total_dim = constraint_count * constraint_flat_dim
-
-            augmented_cost = create_augmented_constraint_cost(
-                stacked_constraint, i, total_dim, al_params
-            )
-            constraint_costs.append(augmented_cost)
-
-        original_costs = self._extract_original_costs(problem)
-        variables = self._extract_variables(problem)
-
-        if self.verbose:
-            jax_log("Pre-analyzing augmented problem structure (one-time cost)...")
-
-        augmented = LeastSquaresProblem(
-            costs=original_costs + constraint_costs,
-            variables=variables,
-        ).analyze()
-
-        return augmented
-
     def solve(
         self,
         problem: Any,
         initial_vals: Any,
         return_summary: jdc.Static[Any] = False,
     ) -> Any:
-        assert len(problem.stacked_constraints) > 0, (
+        constraint_costs = [
+            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+        ]
+        assert len(constraint_costs) > 0, (
             "AugmentedLagrangianSolver requires constraints. "
             "Use NonlinearSolver for unconstrained problems."
         )
 
-        h_vals = problem.compute_constraint_values(initial_vals)
-        constraint_dim = len(h_vals)
+        h_vals = problem._compute_constraint_values(initial_vals)
 
-        lagrange_multipliers = jnp.zeros(constraint_dim)
+        lagrange_multipliers = tuple(jnp.zeros_like(h) for h in h_vals)
 
         initial_snorm, initial_csupn = self._compute_snorm_csupn(
             problem, h_vals, lagrange_multipliers
@@ -177,20 +103,13 @@ class AugmentedLagrangianSolver:
             initial_cost = jnp.sum(residual_vector**2)
 
             sum_c_squared = jnp.array(0.0)
-            offset = 0
-            for i, stacked_constraint in enumerate(problem.stacked_constraints):
-                constraint_count = problem.constraint_counts[i]
-                constraint_flat_dim = stacked_constraint.residual_flat_dim
-                total_dim = constraint_count * constraint_flat_dim
-                h_slice = h_vals[offset : offset + total_dim]
-
-                if stacked_constraint.constraint_type == "leq_zero":
+            for cost, h_group in zip(constraint_costs, h_vals):
+                if cost.constraint_type == "leq_zero":
                     sum_c_squared = sum_c_squared + jnp.sum(
-                        0.5 * jnp.maximum(0.0, h_slice) ** 2
+                        0.5 * jnp.maximum(0.0, h_group) ** 2
                     )
                 else:
-                    sum_c_squared = sum_c_squared + jnp.sum(0.5 * h_slice**2)
-                offset += total_dim
+                    sum_c_squared = sum_c_squared + jnp.sum(0.5 * h_group**2)
 
             penalty_initial = (
                 10.0
@@ -203,10 +122,9 @@ class AugmentedLagrangianSolver:
         else:
             penalty_initial = self.config.penalty_initial
 
-        penalty_params = jnp.full(constraint_dim, penalty_initial)
+        penalty_params = tuple(jnp.full_like(h, penalty_initial) for h in h_vals)
 
-        augmented_structure = self._analyze_augmented_problem(problem, constraint_dim)
-
+        constraint_dim = sum(h.size for h in h_vals)
         if self.verbose:
             jax_log(
                 "Augmented Lagrangian: initial snorm={snorm:.4e}, csupn={csupn:.4e}, penalty={penalty:.4e}, constraint_dim={dim}",
@@ -241,9 +159,9 @@ class AugmentedLagrangianSolver:
             vals=initial_vals,
             lagrange_multipliers=lagrange_multipliers,
             penalty_params=penalty_params,
+            constraint_values_prev=h_vals,
             snorm=initial_snorm,
             snorm_prev=initial_snorm,
-            constraint_values_prev=h_vals,
             constraint_violation=initial_csupn,
             initial_snorm=initial_snorm,
             outer_iteration=0,
@@ -270,7 +188,7 @@ class AugmentedLagrangianSolver:
             return (first_iteration | ~converged) & under_max_iters
 
         def body_fn(state: Any) -> Any:
-            return self._step(problem, augmented_structure, state)
+            return self._step(problem, state)
 
         state = jax.lax.while_loop(cond_fn, body_fn, state)
 
@@ -283,19 +201,14 @@ class AugmentedLagrangianSolver:
         )
 
         if self.verbose:
-            if converged_absolute and converged_relative:
-                jax_log(
-                    "Augmented Lagrangian converged @ outer iteration {i}: snorm={snorm:.4e}, csupn={csupn:.4e}",
-                    i=state.outer_iteration,
-                    snorm=state.snorm,
-                    csupn=state.constraint_violation,
-                )
-            else:
-                jax_log(
-                    "Augmented Lagrangian: max iterations reached. Final snorm={snorm:.4e}, csupn={csupn:.4e}",
-                    snorm=state.snorm,
-                    csupn=state.constraint_violation,
-                )
+            jax_log(
+                "Augmented Lagrangian finished @ outer iteration {i}: converged_absolute={abs}, converged_relative={rel}, snorm={snorm:.4e}, csupn={csupn:.4e}",
+                i=state.outer_iteration,
+                abs=converged_absolute,
+                rel=converged_relative,
+                snorm=state.snorm,
+                csupn=state.constraint_violation,
+            )
 
         if return_summary:
             return state.vals, state.inner_summary
@@ -310,24 +223,21 @@ class AugmentedLagrangianSolver:
     ) -> Any:
         snorm_parts = []
         csupn_parts = []
-        offset = 0
 
-        for i, stacked_constraint in enumerate(problem.stacked_constraints):
-            constraint_count = problem.constraint_counts[i]
-            constraint_flat_dim = stacked_constraint.residual_flat_dim
-            total_dim = constraint_count * constraint_flat_dim
-            h_slice = h_vals[offset : offset + total_dim]
-            lambda_slice = lagrange_multipliers[offset : offset + total_dim]
+        constraint_costs = [
+            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+        ]
 
-            if stacked_constraint.constraint_type == "leq_zero":
-                comp = jnp.minimum(-h_slice, lambda_slice)
+        for cost, h_group, lambda_group in zip(
+            constraint_costs, h_vals, lagrange_multipliers
+        ):
+            if cost.constraint_type == "leq_zero":
+                comp = jnp.minimum(-h_group, lambda_group)
                 snorm_parts.append(jnp.max(jnp.abs(comp)))
-                csupn_parts.append(jnp.max(jnp.maximum(0.0, h_slice)))
+                csupn_parts.append(jnp.max(jnp.maximum(0.0, h_group)))
             else:
-                snorm_parts.append(jnp.max(jnp.abs(h_slice)))
-                csupn_parts.append(jnp.max(jnp.abs(h_slice)))
-
-            offset += total_dim
+                snorm_parts.append(jnp.max(jnp.abs(h_group)))
+                csupn_parts.append(jnp.max(jnp.abs(h_group)))
 
         if len(snorm_parts) == 0:
             return jnp.array(0.0), jnp.array(0.0)
@@ -342,75 +252,60 @@ class AugmentedLagrangianSolver:
         h_vals: Any,
     ) -> Any:
         violation_parts = []
-        offset = 0
 
-        for i, stacked_constraint in enumerate(problem.stacked_constraints):
-            constraint_count = problem.constraint_counts[i]
-            constraint_flat_dim = stacked_constraint.residual_flat_dim
-            total_dim = constraint_count * constraint_flat_dim
-            h_slice = h_vals[offset : offset + total_dim]
+        constraint_costs = [
+            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+        ]
 
-            if stacked_constraint.constraint_type == "leq_zero":
-                violation_parts.append(jnp.maximum(0.0, h_slice))
+        for cost, h_group in zip(constraint_costs, h_vals):
+            if cost.constraint_type == "leq_zero":
+                violation_parts.append(jnp.maximum(0.0, h_group))
             else:
-                violation_parts.append(jnp.abs(h_slice))
+                violation_parts.append(jnp.abs(h_group))
 
-            offset += total_dim
-
-        return jnp.concatenate(violation_parts)
+        return tuple(violation_parts)
 
     def _step(
         self,
         problem: Any,
-        augmented_structure: Any,
         state: Any,
     ) -> Any:
-        constraint_dims = []
-        for i, (stacked_constraint, constraint_count) in enumerate(
-            zip(problem.stacked_constraints, problem.constraint_counts)
-        ):
-            constraint_flat_dim = stacked_constraint.residual_flat_dim
-            total_dim = constraint_count * constraint_flat_dim
-            constraint_dims.append(total_dim)
+        updated_costs = []
+        constraint_group_idx = 0
 
-        lambda_arrays = []
-        penalty_arrays = []
-        offset = 0
-        for dim in constraint_dims:
-            lambda_arrays.append(state.lagrange_multipliers[offset : offset + dim])
-            penalty_arrays.append(state.penalty_params[offset : offset + dim])
-            offset += dim
+        for cost in problem.stacked_costs:
+            if cost.constraint_type is None:
+                updated_costs.append(cost)
+            else:
+                current_al_params: Any = cost.args[0]
 
-        al_params = AugmentedLagrangianParams(
-            lagrange_multipliers=tuple(lambda_arrays),
-            penalty_params=tuple(penalty_arrays),
-        )
+                (constraint_count,) = cost._get_batch_axes()
+                constraint_flat_dim = cost.residual_flat_dim
 
-        num_original_costs = len(problem.stacked_costs)
-        updated_costs = list(augmented_structure.stacked_costs[:num_original_costs])
+                lambda_flat = state.lagrange_multipliers[constraint_group_idx]
+                penalty_flat = state.penalty_params[constraint_group_idx]
 
-        constraint_idx = 0
-        for cost in augmented_structure.stacked_costs[num_original_costs:]:
-            (constraint_count,) = cost._get_batch_axes()
+                lambda_reshaped = lambda_flat.reshape(
+                    constraint_count, constraint_flat_dim
+                )
+                penalty_reshaped = penalty_flat.reshape(
+                    constraint_count, constraint_flat_dim
+                )
 
-            def broadcast_to_batch(arr: Any) -> Any:
-                return jnp.broadcast_to(arr, (constraint_count,) + arr.shape)
+                al_params_updated = AugmentedLagrangianParams(
+                    lagrange_multipliers=lambda_reshaped,
+                    penalty_params=penalty_reshaped,
+                    original_args=current_al_params.original_args,
+                    constraint_index=current_al_params.constraint_index,
+                )
 
-            al_params_broadcasted = AugmentedLagrangianParams(
-                lagrange_multipliers=tuple(
-                    broadcast_to_batch(arr) for arr in al_params.lagrange_multipliers
-                ),
-                penalty_params=tuple(
-                    broadcast_to_batch(arr) for arr in al_params.penalty_params
-                ),
-            )
-            with jdc.copy_and_mutate(cost) as cost_copy:
-                cost_copy.al_params = al_params_broadcasted
-            updated_costs.append(cost_copy)
-            constraint_idx += 1
+                with jdc.copy_and_mutate(cost) as cost_copy:
+                    cost_copy.args = (al_params_updated,)
+                updated_costs.append(cost_copy)
+                constraint_group_idx += 1
 
-        with jdc.copy_and_mutate(augmented_structure) as augmented_problem:
-            augmented_problem.stacked_costs = tuple(updated_costs)
+        with jdc.copy_and_mutate(problem) as updated_problem:
+            updated_problem.stacked_costs = tuple(updated_costs)
 
         with jdc.copy_and_mutate(self.inner_solver.termination) as inner_termination:
             inner_termination.cost_tolerance = jnp.maximum(
@@ -423,34 +318,29 @@ class AugmentedLagrangianSolver:
             inner_solver_updated.termination = inner_termination
 
         vals_updated, inner_summary = inner_solver_updated.solve(
-            augmented_problem, state.vals, return_summary=True
+            updated_problem, state.vals, return_summary=True
         )
 
-        h_vals = problem.compute_constraint_values(vals_updated)
+        h_vals = problem._compute_constraint_values(vals_updated)
 
-        lagrange_multipliers_updated = (
-            state.lagrange_multipliers + state.penalty_params * h_vals
-        )
-
-        offset = 0
-        lambda_arrays_projected = []
-        for i, stacked_constraint in enumerate(problem.stacked_constraints):
-            constraint_count = problem.constraint_counts[i]
-            constraint_flat_dim = stacked_constraint.residual_flat_dim
-            total_dim = constraint_count * constraint_flat_dim
-
-            lambda_slice = lagrange_multipliers_updated[offset : offset + total_dim]
-
-            if stacked_constraint.constraint_type == "leq_zero":
-                lambda_slice = jnp.maximum(0.0, lambda_slice)
-            lambda_slice = jnp.clip(
-                lambda_slice, self.config.lambda_min, self.config.lambda_max
+        constraint_costs = [
+            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+        ]
+        lagrange_multipliers_updated = []
+        for cost, lambda_group, penalty_group, h_group in zip(
+            constraint_costs,
+            state.lagrange_multipliers,
+            state.penalty_params,
+            h_vals,
+        ):
+            lambda_new = lambda_group + penalty_group * h_group
+            if cost.constraint_type == "leq_zero":
+                lambda_new = jnp.maximum(0.0, lambda_new)
+            lambda_new = jnp.clip(
+                lambda_new, self.config.lambda_min, self.config.lambda_max
             )
-
-            lambda_arrays_projected.append(lambda_slice)
-            offset += total_dim
-
-        lagrange_multipliers_updated = jnp.concatenate(lambda_arrays_projected)
+            lagrange_multipliers_updated.append(lambda_new)
+        lagrange_multipliers_updated = tuple(lagrange_multipliers_updated)
 
         snorm_new, csupn_new = self._compute_snorm_csupn(
             problem, h_vals, lagrange_multipliers_updated
@@ -463,22 +353,29 @@ class AugmentedLagrangianSolver:
             problem, state.constraint_values_prev
         )
 
-        insufficient_progress_per = constraint_violation_per > (
-            self.config.violation_reduction_threshold * constraint_violation_prev_per
-        )
-
         inner_hit_max_iters = inner_summary.termination_criteria[3]
         inner_made_progress = inner_summary.termination_criteria[0]
         rhorestart_needed = inner_hit_max_iters & ~inner_made_progress
 
-        penalty_params_updated = jnp.where(
-            insufficient_progress_per | rhorestart_needed,
-            jnp.minimum(
-                state.penalty_params * self.config.penalty_factor,
-                self.config.penalty_max,
-            ),
+        penalty_params_updated = []
+        for violation, violation_prev, penalty_group in zip(
+            constraint_violation_per,
+            constraint_violation_prev_per,
             state.penalty_params,
-        )
+        ):
+            insufficient_progress = violation > (
+                self.config.violation_reduction_threshold * violation_prev
+            )
+            penalty_new = jnp.where(
+                insufficient_progress | rhorestart_needed,
+                jnp.minimum(
+                    penalty_group * self.config.penalty_factor,
+                    self.config.penalty_max,
+                ),
+                penalty_group,
+            )
+            penalty_params_updated.append(penalty_new)
+        penalty_params_updated = tuple(penalty_params_updated)
 
         nlpsupn = inner_summary.termination_deltas[1]
         base_tol = self.inner_solver.termination.gradient_tolerance
@@ -496,13 +393,15 @@ class AugmentedLagrangianSolver:
             state.epsopk,
         )
 
+        max_penalty = jnp.max(jnp.array([jnp.max(p) for p in penalty_params_updated]))
+
         if self.verbose:
             jax_log(
                 " AL outer iter {i}: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}, inner_iters={inner_iters}, epsopk={epsopk:.4e}",
                 i=state.outer_iteration,
                 snorm=snorm_new,
                 csupn=csupn_new,
-                max_rho=jnp.max(penalty_params_updated),
+                max_rho=max_penalty,
                 inner_iters=inner_summary.iterations,
                 epsopk=epsopk_new,
                 ordered=True,
@@ -513,9 +412,9 @@ class AugmentedLagrangianSolver:
             state_updated.vals = vals_updated
             state_updated.lagrange_multipliers = lagrange_multipliers_updated
             state_updated.penalty_params = penalty_params_updated
+            state_updated.constraint_values_prev = h_vals
             state_updated.snorm = snorm_new
             state_updated.snorm_prev = state.snorm
-            state_updated.constraint_values_prev = h_vals
             state_updated.constraint_violation = csupn_new
             state_updated.outer_iteration = state.outer_iteration + 1
             state_updated.inner_summary = inner_summary
@@ -523,80 +422,10 @@ class AugmentedLagrangianSolver:
                 state.constraint_violation_history.at[next_idx].set(csupn_new)
             )
             state_updated.penalty_history = state.penalty_history.at[next_idx].set(
-                jnp.max(penalty_params_updated)
+                max_penalty
             )
             state_updated.inner_iterations_count = state.inner_iterations_count.at[
                 next_idx
             ].set(inner_summary.iterations)
             state_updated.epsopk = epsopk_new
         return state_updated
-
-
-def create_augmented_constraint_cost(
-    analyzed_constraint: Any,
-    constraint_index: Any,
-    total_dim: Any,
-    al_params: Any,
-) -> Any:
-    from ._core import _AnalyzedCost
-
-    is_inequality = analyzed_constraint.constraint_type == "leq_zero"
-    constraint_flat_dim = analyzed_constraint.residual_flat_dim
-
-    def augmented_residual_fn(
-        vals: Any,
-        *args_with_index_and_params,
-    ) -> Any:
-        args = args_with_index_and_params[:-2]
-        instance_index = args_with_index_and_params[-2]
-        al_params_inner: Any = args_with_index_and_params[-1]
-
-        constraint_val = analyzed_constraint.compute_residual(vals, *args).flatten()
-
-        start_idx = instance_index * constraint_flat_dim
-        lambdas = jax.lax.dynamic_slice(
-            al_params_inner.lagrange_multipliers[constraint_index],
-            (start_idx,),
-            (constraint_flat_dim,),
-        )
-        rho = jax.lax.dynamic_slice(
-            al_params_inner.penalty_params[constraint_index],
-            (start_idx,),
-            (constraint_flat_dim,),
-        )
-
-        if is_inequality:
-            return jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
-        else:
-            return jnp.sqrt(rho) * (constraint_val + lambdas / rho)
-
-    constraint_count = total_dim // constraint_flat_dim
-
-    instance_indices = jnp.arange(constraint_count)
-
-    def broadcast_to_batch(arr: Any) -> Any:
-        return jnp.broadcast_to(arr, (constraint_count,) + arr.shape)
-
-    al_params_broadcasted = AugmentedLagrangianParams(
-        lagrange_multipliers=tuple(
-            broadcast_to_batch(arr) for arr in al_params.lagrange_multipliers
-        ),
-        penalty_params=tuple(
-            broadcast_to_batch(arr) for arr in al_params.penalty_params
-        ),
-    )
-
-    return _AnalyzedCost(
-        compute_residual=augmented_residual_fn,
-        args=(*analyzed_constraint.args, instance_indices),
-        jac_mode="auto",
-        jac_batch_size=None,
-        jac_custom_fn=None,
-        jac_custom_with_cache_fn=None,
-        name=f"augmented_{analyzed_constraint._get_name()}",
-        num_variables=analyzed_constraint.num_variables,
-        sorted_ids_from_var_type=analyzed_constraint.sorted_ids_from_var_type,
-        residual_flat_dim=constraint_flat_dim,
-        constraint_type=analyzed_constraint.constraint_type,
-        al_params=al_params_broadcasted,
-    )

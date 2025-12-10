@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import dis
 import functools
 from typing import Any
@@ -18,6 +19,8 @@ from ._solvers import (
     TerminationConfig,
     TrustRegionConfig,
 )
+
+from ._constraints import Constraint, analyze_constraint
 from ._sparse_matrices import (
     BlockRowSparseMatrix,
     SparseBlockRow,
@@ -190,7 +193,7 @@ class LeastSquaresProblem:
                 stacked_cost_expanded.residual_flat_dim * count_from_group[group_key]
             )
 
-        jac_coords_coo: Any = SparseCooCoordinates(
+        jac_coords_coo = SparseCooCoordinates(
             *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
             shape=(residual_dim_sum, tangent_dim_sum),
         )
@@ -205,7 +208,9 @@ class LeastSquaresProblem:
 
         compute_residual_from_hash_constraints = dict()
 
-        def _deduplicate_compute_residual_constraint(constraint: Any) -> Any:
+        def _deduplicate_compute_residual_constraint(
+            constraint: Any,
+        ) -> Any:
             with jdc.copy_and_mutate(constraint) as constraint_copy:
                 constraint_copy.compute_residual = (
                     compute_residual_from_hash_constraints.setdefault(
@@ -220,12 +225,12 @@ class LeastSquaresProblem:
             for constraint in self.constraints
         )
 
-        stacked_constraints = list()
-        constraint_counts = list()
-
+        constraint_index = 0
         if len(constraints) > 0:
             constraints_from_group = dict()
             constraint_count_from_group = dict()
+            constraint_index_from_group = dict()
+
             for constraint in constraints:
                 constraint = constraint._broadcast_batch_axes()
                 batch_axes = constraint._get_batch_axes()
@@ -237,8 +242,11 @@ class LeastSquaresProblem:
                         for leaf in jax.tree.leaves(constraint)
                     ),
                 )
-                constraints_from_group.setdefault(group_key, [])
-                constraint_count_from_group.setdefault(group_key, 0)
+                if group_key not in constraints_from_group:
+                    constraints_from_group[group_key] = []
+                    constraint_count_from_group[group_key] = 0
+                    constraint_index_from_group[group_key] = constraint_index
+                    constraint_index += 1
 
                 if len(batch_axes) == 0:
                     constraint = jax.tree.map(
@@ -253,23 +261,68 @@ class LeastSquaresProblem:
 
             for group_key in sorted(constraints_from_group.keys(), key=_sort_key):
                 group = constraints_from_group[group_key]
+                group_constraint_index = constraint_index_from_group[group_key]
 
                 stacked_constraint: Any = jax.tree.map(
                     lambda *args: jnp.concatenate(args, axis=0), *group
                 )
 
-                stacked_constraint_expanded: Any = jax.vmap(_AnalyzedCost._make)(
-                    stacked_constraint
-                )
-                stacked_constraints.append(stacked_constraint_expanded)
-                constraint_counts.append(constraint_count_from_group[group_key])
+                stacked_cost_expanded: Any = jax.vmap(
+                    lambda c: analyze_constraint(c, group_constraint_index)
+                )(stacked_constraint)
+                stacked_costs.append(stacked_cost_expanded)
+                cost_counts.append(constraint_count_from_group[group_key])
 
                 logger.info(
                     "Vectorizing constraint group with {} constraints, {} variables each: {}",
                     constraint_count_from_group[group_key],
-                    stacked_constraints[-1].num_variables,
-                    stacked_constraints[-1]._get_name(),
+                    stacked_cost_expanded.num_variables,
+                    stacked_cost_expanded._get_name(),
                 )
+
+                rows, cols = jax.vmap(
+                    functools.partial(
+                        _AnalyzedCost._compute_block_sparse_jac_indices,
+                        tangent_ordering=tangent_ordering,
+                        sorted_ids_from_var_type=sorted_ids_from_var_type,
+                        tangent_start_from_var_type=tangent_start_from_var_type,
+                    )
+                )(stacked_cost_expanded)
+                constraint_count = constraint_count_from_group[group_key]
+                assert (
+                    rows.shape
+                    == cols.shape
+                    == (
+                        constraint_count,
+                        stacked_cost_expanded.residual_flat_dim,
+                        rows.shape[-1],
+                    )
+                )
+                rows = rows + (
+                    jnp.arange(constraint_count)[:, None, None]
+                    * stacked_cost_expanded.residual_flat_dim
+                )
+                rows = rows + residual_dim_sum
+                jac_coords.append((rows.flatten(), cols.flatten()))
+                residual_dim_sum += (
+                    stacked_cost_expanded.residual_flat_dim * constraint_count
+                )
+
+        if len(jac_coords) > 0:
+            jac_coords_coo = SparseCooCoordinates(
+                *jax.tree.map(
+                    lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords
+                ),
+                shape=(residual_dim_sum, tangent_dim_sum),
+            )
+            csr_indptr = jnp.searchsorted(
+                jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
+            )
+            jac_coords_csr = SparseCsrCoordinates(
+                indices=jac_coords_coo.cols,
+                indptr=csr_indptr,
+                shape=(residual_dim_sum, tangent_dim_sum),
+            )
 
         return AnalyzedLeastSquaresProblem(
             stacked_costs=tuple(stacked_costs),
@@ -281,8 +334,6 @@ class LeastSquaresProblem:
             tangent_start_from_var_type=tangent_start_from_var_type,
             tangent_dim=tangent_dim_sum,
             residual_dim=residual_dim_sum,
-            stacked_constraints=tuple(stacked_constraints),
-            constraint_counts=tuple(constraint_counts),
         )
 
 
@@ -297,9 +348,6 @@ class AnalyzedLeastSquaresProblem:
     tangent_start_from_var_type: jdc.Static[Any]
     tangent_dim: jdc.Static[Any]
     residual_dim: jdc.Static[Any]
-
-    stacked_constraints: Any = ()
-    constraint_counts: jdc.Static[Any] = ()
 
     def solve(
         self,
@@ -318,7 +366,9 @@ class AnalyzedLeastSquaresProblem:
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
 
-        has_constraints = len(self.stacked_constraints) > 0
+        has_constraints = any(
+            cost.constraint_type is not None for cost in self.stacked_costs
+        )
 
         if has_constraints:
             from ._augmented_lagrangian import (
@@ -392,17 +442,24 @@ class AnalyzedLeastSquaresProblem:
         else:
             return jnp.concatenate(residual_slices, axis=0)
 
-    def compute_constraint_values(self, vals: Any) -> Any:
-        if len(self.stacked_constraints) == 0:
-            return jnp.array([])
-
+    def _compute_constraint_values(self, vals: Any) -> Any:
         constraint_slices = list()
-        for stacked_constraint in self.stacked_constraints:
+        for stacked_cost in self.stacked_costs:
+            if stacked_cost.constraint_type is None:
+                continue
+
+            assert stacked_cost.compute_residual_original is not None
             constraint_vals = jax.vmap(
-                lambda c: c.compute_residual_flat(vals, *c.args)
-            )(stacked_constraint)
+                lambda c: c.compute_residual_original(vals, *c.args)
+            )(stacked_cost)
             constraint_slices.append(constraint_vals.reshape((-1,)))
 
+        return tuple(constraint_slices)
+
+    def compute_constraint_values(self, vals: Any) -> Any:
+        constraint_slices = self._compute_constraint_values(vals)
+        if len(constraint_slices) == 0:
+            return jnp.array([])
         return jnp.concatenate(constraint_slices, axis=0)
 
     def _compute_jac_values(self, vals: Any, jac_cache: Any) -> Any:
@@ -510,14 +567,14 @@ class AnalyzedLeastSquaresProblem:
         return bsparse_jacobian
 
 
-class _CostBase:
+class _CostBase(abc.ABC):
     @classmethod
     def __class_getitem__(cls, params):
         return cls
 
     compute_residual: Any
     args: Any
-    name: jdc.Static[Any]
+    name: Any
 
     def _get_name(self) -> Any:
         if self.name is None:
@@ -671,13 +728,10 @@ class _AnalyzedCost(Cost[Any]):
 
     constraint_type: jdc.Static[Any] = None
 
-    al_params: Any = None
+    compute_residual_original: jdc.Static[Any] = None
 
     def compute_residual_flat(self, vals: Any, *args: Any) -> Any:
-        if self.al_params is not None:
-            out = self.compute_residual(vals, *args, self.al_params)
-        else:
-            out = self.compute_residual(vals, *args)
+        out = self.compute_residual(vals, *args)
 
         if isinstance(out, tuple):
             assert len(out) == 2
@@ -693,41 +747,7 @@ class _AnalyzedCost(Cost[Any]):
         cost_or_constraint: Any,
     ) -> Any:
         if isinstance(cost_or_constraint, Constraint):
-            constraint = cost_or_constraint
-            variables = constraint._get_variables()
-            assert len(variables) > 0
-
-            if not isinstance(variables[0].id, int):
-                batch_axes = variables[0].id.shape
-                assert len(batch_axes) in (0, 1)
-                for var in variables[1:]:
-                    assert (
-                        () if isinstance(var.id, int) else var.id.shape
-                    ) == batch_axes, "Batch axes of variables do not match."
-                if len(batch_axes) == 1:
-                    return jax.vmap(_AnalyzedCost._make)(constraint)
-
-            dummy_vals = jax.eval_shape(VarValues.make, variables)
-            constraint_dim = onp.prod(
-                jax.eval_shape(
-                    constraint.compute_residual, dummy_vals, *constraint.args
-                ).shape
-            )
-
-            return _AnalyzedCost(
-                compute_residual=constraint.compute_residual,
-                args=constraint.args,
-                jac_mode="auto",
-                jac_batch_size=None,
-                jac_custom_fn=None,
-                jac_custom_with_cache_fn=None,
-                name=constraint.name,
-                num_variables=len(variables),
-                sorted_ids_from_var_type=sort_and_stack_vars(variables),
-                residual_flat_dim=constraint_dim,
-                constraint_type=constraint.constraint_type,
-                al_params=None,
-            )
+            return analyze_constraint(cost_or_constraint)
 
         cost = cost_or_constraint
         variables = cost._get_variables()
@@ -752,18 +772,9 @@ class _AnalyzedCost(Cost[Any]):
                 return residual_out
 
         dummy_vals = jax.eval_shape(VarValues.make, variables)
-
-        al_params = getattr(cost, "al_params", None)
-        if al_params is not None:
-            residual_dim = onp.prod(
-                jax.eval_shape(
-                    _residual_no_cache, dummy_vals, *cost.args, al_params
-                ).shape
-            )
-        else:
-            residual_dim = onp.prod(
-                jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
-            )
+        residual_dim = onp.prod(
+            jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
+        )
 
         constraint_type = getattr(cost, "constraint_type", None)
 
@@ -779,7 +790,6 @@ class _AnalyzedCost(Cost[Any]):
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_flat_dim=residual_dim,
             constraint_type=constraint_type,
-            al_params=al_params,
         )
 
     def _compute_block_sparse_jac_indices(
@@ -809,44 +819,3 @@ class _AnalyzedCost(Cost[Any]):
             indexing="ij",
         )
         return rows, cols
-
-
-@jdc.pytree_dataclass
-class Constraint(_CostBase[Any]):
-    @classmethod
-    def __class_getitem__(cls, params):
-        return cls
-
-    compute_residual: jdc.Static[Any]
-
-    args: Any
-
-    constraint_type: jdc.Static[Any] = "eq_zero"
-
-    name: jdc.Static[Any] = None
-
-    @staticmethod
-    def create_factory(
-        compute_residual: Any = None,
-        *,
-        constraint_type: Any = "eq_zero",
-        name: Any = None,
-    ) -> Any:
-        def decorator(
-            compute_residual: Any,
-        ) -> Any:
-            def inner(*args: Any, **kwargs: Any) -> Any:
-                return Constraint(
-                    compute_residual=lambda values, args, kwargs: compute_residual(
-                        values, *args, **kwargs
-                    ),
-                    args=(args, kwargs),
-                    constraint_type=constraint_type,
-                    name=name if name is not None else compute_residual.__name__,
-                )
-
-            return inner
-
-        if compute_residual is None:
-            return decorator
-        return decorator(compute_residual)
