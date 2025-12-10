@@ -337,7 +337,7 @@ def test_robot_arm_end_effector_constraint():
     # Link lengths
     L1, L2, L3 = 1.0, 1.0, 0.5
 
-    def forward_kinematics(theta1: float, theta2: float, theta3: float) -> jax.Array:
+    def forward_kinematics(theta1: jax.Array, theta2: jax.Array, theta3: jax.Array) -> jax.Array:
         """Compute end effector position for 3-link planar arm.
 
         Each link is connected by a revolute joint. Angles are measured relative
