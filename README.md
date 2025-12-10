@@ -15,7 +15,11 @@ Some projects where `jaxls` is used:
 To install:
 
 ```bash
-pip install "git+https://github.com/brentyi/jaxls.git[examples]"
+# Core package only
+pip install "git+https://github.com/brentyi/jaxls.git"
+
+# Or, with examples:
+pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[examples]"
 ```
 
 ### Python Version Compatibility
