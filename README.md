@@ -76,14 +76,14 @@ pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[examples]"
   </tr>
 </table>
 
-### Overview
+### Supported features
 
 We provide a factor graph interface for specifying and solving least squares
 problems. **`jaxls`** takes advantage of structure in graphs: repeated cost and
 variable types are vectorized, and sparsity of adjacency is translated into
 sparse matrix operations.
 
-Supported:
+Features include:
 
 - Automatic sparse Jacobians.
 - Optimization on manifolds.

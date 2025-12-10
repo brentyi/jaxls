@@ -6,7 +6,7 @@ import jax
 import jax_dataclasses as jdc
 from jax import numpy as jnp
 
-from ._constraints import AugmentedLagrangianParams
+from ._core import AugmentedLagrangianParams
 from ._solvers import NonlinearSolver, SolveSummary
 from ._variables import VarValues
 from .utils import jax_log
@@ -163,12 +163,12 @@ class AugmentedLagrangianSolver:
         Returns:
             Solution values, and optionally a solve summary.
         """
-        # Ensure we have constraints (costs with constraint_type set).
+        # Ensure we have constraints (costs with mode != "cost").
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
         ]
         assert len(constraint_costs) > 0, (
-            "AugmentedLagrangianSolver requires constraints. "
+            "AugmentedLagrangianSolver requires constraints (mode != 'cost'). "
             "Use NonlinearSolver for unconstrained problems."
         )
 
@@ -196,7 +196,9 @@ class AugmentedLagrangianSolver:
             # Sum of squared violations. For inequalities, only count g > 0.
             sum_c_squared = jnp.array(0.0)
             for cost, h_group in zip(constraint_costs, h_vals):
-                if cost.constraint_type == "leq_zero":
+                # leq_zero and geq_zero are both inequality constraints
+                # (geq_zero is internally converted to leq_zero form)
+                if cost.mode in ("leq_zero", "geq_zero"):
                     sum_c_squared = sum_c_squared + jnp.sum(
                         0.5 * jnp.maximum(0.0, h_group) ** 2
                     )
@@ -324,13 +326,13 @@ class AugmentedLagrangianSolver:
         csupn_parts = []
 
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
         ]
 
         for cost, h_group, lambda_group in zip(
             constraint_costs, h_vals, lagrange_multipliers
         ):
-            if cost.constraint_type == "leq_zero":
+            if cost.mode in ("leq_zero", "geq_zero"):
                 # Inequality: snorm = |min(-g, λ)|, csupn = max(0, g).
                 comp = jnp.minimum(-h_group, lambda_group)
                 snorm_parts.append(jnp.max(jnp.abs(comp)))
@@ -356,11 +358,11 @@ class AugmentedLagrangianSolver:
         violation_parts = []
 
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
         ]
 
         for cost, h_group in zip(constraint_costs, h_vals):
-            if cost.constraint_type == "leq_zero":
+            if cost.mode in ("leq_zero", "geq_zero"):
                 violation_parts.append(jnp.maximum(0.0, h_group))
             else:
                 violation_parts.append(jnp.abs(h_group))
@@ -386,7 +388,7 @@ class AugmentedLagrangianSolver:
         constraint_group_idx = 0
 
         for cost in problem.stacked_costs:
-            if cost.constraint_type is None:
+            if cost.mode == "minimize_l2_squared":
                 # Regular cost, no update needed.
                 updated_costs.append(cost)
             else:
@@ -445,7 +447,7 @@ class AugmentedLagrangianSolver:
         # Update Lagrange multipliers: λ_new = λ_old + ρ * h(x).
         # Project multipliers: non-negative for inequalities, then apply safeguard bounds.
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.constraint_type is not None
+            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
         ]
         lagrange_multipliers_updated = []
         for cost, lambda_group, penalty_group, h_group in zip(
@@ -455,7 +457,7 @@ class AugmentedLagrangianSolver:
             h_vals,
         ):
             lambda_new = lambda_group + penalty_group * h_group
-            if cost.constraint_type == "leq_zero":
+            if cost.mode in ("leq_zero", "geq_zero"):
                 lambda_new = jnp.maximum(0.0, lambda_new)
             lambda_new = jnp.clip(
                 lambda_new, self.config.lambda_min, self.config.lambda_max

@@ -24,7 +24,7 @@ def test_simple_scalar_constraint():
         """Cost pulls variable toward target."""
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_fn(
         vals: jaxls.VarValues, var: ScalarVar, target: float
     ) -> jax.Array:
@@ -33,9 +33,8 @@ def test_simple_scalar_constraint():
 
     # Create problem: cost pulls to 2.0, constraint forces to 1.0
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 2.0)],
+        costs=[cost_fn(var, 2.0)] + [constraint_fn(var, 1.0)],
         variables=[var],
-        constraints=[constraint_fn(var, 1.0)],
     ).analyze()
 
     # Solve with initial value far from solution.
@@ -69,16 +68,15 @@ def test_2d_constrained_optimization():
         """Minimize distance from origin."""
         return vals[var]
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         """Constraint: x + y = 1."""
         vec = vals[var]
         return jnp.array([vec[0] + vec[1] - 1.0])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var)],
+        costs=[cost_fn(var)] + [constraint_fn(var)],
         variables=[var],
-        constraints=[constraint_fn(var)],
     ).analyze()
 
     solution = problem.solve(
@@ -111,7 +109,7 @@ def test_se2_position_constraint():
         """Prior cost for a pose variable."""
         return (vals[var] @ target.inverse()).log()
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def position_x_constraint(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target_x: float
     ) -> jax.Array:
@@ -125,10 +123,10 @@ def test_se2_position_constraint():
     ]
 
     # Constraint: pose 1 x-position must be 1.0 (not 2.0).
-    constraints = [position_x_constraint(pose_vars[1], 1.0)]
+    constraint_costs = [position_x_constraint(pose_vars[1], 1.0)]
 
     problem = jaxls.LeastSquaresProblem(
-        costs=costs, variables=pose_vars, constraints=constraints
+        costs=costs + constraint_costs, variables=pose_vars
     ).analyze()
 
     solution = problem.solve(verbose=False)
@@ -156,24 +154,24 @@ def test_multiple_constraints():
         """Cost pulls toward target."""
         return vals[var] - target
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_x(vals: jaxls.VarValues, var: Vec3Var, val: float) -> jax.Array:
         """Constraint: x = val."""
         return jnp.array([vals[var][0] - val])
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_y(vals: jaxls.VarValues, var: Vec3Var, val: float) -> jax.Array:
         """Constraint: y = val."""
         return jnp.array([vals[var][1] - val])
 
     # Cost pulls to (5, 5, 5), constraints force x=1, y=2.
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, jnp.array([5.0, 5.0, 5.0]))],
-        variables=[var],
-        constraints=[
+        costs=[
+            cost_fn(var, jnp.array([5.0, 5.0, 5.0])),
             constraint_x(var, 1.0),
             constraint_y(var, 2.0),
         ],
+        variables=[var],
     ).analyze()
 
     solution = problem.solve(verbose=False)
@@ -200,14 +198,13 @@ def test_constraint_violation_decreases():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 10.0])
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 1.0])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var)],
+        costs=[cost_fn(var)] + [constraint_fn(var)],
         variables=[var],
-        constraints=[constraint_fn(var)],
     ).analyze()
 
     # Start far from constraint satisfaction.
@@ -236,7 +233,7 @@ def test_batched_constraints():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         """Constraint: variable = 1.0."""
         return jnp.array([vals[var] - 1.0])
@@ -249,9 +246,9 @@ def test_batched_constraints():
             cost_fn(vars[0], 5.0),
             cost_fn(vars[1], 6.0),
             cost_fn(vars[2], 7.0),
+            constraint_fn(batched_var),  # Single batched constraint
         ],
         variables=vars,
-        constraints=[constraint_fn(batched_var)],  # Single batched constraint
     ).analyze()
 
     solution = problem.solve(verbose=False)
@@ -281,7 +278,7 @@ def test_nonlinear_constraint():
         """Cost pulls toward target."""
         return vals[var] - target
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def circle_constraint(
         vals: jaxls.VarValues, var: Vec2Var, radius: float
     ) -> jax.Array:
@@ -290,9 +287,8 @@ def test_nonlinear_constraint():
 
     # Cost pulls to (2, 0), constraint forces to circle of radius 1.
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, jnp.array([2.0, 0.0]))],
+        costs=[cost_fn(var, jnp.array([2.0, 0.0])), circle_constraint(var, 1.0)],
         variables=[var],
-        constraints=[circle_constraint(var, 1.0)],
     ).analyze()
 
     solution = problem.solve(
@@ -337,7 +333,9 @@ def test_robot_arm_end_effector_constraint():
     # Link lengths
     L1, L2, L3 = 1.0, 1.0, 0.5
 
-    def forward_kinematics(theta1: jax.Array, theta2: jax.Array, theta3: jax.Array) -> jax.Array:
+    def forward_kinematics(
+        theta1: jax.Array, theta2: jax.Array, theta3: jax.Array
+    ) -> jax.Array:
         """Compute end effector position for 3-link planar arm.
 
         Each link is connected by a revolute joint. Angles are measured relative
@@ -364,7 +362,7 @@ def test_robot_arm_end_effector_constraint():
         """Cost that pulls joint toward target angle."""
         return jnp.array([vals[joint] - target_angle])
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def end_effector_constraint(
         vals: jaxls.VarValues,
         j1: AngleVar,
@@ -389,13 +387,13 @@ def test_robot_arm_end_effector_constraint():
     target_ee = jnp.array([2.0, 0.5])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=costs,
-        variables=joint_angles,
-        constraints=[
+        costs=costs
+        + [
             end_effector_constraint(
                 joint_angles[0], joint_angles[1], joint_angles[2], target_ee
             )
         ],
+        variables=joint_angles,
     ).analyze()
 
     # Start from a configuration that's closer to a solution
@@ -456,7 +454,7 @@ def test_inequality_constraint_simple():
         """Cost pulls variable toward target."""
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+    @jaxls.Cost.create_factory(mode="leq_zero")
     def inequality_constraint(
         vals: jaxls.VarValues, var: ScalarVar, upper_bound: float
     ) -> jax.Array:
@@ -465,9 +463,8 @@ def test_inequality_constraint_simple():
 
     # Create problem: cost pulls to 2.0, constraint forces x ≤ 1.0
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 2.0)],
+        costs=[cost_fn(var, 2.0)] + [inequality_constraint(var, 1.0)],
         variables=[var],
-        constraints=[inequality_constraint(var, 1.0)],
     ).analyze()
 
     # Solve with initial value at origin
@@ -505,16 +502,15 @@ def test_inequality_constraint_inactive():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+    @jaxls.Cost.create_factory(mode="leq_zero")
     def inequality_constraint(
         vals: jaxls.VarValues, var: ScalarVar, upper_bound: float
     ) -> jax.Array:
         return jnp.array([vals[var] - upper_bound])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 0.5)],
+        costs=[cost_fn(var, 0.5)] + [inequality_constraint(var, 2.0)],
         variables=[var],
-        constraints=[inequality_constraint(var, 2.0)],
     ).analyze()
 
     solution = problem.solve(verbose=False)
@@ -545,14 +541,14 @@ def test_multiple_inequality_constraints():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+    @jaxls.Cost.create_factory(mode="leq_zero")
     def upper_bound_constraint(
         vals: jaxls.VarValues, var: ScalarVar, upper: float
     ) -> jax.Array:
         """x ≤ upper"""
         return jnp.array([vals[var] - upper])
 
-    @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+    @jaxls.Cost.create_factory(mode="leq_zero")
     def lower_bound_constraint(
         vals: jaxls.VarValues, var: ScalarVar, lower: float
     ) -> jax.Array:
@@ -561,12 +557,12 @@ def test_multiple_inequality_constraints():
 
     # Cost pulls to 5.0, but constraints force 1 ≤ x ≤ 3
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 5.0)],
-        variables=[var],
-        constraints=[
+        costs=[cost_fn(var, 5.0)]
+        + [
             upper_bound_constraint(var, 3.0),
             lower_bound_constraint(var, 1.0),
         ],
+        variables=[var],
     ).analyze()
 
     solution = problem.solve(verbose=False)
@@ -592,14 +588,13 @@ def test_custom_augmented_lagrangian_config():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var]])
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 1.0])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var)],
+        costs=[cost_fn(var)] + [constraint_fn(var)],
         variables=[var],
-        constraints=[constraint_fn(var)],
     ).analyze()
 
     # Use custom config with tighter tolerances.
@@ -653,16 +648,15 @@ def test_constraint_with_jac_mode_forward():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory(jac_mode="forward")
+    @jaxls.Cost.create_factory(mode="eq_zero", jac_mode="forward")
     def constraint_fn(
         vals: jaxls.VarValues, var: ScalarVar, target: float
     ) -> jax.Array:
         return jnp.array([vals[var] - target])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 2.0)],
+        costs=[cost_fn(var, 2.0)] + [constraint_fn(var, 1.0)],
         variables=[var],
-        constraints=[constraint_fn(var, 1.0)],
     ).analyze()
 
     solution = problem.solve(
@@ -685,16 +679,15 @@ def test_constraint_with_jac_mode_reverse():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory(jac_mode="reverse")
+    @jaxls.Cost.create_factory(mode="eq_zero", jac_mode="reverse")
     def constraint_fn(
         vals: jaxls.VarValues, var: ScalarVar, target: float
     ) -> jax.Array:
         return jnp.array([vals[var] - target])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 2.0)],
+        costs=[cost_fn(var, 2.0)] + [constraint_fn(var, 1.0)],
         variables=[var],
-        constraints=[constraint_fn(var, 1.0)],
     ).analyze()
 
     solution = problem.solve(
@@ -724,16 +717,15 @@ def test_constraint_with_custom_jacobian():
     def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         return vals[var]
 
-    @jaxls.Constraint.create_factory(jac_custom_fn=my_constraint_jac)
+    @jaxls.Cost.create_factory(mode="eq_zero", jac_custom_fn=my_constraint_jac)
     def constraint_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         """Constraint: x + y = 1."""
         vec = vals[var]
         return jnp.array([vec[0] + vec[1] - 1.0])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var)],
+        costs=[cost_fn(var)] + [constraint_fn(var)],
         variables=[var],
-        constraints=[constraint_fn(var)],
     ).analyze()
 
     solution = problem.solve(
@@ -774,8 +766,8 @@ def test_constraint_with_custom_jacobian_with_cache():
     def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         return vals[var]
 
-    @jaxls.Constraint.create_factory(
-        jac_custom_with_cache_fn=my_constraint_jac_with_cache
+    @jaxls.Cost.create_factory(
+        mode="eq_zero", jac_custom_with_cache_fn=my_constraint_jac_with_cache
     )
     def constraint_fn(
         vals: jaxls.VarValues, var: Vec2Var
@@ -787,9 +779,8 @@ def test_constraint_with_custom_jacobian_with_cache():
         return constraint_val, cache
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var)],
+        costs=[cost_fn(var)] + [constraint_fn(var)],
         variables=[var],
-        constraints=[constraint_fn(var)],
     ).analyze()
 
     solution = problem.solve(
@@ -821,18 +812,15 @@ def test_inequality_constraint_custom_jacobian_zeros_when_inactive():
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Constraint.create_factory(
-        constraint_type="leq_zero", jac_custom_fn=my_constraint_jac
-    )
+    @jaxls.Cost.create_factory(mode="leq_zero", jac_custom_fn=my_constraint_jac)
     def inequality_constraint(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         """Constraint: x <= 2, i.e., x - 2 <= 0."""
         return jnp.array([vals[var] - 2.0])
 
     # Cost pulls to 0.5, constraint x <= 2 is inactive
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 0.5)],
+        costs=[cost_fn(var, 0.5)] + [inequality_constraint(var)],
         variables=[var],
-        constraints=[inequality_constraint(var)],
     ).analyze()
 
     solution = problem.solve(verbose=False)
@@ -858,15 +846,14 @@ def test_constraint_with_jac_batch_size():
         return vals[var]
 
     # Use jac_batch_size=1 to compute Jacobian one column at a time
-    @jaxls.Constraint.create_factory(jac_batch_size=1)
+    @jaxls.Cost.create_factory(mode="eq_zero", jac_batch_size=1)
     def constraint_fn(vals: jaxls.VarValues, var: Vec4Var) -> jax.Array:
         """Constraint: sum(x) = 2."""
         return jnp.array([jnp.sum(vals[var]) - 2.0])
 
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var)],
+        costs=[cost_fn(var)] + [constraint_fn(var)],
         variables=[var],
-        constraints=[constraint_fn(var)],
     ).analyze()
 
     solution = problem.solve(

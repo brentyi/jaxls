@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import dis
 import functools
 from typing import (
@@ -11,6 +10,7 @@ from typing import (
     Hashable,
     Iterable,
     Literal,
+    Self,
     cast,
     overload,
 )
@@ -21,7 +21,7 @@ import numpy as onp
 from jax import numpy as jnp
 from jax.tree_util import default_registry
 from loguru import logger
-from typing_extensions import Self, deprecated
+from typing_extensions import deprecated
 
 from ._solvers import (
     ConjugateGradientConfig,
@@ -34,7 +34,6 @@ from ._solvers import (
 if TYPE_CHECKING:
     from ._augmented_lagrangian import AugmentedLagrangianConfig
 
-from ._constraints import AugmentedLagrangianParams, Constraint, analyze_constraint
 from ._sparse_matrices import (
     BlockRowSparseMatrix,
     SparseBlockRow,
@@ -67,14 +66,16 @@ def _get_function_signature(func: Callable) -> Hashable:
 class LeastSquaresProblem:
     """We define least squares problem as bipartite graphs, which have two types of nodes:
 
-    - `jaxls.Cost`. These are the terms we want to minimize.
+    - `jaxls.Cost`. These are cost terms or constraints.
+      - `mode="minimize_l2_squared"` (default): Minimize squared L2 norm ||r(x)||²
+      - `mode="eq_zero"`: Equality constraint r(x) = 0
+      - `mode="leq_zero"`: Inequality constraint r(x) <= 0
+      - `mode="geq_zero"`: Inequality constraint r(x) >= 0
     - `jaxls.Var`. These are the parameters we want to optimize.
-    - `jaxls.Constraint`. These are equality constraints that must be satisfied.
     """
 
     costs: Iterable[Cost]
     variables: Iterable[Var]
-    constraints: Iterable[Constraint] = ()
 
     def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving."""
@@ -98,11 +99,17 @@ class LeastSquaresProblem:
 
         costs = tuple(_deduplicate_compute_residual(cost) for cost in self.costs)
 
-        # We're assuming no more than 1 batch axis.
-        num_costs = 0
+        # Count costs by mode.
+        count_by_mode: dict[CostMode, int] = {
+            "minimize_l2_squared": 0,
+            "eq_zero": 0,
+            "leq_zero": 0,
+            "geq_zero": 0,
+        }
         for f in costs:
             assert len(f._get_batch_axes()) in (0, 1)
-            num_costs += 1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
+            increment = 1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
+            count_by_mode[f.mode] += increment
 
         num_variables = 0
         for v in variables:
@@ -110,10 +117,18 @@ class LeastSquaresProblem:
             num_variables += (
                 1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
             )
+
+        # Log counts by mode.
+        total_costs = sum(count_by_mode.values())
         logger.info(
-            "Building optimization problem with {} costs and {} variables.",
-            num_costs,
+            "Building optimization problem with {} terms and {} variables: "
+            "{} minimize_l2_squared, {} eq_zero, {} leq_zero, {} geq_zero",
+            total_costs,
             num_variables,
+            count_by_mode["minimize_l2_squared"],
+            count_by_mode["eq_zero"],
+            count_by_mode["leq_zero"],
+            count_by_mode["geq_zero"],
         )
 
         # Create storage layout: this describes which parts of our tangent
@@ -148,20 +163,20 @@ class LeastSquaresProblem:
             }
         )
 
-        # Start by grouping our costs and grabbing a list of (ordered!) variables.
+        # Separate costs by mode: regular costs vs constraint-mode costs.
+        # Constraint-mode costs need special handling with _analyze_constraint_cost.
+        regular_costs = [c for c in costs if c.mode == "minimize_l2_squared"]
+        constraint_costs = [c for c in costs if c.mode != "minimize_l2_squared"]
+
+        # Group regular costs by structure.
         costs_from_group = dict[Any, list[Cost]]()
         count_from_group = dict[Any, int]()
-        for cost in costs:
-            # Support broadcasting for cost arguments.
+        for cost in regular_costs:
             cost = cost._broadcast_batch_axes()
             batch_axes = cost._get_batch_axes()
 
-            # Each cost is ultimately just a pytree node; in order for a set of
-            # costs to be batchable, they must share the same:
             group_key: Hashable = (
-                # (1) Treedef. Structure of inputs must match.
                 jax.tree.structure(cost),
-                # (2) Leaf shapes: contained array shapes must match (except batch axes).
                 tuple(
                     leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
                     for leaf in jax.tree.leaves(cost)
@@ -177,7 +192,6 @@ class LeastSquaresProblem:
                 assert len(batch_axes) == 1
                 count_from_group[group_key] += batch_axes[0]
 
-            # Record costs and variables.
             costs_from_group[group_key].append(cost)
 
         # Fields we want to populate.
@@ -189,12 +203,11 @@ class LeastSquaresProblem:
         sorted_ids_from_var_type = sort_and_stack_vars(variables)
         del variables
 
-        # Prepare each cost group. We put groups in a consistent order.
+        # Process regular cost groups.
         residual_dim_sum = 0
         for group_key in sorted(costs_from_group.keys(), key=_sort_key):
             group = costs_from_group[group_key]
 
-            # Stack cost parameters.
             stacked_cost: Cost = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
@@ -211,10 +224,6 @@ class LeastSquaresProblem:
                 stacked_costs[-1]._get_name(),
             )
 
-            # Compute Jacobian coordinates.
-            #
-            # These should be N pairs of (row, col) indices, where rows correspond to
-            # residual indices and columns correspond to tangent vector indices.
             rows, cols = jax.vmap(
                 functools.partial(
                     _AnalyzedCost._compute_block_sparse_jac_indices,
@@ -242,103 +251,63 @@ class LeastSquaresProblem:
                 stacked_cost_expanded.residual_flat_dim * count_from_group[group_key]
             )
 
-        # Handle case with no costs (constraint-only problems).
-        jac_coords_coo = SparseCooCoordinates(
-            *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
-            shape=(residual_dim_sum, tangent_dim_sum),
-        )
-        csr_indptr = jnp.searchsorted(
-            jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
-        )
-        jac_coords_csr = SparseCsrCoordinates(
-            indices=jac_coords_coo.cols,
-            indptr=cast(jax.Array, csr_indptr),
-            shape=(residual_dim_sum, tangent_dim_sum),
-        )
-
-        # Process constraints as augmented costs.
-        # Constraints are converted directly to augmented _AnalyzedCost form with
-        # placeholder AL params. They're stored in stacked_costs alongside regular costs.
-        #
-        # Deduplicate compute_residual functions (same as we do for costs).
-        compute_residual_from_hash_constraints = dict[Hashable, Callable]()
-
-        def _deduplicate_compute_residual_constraint(
-            constraint: Constraint,
-        ) -> Constraint:
-            with jdc.copy_and_mutate(constraint) as constraint_copy:
-                constraint_copy.compute_residual = (
-                    compute_residual_from_hash_constraints.setdefault(
-                        _get_function_signature(constraint.compute_residual),
-                        constraint.compute_residual,
-                    )
-                )
-            return constraint_copy
-
-        constraints = tuple(
-            _deduplicate_compute_residual_constraint(constraint)
-            for constraint in self.constraints
-        )
-
+        # Process constraint-mode costs.
+        # These are converted to augmented _AnalyzedCost form with placeholder AL params.
         constraint_index = 0
-        if len(constraints) > 0:
-            # Group constraints by structure (same logic as costs).
-            constraints_from_group = dict[Any, list[Constraint]]()
+        if len(constraint_costs) > 0:
+            constraint_costs_from_group = dict[Any, list[Cost]]()
             constraint_count_from_group = dict[Any, int]()
             constraint_index_from_group = dict[Any, int]()
 
-            for constraint in constraints:
-                constraint = constraint._broadcast_batch_axes()
-                batch_axes = constraint._get_batch_axes()
+            for cost in constraint_costs:
+                cost = cost._broadcast_batch_axes()
+                batch_axes = cost._get_batch_axes()
 
                 group_key: Hashable = (
-                    jax.tree.structure(constraint),
+                    jax.tree.structure(cost),
                     tuple(
                         leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
-                        for leaf in jax.tree.leaves(constraint)
+                        for leaf in jax.tree.leaves(cost)
                     ),
                 )
-                if group_key not in constraints_from_group:
-                    constraints_from_group[group_key] = []
+                if group_key not in constraint_costs_from_group:
+                    constraint_costs_from_group[group_key] = []
                     constraint_count_from_group[group_key] = 0
                     constraint_index_from_group[group_key] = constraint_index
                     constraint_index += 1
 
                 if len(batch_axes) == 0:
-                    constraint = jax.tree.map(
-                        lambda x: jnp.asarray(x)[None], constraint
-                    )
+                    cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
                     constraint_count_from_group[group_key] += 1
                 else:
                     assert len(batch_axes) == 1
                     constraint_count_from_group[group_key] += batch_axes[0]
 
-                constraints_from_group[group_key].append(constraint)
+                constraint_costs_from_group[group_key].append(cost)
 
-            # Stack and analyze each constraint group, adding to stacked_costs.
-            for group_key in sorted(constraints_from_group.keys(), key=_sort_key):
-                group = constraints_from_group[group_key]
+            # Stack and analyze each constraint group.
+            for group_key in sorted(constraint_costs_from_group.keys(), key=_sort_key):
+                group = constraint_costs_from_group[group_key]
                 group_constraint_index = constraint_index_from_group[group_key]
 
-                # Stack constraint parameters.
-                stacked_constraint: Constraint = jax.tree.map(
+                stacked_cost: Cost = jax.tree.map(
                     lambda *args: jnp.concatenate(args, axis=0), *group
                 )
                 # Convert to augmented _AnalyzedCost form with placeholder AL params.
                 stacked_cost_expanded: _AnalyzedCost = jax.vmap(
-                    lambda c: analyze_constraint(c, group_constraint_index)
-                )(stacked_constraint)
+                    lambda c: _analyze_constraint_cost(c, group_constraint_index)
+                )(stacked_cost)
                 stacked_costs.append(stacked_cost_expanded)
                 cost_counts.append(constraint_count_from_group[group_key])
 
                 logger.info(
-                    "Vectorizing constraint group with {} constraints, {} variables each: {}",
+                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
                     constraint_count_from_group[group_key],
+                    stacked_cost_expanded.mode,
                     stacked_cost_expanded.num_variables,
                     stacked_cost_expanded._get_name(),
                 )
 
-                # Compute Jacobian coordinates for constraint (same as regular costs).
                 rows, cols = jax.vmap(
                     functools.partial(
                         _AnalyzedCost._compute_block_sparse_jac_indices,
@@ -367,7 +336,7 @@ class LeastSquaresProblem:
                     stacked_cost_expanded.residual_flat_dim * constraint_count
                 )
 
-        # Rebuild sparse coordinates with constraint Jacobians included.
+        # Build sparse coordinates.
         if len(jac_coords) > 0:
             jac_coords_coo = SparseCooCoordinates(
                 *jax.tree.map(
@@ -382,6 +351,18 @@ class LeastSquaresProblem:
                 indices=jac_coords_coo.cols,
                 indptr=cast(jax.Array, csr_indptr),
                 shape=(residual_dim_sum, tangent_dim_sum),
+            )
+        else:
+            # Handle edge case with no costs.
+            jac_coords_coo = SparseCooCoordinates(
+                jnp.array([], dtype=jnp.int32),
+                jnp.array([], dtype=jnp.int32),
+                shape=(0, tangent_dim_sum),
+            )
+            jac_coords_csr = SparseCsrCoordinates(
+                indices=jnp.array([], dtype=jnp.int32),
+                indptr=jnp.array([0], dtype=jnp.int32),
+                shape=(0, tangent_dim_sum),
             )
 
         return AnalyzedLeastSquaresProblem(
@@ -400,8 +381,8 @@ class LeastSquaresProblem:
 @jdc.pytree_dataclass
 class AnalyzedLeastSquaresProblem:
     stacked_costs: tuple[_AnalyzedCost, ...]
-    """All costs including constraint-derived costs. Constraint costs have
-    constraint_type set and args=(AugmentedLagrangianParams,)."""
+    """All costs including constraint-mode costs. Constraint-mode costs have
+    mode != "minimize_l2_squared" and args=(AugmentedLagrangianParams,)."""
     cost_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
     jac_coords_coo: SparseCooCoordinates
@@ -481,9 +462,9 @@ class AnalyzedLeastSquaresProblem:
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
 
-        # Check if we have constraints (costs with constraint_type set).
+        # Check if we have constraints (costs with mode != "minimize_l2_squared").
         has_constraints = any(
-            cost.constraint_type is not None for cost in self.stacked_costs
+            cost.mode != "minimize_l2_squared" for cost in self.stacked_costs
         )
 
         if has_constraints:
@@ -590,12 +571,12 @@ class AnalyzedLeastSquaresProblem:
     def _compute_constraint_values(self, vals: VarValues) -> tuple[jax.Array, ...]:
         """Compute original constraint values (not augmented), one array per constraint group.
 
-        For constraint-derived costs, this uses compute_residual_original to get
+        For constraint-mode costs, this uses compute_residual_original to get
         the raw constraint values (before augmented Lagrangian transformation).
         """
         constraint_slices = list[jax.Array]()
         for stacked_cost in self.stacked_costs:
-            if stacked_cost.constraint_type is None:
+            if stacked_cost.mode == "minimize_l2_squared":
                 continue  # Skip regular costs
 
             # Use compute_residual_original to get raw constraint values.
@@ -737,20 +718,153 @@ class AnalyzedLeastSquaresProblem:
 CustomJacobianCache = Any
 
 
-class _CostBase[*Args](abc.ABC):
-    """Base class for cost-like terms (costs and constraints).
+type ResidualFunc[**Args] = Callable[
+    Concatenate[VarValues, Args],
+    jax.Array,
+]
+type ResidualFuncWithJacCache[**Args, TJacobianCache: CustomJacobianCache] = Callable[
+    Concatenate[VarValues, Args],
+    tuple[jax.Array, TJacobianCache],
+]
 
-    This class provides shared functionality for both `Cost` and `Constraint`,
-    including variable extraction, batch axis handling, and broadcasting.
+type JacobianFunc[**Args] = Callable[
+    Concatenate[VarValues, Args],
+    jax.Array,
+]
+type JacobianFuncWithCache[**Args, TJacobianCache: CustomJacobianCache] = Callable[
+    Concatenate[VarValues, TJacobianCache, Args],
+    jax.Array,
+]
 
-    Note: This is NOT a dataclass - it just provides methods. Fields are defined
-    on the concrete subclasses.
+type CostFactory[**Args] = Callable[
+    Args,
+    Cost[tuple[Any, ...], dict[str, Any]],
+]
+
+
+type CostMode = Literal["minimize_l2_squared", "eq_zero", "leq_zero", "geq_zero"]
+
+
+@jdc.pytree_dataclass
+class AugmentedLagrangianParams[*Args]:
+    """Parameters for a single augmented constraint cost.
+
+    Each augmented cost gets its own params with arrays for just that constraint.
+    The original cost args are bundled here for type-safe access.
     """
 
-    # Fields expected on subclasses.
-    compute_residual: Any
+    lagrange_multipliers: jax.Array
+    """Lagrange multipliers for this constraint. Shape: (constraint_flat_dim,)."""
+
+    penalty_params: jax.Array
+    """Penalty parameters for this constraint. Shape: (constraint_flat_dim,)."""
+
+    original_args: tuple[*Args]
+    """The original cost args to pass to compute_residual."""
+
+    constraint_index: jdc.Static[int]
+    """Index used to group constraints with the same structure for vectorized updates.
+
+    Constraints with the same structure (pytree shape, array shapes) are assigned the
+    same constraint_index so the AL solver can update their parameters together.
+    """
+
+
+@jdc.pytree_dataclass
+class Cost[*Args]:
+    """A cost or constraint term in our optimization problem.
+
+    The `mode` field determines how the residual function is interpreted:
+    - `"minimize_l2_squared"` (default): Minimize squared L2 norm: `||r(x)||²`
+    - `"eq_zero"`: Equality constraint: `r(x) = 0`
+    - `"leq_zero"`: Inequality constraint: `r(x) ≤ 0`
+    - `"geq_zero"`: Inequality constraint: `r(x) ≥ 0`
+
+    The recommended way to create a cost is to use the `create_factory` decorator
+    on a function that computes the residual.
+
+    ```python
+    # Standard cost (minimize squared residual)
+    @jaxls.Cost.create_factory
+    def my_cost(values: VarValues, [...args]) -> jax.Array:
+        return residual
+
+    # Equality constraint: r(x) = 0
+    @jaxls.Cost.create_factory(mode="eq_zero")
+    def my_equality_constraint(values: VarValues, [...args]) -> jax.Array:
+        return values[var] - target
+
+    # Inequality constraint: r(x) <= 0
+    @jaxls.Cost.create_factory(mode="leq_zero")
+    def my_inequality_constraint(values: VarValues, [...args]) -> jax.Array:
+        return values[var] - upper_bound
+
+    problem = jaxls.LeastSquaresProblem(
+        costs=[my_cost(...), my_equality_constraint(...), my_inequality_constraint(...)],
+    )
+    ```
+
+    Each `Cost.compute_residual` should take at least one argument that inherits
+    from the symbolic variable `jaxls.Var(id)`, where `id` must be a scalar
+    integer.
+
+    To create a batch of costs, a leading batch axis can be added to the
+    arguments passed to `Cost.args`:
+    - The batch axis must be the same for all arguments. Leading axes of shape
+      `(1,)` are broadcasted.
+    - The `id` field of each `jaxls.Var` instance must have shape of either
+      `()` (unbatched) or `(batch_size,)` (batched).
+    """
+
+    compute_residual: jdc.Static[
+        Callable[[VarValues, *Args], jax.Array]
+        | Callable[[VarValues, *Args], tuple[jax.Array, Any]]
+    ]
+    """Residual/constraint computation function. Can either return:
+        1. A residual/constraint vector, or
+        2. A tuple of (residual/constraint, jacobian_cache).
+
+    The second option is useful when custom Jacobian computation benefits from
+    intermediate values computed during the residual computation."""
+
     args: tuple[*Args]
-    name: str | None
+    """Arguments to the residual function. This should include at least one
+    `jaxls.Var` object, which can either be in the root of the tuple or nested
+    within a PyTree structure arbitrarily."""
+
+    mode: jdc.Static[CostMode] = "minimize_l2_squared"
+    """How the residual function is interpreted:
+    - 'minimize_l2_squared': Minimize squared L2 norm ||r(x)||²
+    - 'eq_zero': Equality constraint r(x) = 0
+    - 'leq_zero': Inequality constraint r(x) <= 0
+    - 'geq_zero': Inequality constraint r(x) >= 0
+    """
+
+    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
+    """Depending on the function being differentiated, it may be faster to use
+    forward-mode or reverse-mode autodiff. Ignored if `jac_custom_fn` is
+    specified."""
+
+    jac_batch_size: jdc.Static[int | None] = None
+    """Batch size for computing Jacobians that can be parallelized. Can be set
+    to make tradeoffs between runtime and memory usage.
+
+    If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
+    one at a time."""
+
+    jac_custom_fn: jdc.Static[Callable[[VarValues, *Args], jax.Array] | None] = None
+    """Optional custom Jacobian function. If None, we use autodiff. Inputs are
+    the same as `compute_residual`. Output is a single 2D Jacobian matrix with
+    shape (residual_dim, sum_of_tangent_dims_of_variables)."""
+
+    jac_custom_with_cache_fn: jdc.Static[
+        Callable[[VarValues, Any, *Args], jax.Array] | None
+    ] = None
+    """Optional custom Jacobian function. The same as `jac_custom_fn`, but
+    should be used when `compute_residual` returns a tuple with cache."""
+
+    name: jdc.Static[str | None] = None
+    """Custom name for debugging and logging."""
 
     def _get_name(self) -> str:
         """Get the name. If not set, falls back to the function name."""
@@ -761,7 +875,7 @@ class _CostBase[*Args](abc.ABC):
     def _get_variables(self) -> tuple[Var, ...]:
         """Extract all Var objects from args (walks the pytree)."""
 
-        def get_variables(current: Any) -> list[Var]:
+        def get_variables_recursive(current: Any) -> list[Var]:
             children_and_meta = default_registry.flatten_one_level(current)
             if children_and_meta is None:
                 return []
@@ -771,10 +885,10 @@ class _CostBase[*Args](abc.ABC):
                 if isinstance(child, Var):
                     variables.append(child)
                 else:
-                    variables.extend(get_variables(child))
+                    variables.extend(get_variables_recursive(child))
             return variables
 
-        return tuple(get_variables(self.args))
+        return tuple(get_variables_recursive(self.args))
 
     def _get_batch_axes(self) -> tuple[int, ...]:
         """Get batch axes from variables in args."""
@@ -811,119 +925,6 @@ class _CostBase[*Args](abc.ABC):
             broadcasted_leaves.append(broadcasted_leaf)
         return jax.tree.unflatten(treedef, broadcasted_leaves)
 
-
-type ResidualFunc[**Args] = Callable[
-    Concatenate[VarValues, Args],
-    jax.Array,
-]
-type ResidualFuncWithJacCache[**Args, TJacobianCache: CustomJacobianCache] = Callable[
-    Concatenate[VarValues, Args],
-    tuple[jax.Array, TJacobianCache],
-]
-
-type JacobianFunc[**Args] = Callable[
-    Concatenate[VarValues, Args],
-    jax.Array,
-]
-type JacobianFuncWithCache[**Args, TJacobianCache: CustomJacobianCache] = Callable[
-    Concatenate[VarValues, TJacobianCache, Args],
-    jax.Array,
-]
-
-type CostFactory[**Args] = Callable[
-    Args,
-    Cost[tuple[Any, ...], dict[str, Any]],
-]
-
-
-@jdc.pytree_dataclass
-class Cost[*Args](_CostBase[*Args]):
-    """A least squares cost term in our optimization problem, defined by a
-    residual function.
-
-    The recommended way to create a cost is to use the `create_factory` decorator
-    on a function that computes the residual. This will transform the input function
-    into a "factory" functinos that returns `Cost` objects.
-
-
-    ```python
-    @jaxls.Cost.create_factory
-    def compute_residual(values: VarValues, [...args]) -> jax.Array:
-        # Compute residual vector/array.
-        return residual
-
-    # `compute_residual()` is now a factory function that returns `jaxls.Cost` objects.
-    problem = jaxls.LeastSquaresProblem(
-        costs=[compute_residual(...), ...],
-        variables=[...],
-    )
-    ```
-
-    The cost that this represents is defined as:
-
-         || compute_residual(values, *args) ||_2^2
-
-    where `values` is a `jaxls.VarValues` object.
-
-    Each `Cost.compute_residual` should take at least one argument that inherits
-    from the symbolic variable `jaxls.Var(id)`, where `id` must be a scalar
-    integer.
-
-    To create a batch of costs, a leading batch axis can be added to the
-    arguments passed to `Cost.args`:
-    - The batch axis must be the same for all arguments. Leading axes of shape
-      `(1,)` are broadcasted.
-    - The `id` field of each `jaxls.Var` instance must have shape of either
-      `()` (unbatched) or `(batch_size,)` (batched).
-    """
-
-    compute_residual: jdc.Static[
-        Callable[[VarValues, *Args], jax.Array]
-        | Callable[[VarValues, *Args], tuple[jax.Array, CustomJacobianCache]]
-    ]
-    """Residual computation function. Can either return:
-        1. A residual vector, or
-        2. A tuple, where the tuple values should be (residual, jacobian_cache).
-
-    The second option is useful when custom Jacobian computation benefits from
-    intermediate values computed during the residual computation.
-
-    `jac_custom_with_cache_fn` should be specified in the second case,
-    and will be expected to take arguments in the form `(values,
-    jacobian_cache, *args)`."""
-
-    args: tuple[*Args]
-    """Arguments to the residual function. This should include at least one
-    `jaxls.Var` object, which can either be in the root of the tuple or nested
-    within a PyTree structure arbitrarily."""
-
-    jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
-    """Depending on the function being differentiated, it may be faster to use
-    forward-mode or reverse-mode autodiff. Ignored if `jac_custom_fn` is
-    specified."""
-
-    jac_batch_size: jdc.Static[int | None] = None
-    """Batch size for computing Jacobians that can be parallelized. Can be set
-    to make tradeoffs between runtime and memory usage.
-
-    If None, we compute all Jacobians in parallel. If 1, we compute Jacobians
-    one at a time."""
-
-    jac_custom_fn: jdc.Static[Callable[[VarValues, *Args], jax.Array] | None] = None
-    """Optional custom Jacobian function. If None, we use autodiff. Inputs are
-    the same as `compute_residual`. Output is a single 2D Jacobian matrix with
-    shape (residual_dim, sum_of_tangent_dims_of_variables)."""
-
-    jac_custom_with_cache_fn: jdc.Static[
-        Callable[[VarValues, CustomJacobianCache, *Args], jax.Array] | None
-    ] = None
-    """Optional custom Jacobian function. The same as `jac_custom_fn`, but
-    should be used when `compute_residual` returns a tuple with
-    cache."""
-
-    name: jdc.Static[str | None] = None
-    """Custom name for debugging and logging."""
-
     # Simple decorator.
     @overload
     @staticmethod
@@ -936,6 +937,7 @@ class Cost[*Args](_CostBase[*Args]):
     @staticmethod
     def create_factory[**Args_](
         *,
+        mode: CostMode = "minimize_l2_squared",
         jac_mode: Literal["auto", "forward", "reverse"] = "auto",
         jac_batch_size: int | None = None,
         name: str | None = None,
@@ -947,6 +949,7 @@ class Cost[*Args](_CostBase[*Args]):
     @staticmethod
     def create_factory[**Args_](
         *,
+        mode: CostMode = "minimize_l2_squared",
         jac_custom_fn: JacobianFunc[Args_],
         jac_batch_size: int | None = None,
         name: str | None = None,
@@ -958,6 +961,7 @@ class Cost[*Args](_CostBase[*Args]):
     @staticmethod
     def create_factory[**Args_, TJacobianCache](
         *,
+        mode: CostMode = "minimize_l2_squared",
         jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, TJacobianCache],
         jac_batch_size: int | None = None,
         name: str | None = None,
@@ -969,6 +973,7 @@ class Cost[*Args](_CostBase[*Args]):
     def create_factory[**Args_](
         compute_residual: ResidualFunc[Args_] | None = None,
         *,
+        mode: CostMode = "minimize_l2_squared",
         jac_mode: Literal["auto", "forward", "reverse"] = "auto",
         jac_batch_size: int | None = None,
         jac_custom_fn: JacobianFunc[Args_] | None = None,
@@ -983,24 +988,34 @@ class Cost[*Args](_CostBase[*Args]):
 
         Examples:
 
+            # Standard cost (minimize squared residual)
             @jaxls.Cost.create_factory
-            def cost1(values: VarValues, var1: SE2Var, var2: int) -> jax.Array:
+            def my_cost(values: VarValues, var1: SE2Var) -> jax.Array:
                 ...
 
+            # Equality constraint: r(x) = 0
+            @jaxls.Cost.create_factory(mode="eq_zero")
+            def my_equality_constraint(values: VarValues, var1: SE2Var) -> jax.Array:
+                return values[var1].translation()[0] - target
+
+            # Inequality constraint: r(x) <= 0
+            @jaxls.Cost.create_factory(mode="leq_zero")
+            def my_inequality_constraint(values: VarValues, var1: ScalarVar) -> jax.Array:
+                return values[var1] - upper_bound
+
             # Factory will have the same input signature as the wrapped
-            # residual function, but without the `VarValues` argument. The
-            # return type will be `Factor` instead of `jax.Array`.
-            cost = cost1(var1=SE2Var(0), var2=5)
+            # residual function, but without the `VarValues` argument.
+            cost = my_cost(var1=SE2Var(0))
             assert isinstance(cost, jaxls.Cost)
 
         Keyword arguments can also be used for configuration. For example:
 
             # To enforce forward-mode autodiff for Jacobians.
-            @Factor.create_factory(jac_mode="forward")
+            @Cost.create_factory(jac_mode="forward")
             def cost(...): ...
 
             # To reduce memory usage.
-            @Factor.create_factory(jac_batch_size=1)
+            @Cost.create_factory(jac_batch_size=1)
             def cost(...): ...
 
         """
@@ -1016,6 +1031,7 @@ class Cost[*Args](_CostBase[*Args]):
                         values, *args, **kwargs
                     ),
                     args=(args, kwargs),
+                    mode=mode,
                     jac_mode=jac_mode,
                     jac_batch_size=jac_batch_size,
                     jac_custom_fn=(
@@ -1070,22 +1086,17 @@ class Cost[*Args](_CostBase[*Args]):
 class _AnalyzedCost[*Args](Cost[*Args]):
     """Analyzed cost ready for optimization.
 
-    Used for both regular costs and constraints internally. When created from
-    a Constraint, the constraint function becomes the compute_residual function.
+    Used for both regular costs and constraint-mode costs internally.
     """
 
     num_variables: jdc.Static[int]
     sorted_ids_from_var_type: dict[type[Var[Any]], jax.Array]
     residual_flat_dim: jdc.Static[int] = 0
 
-    # Constraint support: None for regular costs, set for constraints
-    constraint_type: jdc.Static[Literal["eq_zero", "leq_zero"] | None] = None
-    """None for regular costs, 'eq_zero'/'leq_zero' for constraints."""
-
-    # For constraint-derived costs, stores the original constraint function
+    # For constraint-mode costs, stores the original constraint function
     # (before augmented Lagrangian transformation). None for regular costs.
     compute_residual_original: jdc.Static[Callable[..., jax.Array] | None] = None
-    """For constraint-derived costs, computes the raw constraint value (not augmented).
+    """For constraint-mode costs, computes the raw constraint value (not augmented).
     Takes (vals, al_params) and returns the original constraint value."""
 
     def compute_residual_flat(
@@ -1105,18 +1116,21 @@ class _AnalyzedCost[*Args](Cost[*Args]):
     @staticmethod
     @jdc.jit
     def _make[*Args_](
-        cost_or_constraint: Cost[*Args_] | Constraint[*Args_],
+        cost: Cost[*Args_],
     ) -> (
         _AnalyzedCost[*Args_] | _AnalyzedCost[tuple[AugmentedLagrangianParams[*Args_]]]
     ):
-        """Construct an analyzed cost from Cost or Constraint."""
+        """Construct an analyzed cost from Cost.
 
-        # Handle Constraint -> _AnalyzedCost conversion
-        if isinstance(cost_or_constraint, Constraint):
-            return analyze_constraint(cost_or_constraint)
+        For constraint-mode costs (mode != "minimize_l2_squared"), this converts to augmented
+        Lagrangian form with placeholder AL params.
+        """
 
-        # Handle Cost -> _AnalyzedCost conversion
-        cost = cost_or_constraint
+        # Handle constraint modes -> augmented _AnalyzedCost conversion
+        if cost.mode != "minimize_l2_squared":
+            return _analyze_constraint_cost(cost)
+
+        # Handle regular cost -> _AnalyzedCost conversion
         variables = cost._get_variables()
         assert len(variables) > 0
 
@@ -1146,13 +1160,10 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
         )
 
-        # Preserve constraint_type if set on the input cost
-        # (for augmented costs being re-analyzed).
-        constraint_type = getattr(cost, "constraint_type", None)
-
         return _AnalyzedCost(
             compute_residual=cost.compute_residual,
             args=cost.args,
+            mode=cost.mode,
             jac_mode=cost.jac_mode,
             jac_batch_size=cost.jac_batch_size,
             jac_custom_fn=cost.jac_custom_fn,
@@ -1161,7 +1172,6 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_flat_dim=residual_dim,
-            constraint_type=constraint_type,
         )
 
     def _compute_block_sparse_jac_indices(
@@ -1193,3 +1203,227 @@ class _AnalyzedCost[*Args](Cost[*Args]):
             indexing="ij",
         )
         return rows, cols
+
+
+def _analyze_constraint_cost[*Args](
+    cost: Cost[*Args], constraint_index: int = 0
+) -> _AnalyzedCost[tuple[AugmentedLagrangianParams[*Args]]]:
+    """Analyze a constraint-mode cost and convert it to augmented _AnalyzedCost form.
+
+    This creates an _AnalyzedCost that wraps the cost with the augmented
+    Lagrangian formulation, with placeholder AL params that will be updated
+    during optimization.
+
+    For equality constraints (mode="eq_zero"): h(x) = 0
+        r = sqrt(rho) * (h(x) + lambda/rho)
+
+    For inequality constraints (mode="leq_zero"): g(x) <= 0
+        r = sqrt(rho) * max(0, g(x) + lambda/rho)
+
+    For inequality constraints (mode="geq_zero"): g(x) >= 0
+        Internally converted to -g(x) <= 0, then treated as leq_zero.
+
+    Args:
+        cost: The constraint-mode cost to analyze.
+        constraint_index: Index for this constraint (used by AL solver).
+
+    Returns:
+        An _AnalyzedCost with augmented residual and placeholder AL params.
+    """
+    assert cost.mode != "minimize_l2_squared", (
+        "Only constraint-mode costs should be analyzed here"
+    )
+
+    variables = cost._get_variables()
+    assert len(variables) > 0
+
+    # Support batch axis.
+    if not isinstance(variables[0].id, int):
+        batch_axes = variables[0].id.shape
+        assert len(batch_axes) in (0, 1)
+        for var in variables[1:]:
+            assert (() if isinstance(var.id, int) else var.id.shape) == batch_axes, (
+                "Batch axes of variables do not match."
+            )
+        if len(batch_axes) == 1:
+            return cast(
+                _AnalyzedCost[Any],
+                jax.vmap(lambda c: _analyze_constraint_cost(c, constraint_index))(cost),
+            )
+
+    # Compute constraint dimension.
+    def _constraint_no_cache(*args) -> jax.Array:
+        constraint_out = cost.compute_residual(*args)  # type: ignore
+        if isinstance(constraint_out, tuple):
+            assert len(constraint_out) == 2
+            return constraint_out[0]
+        else:
+            return constraint_out
+
+    dummy_vals = jax.eval_shape(VarValues.make, variables)
+    constraint_dim = onp.prod(
+        jax.eval_shape(_constraint_no_cache, dummy_vals, *cost.args).shape
+    )
+
+    # Create placeholder AL params.
+    al_params = AugmentedLagrangianParams(
+        lagrange_multipliers=jnp.zeros(constraint_dim),
+        penalty_params=jnp.ones(constraint_dim),
+        original_args=cost.args,
+        constraint_index=constraint_index,
+    )
+
+    # Capture cost for closures.
+    orig_compute_residual = cost.compute_residual
+    orig_mode = cost.mode
+
+    # Determine if this is an inequality constraint
+    is_leq = orig_mode == "leq_zero"
+    is_geq = orig_mode == "geq_zero"
+    is_inequality = is_leq or is_geq
+
+    def augmented_residual_fn(
+        vals: VarValues,
+        al_params_inner: AugmentedLagrangianParams[*Args],
+    ) -> jax.Array | tuple[jax.Array, Any]:
+        """Compute augmented constraint residual with per-constraint penalty."""
+        constraint_out = orig_compute_residual(vals, *al_params_inner.original_args)
+
+        # Handle Jacobian cache if present.
+        if isinstance(constraint_out, tuple):
+            assert len(constraint_out) == 2
+            constraint_val = constraint_out[0].flatten()
+            jac_cache = constraint_out[1]
+            has_cache = True
+        else:
+            constraint_val = constraint_out.flatten()
+            jac_cache = None
+            has_cache = False
+
+        # For geq_zero, negate to convert to leq_zero form
+        if is_geq:
+            constraint_val = -constraint_val
+
+        # For inequality constraints: only penalize when violated (max formulation)
+        # For equality constraints: always penalize deviation
+        lambdas = al_params_inner.lagrange_multipliers
+        rho = al_params_inner.penalty_params
+        if is_inequality:
+            # g(x) <= 0: penalize only when g(x) + lambda/rho > 0
+            residual = jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
+        else:
+            # h(x) = 0: always penalize
+            residual = jnp.sqrt(rho) * (constraint_val + lambdas / rho)
+
+        if has_cache:
+            return residual, jac_cache
+        return residual
+
+    # Create wrapper Jacobian functions if original cost has custom Jacobians.
+    wrapped_jac_custom_fn = None
+    wrapped_jac_custom_with_cache_fn = None
+
+    if cost.jac_custom_fn is not None:
+        orig_jac_fn = cost.jac_custom_fn
+
+        def _wrapped_jac_custom_fn(
+            vals: VarValues,
+            al_params_inner: AugmentedLagrangianParams[*Args],
+        ) -> jax.Array:
+            """Wrapper Jacobian that applies chain rule for augmented residual."""
+            original_jac = orig_jac_fn(vals, *al_params_inner.original_args)
+
+            # For geq_zero, negate the Jacobian
+            if is_geq:
+                original_jac = -original_jac
+
+            rho = al_params_inner.penalty_params
+            lambdas = al_params_inner.lagrange_multipliers
+
+            if is_inequality:
+                # g(x) <= 0: zero Jacobian when inactive
+                constraint_out = orig_compute_residual(
+                    vals, *al_params_inner.original_args
+                )
+                if isinstance(constraint_out, tuple):
+                    constraint_val = constraint_out[0]
+                else:
+                    constraint_val = constraint_out
+                constraint_val = constraint_val.flatten()
+                if is_geq:
+                    constraint_val = -constraint_val
+                active = (constraint_val + lambdas / rho) > 0
+                return jnp.sqrt(rho)[:, None] * original_jac * active[:, None]
+            else:
+                return jnp.sqrt(rho)[:, None] * original_jac
+
+        wrapped_jac_custom_fn = _wrapped_jac_custom_fn
+
+    if cost.jac_custom_with_cache_fn is not None:
+        orig_jac_with_cache_fn = cost.jac_custom_with_cache_fn
+
+        def _wrapped_jac_custom_with_cache_fn(
+            vals: VarValues,
+            jac_cache: CustomJacobianCache,
+            al_params_inner: AugmentedLagrangianParams[*Args],
+        ) -> jax.Array:
+            """Wrapper Jacobian with cache that applies chain rule."""
+            original_jac = orig_jac_with_cache_fn(
+                vals, jac_cache, *al_params_inner.original_args
+            )
+
+            # For geq_zero, negate the Jacobian
+            if is_geq:
+                original_jac = -original_jac
+
+            rho = al_params_inner.penalty_params
+            lambdas = al_params_inner.lagrange_multipliers
+
+            if is_inequality:
+                constraint_out = orig_compute_residual(
+                    vals, *al_params_inner.original_args
+                )
+                if isinstance(constraint_out, tuple):
+                    constraint_val = constraint_out[0]
+                else:
+                    constraint_val = constraint_out
+                constraint_val = constraint_val.flatten()
+                if is_geq:
+                    constraint_val = -constraint_val
+                active = (constraint_val + lambdas / rho) > 0
+                return jnp.sqrt(rho)[:, None] * original_jac * active[:, None]
+            else:
+                return jnp.sqrt(rho)[:, None] * original_jac
+
+        wrapped_jac_custom_with_cache_fn = _wrapped_jac_custom_with_cache_fn
+
+    # Create function to compute original constraint value (without augmentation).
+    def compute_residual_original_fn(
+        vals: VarValues,
+        al_params_inner: AugmentedLagrangianParams[*Args],
+    ) -> jax.Array:
+        """Compute original constraint value (not augmented)."""
+        constraint_out = orig_compute_residual(vals, *al_params_inner.original_args)
+        if isinstance(constraint_out, tuple):
+            constraint_val = constraint_out[0].flatten()
+        else:
+            constraint_val = constraint_out.flatten()
+        # For geq_zero, negate to get the leq_zero equivalent
+        if is_geq:
+            constraint_val = -constraint_val
+        return constraint_val
+
+    return _AnalyzedCost(
+        compute_residual=augmented_residual_fn,  # type: ignore[arg-type]
+        args=(al_params,),
+        mode=cost.mode,
+        jac_mode=cost.jac_mode,
+        jac_batch_size=cost.jac_batch_size,
+        jac_custom_fn=wrapped_jac_custom_fn,
+        jac_custom_with_cache_fn=wrapped_jac_custom_with_cache_fn,
+        name=f"augmented_{cost._get_name()}",
+        num_variables=len(variables),
+        sorted_ids_from_var_type=sort_and_stack_vars(variables),
+        residual_flat_dim=constraint_dim,
+        compute_residual_original=compute_residual_original_fn,
+    )
