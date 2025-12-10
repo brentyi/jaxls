@@ -2,8 +2,9 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-**`jaxls`** is a library for solving sparse, constrained, and non-Euclidean least squares problems in JAX.
-These are common in robotics and computer vision.
+**`jaxls`** is a library for solving sparse, constrained, and/or non-Euclidean
+least squares problems in JAX. These are common in robotics and computer
+vision.
 
 To install (Python >=3.10):
 
@@ -89,12 +90,6 @@ Features include:
 - Optimization on manifolds.
   - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- Equality and inequality constraints via Augmented Lagrangian method.
-  - Equality constraints: `h(x) = 0` with `mode="eq_zero"`
-  - Inequality constraints: `g(x) ≤ 0` with `mode="leq_zero"`
-  - Greater-than constraints: `g(x) ≥ 0` with `mode="geq_zero"`
-  - Automatic conversion to penalty-based formulation.
-  - Adaptive penalty parameter scheduling.
 - Linear subproblem solvers:
   - Sparse iterative with Conjugate Gradient.
     - Preconditioning: block and point Jacobi.
@@ -103,6 +98,11 @@ Features include:
   - Dense Cholesky.
     - Fast for small problems.
   - Sparse Cholesky, on CPU. (CHOLMOD)
+- Equality and inequality constraints, enforced via an augmented Lagrangian.
+  - Equality constraints: `h(x) = 0` with `mode="eq_zero"`
+  - Inequality constraints: `g(x) ≤ 0` with `mode="leq_zero"`
+  - Greater-than constraints: `g(x) ≥ 0` with `mode="geq_zero"`
+  - Automatic conversion to penalty-based formulation + adaptive penalties.
 
 `jaxls` borrows heavily from libraries like
 [GTSAM](https://gtsam.org/), [Ceres Solver](http://ceres-solver.org/),
