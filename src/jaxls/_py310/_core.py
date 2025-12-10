@@ -126,12 +126,12 @@ class LeastSquaresProblem:
             }
         )
 
-        regular_costs = [c for c in costs if c.mode == "minimize_l2_squared"]
-        constraint_costs = [c for c in costs if c.mode != "minimize_l2_squared"]
-
         costs_from_group = dict()
         count_from_group = dict()
-        for cost in regular_costs:
+        constraint_index_from_group = dict()
+        constraint_index = 0
+
+        for cost in costs:
             cost = cost._broadcast_batch_axes()
             batch_axes = cost._get_batch_axes()
 
@@ -142,8 +142,14 @@ class LeastSquaresProblem:
                     for leaf in jax.tree.leaves(cost)
                 ),
             )
-            costs_from_group.setdefault(group_key, [])
-            count_from_group.setdefault(group_key, 0)
+
+            if group_key not in costs_from_group:
+                costs_from_group[group_key] = []
+                count_from_group[group_key] = 0
+
+                if cost.mode != "minimize_l2_squared":
+                    constraint_index_from_group[group_key] = constraint_index
+                    constraint_index += 1
 
             if len(batch_axes) == 0:
                 cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
@@ -164,20 +170,39 @@ class LeastSquaresProblem:
         residual_dim_sum = 0
         for group_key in sorted(costs_from_group.keys(), key=_sort_key):
             group = costs_from_group[group_key]
+            count = count_from_group[group_key]
 
             stacked_cost: Any = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
-            stacked_cost_expanded: Any = jax.vmap(_AnalyzedCost._make)(stacked_cost)
-            stacked_costs.append(stacked_cost_expanded)
-            cost_counts.append(count_from_group[group_key])
 
-            logger.info(
-                "Vectorizing group with {} costs, {} variables each: {}",
-                count_from_group[group_key],
-                stacked_costs[-1].num_variables,
-                stacked_costs[-1]._get_name(),
-            )
+            is_constraint_group = group_key in constraint_index_from_group
+            if is_constraint_group:
+                group_constraint_index = constraint_index_from_group[group_key]
+                stacked_cost_expanded: Any = jax.vmap(
+                    lambda c: _augment_constraint_cost(c, group_constraint_index)
+                )(stacked_cost)
+            else:
+                stacked_cost_expanded: Any = jax.vmap(_AnalyzedCost._make)(stacked_cost)
+
+            stacked_costs.append(stacked_cost_expanded)
+            cost_counts.append(count)
+
+            if is_constraint_group:
+                logger.info(
+                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
+                    count,
+                    stacked_cost_expanded.mode,
+                    stacked_cost_expanded.num_variables,
+                    stacked_cost_expanded._get_name(),
+                )
+            else:
+                logger.info(
+                    "Vectorizing group with {} costs, {} variables each: {}",
+                    count,
+                    stacked_cost_expanded.num_variables,
+                    stacked_cost_expanded._get_name(),
+                )
 
             rows, cols = jax.vmap(
                 functools.partial(
@@ -191,102 +216,18 @@ class LeastSquaresProblem:
                 rows.shape
                 == cols.shape
                 == (
-                    count_from_group[group_key],
+                    count,
                     stacked_cost_expanded.residual_flat_dim,
                     rows.shape[-1],
                 )
             )
             rows = rows + (
-                jnp.arange(count_from_group[group_key])[:, None, None]
+                jnp.arange(count)[:, None, None]
                 * stacked_cost_expanded.residual_flat_dim
             )
             rows = rows + residual_dim_sum
             jac_coords.append((rows.flatten(), cols.flatten()))
-            residual_dim_sum += (
-                stacked_cost_expanded.residual_flat_dim * count_from_group[group_key]
-            )
-
-        constraint_index = 0
-        if len(constraint_costs) > 0:
-            constraint_costs_from_group = dict()
-            constraint_count_from_group = dict()
-            constraint_index_from_group = dict()
-
-            for cost in constraint_costs:
-                cost = cost._broadcast_batch_axes()
-                batch_axes = cost._get_batch_axes()
-
-                group_key: Any = (
-                    jax.tree.structure(cost),
-                    tuple(
-                        leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
-                        for leaf in jax.tree.leaves(cost)
-                    ),
-                )
-                if group_key not in constraint_costs_from_group:
-                    constraint_costs_from_group[group_key] = []
-                    constraint_count_from_group[group_key] = 0
-                    constraint_index_from_group[group_key] = constraint_index
-                    constraint_index += 1
-
-                if len(batch_axes) == 0:
-                    cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
-                    constraint_count_from_group[group_key] += 1
-                else:
-                    assert len(batch_axes) == 1
-                    constraint_count_from_group[group_key] += batch_axes[0]
-
-                constraint_costs_from_group[group_key].append(cost)
-
-            for group_key in sorted(constraint_costs_from_group.keys(), key=_sort_key):
-                group = constraint_costs_from_group[group_key]
-                group_constraint_index = constraint_index_from_group[group_key]
-
-                stacked_cost: Any = jax.tree.map(
-                    lambda *args: jnp.concatenate(args, axis=0), *group
-                )
-
-                stacked_cost_expanded: Any = jax.vmap(
-                    lambda c: _analyze_constraint_cost(c, group_constraint_index)
-                )(stacked_cost)
-                stacked_costs.append(stacked_cost_expanded)
-                cost_counts.append(constraint_count_from_group[group_key])
-
-                logger.info(
-                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
-                    constraint_count_from_group[group_key],
-                    stacked_cost_expanded.mode,
-                    stacked_cost_expanded.num_variables,
-                    stacked_cost_expanded._get_name(),
-                )
-
-                rows, cols = jax.vmap(
-                    functools.partial(
-                        _AnalyzedCost._compute_block_sparse_jac_indices,
-                        tangent_ordering=tangent_ordering,
-                        sorted_ids_from_var_type=sorted_ids_from_var_type,
-                        tangent_start_from_var_type=tangent_start_from_var_type,
-                    )
-                )(stacked_cost_expanded)
-                constraint_count = constraint_count_from_group[group_key]
-                assert (
-                    rows.shape
-                    == cols.shape
-                    == (
-                        constraint_count,
-                        stacked_cost_expanded.residual_flat_dim,
-                        rows.shape[-1],
-                    )
-                )
-                rows = rows + (
-                    jnp.arange(constraint_count)[:, None, None]
-                    * stacked_cost_expanded.residual_flat_dim
-                )
-                rows = rows + residual_dim_sum
-                jac_coords.append((rows.flatten(), cols.flatten()))
-                residual_dim_sum += (
-                    stacked_cost_expanded.residual_flat_dim * constraint_count
-                )
+            residual_dim_sum += stacked_cost_expanded.residual_flat_dim * count
 
         jac_coords_coo = SparseCooCoordinates(
             *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
@@ -731,7 +672,7 @@ class _AnalyzedCost(Cost[Any]):
         cost: Any,
     ) -> Any:
         if cost.mode != "minimize_l2_squared":
-            return _analyze_constraint_cost(cost)
+            return _augment_constraint_cost(cost)
 
         variables = cost._get_variables()
         assert len(variables) > 0
@@ -802,9 +743,9 @@ class _AnalyzedCost(Cost[Any]):
         return rows, cols
 
 
-def _analyze_constraint_cost(cost: Any, constraint_index: Any = 0) -> Any:
+def _augment_constraint_cost(cost: Any, constraint_index: Any = 0) -> Any:
     assert cost.mode != "minimize_l2_squared", (
-        "Only constraint-mode costs should be analyzed here"
+        "Only constraint-mode costs should be augmented here"
     )
 
     variables = cost._get_variables()
@@ -818,7 +759,7 @@ def _analyze_constraint_cost(cost: Any, constraint_index: Any = 0) -> Any:
                 "Batch axes of variables do not match."
             )
         if len(batch_axes) == 1:
-            return jax.vmap(lambda c: _analyze_constraint_cost(c, constraint_index))(
+            return jax.vmap(lambda c: _augment_constraint_cost(c, constraint_index))(
                 cost
             )
 

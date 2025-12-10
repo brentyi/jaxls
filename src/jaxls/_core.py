@@ -163,15 +163,14 @@ class LeastSquaresProblem:
             }
         )
 
-        # Separate costs by mode: regular costs vs constraint-mode costs.
-        # Constraint-mode costs need special handling with _analyze_constraint_cost.
-        regular_costs = [c for c in costs if c.mode == "minimize_l2_squared"]
-        constraint_costs = [c for c in costs if c.mode != "minimize_l2_squared"]
-
-        # Group regular costs by structure.
+        # Group all costs by structure (both regular and constraint-mode).
+        # This allows us to share the grouping/stacking logic.
         costs_from_group = dict[Any, list[Cost]]()
         count_from_group = dict[Any, int]()
-        for cost in regular_costs:
+        constraint_index_from_group = dict[Any, int]()
+        constraint_index = 0
+
+        for cost in costs:
             cost = cost._broadcast_batch_axes()
             batch_axes = cost._get_batch_axes()
 
@@ -182,8 +181,15 @@ class LeastSquaresProblem:
                     for leaf in jax.tree.leaves(cost)
                 ),
             )
-            costs_from_group.setdefault(group_key, [])
-            count_from_group.setdefault(group_key, 0)
+
+            # Initialize group if new.
+            if group_key not in costs_from_group:
+                costs_from_group[group_key] = []
+                count_from_group[group_key] = 0
+                # Assign constraint_index for constraint-mode groups.
+                if cost.mode != "minimize_l2_squared":
+                    constraint_index_from_group[group_key] = constraint_index
+                    constraint_index += 1
 
             if len(batch_axes) == 0:
                 cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
@@ -203,27 +209,52 @@ class LeastSquaresProblem:
         sorted_ids_from_var_type = sort_and_stack_vars(variables)
         del variables
 
-        # Process regular cost groups.
+        # Process all cost groups with unified logic.
         residual_dim_sum = 0
         for group_key in sorted(costs_from_group.keys(), key=_sort_key):
             group = costs_from_group[group_key]
+            count = count_from_group[group_key]
 
+            # Stack costs within this group.
             stacked_cost: Cost = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
-            stacked_cost_expanded: _AnalyzedCost = jax.vmap(_AnalyzedCost._make)(
-                stacked_cost
-            )
+
+            # Convert to _AnalyzedCost.
+            # For constraint-mode costs, use _augment_constraint_cost with constraint_index.
+            # For regular costs, use _AnalyzedCost._make.
+            is_constraint_group = group_key in constraint_index_from_group
+            if is_constraint_group:
+                group_constraint_index = constraint_index_from_group[group_key]
+                stacked_cost_expanded: _AnalyzedCost = jax.vmap(
+                    lambda c: _augment_constraint_cost(c, group_constraint_index)
+                )(stacked_cost)
+            else:
+                stacked_cost_expanded: _AnalyzedCost = jax.vmap(_AnalyzedCost._make)(
+                    stacked_cost
+                )
+
             stacked_costs.append(stacked_cost_expanded)
-            cost_counts.append(count_from_group[group_key])
+            cost_counts.append(count)
 
-            logger.info(
-                "Vectorizing group with {} costs, {} variables each: {}",
-                count_from_group[group_key],
-                stacked_costs[-1].num_variables,
-                stacked_costs[-1]._get_name(),
-            )
+            # Log group info.
+            if is_constraint_group:
+                logger.info(
+                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
+                    count,
+                    stacked_cost_expanded.mode,
+                    stacked_cost_expanded.num_variables,
+                    stacked_cost_expanded._get_name(),
+                )
+            else:
+                logger.info(
+                    "Vectorizing group with {} costs, {} variables each: {}",
+                    count,
+                    stacked_cost_expanded.num_variables,
+                    stacked_cost_expanded._get_name(),
+                )
 
+            # Compute Jacobian coordinates.
             rows, cols = jax.vmap(
                 functools.partial(
                     _AnalyzedCost._compute_block_sparse_jac_indices,
@@ -236,105 +267,18 @@ class LeastSquaresProblem:
                 rows.shape
                 == cols.shape
                 == (
-                    count_from_group[group_key],
+                    count,
                     stacked_cost_expanded.residual_flat_dim,
                     rows.shape[-1],
                 )
             )
             rows = rows + (
-                jnp.arange(count_from_group[group_key])[:, None, None]
+                jnp.arange(count)[:, None, None]
                 * stacked_cost_expanded.residual_flat_dim
             )
             rows = rows + residual_dim_sum
             jac_coords.append((rows.flatten(), cols.flatten()))
-            residual_dim_sum += (
-                stacked_cost_expanded.residual_flat_dim * count_from_group[group_key]
-            )
-
-        # Process constraint-mode costs.
-        # These are converted to augmented _AnalyzedCost form with placeholder AL params.
-        constraint_index = 0
-        if len(constraint_costs) > 0:
-            constraint_costs_from_group = dict[Any, list[Cost]]()
-            constraint_count_from_group = dict[Any, int]()
-            constraint_index_from_group = dict[Any, int]()
-
-            for cost in constraint_costs:
-                cost = cost._broadcast_batch_axes()
-                batch_axes = cost._get_batch_axes()
-
-                group_key: Hashable = (
-                    jax.tree.structure(cost),
-                    tuple(
-                        leaf.shape[len(batch_axes) :] if hasattr(leaf, "shape") else ()
-                        for leaf in jax.tree.leaves(cost)
-                    ),
-                )
-                if group_key not in constraint_costs_from_group:
-                    constraint_costs_from_group[group_key] = []
-                    constraint_count_from_group[group_key] = 0
-                    constraint_index_from_group[group_key] = constraint_index
-                    constraint_index += 1
-
-                if len(batch_axes) == 0:
-                    cost = jax.tree.map(lambda x: jnp.asarray(x)[None], cost)
-                    constraint_count_from_group[group_key] += 1
-                else:
-                    assert len(batch_axes) == 1
-                    constraint_count_from_group[group_key] += batch_axes[0]
-
-                constraint_costs_from_group[group_key].append(cost)
-
-            # Stack and analyze each constraint group.
-            for group_key in sorted(constraint_costs_from_group.keys(), key=_sort_key):
-                group = constraint_costs_from_group[group_key]
-                group_constraint_index = constraint_index_from_group[group_key]
-
-                stacked_cost: Cost = jax.tree.map(
-                    lambda *args: jnp.concatenate(args, axis=0), *group
-                )
-                # Convert to augmented _AnalyzedCost form with placeholder AL params.
-                stacked_cost_expanded: _AnalyzedCost = jax.vmap(
-                    lambda c: _analyze_constraint_cost(c, group_constraint_index)
-                )(stacked_cost)
-                stacked_costs.append(stacked_cost_expanded)
-                cost_counts.append(constraint_count_from_group[group_key])
-
-                logger.info(
-                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
-                    constraint_count_from_group[group_key],
-                    stacked_cost_expanded.mode,
-                    stacked_cost_expanded.num_variables,
-                    stacked_cost_expanded._get_name(),
-                )
-
-                rows, cols = jax.vmap(
-                    functools.partial(
-                        _AnalyzedCost._compute_block_sparse_jac_indices,
-                        tangent_ordering=tangent_ordering,
-                        sorted_ids_from_var_type=sorted_ids_from_var_type,
-                        tangent_start_from_var_type=tangent_start_from_var_type,
-                    )
-                )(stacked_cost_expanded)
-                constraint_count = constraint_count_from_group[group_key]
-                assert (
-                    rows.shape
-                    == cols.shape
-                    == (
-                        constraint_count,
-                        stacked_cost_expanded.residual_flat_dim,
-                        rows.shape[-1],
-                    )
-                )
-                rows = rows + (
-                    jnp.arange(constraint_count)[:, None, None]
-                    * stacked_cost_expanded.residual_flat_dim
-                )
-                rows = rows + residual_dim_sum
-                jac_coords.append((rows.flatten(), cols.flatten()))
-                residual_dim_sum += (
-                    stacked_cost_expanded.residual_flat_dim * constraint_count
-                )
+            residual_dim_sum += stacked_cost_expanded.residual_flat_dim * count
 
         # Build sparse coordinates.
         jac_coords_coo = SparseCooCoordinates(
@@ -1113,7 +1057,7 @@ class _AnalyzedCost[*Args](Cost[*Args]):
 
         # Handle constraint modes -> augmented _AnalyzedCost conversion
         if cost.mode != "minimize_l2_squared":
-            return _analyze_constraint_cost(cost)
+            return _augment_constraint_cost(cost)
 
         # Handle regular cost -> _AnalyzedCost conversion
         variables = cost._get_variables()
@@ -1190,10 +1134,10 @@ class _AnalyzedCost[*Args](Cost[*Args]):
         return rows, cols
 
 
-def _analyze_constraint_cost[*Args](
+def _augment_constraint_cost[*Args](
     cost: Cost[*Args], constraint_index: int = 0
 ) -> _AnalyzedCost[tuple[AugmentedLagrangianParams[*Args]]]:
-    """Analyze a constraint-mode cost and convert it to augmented _AnalyzedCost form.
+    """Augment a constraint-mode cost and convert it to augmented _AnalyzedCost form.
 
     This creates an _AnalyzedCost that wraps the cost with the augmented
     Lagrangian formulation, with placeholder AL params that will be updated
@@ -1216,7 +1160,7 @@ def _analyze_constraint_cost[*Args](
         An _AnalyzedCost with augmented residual and placeholder AL params.
     """
     assert cost.mode != "minimize_l2_squared", (
-        "Only constraint-mode costs should be analyzed here"
+        "Only constraint-mode costs should be augmented here"
     )
 
     variables = cost._get_variables()
@@ -1233,7 +1177,7 @@ def _analyze_constraint_cost[*Args](
         if len(batch_axes) == 1:
             return cast(
                 _AnalyzedCost[Any],
-                jax.vmap(lambda c: _analyze_constraint_cost(c, constraint_index))(cost),
+                jax.vmap(lambda c: _augment_constraint_cost(c, constraint_index))(cost),
             )
 
     # Compute constraint dimension.
@@ -1318,7 +1262,7 @@ def _analyze_constraint_cost[*Args](
             """Wrapper Jacobian that applies chain rule for augmented residual."""
             original_jac = orig_jac_fn(vals, *al_params_inner.original_args)
 
-            # For geq_zero, negate the Jacobian
+            # For geq_zero, negate the Jacobian.
             if is_geq:
                 original_jac = -original_jac
 
@@ -1326,7 +1270,7 @@ def _analyze_constraint_cost[*Args](
             lambdas = al_params_inner.lagrange_multipliers
 
             if is_inequality:
-                # g(x) <= 0: zero Jacobian when inactive
+                # g(x) <= 0: zero Jacobian when inactive.
                 constraint_out = orig_compute_residual(
                     vals, *al_params_inner.original_args
                 )
@@ -1357,7 +1301,7 @@ def _analyze_constraint_cost[*Args](
                 vals, jac_cache, *al_params_inner.original_args
             )
 
-            # For geq_zero, negate the Jacobian
+            # For geq_zero, negate the Jacobian.
             if is_geq:
                 original_jac = -original_jac
 
