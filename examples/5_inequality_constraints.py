@@ -62,14 +62,14 @@ def main():
         """Cost penalizes large gaps between waypoints."""
         return vals[wp1] - vals[wp2]
 
-    @jaxls.Constraint.create_factory(constraint_type="eq_zero")
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def fix_waypoint(
         vals: jaxls.VarValues, waypoint: WaypointVar, target: jax.Array
     ) -> jax.Array:
         """Equality constraint: waypoint = target."""
         return vals[waypoint] - target
 
-    @jaxls.Constraint.create_factory(constraint_type="leq_zero")
+    @jaxls.Cost.create_factory(mode="leq_zero")
     def obstacle_avoidance(
         vals: jaxls.VarValues,
         waypoint: WaypointVar,
@@ -85,27 +85,23 @@ def main():
         dist_sq = jnp.sum((wp_pos - obstacle_center) ** 2)
         return jnp.array([obstacle_radius**2 - dist_sq])
 
-    costs = []
+    # Build list of all costs + constraints.
+    costs: list[jaxls.Cost] = []
     for i in range(num_waypoints - 1):
         costs.append(smoothness_cost(waypoints[i], waypoints[i + 1]))
 
-    constraints = [
-        fix_waypoint(waypoints[0], start),
-        fix_waypoint(waypoints[-1], goal),
-    ]
+    # Fix start and end positions.
+    costs.append(fix_waypoint(waypoints[0], start))
+    costs.append(fix_waypoint(waypoints[-1], goal))
 
     # Add obstacle avoidance for intermediate waypoints.
     for i in range(1, num_waypoints - 1):
         for obs_center, obs_radius in obstacles:
-            constraints.append(
+            costs.append(
                 obstacle_avoidance(waypoints[i], obs_center, jnp.array(obs_radius))
             )
 
-    problem = jaxls.LeastSquaresProblem(
-        costs=costs,
-        variables=waypoints,
-        constraints=constraints,
-    ).analyze()
+    problem = jaxls.LeastSquaresProblem(costs=costs, variables=waypoints).analyze()
 
     # Initial guess: straight line from start to goal.
     initial_vals = jaxls.VarValues.make(

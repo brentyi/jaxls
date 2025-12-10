@@ -124,13 +124,7 @@ def main():
         """Cost that pulls joint toward target angle."""
         return jnp.array([vals[joint] - target_angle])
 
-    costs = [
-        joint_prior_cost(joint_angles[0], default_angle),
-        joint_prior_cost(joint_angles[1], default_angle),
-        joint_prior_cost(joint_angles[2], default_angle),
-    ]
-
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def end_effector_constraint(
         vals: jaxls.VarValues,
         j1: AngleVar,
@@ -157,15 +151,16 @@ def main():
         print("WARNING: Target is outside reachable workspace!")
         return
 
-    problem = jaxls.LeastSquaresProblem(
-        costs=costs,
-        variables=joint_angles,
-        constraints=[
-            end_effector_constraint(
-                joint_angles[0], joint_angles[1], joint_angles[2], target_ee
-            )
-        ],
-    ).analyze()
+    costs = [
+        joint_prior_cost(joint_angles[0], default_angle),
+        joint_prior_cost(joint_angles[1], default_angle),
+        joint_prior_cost(joint_angles[2], default_angle),
+        end_effector_constraint(
+            joint_angles[0], joint_angles[1], joint_angles[2], target_ee
+        ),
+    ]
+
+    problem = jaxls.LeastSquaresProblem(costs=costs, variables=joint_angles).analyze()
 
     initial_vals = jaxls.VarValues.make(
         [

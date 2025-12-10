@@ -44,7 +44,7 @@ def main():
         """Between cost: penalizes deviation from relative pose."""
         return ((vals[var0].inverse() @ vals[var1]) @ delta.inverse()).log()
 
-    @jaxls.Constraint.create_factory
+    @jaxls.Cost.create_factory(mode="eq_zero")
     def position_constraint(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target_xy: jax.Array
     ) -> jax.Array:
@@ -53,6 +53,7 @@ def main():
 
     # Scenario: Robot travels along path, but we have GPS measurement at pose 2.
     # Prior costs give rough estimates of poses.
+    # GPS measurement says pose 2 is at (2.5, 1.0). Contradicts noisy priors.
     costs = [
         prior_cost(pose_vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
         prior_cost(pose_vars[1], jaxlie.SE2.from_xy_theta(1.0, 0.5, 0.2)),
@@ -64,10 +65,9 @@ def main():
         between_cost(
             pose_vars[1], pose_vars[2], jaxlie.SE2.from_xy_theta(0.9, 0.3, 0.1)
         ),
+        # GPS constraint on pose 2.
+        position_constraint(pose_vars[2], jnp.array([2.5, 1.0])),
     ]
-
-    # GPS measurement says pose 2 is at (2.5, 1.0). Contradicts noisy priors.
-    constraints = [position_constraint(pose_vars[2], jnp.array([2.5, 1.0]))]
 
     print("=" * 60)
     print("Constrained Pose Graph Optimization")
@@ -81,11 +81,7 @@ def main():
     print()
 
     # Build and analyze problem.
-    problem = jaxls.LeastSquaresProblem(
-        costs=costs,
-        variables=pose_vars,
-        constraints=constraints,
-    ).analyze()
+    problem = jaxls.LeastSquaresProblem(costs=costs, variables=pose_vars).analyze()
 
     print("Solving constrained optimization...")
     print()
