@@ -234,7 +234,9 @@ def main():
         color=(255, 255, 0),
     )
 
-    print("Visualization server running at http://localhost:8080")
+    print(
+        f"Visualization server running at http://{server.get_host()}:{server.get_port()}"
+    )
     server.sleep_forever()
 
 

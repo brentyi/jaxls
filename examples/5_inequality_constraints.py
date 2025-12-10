@@ -287,7 +287,9 @@ def main():
 
     server.scene.add_grid("/grid", width=5.0, height=2.0, cell_size=0.5)
 
-    print("Visualization server running at http://localhost:8080")
+    print(
+        f"Visualization server running at http://{server.get_host()}:{server.get_port()}"
+    )
     server.sleep_forever()
 
 
