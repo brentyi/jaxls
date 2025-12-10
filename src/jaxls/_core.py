@@ -337,33 +337,18 @@ class LeastSquaresProblem:
                 )
 
         # Build sparse coordinates.
-        if len(jac_coords) > 0:
-            jac_coords_coo = SparseCooCoordinates(
-                *jax.tree.map(
-                    lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords
-                ),
-                shape=(residual_dim_sum, tangent_dim_sum),
-            )
-            csr_indptr = jnp.searchsorted(
-                jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
-            )
-            jac_coords_csr = SparseCsrCoordinates(
-                indices=jac_coords_coo.cols,
-                indptr=cast(jax.Array, csr_indptr),
-                shape=(residual_dim_sum, tangent_dim_sum),
-            )
-        else:
-            # Handle edge case with no costs.
-            jac_coords_coo = SparseCooCoordinates(
-                jnp.array([], dtype=jnp.int32),
-                jnp.array([], dtype=jnp.int32),
-                shape=(0, tangent_dim_sum),
-            )
-            jac_coords_csr = SparseCsrCoordinates(
-                indices=jnp.array([], dtype=jnp.int32),
-                indptr=jnp.array([0], dtype=jnp.int32),
-                shape=(0, tangent_dim_sum),
-            )
+        jac_coords_coo = SparseCooCoordinates(
+            *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
+            shape=(residual_dim_sum, tangent_dim_sum),
+        )
+        csr_indptr = jnp.searchsorted(
+            jac_coords_coo.rows, jnp.arange(residual_dim_sum + 1)
+        )
+        jac_coords_csr = SparseCsrCoordinates(
+            indices=jac_coords_coo.cols,
+            indptr=cast(jax.Array, csr_indptr),
+            shape=(residual_dim_sum, tangent_dim_sum),
+        )
 
         return AnalyzedLeastSquaresProblem(
             stacked_costs=tuple(stacked_costs),
