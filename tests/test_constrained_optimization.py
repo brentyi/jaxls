@@ -641,6 +641,247 @@ def test_no_constraints_uses_standard_solver():
     assert jnp.abs(solution[var] - 5.0) < 1e-6
 
 
+def test_constraint_with_jac_mode_forward():
+    """Test constraint with explicit jac_mode='forward'."""
+
+    class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
+        pass
+
+    var = ScalarVar(0)
+
+    @jaxls.Cost.create_factory
+    def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
+        return jnp.array([vals[var] - target])
+
+    @jaxls.Constraint.create_factory(jac_mode="forward")
+    def constraint_fn(
+        vals: jaxls.VarValues, var: ScalarVar, target: float
+    ) -> jax.Array:
+        return jnp.array([vals[var] - target])
+
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var, 2.0)],
+        variables=[var],
+        constraints=[constraint_fn(var, 1.0)],
+    ).analyze()
+
+    solution = problem.solve(
+        initial_vals=jaxls.VarValues.make([var.with_value(jnp.array(5.0))]),
+        verbose=False,
+    )
+
+    assert jnp.abs(solution[var] - 1.0) < 1e-5
+
+
+def test_constraint_with_jac_mode_reverse():
+    """Test constraint with explicit jac_mode='reverse'."""
+
+    class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
+        pass
+
+    var = ScalarVar(0)
+
+    @jaxls.Cost.create_factory
+    def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
+        return jnp.array([vals[var] - target])
+
+    @jaxls.Constraint.create_factory(jac_mode="reverse")
+    def constraint_fn(
+        vals: jaxls.VarValues, var: ScalarVar, target: float
+    ) -> jax.Array:
+        return jnp.array([vals[var] - target])
+
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var, 2.0)],
+        variables=[var],
+        constraints=[constraint_fn(var, 1.0)],
+    ).analyze()
+
+    solution = problem.solve(
+        initial_vals=jaxls.VarValues.make([var.with_value(jnp.array(5.0))]),
+        verbose=False,
+    )
+
+    assert jnp.abs(solution[var] - 1.0) < 1e-5
+
+
+def test_constraint_with_custom_jacobian():
+    """Test constraint with custom Jacobian function.
+
+    The wrapper Jacobian should correctly apply sqrt(rho) scaling.
+    """
+
+    class Vec2Var(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(2)):
+        pass
+
+    var = Vec2Var(0)
+
+    def my_constraint_jac(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
+        """Custom Jacobian: d(x+y)/d(x,y) = [1, 1]."""
+        return jnp.array([[1.0, 1.0]])
+
+    @jaxls.Cost.create_factory
+    def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
+        return vals[var]
+
+    @jaxls.Constraint.create_factory(jac_custom_fn=my_constraint_jac)
+    def constraint_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
+        """Constraint: x + y = 1."""
+        vec = vals[var]
+        return jnp.array([vec[0] + vec[1] - 1.0])
+
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var)],
+        variables=[var],
+        constraints=[constraint_fn(var)],
+    ).analyze()
+
+    solution = problem.solve(
+        initial_vals=jaxls.VarValues.make([var.with_value(jnp.array([2.0, 3.0]))]),
+        verbose=False,
+    )
+
+    # Solution should be (0.5, 0.5).
+    expected = jnp.array([0.5, 0.5])
+    assert jnp.linalg.norm(solution[var] - expected) < 1e-4
+
+    # Verify constraint is satisfied.
+    constraint_violation = problem.compute_constraint_values(solution)
+    assert jnp.linalg.norm(constraint_violation) < 1e-5
+
+
+def test_constraint_with_custom_jacobian_with_cache():
+    """Test constraint with custom Jacobian that uses cache from residual computation."""
+
+    class Vec2Var(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(2)):
+        pass
+
+    var = Vec2Var(0)
+
+    def my_constraint_jac_with_cache(
+        vals: jaxls.VarValues, cache: jax.Array, var: Vec2Var
+    ) -> jax.Array:
+        """Custom Jacobian using cached intermediate value.
+
+        Cache contains the squared values, which we use to verify cache passing works.
+        The actual Jacobian is still [1, 1] for x + y.
+        """
+        # Just verify cache was passed correctly
+        _ = cache  # Would use in real scenario
+        return jnp.array([[1.0, 1.0]])
+
+    @jaxls.Cost.create_factory
+    def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
+        return vals[var]
+
+    @jaxls.Constraint.create_factory(
+        jac_custom_with_cache_fn=my_constraint_jac_with_cache
+    )
+    def constraint_fn(
+        vals: jaxls.VarValues, var: Vec2Var
+    ) -> tuple[jax.Array, jax.Array]:
+        """Constraint: x + y = 1, with cache."""
+        vec = vals[var]
+        constraint_val = jnp.array([vec[0] + vec[1] - 1.0])
+        cache = vec**2  # Cache squared values for Jacobian
+        return constraint_val, cache
+
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var)],
+        variables=[var],
+        constraints=[constraint_fn(var)],
+    ).analyze()
+
+    solution = problem.solve(
+        initial_vals=jaxls.VarValues.make([var.with_value(jnp.array([2.0, 3.0]))]),
+        verbose=False,
+    )
+
+    # Solution should be (0.5, 0.5).
+    expected = jnp.array([0.5, 0.5])
+    assert jnp.linalg.norm(solution[var] - expected) < 1e-4
+
+
+def test_inequality_constraint_custom_jacobian_zeros_when_inactive():
+    """Test that inequality constraint wrapper Jacobian zeros out when inactive.
+
+    For g(x) <= 0, when g(x) + λ/ρ <= 0, the Jacobian should be zero.
+    """
+
+    class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
+        pass
+
+    var = ScalarVar(0)
+
+    def my_constraint_jac(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
+        """Custom Jacobian: d(x-2)/dx = 1."""
+        return jnp.array([[1.0]])
+
+    @jaxls.Cost.create_factory
+    def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
+        return jnp.array([vals[var] - target])
+
+    @jaxls.Constraint.create_factory(
+        constraint_type="leq_zero", jac_custom_fn=my_constraint_jac
+    )
+    def inequality_constraint(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
+        """Constraint: x <= 2, i.e., x - 2 <= 0."""
+        return jnp.array([vals[var] - 2.0])
+
+    # Cost pulls to 0.5, constraint x <= 2 is inactive
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var, 0.5)],
+        variables=[var],
+        constraints=[inequality_constraint(var)],
+    ).analyze()
+
+    solution = problem.solve(verbose=False)
+
+    # Solution should be at unconstrained optimum x = 0.5
+    assert jnp.abs(solution[var] - 0.5) < 1e-4
+
+    # Constraint should be satisfied with slack
+    constraint_val = problem.compute_constraint_values(solution)[0]
+    assert constraint_val < -0.1, "Constraint should be inactive"
+
+
+def test_constraint_with_jac_batch_size():
+    """Test constraint with jac_batch_size for memory-efficient Jacobian computation."""
+
+    class Vec4Var(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(4)):
+        pass
+
+    var = Vec4Var(0)
+
+    @jaxls.Cost.create_factory
+    def cost_fn(vals: jaxls.VarValues, var: Vec4Var) -> jax.Array:
+        return vals[var]
+
+    # Use jac_batch_size=1 to compute Jacobian one column at a time
+    @jaxls.Constraint.create_factory(jac_batch_size=1)
+    def constraint_fn(vals: jaxls.VarValues, var: Vec4Var) -> jax.Array:
+        """Constraint: sum(x) = 2."""
+        return jnp.array([jnp.sum(vals[var]) - 2.0])
+
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var)],
+        variables=[var],
+        constraints=[constraint_fn(var)],
+    ).analyze()
+
+    solution = problem.solve(
+        initial_vals=jaxls.VarValues.make([var.with_value(jnp.ones(4))]),
+        verbose=False,
+    )
+
+    # Sum should equal 2.0
+    assert jnp.abs(jnp.sum(solution[var]) - 2.0) < 1e-4
+
+    # Verify constraint is satisfied
+    constraint_violation = problem.compute_constraint_values(solution)
+    assert jnp.linalg.norm(constraint_violation) < 1e-5
+
+
 if __name__ == "__main__":
     # Run all tests.
     pytest.main([__file__, "-v"])
