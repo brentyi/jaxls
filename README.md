@@ -90,8 +90,9 @@ Features include:
   - Examples provided for SO(2), SO(3), SE(2), and SE(3).
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
 - Equality and inequality constraints via Augmented Lagrangian method.
-  - Equality constraints: `h(x) = 0` with `constraint_type="eq_zero"`
-  - Inequality constraints: `g(x) ≤ 0` with `constraint_type="leq_zero"`
+  - Equality constraints: `h(x) = 0` with `mode="eq_zero"`
+  - Inequality constraints: `g(x) ≤ 0` with `mode="leq_zero"`
+  - Greater-than constraints: `g(x) ≥ 0` with `mode="geq_zero"`
   - Automatic conversion to penalty-based formulation.
   - Adaptive penalty parameter scheduling.
 - Linear subproblem solvers:
@@ -134,20 +135,20 @@ pose_vars = [jaxls.SE2Var(0), jaxls.SE2Var(1)]
 ```
 
 **Defining costs (decorator).** The recommended way to define a cost is to
-transform a function into a cost factory using the `@jaxls.Cost.create_factory`
+transform a function into a cost factory using the `@jaxls.Cost.factory`
 decorator. The transformed function will return a `jaxls.Cost` object.
 
 ```python
 # Defining cost types.
 
-@jaxls.Cost.create_factory
+@jaxls.Cost.factory
 def prior_cost(
     vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
 ) -> jax.Array:
     """Prior cost for a pose variable. Penalizes deviations from the target"""
     return (vals[var] @ target.inverse()).log()
 
-@jaxls.Cost.create_factory
+@jaxls.Cost.factory
 def between_cost(
     vals: jaxls.VarValues, delta: jaxlie.SE2, var0: jaxls.SE2Var, var1: jaxls.SE2Var
 ) -> jax.Array:
@@ -203,21 +204,23 @@ Batched inputs can also be manually constructed, and are detected by inspecting
 the shape of variable ID arrays in the input.
 
 **Defining constraints.** Constraints enforce conditions on the solution using
-an Augmented Lagrangian method. Two types are supported:
+an Augmented Lagrangian method. They are defined using the same `@jaxls.Cost.factory`
+decorator with a `kind` parameter:
 
-- Equality constraints: `h(x) = 0` with `constraint_type="eq_zero"`
-- Inequality constraints: `g(x) ≤ 0` with `constraint_type="leq_zero"`
+- Equality constraints: `h(x) = 0` with `kind="constraint_eq_zero"`
+- Inequality constraints: `g(x) <= 0` with `kind="constraint_leq_zero"`
+- Greater-than constraints: `g(x) >= 0` with `kind="constraint_geq_zero"`
 
 ```python
 # Equality constraint: fix position to a target.
-@jaxls.Constraint.create_factory(constraint_type="eq_zero")
+@jaxls.Cost.factory(kind="constraint_eq_zero")
 def position_constraint(
     vals: jaxls.VarValues, var: jaxls.SE2Var, target_xy: jax.Array
 ) -> jax.Array:
     return vals[var].translation() - target_xy
 
 # Inequality constraint: stay outside a circular obstacle.
-@jaxls.Constraint.create_factory(constraint_type="leq_zero")
+@jaxls.Cost.factory(kind="constraint_leq_zero")
 def obstacle_avoidance(
     vals: jaxls.VarValues,
     var: jaxls.SE2Var,
@@ -231,8 +234,12 @@ def obstacle_avoidance(
 ```
 
 ```python
-# Instantiating constraints.
-constraints = [
+# Constraints are added to the same costs list.
+costs = [
+    prior_cost(pose_vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
+    prior_cost(pose_vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
+    between_cost(jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0), pose_vars[0], pose_vars[1]),
+    # Constraints go in the same list:
     position_constraint(pose_vars[0], jnp.array([0.0, 0.0])),
     obstacle_avoidance(pose_vars[1], jnp.array([1.0, 0.0]), 0.5),
 ]
@@ -242,15 +249,10 @@ constraints = [
 it, and solve:
 
 ```python
-# Unconstrained problem.
 problem = jaxls.LeastSquaresProblem(costs, pose_vars).analyze()
 solution = problem.solve()
 print("Pose 0", solution[pose_vars[0]])
 print("Pose 1", solution[pose_vars[1]])
-
-# With constraints.
-problem = jaxls.LeastSquaresProblem(costs, pose_vars, constraints).analyze()
-solution = problem.solve()
 ```
 
 ### CHOLMOD setup

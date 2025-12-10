@@ -19,12 +19,12 @@ def test_simple_scalar_constraint():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         """Cost pulls variable toward target."""
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_fn(
         vals: jaxls.VarValues, var: ScalarVar, target: float
     ) -> jax.Array:
@@ -63,12 +63,12 @@ def test_2d_constrained_optimization():
 
     var = Vec2Var(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         """Minimize distance from origin."""
         return vals[var]
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         """Constraint: x + y = 1."""
         vec = vals[var]
@@ -102,14 +102,14 @@ def test_se2_position_constraint():
     """
     pose_vars = [jaxls.SE2Var(0), jaxls.SE2Var(1)]
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def prior_cost(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
     ) -> jax.Array:
         """Prior cost for a pose variable."""
         return (vals[var] @ target.inverse()).log()
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def position_x_constraint(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target_x: float
     ) -> jax.Array:
@@ -149,17 +149,17 @@ def test_multiple_constraints():
 
     var = Vec3Var(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: Vec3Var, target: jax.Array) -> jax.Array:
         """Cost pulls toward target."""
         return vals[var] - target
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_x(vals: jaxls.VarValues, var: Vec3Var, val: float) -> jax.Array:
         """Constraint: x = val."""
         return jnp.array([vals[var][0] - val])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_y(vals: jaxls.VarValues, var: Vec3Var, val: float) -> jax.Array:
         """Constraint: y = val."""
         return jnp.array([vals[var][1] - val])
@@ -194,11 +194,11 @@ def test_constraint_violation_decreases():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 10.0])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 1.0])
 
@@ -229,11 +229,11 @@ def test_batched_constraints():
     # Create 3 variables.
     vars = [ScalarVar(i) for i in range(3)]
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         """Constraint: variable = 1.0."""
         return jnp.array([vals[var] - 1.0])
@@ -273,12 +273,12 @@ def test_nonlinear_constraint():
 
     var = Vec2Var(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: Vec2Var, target: jax.Array) -> jax.Array:
         """Cost pulls toward target."""
         return vals[var] - target
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def circle_constraint(
         vals: jaxls.VarValues, var: Vec2Var, radius: float
     ) -> jax.Array:
@@ -355,14 +355,14 @@ def test_robot_arm_end_effector_constraint():
 
         return jnp.array([x3, y3])
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def joint_prior_cost(
         vals: jaxls.VarValues, joint: AngleVar, target_angle: float
     ) -> jax.Array:
         """Cost that pulls joint toward target angle."""
         return jnp.array([vals[joint] - target_angle])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def end_effector_constraint(
         vals: jaxls.VarValues,
         j1: AngleVar,
@@ -438,10 +438,10 @@ def test_robot_arm_end_effector_constraint():
 
 
 def test_inequality_constraint_simple():
-    """Test simple inequality constraint: minimize x^2 s.t. x ≤ 1.
+    """Test simple inequality constraint: minimize x^2 s.t. x <= 1.
 
     The unconstrained optimum would be x = 0, but we add a cost that pulls
-    toward x = 2, with constraint x ≤ 1.
+    toward x = 2, with constraint x <= 1.
     """
 
     class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
@@ -449,19 +449,19 @@ def test_inequality_constraint_simple():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         """Cost pulls variable toward target."""
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="leq_zero")
+    @jaxls.Cost.factory(kind="constraint_leq_zero")
     def inequality_constraint(
         vals: jaxls.VarValues, var: ScalarVar, upper_bound: float
     ) -> jax.Array:
-        """Constraint: variable ≤ upper_bound."""
+        """Constraint: variable <= upper_bound."""
         return jnp.array([vals[var] - upper_bound])
 
-    # Create problem: cost pulls to 2.0, constraint forces x ≤ 1.0
+    # Create problem: cost pulls to 2.0, constraint forces x <= 1.0
     problem = jaxls.LeastSquaresProblem(
         costs=[cost_fn(var, 2.0)] + [inequality_constraint(var, 1.0)],
         variables=[var],
@@ -488,9 +488,9 @@ def test_inequality_constraint_simple():
 def test_inequality_constraint_inactive():
     """Test inequality constraint that is inactive (not at boundary).
 
-    minimize ||x - 0.5||^2 s.t. x ≤ 2.0
+    minimize ||x - 0.5||^2 s.t. x <= 2.0
 
-    The constraint should be inactive since optimum x=0.5 satisfies x ≤ 2.
+    The constraint should be inactive since optimum x=0.5 satisfies x <= 2.
     """
 
     class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
@@ -498,11 +498,11 @@ def test_inequality_constraint_inactive():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="leq_zero")
+    @jaxls.Cost.factory(kind="constraint_leq_zero")
     def inequality_constraint(
         vals: jaxls.VarValues, var: ScalarVar, upper_bound: float
     ) -> jax.Array:
@@ -523,13 +523,11 @@ def test_inequality_constraint_inactive():
     assert constraint_val < -0.1, "Constraint should be inactive"
 
 
-def test_multiple_inequality_constraints():
-    """Test multiple inequality constraints: box constraints.
+def test_geq_zero_constraint():
+    """Test geq_zero constraint: minimize ||x - target||^2 s.t. x >= lower_bound.
 
-    minimize ||x - 5||^2 s.t. 1 ≤ x ≤ 3
-
-    Implemented as: x - 1 ≥ 0 and x - 3 ≤ 0
-    Which becomes: -(x - 1) ≤ 0 and x - 3 ≤ 0
+    Cost pulls toward 0.0, constraint forces x >= 1.0.
+    Solution should be at the constraint boundary: x = 1.0.
     """
 
     class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
@@ -537,25 +535,72 @@ def test_multiple_inequality_constraints():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
+    def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
+        """Cost pulls variable toward target."""
+        return jnp.array([vals[var] - target])
+
+    @jaxls.Cost.factory(kind="constraint_geq_zero")
+    def geq_constraint(
+        vals: jaxls.VarValues, var: ScalarVar, lower_bound: float
+    ) -> jax.Array:
+        """Constraint: variable >= lower_bound."""
+        return jnp.array([vals[var] - lower_bound])
+
+    # Create problem: cost pulls to 0.0, constraint forces x >= 1.0
+    problem = jaxls.LeastSquaresProblem(
+        costs=[cost_fn(var, 0.0), geq_constraint(var, 1.0)],
+        variables=[var],
+    ).analyze()
+
+    # Solve with initial value above the constraint
+    solution = problem.solve(
+        initial_vals=jaxls.VarValues.make([var.with_value(jnp.array(2.0))]),
+        verbose=False,
+    )
+
+    # Solution should be at the constraint boundary: x = 1.0
+    assert jnp.abs(solution[var] - 1.0) < 2e-2, f"Expected x=1.0, got x={solution[var]}"
+
+    # Verify constraint is satisfied (x - lower_bound >= 0)
+    constraint_value = problem.compute_constraint_values(solution)
+    # For geq_zero, internally converted to leq_zero by negation, so we check <= 0
+    assert constraint_value[0] <= 2e-2, f"Constraint violated: {constraint_value[0]}"
+
+
+def test_multiple_inequality_constraints():
+    """Test multiple inequality constraints: box constraints.
+
+    minimize ||x - 5||^2 s.t. 1 <= x <= 3
+
+    Implemented as: x - 1 >= 0 and x - 3 <= 0
+    Which becomes: -(x - 1) <= 0 and x - 3 <= 0
+    """
+
+    class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
+        pass
+
+    var = ScalarVar(0)
+
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="leq_zero")
+    @jaxls.Cost.factory(kind="constraint_leq_zero")
     def upper_bound_constraint(
         vals: jaxls.VarValues, var: ScalarVar, upper: float
     ) -> jax.Array:
-        """x ≤ upper"""
+        """x <= upper"""
         return jnp.array([vals[var] - upper])
 
-    @jaxls.Cost.create_factory(mode="leq_zero")
+    @jaxls.Cost.factory(kind="constraint_leq_zero")
     def lower_bound_constraint(
         vals: jaxls.VarValues, var: ScalarVar, lower: float
     ) -> jax.Array:
-        """x ≥ lower, which is -(x - lower) ≤ 0"""
+        """x >= lower, which is -(x - lower) <= 0"""
         return jnp.array([lower - vals[var]])
 
-    # Cost pulls to 5.0, but constraints force 1 ≤ x ≤ 3
+    # Cost pulls to 5.0, but constraints force 1 <= x <= 3
     problem = jaxls.LeastSquaresProblem(
         costs=[cost_fn(var, 5.0)]
         + [
@@ -584,11 +629,11 @@ def test_custom_augmented_lagrangian_config():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var]])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def constraint_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 1.0])
 
@@ -620,7 +665,7 @@ def test_no_constraints_uses_standard_solver():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         return jnp.array([vals[var] - 5.0])
 
@@ -644,11 +689,11 @@ def test_constraint_with_jac_mode_forward():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="eq_zero", jac_mode="forward")
+    @jaxls.Cost.factory(kind="constraint_eq_zero", jac_mode="forward")
     def constraint_fn(
         vals: jaxls.VarValues, var: ScalarVar, target: float
     ) -> jax.Array:
@@ -675,11 +720,11 @@ def test_constraint_with_jac_mode_reverse():
 
     var = ScalarVar(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="eq_zero", jac_mode="reverse")
+    @jaxls.Cost.factory(kind="constraint_eq_zero", jac_mode="reverse")
     def constraint_fn(
         vals: jaxls.VarValues, var: ScalarVar, target: float
     ) -> jax.Array:
@@ -713,11 +758,11 @@ def test_constraint_with_custom_jacobian():
         """Custom Jacobian: d(x+y)/d(x,y) = [1, 1]."""
         return jnp.array([[1.0, 1.0]])
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         return vals[var]
 
-    @jaxls.Cost.create_factory(mode="eq_zero", jac_custom_fn=my_constraint_jac)
+    @jaxls.Cost.factory(kind="constraint_eq_zero", jac_custom_fn=my_constraint_jac)
     def constraint_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         """Constraint: x + y = 1."""
         vec = vals[var]
@@ -762,12 +807,12 @@ def test_constraint_with_custom_jacobian_with_cache():
         _ = cache  # Would use in real scenario
         return jnp.array([[1.0, 1.0]])
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: Vec2Var) -> jax.Array:
         return vals[var]
 
-    @jaxls.Cost.create_factory(
-        mode="eq_zero", jac_custom_with_cache_fn=my_constraint_jac_with_cache
+    @jaxls.Cost.factory(
+        kind="constraint_eq_zero", jac_custom_with_cache_fn=my_constraint_jac_with_cache
     )
     def constraint_fn(
         vals: jaxls.VarValues, var: Vec2Var
@@ -796,7 +841,7 @@ def test_constraint_with_custom_jacobian_with_cache():
 def test_inequality_constraint_custom_jacobian_zeros_when_inactive():
     """Test that inequality constraint wrapper Jacobian zeros out when inactive.
 
-    For g(x) <= 0, when g(x) + λ/ρ <= 0, the Jacobian should be zero.
+    For g(x) <= 0, when g(x) + lam/rho <= 0, the Jacobian should be zero.
     """
 
     class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.array(0.0)):
@@ -808,11 +853,11 @@ def test_inequality_constraint_custom_jacobian_zeros_when_inactive():
         """Custom Jacobian: d(x-2)/dx = 1."""
         return jnp.array([[1.0]])
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
         return jnp.array([vals[var] - target])
 
-    @jaxls.Cost.create_factory(mode="leq_zero", jac_custom_fn=my_constraint_jac)
+    @jaxls.Cost.factory(kind="constraint_leq_zero", jac_custom_fn=my_constraint_jac)
     def inequality_constraint(vals: jaxls.VarValues, var: ScalarVar) -> jax.Array:
         """Constraint: x <= 2, i.e., x - 2 <= 0."""
         return jnp.array([vals[var] - 2.0])
@@ -841,12 +886,12 @@ def test_constraint_with_jac_batch_size():
 
     var = Vec4Var(0)
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def cost_fn(vals: jaxls.VarValues, var: Vec4Var) -> jax.Array:
         return vals[var]
 
     # Use jac_batch_size=1 to compute Jacobian one column at a time
-    @jaxls.Cost.create_factory(mode="eq_zero", jac_batch_size=1)
+    @jaxls.Cost.factory(kind="constraint_eq_zero", jac_batch_size=1)
     def constraint_fn(vals: jaxls.VarValues, var: Vec4Var) -> jax.Array:
         """Constraint: sum(x) = 2."""
         return jnp.array([jnp.sum(vals[var]) - 2.0])

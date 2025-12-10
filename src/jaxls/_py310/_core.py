@@ -70,16 +70,16 @@ class LeastSquaresProblem:
 
         costs = tuple(_deduplicate_compute_residual(cost) for cost in self.costs)
 
-        count_by_mode: Any = {
-            "minimize_l2_squared": 0,
-            "eq_zero": 0,
-            "leq_zero": 0,
-            "geq_zero": 0,
+        count_by_kind: Any = {
+            "l2_squared": 0,
+            "constraint_eq_zero": 0,
+            "constraint_leq_zero": 0,
+            "constraint_geq_zero": 0,
         }
         for f in costs:
             assert len(f._get_batch_axes()) in (0, 1)
             increment = 1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
-            count_by_mode[f.mode] += increment
+            count_by_kind[f.kind] += increment
 
         num_variables = 0
         for v in variables:
@@ -88,16 +88,16 @@ class LeastSquaresProblem:
                 1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
             )
 
-        total_costs = sum(count_by_mode.values())
+        total_costs = sum(count_by_kind.values())
         logger.info(
             "Building optimization problem with {} terms and {} variables: "
-            "{} minimize_l2_squared, {} eq_zero, {} leq_zero, {} geq_zero",
+            "{} costs, {} eq_zero, {} leq_zero, {} geq_zero",
             total_costs,
             num_variables,
-            count_by_mode["minimize_l2_squared"],
-            count_by_mode["eq_zero"],
-            count_by_mode["leq_zero"],
-            count_by_mode["geq_zero"],
+            count_by_kind["l2_squared"],
+            count_by_kind["constraint_eq_zero"],
+            count_by_kind["constraint_leq_zero"],
+            count_by_kind["constraint_geq_zero"],
         )
 
         tangent_start_from_var_type = dict()
@@ -147,7 +147,7 @@ class LeastSquaresProblem:
                 costs_from_group[group_key] = []
                 count_from_group[group_key] = 0
 
-                if cost.mode != "minimize_l2_squared":
+                if cost.kind != "l2_squared":
                     constraint_index_from_group[group_key] = constraint_index
                     constraint_index += 1
 
@@ -190,9 +190,9 @@ class LeastSquaresProblem:
 
             if is_constraint_group:
                 logger.info(
-                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
+                    "Vectorizing constraint group with {} constraints ({}), {} variables each: {}",
                     count,
-                    stacked_cost_expanded.mode,
+                    stacked_cost_expanded.kind,
                     stacked_cost_expanded.num_variables,
                     stacked_cost_expanded._get_name(),
                 )
@@ -284,9 +284,7 @@ class AnalyzedLeastSquaresProblem:
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
 
-        has_constraints = any(
-            cost.mode != "minimize_l2_squared" for cost in self.stacked_costs
-        )
+        has_constraints = any(cost.kind != "l2_squared" for cost in self.stacked_costs)
 
         if has_constraints:
             from ._augmented_lagrangian import (
@@ -363,7 +361,7 @@ class AnalyzedLeastSquaresProblem:
     def _compute_constraint_values(self, vals: Any) -> Any:
         constraint_slices = list()
         for stacked_cost in self.stacked_costs:
-            if stacked_cost.mode == "minimize_l2_squared":
+            if stacked_cost.kind == "l2_squared":
                 continue
 
             assert stacked_cost.compute_residual_original is not None
@@ -510,7 +508,7 @@ class Cost:
 
     args: Any
 
-    mode: jdc.Static[Any] = "minimize_l2_squared"
+    kind: jdc.Static[Any] = "l2_squared"
 
     jac_mode: jdc.Static[Any] = "auto"
 
@@ -576,10 +574,10 @@ class Cost:
         return jax.tree.unflatten(treedef, broadcasted_leaves)
 
     @staticmethod
-    def create_factory(
+    def factory(
         compute_residual: Any = None,
         *,
-        mode: Any = "minimize_l2_squared",
+        kind: Any = "l2_squared",
         jac_mode: Any = "auto",
         jac_batch_size: Any = None,
         jac_custom_fn: Any = None,
@@ -595,7 +593,7 @@ class Cost:
                         values, *args, **kwargs
                     ),
                     args=(args, kwargs),
-                    mode=mode,
+                    kind=kind,
                     jac_mode=jac_mode,
                     jac_batch_size=jac_batch_size,
                     jac_custom_fn=(
@@ -620,6 +618,35 @@ class Cost:
         if compute_residual is None:
             return decorator
         return decorator(compute_residual)
+
+    @staticmethod
+    @deprecated("Use Cost.factory instead of Cost.create_factory")
+    def create_factory(
+        compute_residual: Any = None,
+        *,
+        kind: Any = "l2_squared",
+        jac_mode: Any = "auto",
+        jac_batch_size: Any = None,
+        jac_custom_fn: Any = None,
+        jac_custom_with_cache_fn: Any = None,
+        name: Any = None,
+    ) -> Any:
+        import warnings
+
+        warnings.warn(
+            "Cost.create_factory is deprecated, use Cost.factory instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return Cost.factory(
+            compute_residual,
+            kind=kind,
+            jac_mode=jac_mode,
+            jac_batch_size=jac_batch_size,
+            jac_custom_fn=jac_custom_fn,
+            jac_custom_with_cache_fn=jac_custom_with_cache_fn,
+            name=name,
+        )
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
@@ -671,7 +698,7 @@ class _AnalyzedCost(Cost[Any]):
     def _make(
         cost: Any,
     ) -> Any:
-        if cost.mode != "minimize_l2_squared":
+        if cost.kind != "l2_squared":
             return _augment_constraint_cost(cost)
 
         variables = cost._get_variables()
@@ -703,7 +730,7 @@ class _AnalyzedCost(Cost[Any]):
         return _AnalyzedCost(
             compute_residual=cost.compute_residual,
             args=cost.args,
-            mode=cost.mode,
+            kind=cost.kind,
             jac_mode=cost.jac_mode,
             jac_batch_size=cost.jac_batch_size,
             jac_custom_fn=cost.jac_custom_fn,
@@ -744,7 +771,7 @@ class _AnalyzedCost(Cost[Any]):
 
 
 def _augment_constraint_cost(cost: Any, constraint_index: Any = 0) -> Any:
-    assert cost.mode != "minimize_l2_squared", (
+    assert cost.kind != "l2_squared", (
         "Only constraint-mode costs should be augmented here"
     )
 
@@ -784,10 +811,10 @@ def _augment_constraint_cost(cost: Any, constraint_index: Any = 0) -> Any:
     )
 
     orig_compute_residual = cost.compute_residual
-    orig_mode = cost.mode
+    orig_kind = cost.kind
 
-    is_leq = orig_mode == "leq_zero"
-    is_geq = orig_mode == "geq_zero"
+    is_leq = orig_kind == "constraint_leq_zero"
+    is_geq = orig_kind == "constraint_geq_zero"
     is_inequality = is_leq or is_geq
 
     def augmented_residual_fn(
@@ -909,7 +936,7 @@ def _augment_constraint_cost(cost: Any, constraint_index: Any = 0) -> Any:
     return _AnalyzedCost(
         compute_residual=augmented_residual_fn,
         args=(al_params,),
-        mode=cost.mode,
+        kind=cost.kind,
         jac_mode=cost.jac_mode,
         jac_batch_size=cost.jac_batch_size,
         jac_custom_fn=wrapped_jac_custom_fn,

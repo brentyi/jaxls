@@ -67,10 +67,10 @@ class LeastSquaresProblem:
     """We define least squares problem as bipartite graphs, which have two types of nodes:
 
     - `jaxls.Cost`. These are cost terms or constraints.
-      - `mode="minimize_l2_squared"` (default): Minimize squared L2 norm ||r(x)||²
-      - `mode="eq_zero"`: Equality constraint r(x) = 0
-      - `mode="leq_zero"`: Inequality constraint r(x) <= 0
-      - `mode="geq_zero"`: Inequality constraint r(x) >= 0
+      - `kind=False` (default): Minimize squared L2 norm ||r(x)||^2
+      - `kind="constraint_eq_zero"`: Equality constraint r(x) = 0
+      - `kind="constraint_leq_zero"`: Inequality constraint r(x) <= 0
+      - `kind="constraint_geq_zero"`: Inequality constraint r(x) >= 0
     - `jaxls.Var`. These are the parameters we want to optimize.
     """
 
@@ -100,16 +100,16 @@ class LeastSquaresProblem:
         costs = tuple(_deduplicate_compute_residual(cost) for cost in self.costs)
 
         # Count costs by mode.
-        count_by_mode: dict[CostMode, int] = {
-            "minimize_l2_squared": 0,
-            "eq_zero": 0,
-            "leq_zero": 0,
-            "geq_zero": 0,
+        count_by_kind: dict[CostKind, int] = {
+            "l2_squared": 0,
+            "constraint_eq_zero": 0,
+            "constraint_leq_zero": 0,
+            "constraint_geq_zero": 0,
         }
         for f in costs:
             assert len(f._get_batch_axes()) in (0, 1)
             increment = 1 if len(f._get_batch_axes()) == 0 else f._get_batch_axes()[0]
-            count_by_mode[f.mode] += increment
+            count_by_kind[f.kind] += increment
 
         num_variables = 0
         for v in variables:
@@ -118,17 +118,17 @@ class LeastSquaresProblem:
                 1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
             )
 
-        # Log counts by mode.
-        total_costs = sum(count_by_mode.values())
+        # Log counts by constraint type.
+        total_costs = sum(count_by_kind.values())
         logger.info(
             "Building optimization problem with {} terms and {} variables: "
-            "{} minimize_l2_squared, {} eq_zero, {} leq_zero, {} geq_zero",
+            "{} costs, {} eq_zero, {} leq_zero, {} geq_zero",
             total_costs,
             num_variables,
-            count_by_mode["minimize_l2_squared"],
-            count_by_mode["eq_zero"],
-            count_by_mode["leq_zero"],
-            count_by_mode["geq_zero"],
+            count_by_kind["l2_squared"],
+            count_by_kind["constraint_eq_zero"],
+            count_by_kind["constraint_leq_zero"],
+            count_by_kind["constraint_geq_zero"],
         )
 
         # Create storage layout: this describes which parts of our tangent
@@ -187,7 +187,7 @@ class LeastSquaresProblem:
                 costs_from_group[group_key] = []
                 count_from_group[group_key] = 0
                 # Assign constraint_index for constraint-mode groups.
-                if cost.mode != "minimize_l2_squared":
+                if cost.kind != "l2_squared":
                     constraint_index_from_group[group_key] = constraint_index
                     constraint_index += 1
 
@@ -240,9 +240,9 @@ class LeastSquaresProblem:
             # Log group info.
             if is_constraint_group:
                 logger.info(
-                    "Vectorizing constraint group with {} constraints (mode={}), {} variables each: {}",
+                    "Vectorizing constraint group with {} constraints ({}), {} variables each: {}",
                     count,
-                    stacked_cost_expanded.mode,
+                    stacked_cost_expanded.kind,
                     stacked_cost_expanded.num_variables,
                     stacked_cost_expanded._get_name(),
                 )
@@ -311,7 +311,7 @@ class LeastSquaresProblem:
 class AnalyzedLeastSquaresProblem:
     stacked_costs: tuple[_AnalyzedCost, ...]
     """All costs including constraint-mode costs. Constraint-mode costs have
-    mode != "minimize_l2_squared" and args=(AugmentedLagrangianParams,)."""
+    constraint is not None and args=(AugmentedLagrangianParams,)."""
     cost_counts: jdc.Static[tuple[int, ...]]
     sorted_ids_from_var_type: dict[type[Var], jax.Array]
     jac_coords_coo: SparseCooCoordinates
@@ -391,10 +391,8 @@ class AnalyzedLeastSquaresProblem:
                 var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
             )
 
-        # Check if we have constraints (costs with mode != "minimize_l2_squared").
-        has_constraints = any(
-            cost.mode != "minimize_l2_squared" for cost in self.stacked_costs
-        )
+        # Check if we have constraints (costs with constraint is not None).
+        has_constraints = any(cost.kind != "l2_squared" for cost in self.stacked_costs)
 
         if has_constraints:
             # Use Augmented Lagrangian solver for constrained problems.
@@ -505,7 +503,7 @@ class AnalyzedLeastSquaresProblem:
         """
         constraint_slices = list[jax.Array]()
         for stacked_cost in self.stacked_costs:
-            if stacked_cost.mode == "minimize_l2_squared":
+            if stacked_cost.kind == "l2_squared":
                 continue  # Skip regular costs
 
             # Use compute_residual_original to get raw constraint values.
@@ -671,7 +669,9 @@ type CostFactory[**Args] = Callable[
 ]
 
 
-type CostMode = Literal["minimize_l2_squared", "eq_zero", "leq_zero", "geq_zero"]
+type CostKind = Literal[
+    "l2_squared", "constraint_eq_zero", "constraint_leq_zero", "constraint_geq_zero"
+]
 
 
 @jdc.pytree_dataclass
@@ -704,10 +704,10 @@ class Cost[*Args]:
     """A cost or constraint term in our optimization problem.
 
     The `mode` field determines how the residual function is interpreted:
-    - `"minimize_l2_squared"` (default): Minimize squared L2 norm: `||r(x)||²`
-    - `"eq_zero"`: Equality constraint: `r(x) = 0`
-    - `"leq_zero"`: Inequality constraint: `r(x) ≤ 0`
-    - `"geq_zero"`: Inequality constraint: `r(x) ≥ 0`
+    - `"l2_squared"` (default): Minimize squared L2 norm: `||r(x)||^2`
+    - `"constraint_eq_zero"`: Equality kind: `r(x) = 0`
+    - `"constraint_leq_zero"`: Inequality kind: `r(x) <= 0`
+    - `"constraint_geq_zero"`: Inequality kind: `r(x) >= 0`
 
     The recommended way to create a cost is to use the `create_factory` decorator
     on a function that computes the residual.
@@ -718,13 +718,13 @@ class Cost[*Args]:
     def my_cost(values: VarValues, [...args]) -> jax.Array:
         return residual
 
-    # Equality constraint: r(x) = 0
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    # Equality kind: r(x) = 0
+    @jaxls.Cost.create_factory(kind="constraint_eq_zero")
     def my_equality_constraint(values: VarValues, [...args]) -> jax.Array:
         return values[var] - target
 
-    # Inequality constraint: r(x) <= 0
-    @jaxls.Cost.create_factory(mode="leq_zero")
+    # Inequality kind: r(x) <= 0
+    @jaxls.Cost.create_factory(kind="constraint_leq_zero")
     def my_inequality_constraint(values: VarValues, [...args]) -> jax.Array:
         return values[var] - upper_bound
 
@@ -761,12 +761,12 @@ class Cost[*Args]:
     `jaxls.Var` object, which can either be in the root of the tuple or nested
     within a PyTree structure arbitrarily."""
 
-    mode: jdc.Static[CostMode] = "minimize_l2_squared"
+    kind: jdc.Static[CostKind] = "l2_squared"
     """How the residual function is interpreted:
-    - 'minimize_l2_squared': Minimize squared L2 norm ||r(x)||²
-    - 'eq_zero': Equality constraint r(x) = 0
-    - 'leq_zero': Inequality constraint r(x) <= 0
-    - 'geq_zero': Inequality constraint r(x) >= 0
+    - 'l2_squared': Minimize squared L2 norm ||r(x)||^2
+    - 'constraint_eq_zero': Equality constraint r(x) = 0
+    - 'constraint_leq_zero': Inequality constraint r(x) <= 0
+    - 'constraint_geq_zero': Inequality constraint r(x) >= 0
     """
 
     jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto"
@@ -857,16 +857,16 @@ class Cost[*Args]:
     # Simple decorator.
     @overload
     @staticmethod
-    def create_factory[**Args_](
+    def factory[**Args_](
         compute_residual: ResidualFunc[Args_],
     ) -> CostFactory[Args_]: ...
 
     # Decorator factory with keyword arguments.
     @overload
     @staticmethod
-    def create_factory[**Args_](
+    def factory[**Args_](
         *,
-        mode: CostMode = "minimize_l2_squared",
+        kind: CostKind = "l2_squared",
         jac_mode: Literal["auto", "forward", "reverse"] = "auto",
         jac_batch_size: int | None = None,
         name: str | None = None,
@@ -876,9 +876,9 @@ class Cost[*Args]:
     # `jac_mode` is ignored in this case.
     @overload
     @staticmethod
-    def create_factory[**Args_](
+    def factory[**Args_](
         *,
-        mode: CostMode = "minimize_l2_squared",
+        kind: CostKind = "l2_squared",
         jac_custom_fn: JacobianFunc[Args_],
         jac_batch_size: int | None = None,
         name: str | None = None,
@@ -888,9 +888,9 @@ class Cost[*Args]:
     # `jac_mode` is ignored in this case.
     @overload
     @staticmethod
-    def create_factory[**Args_, TJacobianCache](
+    def factory[**Args_, TJacobianCache](
         *,
-        mode: CostMode = "minimize_l2_squared",
+        kind: CostKind = "l2_squared",
         jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, TJacobianCache],
         jac_batch_size: int | None = None,
         name: str | None = None,
@@ -899,10 +899,10 @@ class Cost[*Args]:
     ]: ...
 
     @staticmethod
-    def create_factory[**Args_](
+    def factory[**Args_](
         compute_residual: ResidualFunc[Args_] | None = None,
         *,
-        mode: CostMode = "minimize_l2_squared",
+        kind: CostKind = "l2_squared",
         jac_mode: Literal["auto", "forward", "reverse"] = "auto",
         jac_batch_size: int | None = None,
         jac_custom_fn: JacobianFunc[Args_] | None = None,
@@ -918,17 +918,17 @@ class Cost[*Args]:
         Examples:
 
             # Standard cost (minimize squared residual)
-            @jaxls.Cost.create_factory
+            @jaxls.Cost.factory
             def my_cost(values: VarValues, var1: SE2Var) -> jax.Array:
                 ...
 
-            # Equality constraint: r(x) = 0
-            @jaxls.Cost.create_factory(mode="eq_zero")
+            # Equality kind: r(x) = 0
+            @jaxls.Cost.factory(kind="constraint_eq_zero")
             def my_equality_constraint(values: VarValues, var1: SE2Var) -> jax.Array:
                 return values[var1].translation()[0] - target
 
-            # Inequality constraint: r(x) <= 0
-            @jaxls.Cost.create_factory(mode="leq_zero")
+            # Inequality kind: r(x) <= 0
+            @jaxls.Cost.factory(kind="constraint_leq_zero")
             def my_inequality_constraint(values: VarValues, var1: ScalarVar) -> jax.Array:
                 return values[var1] - upper_bound
 
@@ -940,11 +940,11 @@ class Cost[*Args]:
         Keyword arguments can also be used for configuration. For example:
 
             # To enforce forward-mode autodiff for Jacobians.
-            @Cost.create_factory(jac_mode="forward")
+            @Cost.factory(jac_mode="forward")
             def cost(...): ...
 
             # To reduce memory usage.
-            @Cost.create_factory(jac_batch_size=1)
+            @Cost.factory(jac_batch_size=1)
             def cost(...): ...
 
         """
@@ -960,7 +960,7 @@ class Cost[*Args]:
                         values, *args, **kwargs
                     ),
                     args=(args, kwargs),
-                    mode=mode,
+                    kind=kind,
                     jac_mode=jac_mode,
                     jac_batch_size=jac_batch_size,
                     jac_custom_fn=(
@@ -986,6 +986,40 @@ class Cost[*Args]:
         if compute_residual is None:
             return decorator
         return decorator(compute_residual)
+
+    @staticmethod
+    @deprecated("Use Cost.factory instead of Cost.create_factory")
+    def create_factory[**Args_](
+        compute_residual: ResidualFunc[Args_] | None = None,
+        *,
+        kind: CostKind = "l2_squared",
+        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
+        jac_batch_size: int | None = None,
+        jac_custom_fn: JacobianFunc[Args_] | None = None,
+        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, Any] | None = None,
+        name: str | None = None,
+    ) -> (
+        Callable[[ResidualFunc[Args_]], CostFactory[Args_]]
+        | Callable[[ResidualFuncWithJacCache[Args_, Any]], CostFactory[Args_]]
+        | CostFactory[Args_]
+    ):
+        """Deprecated: Use Cost.factory instead."""
+        import warnings
+
+        warnings.warn(
+            "Cost.create_factory is deprecated, use Cost.factory instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return Cost.factory(  # type: ignore
+            compute_residual,
+            kind=kind,
+            jac_mode=jac_mode,
+            jac_batch_size=jac_batch_size,
+            jac_custom_fn=jac_custom_fn,
+            jac_custom_with_cache_fn=jac_custom_with_cache_fn,
+            name=name,
+        )
 
     @staticmethod
     @deprecated("Use Factor() directly instead of Factor.make()")
@@ -1051,12 +1085,12 @@ class _AnalyzedCost[*Args](Cost[*Args]):
     ):
         """Construct an analyzed cost from Cost.
 
-        For constraint-mode costs (mode != "minimize_l2_squared"), this converts to augmented
+        For constraint-mode costs (constraint is not None), this converts to augmented
         Lagrangian form with placeholder AL params.
         """
 
         # Handle constraint modes -> augmented _AnalyzedCost conversion
-        if cost.mode != "minimize_l2_squared":
+        if cost.kind != "l2_squared":
             return _augment_constraint_cost(cost)
 
         # Handle regular cost -> _AnalyzedCost conversion
@@ -1092,7 +1126,7 @@ class _AnalyzedCost[*Args](Cost[*Args]):
         return _AnalyzedCost(
             compute_residual=cost.compute_residual,
             args=cost.args,
-            mode=cost.mode,
+            kind=cost.kind,
             jac_mode=cost.jac_mode,
             jac_batch_size=cost.jac_batch_size,
             jac_custom_fn=cost.jac_custom_fn,
@@ -1143,13 +1177,13 @@ def _augment_constraint_cost[*Args](
     Lagrangian formulation, with placeholder AL params that will be updated
     during optimization.
 
-    For equality constraints (mode="eq_zero"): h(x) = 0
+    For equality constraints (kind="constraint_eq_zero"): h(x) = 0
         r = sqrt(rho) * (h(x) + lambda/rho)
 
-    For inequality constraints (mode="leq_zero"): g(x) <= 0
+    For inequality constraints (kind="constraint_leq_zero"): g(x) <= 0
         r = sqrt(rho) * max(0, g(x) + lambda/rho)
 
-    For inequality constraints (mode="geq_zero"): g(x) >= 0
+    For inequality constraints (kind="constraint_geq_zero"): g(x) >= 0
         Internally converted to -g(x) <= 0, then treated as leq_zero.
 
     Args:
@@ -1159,7 +1193,7 @@ def _augment_constraint_cost[*Args](
     Returns:
         An _AnalyzedCost with augmented residual and placeholder AL params.
     """
-    assert cost.mode != "minimize_l2_squared", (
+    assert cost.kind != "l2_squared", (
         "Only constraint-mode costs should be augmented here"
     )
 
@@ -1204,11 +1238,11 @@ def _augment_constraint_cost[*Args](
 
     # Capture cost for closures.
     orig_compute_residual = cost.compute_residual
-    orig_mode = cost.mode
+    orig_kind = cost.kind
 
     # Determine if this is an inequality constraint
-    is_leq = orig_mode == "leq_zero"
-    is_geq = orig_mode == "geq_zero"
+    is_leq = orig_kind == "constraint_leq_zero"
+    is_geq = orig_kind == "constraint_geq_zero"
     is_inequality = is_leq or is_geq
 
     def augmented_residual_fn(
@@ -1345,7 +1379,7 @@ def _augment_constraint_cost[*Args](
     return _AnalyzedCost(
         compute_residual=augmented_residual_fn,  # type: ignore[arg-type]
         args=(al_params,),
-        mode=cost.mode,
+        kind=cost.kind,
         jac_mode=cost.jac_mode,
         jac_batch_size=cost.jac_batch_size,
         jac_custom_fn=wrapped_jac_custom_fn,

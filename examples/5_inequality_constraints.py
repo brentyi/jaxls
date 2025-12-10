@@ -55,21 +55,21 @@ def main():
     print()
 
     # Smoothness cost: minimize distance between consecutive waypoints.
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def smoothness_cost(
         vals: jaxls.VarValues, wp1: WaypointVar, wp2: WaypointVar
     ) -> jax.Array:
         """Cost penalizes large gaps between waypoints."""
         return vals[wp1] - vals[wp2]
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def fix_waypoint(
         vals: jaxls.VarValues, waypoint: WaypointVar, target: jax.Array
     ) -> jax.Array:
         """Equality constraint: waypoint = target."""
         return vals[waypoint] - target
 
-    @jaxls.Cost.create_factory(mode="leq_zero")
+    @jaxls.Cost.factory(kind="constraint_leq_zero")
     def obstacle_avoidance(
         vals: jaxls.VarValues,
         waypoint: WaypointVar,

@@ -67,7 +67,7 @@ class _AugmentedLagrangianState:
     """Previous constraint values for per-constraint progress, one array per constraint group."""
 
     snorm: jax.Array
-    """Complementarity measure (infinity-norm). Equality: |h(x)|, inequality: |min(-g(x), λ)|."""
+    """Complementarity measure (infinity-norm). Equality: |h(x)|, inequality: |min(-g(x), lam)|."""
 
     snorm_prev: jax.Array
     """Previous snorm for progress checking."""
@@ -159,7 +159,7 @@ class AugmentedLagrangianSolver:
         """
         # Ensure we have constraints (costs with mode != "cost").
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
+            cost for cost in problem.stacked_costs if cost.kind != "l2_squared"
         ]
         assert len(constraint_costs) > 0, (
             "AugmentedLagrangianSolver requires constraints (mode != 'cost'). "
@@ -172,7 +172,7 @@ class AugmentedLagrangianSolver:
         # Initialize Lagrange multipliers (zeros, as recommended by literature).
         lagrange_multipliers = tuple(jnp.zeros_like(h) for h in h_vals)
 
-        # Compute initial snorm and csupn. With λ=0, snorm = csupn for equalities.
+        # Compute initial snorm and csupn. With lam=0, snorm = csupn for equalities.
         initial_snorm, initial_csupn = self._compute_snorm_csupn(
             problem, h_vals, lagrange_multipliers
         )
@@ -192,7 +192,7 @@ class AugmentedLagrangianSolver:
             for cost, h_group in zip(constraint_costs, h_vals):
                 # leq_zero and geq_zero are both inequality constraints
                 # (geq_zero is internally converted to leq_zero form)
-                if cost.mode in ("leq_zero", "geq_zero"):
+                if cost.kind in ("constraint_leq_zero", "constraint_geq_zero"):
                     sum_c_squared = sum_c_squared + jnp.sum(
                         0.5 * jnp.maximum(0.0, h_group) ** 2
                     )
@@ -320,13 +320,13 @@ class AugmentedLagrangianSolver:
         csupn_parts = []
 
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
+            cost for cost in problem.stacked_costs if cost.kind != "l2_squared"
         ]
 
         for cost, h_group, lambda_group in zip(
             constraint_costs, h_vals, lagrange_multipliers
         ):
-            if cost.mode in ("leq_zero", "geq_zero"):
+            if cost.kind in ("constraint_leq_zero", "constraint_geq_zero"):
                 # Inequality: snorm = |min(-g, lambda)|, csupn = max(0, g).
                 comp = jnp.minimum(-h_group, lambda_group)
                 snorm_parts.append(jnp.max(jnp.abs(comp)))
@@ -352,11 +352,11 @@ class AugmentedLagrangianSolver:
         violation_parts = []
 
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
+            cost for cost in problem.stacked_costs if cost.kind != "l2_squared"
         ]
 
         for cost, h_group in zip(constraint_costs, h_vals):
-            if cost.mode in ("leq_zero", "geq_zero"):
+            if cost.kind in ("constraint_leq_zero", "constraint_geq_zero"):
                 violation_parts.append(jnp.maximum(0.0, h_group))
             else:
                 violation_parts.append(jnp.abs(h_group))
@@ -382,7 +382,7 @@ class AugmentedLagrangianSolver:
         constraint_group_idx = 0
 
         for cost in problem.stacked_costs:
-            if cost.mode == "minimize_l2_squared":
+            if cost.kind == "l2_squared":
                 # Regular cost, no update needed.
                 updated_costs.append(cost)
             else:
@@ -438,10 +438,10 @@ class AugmentedLagrangianSolver:
         # Evaluate constraints at new solution (tuple of arrays).
         h_vals = problem._compute_constraint_values(vals_updated)
 
-        # Update Lagrange multipliers: lambda_new = lambda_old + ρ * h(x).
+        # Update Lagrange multipliers: lambda_new = lambda_old + rho * h(x).
         # Project multipliers: non-negative for inequalities, then apply safeguard bounds.
         constraint_costs = [
-            cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
+            cost for cost in problem.stacked_costs if cost.kind != "l2_squared"
         ]
         lagrange_multipliers_updated = []
         for cost, lambda_group, penalty_group, h_group in zip(
@@ -451,7 +451,7 @@ class AugmentedLagrangianSolver:
             h_vals,
         ):
             lambda_new = lambda_group + penalty_group * h_group
-            if cost.mode in ("leq_zero", "geq_zero"):
+            if cost.kind in ("constraint_leq_zero", "constraint_geq_zero"):
                 lambda_new = jnp.maximum(0.0, lambda_new)
             lambda_new = jnp.clip(
                 lambda_new, self.config.lambda_min, self.config.lambda_max

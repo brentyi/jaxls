@@ -21,7 +21,7 @@ vars = (jaxls.SE2Var(0), jaxls.SE2Var(1))
 
 
 # Create costs. In this example, we use a decorator-based syntax.
-@jaxls.Cost.create_factory
+@jaxls.Cost.factory
 def prior_cost(
     vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
 ) -> jax.Array:
@@ -29,7 +29,7 @@ def prior_cost(
     return (vals[var] @ target.inverse()).log()
 
 
-@jaxls.Cost.create_factory
+@jaxls.Cost.factory
 def between_cost(
     vals: jaxls.VarValues, delta: jaxlie.SE2, var0: jaxls.SE2Var, var1: jaxls.SE2Var
 ) -> jax.Array:

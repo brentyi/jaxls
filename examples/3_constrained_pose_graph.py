@@ -27,14 +27,14 @@ def main():
     # Create 3 poses forming a path.
     pose_vars = [jaxls.SE2Var(i) for i in range(3)]
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def prior_cost(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
     ) -> jax.Array:
         """Prior cost: penalizes deviation from target pose."""
         return (vals[var] @ target.inverse()).log()
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def between_cost(
         vals: jaxls.VarValues,
         var0: jaxls.SE2Var,
@@ -44,7 +44,7 @@ def main():
         """Between cost: penalizes deviation from relative pose."""
         return ((vals[var0].inverse() @ vals[var1]) @ delta.inverse()).log()
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def position_constraint(
         vals: jaxls.VarValues, var: jaxls.SE2Var, target_xy: jax.Array
     ) -> jax.Array:

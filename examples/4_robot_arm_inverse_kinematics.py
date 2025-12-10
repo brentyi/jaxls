@@ -117,14 +117,14 @@ def main():
 
     default_angle = jnp.pi / 4
 
-    @jaxls.Cost.create_factory
+    @jaxls.Cost.factory
     def joint_prior_cost(
         vals: jaxls.VarValues, joint: AngleVar, target_angle: float
     ) -> jax.Array:
         """Cost that pulls joint toward target angle."""
         return jnp.array([vals[joint] - target_angle])
 
-    @jaxls.Cost.create_factory(mode="eq_zero")
+    @jaxls.Cost.factory(kind="constraint_eq_zero")
     def end_effector_constraint(
         vals: jaxls.VarValues,
         j1: AngleVar,
