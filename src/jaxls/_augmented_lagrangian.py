@@ -106,12 +106,6 @@ class AugmentedLagrangianSolver:
     constraints g(x) <= 0 by converting them into augmented cost functions and
     iteratively solving subproblems while updating Lagrange multipliers and
     penalty parameters.
-
-    Note: For simple equality constraints between variables (e.g., x₁ = x₂),
-    reparameterizing the problem to eliminate redundant variables will typically
-    result in better conditioning and faster convergence. Augmented Lagrangian
-    is most useful for nonlinear constraints where direct variable elimination
-    is not straightforward.
     """
 
     config: AugmentedLagrangianConfig
@@ -269,7 +263,7 @@ class AugmentedLagrangianSolver:
             epsopk=initial_epsopk,
         )
 
-        def cond_fn(state: _AugmentedLagrangianState) -> jax.Array:
+        def cond_fun(state: _AugmentedLagrangianState) -> jax.Array:
             """Check convergence. Always run at least one iteration."""
             first_iteration = state.outer_iteration < 1
 
@@ -285,11 +279,11 @@ class AugmentedLagrangianSolver:
             under_max_iters = state.outer_iteration < self.config.max_iterations
             return (first_iteration | ~converged) & under_max_iters
 
-        def body_fn(state: _AugmentedLagrangianState) -> _AugmentedLagrangianState:
-            """Perform one outer iteration."""
-            return self._step(problem, state)
-
-        state = jax.lax.while_loop(cond_fn, body_fn, state)
+        state = jax.lax.while_loop(
+            cond_fun=cond_fun,
+            body_fun=lambda state: self._step(problem, state),
+            init_val=state,
+        )
 
         # Check final convergence for logging.
         converged_absolute = (
@@ -333,7 +327,7 @@ class AugmentedLagrangianSolver:
             constraint_costs, h_vals, lagrange_multipliers
         ):
             if cost.mode in ("leq_zero", "geq_zero"):
-                # Inequality: snorm = |min(-g, λ)|, csupn = max(0, g).
+                # Inequality: snorm = |min(-g, lambda)|, csupn = max(0, g).
                 comp = jnp.minimum(-h_group, lambda_group)
                 snorm_parts.append(jnp.max(jnp.abs(comp)))
                 csupn_parts.append(jnp.max(jnp.maximum(0.0, h_group)))
@@ -444,7 +438,7 @@ class AugmentedLagrangianSolver:
         # Evaluate constraints at new solution (tuple of arrays).
         h_vals = problem._compute_constraint_values(vals_updated)
 
-        # Update Lagrange multipliers: λ_new = λ_old + ρ * h(x).
+        # Update Lagrange multipliers: lambda_new = lambda_old + ρ * h(x).
         # Project multipliers: non-negative for inequalities, then apply safeguard bounds.
         constraint_costs = [
             cost for cost in problem.stacked_costs if cost.mode != "minimize_l2_squared"
