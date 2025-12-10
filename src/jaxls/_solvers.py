@@ -77,7 +77,7 @@ def _cholmod_solve_on_host(
         if len(_cholmod_analyze_cache) > max_cache_size:
             _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
-    # Factorize and solve
+    # Factorize and solve.
     cost = cost.cholesky_AAt(
         A_T_scipy,
         # Some simple linear problems blow up without this 1e-5 term.
@@ -397,7 +397,7 @@ class NonlinearSolver:
         )
         proposed_cost = jnp.sum(proposed_residual_vector**2)
 
-        # Compute step quality and acceptance for LM
+        # Compute step quality and acceptance for LM.
         step_quality = (proposed_cost - state.cost) / (
             jnp.sum(
                 (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
@@ -520,7 +520,7 @@ class NonlinearSolver:
                     lambd_next,
                 )
 
-            # Inner loop: keep trying larger lambdas until accepted or lambda maxed out
+            # Inner loop: keep trying larger lambdas until accepted or lambda maxed out.
             inner_state_final = jax.lax.while_loop(
                 cond_fun=lambda s: jnp.logical_and(
                     ~s.accepted,

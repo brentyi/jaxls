@@ -298,6 +298,7 @@ class NonlinearSolver:
         else:
             assert_never(self.linear_solver)
 
+        assert state.jacobian_scaler is not None
         scaled_local_delta = local_delta * state.jacobian_scaler
 
         proposed_vals = state.vals._retract(
@@ -315,10 +316,10 @@ class NonlinearSolver:
             )
             - state.cost
         )
-        accepted = (
+        accepted: Any = (
             step_quality >= self.trust_region.step_quality_min
             if self.trust_region is not None
-            else True
+            else jnp.array(True)
         )
 
         return _LmInnerState(
@@ -404,11 +405,12 @@ class NonlinearSolver:
             accept_flag = None
 
         else:
+            trust_region = self.trust_region
 
             def lm_inner_step(inner_state: Any) -> Any:
                 lambd_next = jnp.minimum(
-                    inner_state.lambd * self.trust_region.lambda_factor,
-                    self.trust_region.lambda_max,
+                    inner_state.lambd * trust_region.lambda_factor,
+                    trust_region.lambda_max,
                 )
                 return self._solve_and_evaluate(
                     problem,
@@ -423,7 +425,7 @@ class NonlinearSolver:
             inner_state_final = jax.lax.while_loop(
                 cond_fun=lambda s: jnp.logical_and(
                     ~s.accepted,
-                    s.lambd < self.trust_region.lambda_max,
+                    s.lambd < trust_region.lambda_max,
                 ),
                 body_fun=lm_inner_step,
                 init_val=self._solve_and_evaluate(
@@ -442,7 +444,7 @@ class NonlinearSolver:
 
             lambd_next = jnp.where(
                 accept_flag,
-                inner_state_final.lambd / self.trust_region.lambda_factor,
+                inner_state_final.lambd / trust_region.lambda_factor,
                 inner_state_final.lambd,
             )
 
