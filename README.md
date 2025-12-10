@@ -2,17 +2,10 @@
 
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
 
-**`jaxls`** is a library for solving sparse [NLLS](https://en.wikipedia.org/wiki/Non-linear_least_squares) and [IRLS](https://en.wikipedia.org/wiki/Iteratively_reweighted_least_squares) problems in JAX.
-It supports non-Euclidean manifolds and constraints; these are common in robotics and computer vision.
+**`jaxls`** is a library for solving sparse, constrained, and non-Euclidean least squares problems in JAX.
+These are common in robotics and computer vision.
 
-Some projects where `jaxls` is used:
-
-- [**EgoAllo**](https://github.com/brentyi/egoallo): for guiding diffusion model sampling with 2D observations / reprojection errors.
-- [**VideoMimic**](https://videomimic.net/): for human motion estimation, as well as robot retargeting.
-- [**PyRoki**](https://github.com/chungmin99/pyroki): for solving kinematic optimization problems in robotics.
-- [**ProtoMotions**](https://pyroki-toolkit.github.io): for [humanoid motion retargeting](https://protomotions.github.io/tutorials/workflows/retargeting_pyroki.html).
-
-To install:
+To install (Python >=3.10):
 
 ```bash
 # Core package only
@@ -22,15 +15,66 @@ pip install "git+https://github.com/brentyi/jaxls.git"
 pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[examples]"
 ```
 
-### Python Version Compatibility
+### Example use cases
 
-| Python Version | Support Status   | Notes                          |
-| -------------- | ---------------- | ------------------------------ |
-| 3.13           | ✅ Supported     | Recommended                    |
-| 3.12           | ✅ Supported     | Recommended                    |
-| 3.11           | ⚠️ Supported     | Transpiled compatibility layer |
-| 3.10           | ⚠️ Supported     | Transpiled compatibility layer |
-| 3.8~3.9        | ❌ Not supported |                                |
+<table>
+  <tr>
+    <td>
+      <a href="https://egoallo.github.io/">
+        egoallo
+        <br /><img
+          alt="GitHub stars"
+          src="https://img.shields.io/github/stars/brentyi/egoallo?style=social"
+        />
+      </a>
+    </td>
+    <td>
+      For guiding diffusion model sampling with 2D observations / reprojection errors.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="https://videomimic.net/">
+        videomimic
+        <br /><img
+          alt="GitHub stars"
+          src="https://img.shields.io/github/stars/hongsukchoi/videomimic?style=social"
+        />
+      </a>
+    </td>
+    <td>
+      For joint human-scene optimization and motion retargeting.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="https://pyroki-toolkit.github.io/">
+        pyroki
+        <br /><img
+          alt="GitHub stars"
+          src="https://img.shields.io/github/stars/chungmin99/pyroki?style=social"
+        />
+      </a>
+    </td>
+    <td>
+      For solving inverse kinematics, motion planning, etc for robots.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="https://protomotions.github.io/tutorials/workflows/retargeting_pyroki.html">
+        ProtoMotions
+        <br /><img
+          alt="GitHub stars"
+          src="https://img.shields.io/github/stars/nvlabs/ProtoMotions?style=social"
+        />
+      </a>
+    </td>
+    <td>
+      For trajectory-level humanoid motion retargeting.
+    </td>
+  </tr>
+</table>
 
 ### Overview
 
@@ -64,6 +108,16 @@ Supported:
 [minisam](https://github.com/dongjing3309/minisam),
 [SwiftFusion](https://github.com/borglab/SwiftFusion),
 and [g2o](https://github.com/RainerKuemmerle/g2o).
+
+### Python Version Compatibility
+
+| Python Version | Support Status   | Notes                          |
+| -------------- | ---------------- | ------------------------------ |
+| 3.13           | ✅ Supported     | Recommended                    |
+| 3.12           | ✅ Supported     | Recommended                    |
+| 3.11           | ⚠️ Supported     | Transpiled compatibility layer |
+| 3.10           | ⚠️ Supported     | Transpiled compatibility layer |
+| 3.8~3.9        | ❌ Not supported |                                |
 
 ### Pose graph example
 
