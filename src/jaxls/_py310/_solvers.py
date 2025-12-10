@@ -134,6 +134,18 @@ class SolveSummary:
 
 
 @jdc.pytree_dataclass
+class _LmInnerState:
+    lambd: Any
+    accepted: Any
+    proposed_vals: Any
+    proposed_residual_vector: Any
+    proposed_cost: Any
+    proposed_jac_cache: Any
+    local_delta: Any
+    linear_state: Any
+
+
+@jdc.pytree_dataclass
 class _NonlinearSolverState:
     vals: Any
     cost: Any
@@ -236,6 +248,90 @@ class NonlinearSolver:
         else:
             return state.vals
 
+    def _solve_and_evaluate(
+        self,
+        problem: Any,
+        state: Any,
+        A_blocksparse: Any,
+        A_multiply: Any,
+        AT_multiply: Any,
+        ATb: Any,
+        lambd: Any,
+    ) -> Any:
+        linear_state: Any = None
+        if (
+            isinstance(self.linear_solver, ConjugateGradientConfig)
+            or self.linear_solver == "conjugate_gradient"
+        ):
+            cg_config = (
+                ConjugateGradientConfig()
+                if self.linear_solver == "conjugate_gradient"
+                else self.linear_solver
+            )
+            assert isinstance(state.cg_state, _ConjugateGradientState)
+            local_delta, linear_state = cg_config._solve(
+                problem,
+                A_blocksparse,
+                lambda vec: AT_multiply(A_multiply(vec)) + lambd * vec,
+                ATb=ATb,
+                prev_linear_state=state.cg_state,
+            )
+        elif self.linear_solver == "cholmod":
+            A_csr = SparseCsrMatrix(
+                jnp.concatenate(
+                    [
+                        block_row.blocks_concat.flatten()
+                        for block_row in A_blocksparse.block_rows
+                    ],
+                    axis=0,
+                ),
+                problem.jac_coords_csr,
+            )
+            local_delta = _cholmod_solve(A_csr, ATb, lambd=lambd)
+        elif self.linear_solver == "dense_cholesky":
+            A_dense = A_blocksparse.to_dense()
+            ATA = A_dense.T @ A_dense
+            diag_idx = jnp.arange(ATA.shape[0])
+            ATA = ATA.at[diag_idx, diag_idx].add(lambd)
+            cho_factor = jax.scipy.linalg.cho_factor(ATA)
+            local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
+        else:
+            assert_never(self.linear_solver)
+
+        scaled_local_delta = local_delta * state.jacobian_scaler
+
+        proposed_vals = state.vals._retract(
+            scaled_local_delta, problem.tangent_ordering
+        )
+        proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
+            proposed_vals, include_jac_cache=True
+        )
+        proposed_cost = jnp.sum(proposed_residual_vector**2)
+
+        step_quality = (proposed_cost - state.cost) / (
+            jnp.sum(
+                (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
+                ** 2
+            )
+            - state.cost
+        )
+        accepted = (
+            step_quality >= self.trust_region.step_quality_min
+            if self.trust_region is not None
+            else True
+        )
+
+        return _LmInnerState(
+            lambd=lambd,
+            accepted=accepted,
+            proposed_vals=proposed_vals,
+            proposed_residual_vector=proposed_residual_vector,
+            proposed_cost=proposed_cost,
+            proposed_jac_cache=proposed_jac_cache,
+            local_delta=local_delta,
+            linear_state=linear_state,
+        )
+
     def step(
         self,
         problem: Any,
@@ -290,91 +386,75 @@ class NonlinearSolver:
 
         ATb = -AT_multiply(state.residual_vector)
 
-        linear_state = None
-        if (
-            isinstance(self.linear_solver, ConjugateGradientConfig)
-            or self.linear_solver == "conjugate_gradient"
-        ):
-            cg_config = (
-                ConjugateGradientConfig()
-                if self.linear_solver == "conjugate_gradient"
-                else self.linear_solver
-            )
-            assert isinstance(state.cg_state, _ConjugateGradientState)
-            local_delta, linear_state = cg_config._solve(
-                problem,
-                A_blocksparse,
-                lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
-                ATb=ATb,
-                prev_linear_state=state.cg_state,
-            )
-        elif self.linear_solver == "cholmod":
-            A_csr = SparseCsrMatrix(jac_values, problem.jac_coords_csr)
-            local_delta = _cholmod_solve(A_csr, ATb, lambd=state.lambd)
-        elif self.linear_solver == "dense_cholesky":
-            A_dense = A_blocksparse.to_dense()
-            ATA = A_dense.T @ A_dense
-            diag_idx = jnp.arange(ATA.shape[0])
-            ATA = ATA.at[diag_idx, diag_idx].add(state.lambd)
-            cho_factor = jax.scipy.linalg.cho_factor(ATA)
-            local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
-        else:
-            assert_never(self.linear_solver)
-
-        scaled_local_delta = local_delta * state.jacobian_scaler
-
-        proposed_vals = state.vals._retract(
-            scaled_local_delta, problem.tangent_ordering
-        )
-        proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
-            proposed_vals, include_jac_cache=True
-        )
-        proposed_cost = jnp.sum(proposed_residual_vector**2)
-
         if self.trust_region is None:
-            with jdc.copy_and_mutate(state) as state_next:
-                if linear_state is not None:
-                    state_next.cg_state = linear_state
+            result = self._solve_and_evaluate(
+                problem, state, A_blocksparse, A_multiply, AT_multiply, ATb, 0.0
+            )
 
-                state_next.vals = proposed_vals
-                state_next.residual_vector = proposed_residual_vector
-                state_next.cost = proposed_cost
-                accept_flag = None
+            with jdc.copy_and_mutate(state) as state_next:
+                if result.linear_state is not None:
+                    state_next.cg_state = result.linear_state
+
+                state_next.vals = result.proposed_vals
+                state_next.residual_vector = result.proposed_residual_vector
+                state_next.cost = result.proposed_cost
+                state_next.jac_cache = result.proposed_jac_cache
+
+            local_delta = result.local_delta
+            accept_flag = None
 
         else:
-            step_quality = (proposed_cost - state.cost) / (
-                jnp.sum(
-                    (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
-                    ** 2
+
+            def lm_inner_step(inner_state: Any) -> Any:
+                lambd_next = jnp.minimum(
+                    inner_state.lambd * self.trust_region.lambda_factor,
+                    self.trust_region.lambda_max,
                 )
-                - state.cost
-            )
-            accept_flag = step_quality >= self.trust_region.step_quality_min
-
-            with jdc.copy_and_mutate(state) as state_accept:
-                if linear_state is not None:
-                    state_accept.cg_state = linear_state
-
-                state_accept.vals = proposed_vals
-                state_accept.residual_vector = proposed_residual_vector
-                state_accept.cost = proposed_cost
-                state_accept.jac_cache = proposed_jac_cache
-                state_accept.lambd = state.lambd / self.trust_region.lambda_factor
-
-            with jdc.copy_and_mutate(state) as state_reject:
-                state_reject.lambd = jnp.maximum(
-                    self.trust_region.lambda_min,
-                    jnp.minimum(
-                        state.lambd * self.trust_region.lambda_factor,
-                        self.trust_region.lambda_max,
-                    ),
+                return self._solve_and_evaluate(
+                    problem,
+                    state,
+                    A_blocksparse,
+                    A_multiply,
+                    AT_multiply,
+                    ATb,
+                    lambd_next,
                 )
 
-            state_next = jax.tree.map(
-                lambda x, y: x if (x is y) else jnp.where(accept_flag, x, y),
-                state_accept,
-                state_reject,
+            inner_state_final = jax.lax.while_loop(
+                cond_fun=lambda s: jnp.logical_and(
+                    ~s.accepted,
+                    s.lambd < self.trust_region.lambda_max,
+                ),
+                body_fun=lm_inner_step,
+                init_val=self._solve_and_evaluate(
+                    problem,
+                    state,
+                    A_blocksparse,
+                    A_multiply,
+                    AT_multiply,
+                    ATb,
+                    state.lambd,
+                ),
             )
+
+            local_delta = inner_state_final.local_delta
+            accept_flag = inner_state_final.accepted
+
+            lambd_next = jnp.where(
+                accept_flag,
+                inner_state_final.lambd / self.trust_region.lambda_factor,
+                inner_state_final.lambd,
+            )
+
+            with jdc.copy_and_mutate(state) as state_next:
+                if inner_state_final.linear_state is not None:
+                    state_next.cg_state = inner_state_final.linear_state
+
+                state_next.vals = inner_state_final.proposed_vals
+                state_next.residual_vector = inner_state_final.proposed_residual_vector
+                state_next.cost = inner_state_final.proposed_cost
+                state_next.jac_cache = inner_state_final.proposed_jac_cache
+                state_next.lambd = lambd_next
 
         with jdc.copy_and_mutate(state_next) as state_next:
             if self.termination.early_termination:
@@ -383,7 +463,7 @@ class NonlinearSolver:
                     state_next.summary.termination_deltas,
                 ) = self.termination._check_convergence(
                     state,
-                    cost_updated=proposed_cost,
+                    cost_updated=state_next.cost,
                     tangent=local_delta,
                     tangent_ordering=problem.tangent_ordering,
                     ATb=ATb,
