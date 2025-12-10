@@ -55,6 +55,7 @@ examples = [
 
 [tool.ruff]
 exclude = ["_py310"]
+target-version = "py312"
 
 [tool.ruff.lint]
 ignore = ["E731"]  # Ignore lambda assignment warnings

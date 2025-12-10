@@ -77,7 +77,7 @@ def _cholmod_solve_on_host(
         if len(_cholmod_analyze_cache) > max_cache_size:
             _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
-    # Factorize and solve
+    # Factorize and solve.
     cost = cost.cholesky_AAt(
         A_T_scipy,
         # Some simple linear problems blow up without this 1e-5 term.
@@ -180,6 +180,20 @@ class SolveSummary:
     termination_deltas: jax.Array
     cost_history: jax.Array
     lambda_history: jax.Array
+
+
+@jdc.pytree_dataclass
+class _LmInnerState:
+    """State for inner LM loop that tries different lambda values."""
+
+    lambd: float | jax.Array
+    accepted: jax.Array
+    proposed_vals: VarValues
+    proposed_residual_vector: jax.Array
+    proposed_cost: jax.Array
+    proposed_jac_cache: tuple[CustomJacobianCache, ...]
+    local_delta: jax.Array
+    linear_state: _ConjugateGradientState | None
 
 
 @jdc.pytree_dataclass
@@ -317,6 +331,97 @@ class NonlinearSolver:
         else:
             return state.vals
 
+    def _solve_and_evaluate(
+        self,
+        problem: AnalyzedLeastSquaresProblem,
+        state: _NonlinearSolverState,
+        A_blocksparse: BlockRowSparseMatrix,
+        A_multiply: Callable[[jax.Array], jax.Array],
+        AT_multiply: Callable[[jax.Array], jax.Array],
+        ATb: jax.Array,
+        lambd: float | jax.Array,
+    ) -> _LmInnerState:
+        """Solve linear system with given lambda and evaluate proposed step."""
+        linear_state: _ConjugateGradientState | None = None
+        if (
+            isinstance(self.linear_solver, ConjugateGradientConfig)
+            or self.linear_solver == "conjugate_gradient"
+        ):
+            # Use default CG config is specified as a string, otherwise use the provided config.
+            cg_config = (
+                ConjugateGradientConfig()
+                if self.linear_solver == "conjugate_gradient"
+                else self.linear_solver
+            )
+            assert isinstance(state.cg_state, _ConjugateGradientState)
+            local_delta, linear_state = cg_config._solve(
+                problem,
+                A_blocksparse,
+                # We could also use (lambd * ATA_diagonals * vec) for
+                # scale-invariant damping. But this is hard to match with CHOLMOD.
+                lambda vec: AT_multiply(A_multiply(vec)) + lambd * vec,
+                ATb=ATb,
+                prev_linear_state=state.cg_state,
+            )
+        elif self.linear_solver == "cholmod":
+            # Use CHOLMOD for direct solve.
+            A_csr = SparseCsrMatrix(
+                jnp.concatenate(
+                    [
+                        block_row.blocks_concat.flatten()
+                        for block_row in A_blocksparse.block_rows
+                    ],
+                    axis=0,
+                ),
+                problem.jac_coords_csr,
+            )
+            local_delta = _cholmod_solve(A_csr, ATb, lambd=lambd)
+        elif self.linear_solver == "dense_cholesky":
+            A_dense = A_blocksparse.to_dense()
+            ATA = A_dense.T @ A_dense
+            diag_idx = jnp.arange(ATA.shape[0])
+            ATA = ATA.at[diag_idx, diag_idx].add(lambd)
+            cho_factor = jax.scipy.linalg.cho_factor(ATA)
+            local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
+        else:
+            assert_never(self.linear_solver)
+
+        assert state.jacobian_scaler is not None
+        scaled_local_delta = local_delta * state.jacobian_scaler
+
+        proposed_vals = state.vals._retract(
+            scaled_local_delta, problem.tangent_ordering
+        )
+        proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
+            proposed_vals, include_jac_cache=True
+        )
+        proposed_cost = jnp.sum(proposed_residual_vector**2)
+
+        # Compute step quality and acceptance for LM.
+        step_quality = (proposed_cost - state.cost) / (
+            jnp.sum(
+                (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
+                ** 2
+            )
+            - state.cost
+        )
+        accepted: jax.Array = (
+            step_quality >= self.trust_region.step_quality_min
+            if self.trust_region is not None
+            else jnp.array(True)
+        )
+
+        return _LmInnerState(
+            lambd=lambd,
+            accepted=accepted,
+            proposed_vals=proposed_vals,
+            proposed_residual_vector=proposed_residual_vector,
+            proposed_cost=proposed_cost,
+            proposed_jac_cache=proposed_jac_cache,
+            local_delta=local_delta,
+            linear_state=linear_state,
+        )
+
     def step(
         self,
         problem: AnalyzedLeastSquaresProblem,
@@ -377,101 +482,83 @@ class NonlinearSolver:
         # Compute right-hand side of normal equation.
         ATb = -AT_multiply(state.residual_vector)
 
-        linear_state = None
-        if (
-            isinstance(self.linear_solver, ConjugateGradientConfig)
-            or self.linear_solver == "conjugate_gradient"
-        ):
-            # Use default CG config is specified as a string, otherwise use the provided config.
-            cg_config = (
-                ConjugateGradientConfig()
-                if self.linear_solver == "conjugate_gradient"
-                else self.linear_solver
-            )
-            assert isinstance(state.cg_state, _ConjugateGradientState)
-            local_delta, linear_state = cg_config._solve(
-                problem,
-                A_blocksparse,
-                # We could also use (lambd * ATA_diagonals * vec) for
-                # scale-invariant damping. But this is hard to match with CHOLMOD.
-                lambda vec: AT_multiply(A_multiply(vec)) + state.lambd * vec,
-                ATb=ATb,
-                prev_linear_state=state.cg_state,
-            )
-        elif self.linear_solver == "cholmod":
-            # Use CHOLMOD for direct solve.
-            A_csr = SparseCsrMatrix(jac_values, problem.jac_coords_csr)
-            local_delta = _cholmod_solve(A_csr, ATb, lambd=state.lambd)
-        elif self.linear_solver == "dense_cholesky":
-            A_dense = A_blocksparse.to_dense()
-            ATA = A_dense.T @ A_dense
-            diag_idx = jnp.arange(ATA.shape[0])
-            ATA = ATA.at[diag_idx, diag_idx].add(state.lambd)
-            cho_factor = jax.scipy.linalg.cho_factor(ATA)
-            local_delta = jax.scipy.linalg.cho_solve(cho_factor, ATb)
-        else:
-            assert_never(self.linear_solver)
-
-        scaled_local_delta = local_delta * state.jacobian_scaler
-
-        proposed_vals = state.vals._retract(
-            scaled_local_delta, problem.tangent_ordering
-        )
-        proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
-            proposed_vals, include_jac_cache=True
-        )
-        proposed_cost = jnp.sum(proposed_residual_vector**2)
-
         # Always accept Gauss-Newton steps.
         if self.trust_region is None:
+            result = self._solve_and_evaluate(
+                problem, state, A_blocksparse, A_multiply, AT_multiply, ATb, 0.0
+            )
+
             with jdc.copy_and_mutate(state) as state_next:
-                # Update ATb_norm for Eisenstat-Walker criterion.
-                if linear_state is not None:
-                    state_next.cg_state = linear_state
+                if result.linear_state is not None:
+                    state_next.cg_state = result.linear_state
 
-                state_next.vals = proposed_vals
-                state_next.residual_vector = proposed_residual_vector
-                state_next.cost = proposed_cost
-                accept_flag = None
-        # For Levenberg-Marquardt, we need to evaluate the step quality.
+                state_next.vals = result.proposed_vals
+                state_next.residual_vector = result.proposed_residual_vector
+                state_next.cost = result.proposed_cost
+                state_next.jac_cache = result.proposed_jac_cache
+
+            local_delta = result.local_delta
+            accept_flag = None
+
+        # For Levenberg-Marquardt, use inner loop to try different lambdas.
         else:
-            step_quality = (proposed_cost - state.cost) / (
-                jnp.sum(
-                    (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
-                    ** 2
+            trust_region = self.trust_region
+
+            def lm_inner_step(inner_state: _LmInnerState) -> _LmInnerState:
+                """Try next lambda value."""
+                lambd_next = jnp.minimum(
+                    inner_state.lambd * trust_region.lambda_factor,
+                    trust_region.lambda_max,
                 )
-                - state.cost
-            )
-            accept_flag = step_quality >= self.trust_region.step_quality_min
-
-            # What does the accepted state look like?
-            with jdc.copy_and_mutate(state) as state_accept:
-                # Update ATb_norm for Eisenstat-Walker criterion.
-                if linear_state is not None:
-                    state_accept.cg_state = linear_state
-
-                state_accept.vals = proposed_vals
-                state_accept.residual_vector = proposed_residual_vector
-                state_accept.cost = proposed_cost
-                state_accept.jac_cache = proposed_jac_cache
-                state_accept.lambd = state.lambd / self.trust_region.lambda_factor
-
-            # What does the rejected state look like?
-            with jdc.copy_and_mutate(state) as state_reject:
-                state_reject.lambd = jnp.maximum(
-                    self.trust_region.lambda_min,
-                    jnp.minimum(
-                        state.lambd * self.trust_region.lambda_factor,
-                        self.trust_region.lambda_max,
-                    ),
+                return self._solve_and_evaluate(
+                    problem,
+                    state,
+                    A_blocksparse,
+                    A_multiply,
+                    AT_multiply,
+                    ATb,
+                    lambd_next,
                 )
 
-            # Update the state with the accepted or rejected values.
-            state_next = jax.tree.map(
-                lambda x, y: x if (x is y) else jnp.where(accept_flag, x, y),
-                state_accept,
-                state_reject,
+            # Inner loop: keep trying larger lambdas until accepted or lambda maxed out.
+            inner_state_final = jax.lax.while_loop(
+                cond_fun=lambda s: jnp.logical_and(
+                    ~s.accepted,
+                    s.lambd < trust_region.lambda_max,
+                ),
+                body_fun=lm_inner_step,
+                init_val=self._solve_and_evaluate(
+                    problem,
+                    state,
+                    A_blocksparse,
+                    A_multiply,
+                    AT_multiply,
+                    ATb,
+                    state.lambd,
+                ),
             )
+
+            local_delta = inner_state_final.local_delta
+            accept_flag = inner_state_final.accepted
+
+            # Decrease lambda if step was good.
+            lambd_next = jnp.where(
+                accept_flag,
+                inner_state_final.lambd / trust_region.lambda_factor,
+                inner_state_final.lambd,
+            )
+
+            # Build next state - always accept the proposed step from inner loop.
+            # If lambda maxed out, convergence criteria will detect no progress.
+            with jdc.copy_and_mutate(state) as state_next:
+                if inner_state_final.linear_state is not None:
+                    state_next.cg_state = inner_state_final.linear_state
+
+                state_next.vals = inner_state_final.proposed_vals
+                state_next.residual_vector = inner_state_final.proposed_residual_vector
+                state_next.cost = inner_state_final.proposed_cost
+                state_next.jac_cache = inner_state_final.proposed_jac_cache
+                state_next.lambd = lambd_next
 
         # Update termination criteria + summary.
         with jdc.copy_and_mutate(state_next) as state_next:
@@ -481,7 +568,7 @@ class NonlinearSolver:
                     state_next.summary.termination_deltas,
                 ) = self.termination._check_convergence(
                     state,
-                    cost_updated=proposed_cost,
+                    cost_updated=state_next.cost,
                     tangent=local_delta,
                     tangent_ordering=problem.tangent_ordering,
                     ATb=ATb,
@@ -585,12 +672,12 @@ class TerminationConfig:
     ) -> tuple[jax.Array, jax.Array]:
         """Check for convergence!"""
 
-        # Cost tolerance
+        # Cost tolerance.
         cost_absdelta = jnp.abs(cost_updated - state_prev.cost)
         cost_reldelta = cost_absdelta / state_prev.cost
         converged_cost = cost_reldelta < self.cost_tolerance
 
-        # Gradient tolerance
+        # Gradient tolerance.
         flat_vals = jax.flatten_util.ravel_pytree(state_prev.vals)[0]
         gradient_mag = jnp.max(
             flat_vals
@@ -604,7 +691,7 @@ class TerminationConfig:
             False,
         )
 
-        # Parameter tolerance
+        # Parameter tolerance.
         param_delta = jnp.linalg.norm(jnp.abs(tangent)) / (
             jnp.linalg.norm(flat_vals) + self.parameter_tolerance
         )
