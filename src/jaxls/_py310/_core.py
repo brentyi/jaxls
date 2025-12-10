@@ -205,10 +205,7 @@ class LeastSquaresProblem:
             shape=(residual_dim_sum, tangent_dim_sum),
         )
 
-        # Deduplicate compute_constraint functions (same as we do for costs).
-        # This ensures constraints with the same function signature share the same
-        # function object, allowing them to be batched together.
-        compute_constraint_from_hash: dict = dict()
+        compute_constraint_from_hash = dict()
         constraints = tuple(
             jdc.replace(
                 constraint,
@@ -219,6 +216,7 @@ class LeastSquaresProblem:
             )
             for constraint in self.constraints
         )
+
         stacked_constraints = list()
         constraint_counts = list()
 
@@ -256,7 +254,8 @@ class LeastSquaresProblem:
                 stacked_constraint: Any = jax.tree.map(
                     lambda *args: jnp.concatenate(args, axis=0), *group
                 )
-                stacked_constraint_expanded: Any = jax.vmap(_AnalyzedConstraint._make)(
+
+                stacked_constraint_expanded: Any = jax.vmap(_AnalyzedCost._make)(
                     stacked_constraint
                 )
                 stacked_constraints.append(stacked_constraint_expanded)
@@ -288,7 +287,7 @@ class LeastSquaresProblem:
 class AugmentedLagrangianParams:
     lagrange_multipliers: Any
 
-    penalty_param: Any
+    penalty_params: Any
 
 
 @jdc.pytree_dataclass
@@ -302,9 +301,9 @@ class AnalyzedLeastSquaresProblem:
     tangent_start_from_var_type: jdc.Static[Any]
     tangent_dim: jdc.Static[Any]
     residual_dim: jdc.Static[Any]
+
     stacked_constraints: Any = ()
     constraint_counts: jdc.Static[Any] = ()
-    augmented_lagrangian_params: Any = None
 
     def solve(
         self,
@@ -374,20 +373,9 @@ class AnalyzedLeastSquaresProblem:
         residual_slices = list()
         jac_cache = list()
         for stacked_cost in self.stacked_costs:
-            is_augmented = (
-                stacked_cost.name is not None and "augmented_" in stacked_cost.name
-            )
-
-            if is_augmented and self.augmented_lagrangian_params is not None:
-                compute_residual_out = jax.vmap(
-                    lambda args: stacked_cost.compute_residual_flat(
-                        vals, *args, al_params=self.augmented_lagrangian_params
-                    )
-                )(stacked_cost.args)
-            else:
-                compute_residual_out = jax.vmap(
-                    lambda args: stacked_cost.compute_residual_flat(vals, *args)
-                )(stacked_cost.args)
+            compute_residual_out = jax.vmap(
+                lambda cost: cost.compute_residual_flat(vals, *cost.args)
+            )(stacked_cost)
 
             if isinstance(compute_residual_out, tuple):
                 assert len(compute_residual_out) == 2
@@ -410,8 +398,8 @@ class AnalyzedLeastSquaresProblem:
         constraint_slices = list()
         for stacked_constraint in self.stacked_constraints:
             constraint_vals = jax.vmap(
-                lambda args: stacked_constraint.compute_constraint_flat(vals, *args)
-            )(stacked_constraint.args)
+                lambda c: c.compute_residual_flat(vals, *c.args)
+            )(stacked_constraint)
             constraint_slices.append(constraint_vals.reshape((-1,)))
 
         return jnp.concatenate(constraint_slices, axis=0)
@@ -450,23 +438,12 @@ class AnalyzedLeastSquaresProblem:
                     else jax.jacfwd,
                 }[cost.jac_mode]
 
-                is_augmented = cost.name is not None and "augmented_" in cost.name
-
-                if is_augmented and self.augmented_lagrangian_params is not None:
-                    return jacfunc(
-                        lambda tangent: cost.compute_residual_flat(
-                            val_subset._retract(tangent, self.tangent_ordering),
-                            *cost.args,
-                            al_params=self.augmented_lagrangian_params,
-                        )
-                    )(jnp.zeros((val_subset._get_tangent_dim(),)))
-                else:
-                    return jacfunc(
-                        lambda tangent: cost.compute_residual_flat(
-                            val_subset._retract(tangent, self.tangent_ordering),
-                            *cost.args,
-                        )
-                    )(jnp.zeros((val_subset._get_tangent_dim(),)))
+                return jacfunc(
+                    lambda tangent: cost.compute_residual_flat(
+                        val_subset._retract(tangent, self.tangent_ordering),
+                        *cost.args,
+                    )
+                )(jnp.zeros((val_subset._get_tangent_dim(),)))
 
             optional_jac_cache_i = (jac_cache[i],) if jac_cache[i] is not None else ()
 
@@ -532,8 +509,73 @@ class AnalyzedLeastSquaresProblem:
         return bsparse_jacobian
 
 
+class _CostBase:
+    @classmethod
+    def __class_getitem__(cls, params):
+        return cls
+
+    args: Any
+    name: jdc.Static[Any]
+
+    def _get_name(self) -> Any:
+        if self.name is None:
+            func = getattr(self, "compute_residual", None) or getattr(
+                self, "compute_constraint", None
+            )
+            return func.__name__
+        return self.name
+
+    def _get_variables(self) -> Any:
+        def get_variables(current: Any) -> Any:
+            children_and_meta = default_registry.flatten_one_level(current)
+            if children_and_meta is None:
+                return []
+
+            variables = []
+            for child in children_and_meta[0]:
+                if isinstance(child, Var):
+                    variables.append(child)
+                else:
+                    variables.extend(get_variables(child))
+            return variables
+
+        return tuple(get_variables(self.args))
+
+    def _get_batch_axes(self) -> Any:
+        variables = self._get_variables()
+        assert len(variables) != 0, f"No variables found in {type(self).__name__}!"
+        return jnp.broadcast_shapes(
+            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
+        )
+
+    def _broadcast_batch_axes(self) -> Any:
+        batch_axes = self._get_batch_axes()
+        if batch_axes is None:
+            return self
+        leaves, treedef = jax.tree.flatten(self)
+        broadcasted_leaves = []
+        for leaf in leaves:
+            if isinstance(leaf, (int, float)):
+                leaf = jnp.array(leaf)
+            try:
+                broadcasted_leaf = jnp.broadcast_to(
+                    leaf, batch_axes + leaf.shape[len(batch_axes) :]
+                )
+            except ValueError as e:
+                error_msg = (
+                    f"{str(e)}\n"
+                    f"{type(self).__name__} name: '{self._get_name()}'\n"
+                    f"Detected batch axes: {batch_axes}\n"
+                    f"Flattened argument shapes: {[getattr(x, 'shape', ()) for x in leaves]}\n"
+                    f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
+                )
+                raise ValueError(error_msg) from e
+            broadcasted_leaves.append(broadcasted_leaf)
+        return jax.tree.unflatten(treedef, broadcasted_leaves)
+
+
 @jdc.pytree_dataclass
-class Cost:
+class Cost(_CostBase[Any]):
     @classmethod
     def __class_getitem__(cls, params):
         return cls
@@ -551,14 +593,6 @@ class Cost:
     jac_custom_with_cache_fn: jdc.Static[Any] = None
 
     name: jdc.Static[Any] = None
-
-    _al_constraint_index: jdc.Static[Any] = None
-    _al_total_dim: jdc.Static[Any] = None
-
-    def _get_name(self) -> Any:
-        if self.name is None:
-            return self.compute_residual.__name__
-        return self.name
 
     @staticmethod
     def create_factory(
@@ -617,55 +651,13 @@ class Cost:
         warnings.warn(
             "Use Factor() directly instead of Factor.make()", DeprecationWarning
         )
-        return Cost(compute_residual, args, jac_mode, None, jac_custom_fn)
-
-    def _get_variables(self) -> Any:
-        def get_variables(current: Any) -> Any:
-            children_and_meta = default_registry.flatten_one_level(current)
-            if children_and_meta is None:
-                return []
-
-            variables = []
-            for child in children_and_meta[0]:
-                if isinstance(child, Var):
-                    variables.append(child)
-                else:
-                    variables.extend(get_variables(child))
-            return variables
-
-        return tuple(get_variables(self.args))
-
-    def _get_batch_axes(self) -> Any:
-        variables = self._get_variables()
-        assert len(variables) != 0, "No variables found in cost!"
-        return jnp.broadcast_shapes(
-            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
+        return Cost(
+            compute_residual=compute_residual,
+            args=args,
+            jac_mode=jac_mode,
+            jac_batch_size=None,
+            jac_custom_fn=jac_custom_fn,
         )
-
-    def _broadcast_batch_axes(self) -> Any:
-        batch_axes = self._get_batch_axes()
-        if batch_axes is None:
-            return self
-        leaves, treedef = jax.tree.flatten(self)
-        broadcasted_leaves = []
-        for leaf in leaves:
-            if isinstance(leaf, (int, float)):
-                leaf = jnp.array(leaf)
-            try:
-                broadcasted_leaf = jnp.broadcast_to(
-                    leaf, batch_axes + leaf.shape[len(batch_axes) :]
-                )
-            except ValueError as e:
-                error_msg = (
-                    f"{str(e)}\n"
-                    f"Cost name: '{self._get_name()}'\n"
-                    f"Detected batch axes: {batch_axes}\n"
-                    f"Flattened argument shapes: {[getattr(x, 'shape', ()) for x in leaves]}\n"
-                    f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
-                )
-                raise ValueError(error_msg) from e
-            broadcasted_leaves.append(broadcasted_leaf)
-        return jax.tree.unflatten(treedef, broadcasted_leaves)
 
 
 @jdc.pytree_dataclass(kw_only=True)
@@ -678,8 +670,15 @@ class _AnalyzedCost(Cost[Any]):
     sorted_ids_from_var_type: Any
     residual_flat_dim: jdc.Static[Any] = 0
 
-    def compute_residual_flat(self, vals: Any, *args: Any, **kwargs) -> Any:
-        out = self.compute_residual(vals, *args, **kwargs)
+    constraint_type: jdc.Static[Any] = None
+
+    al_params: Any = None
+
+    def compute_residual_flat(self, vals: Any, *args: Any) -> Any:
+        if self.al_params is not None:
+            out = self.compute_residual(vals, *args, self.al_params)
+        else:
+            out = self.compute_residual(vals, *args)
 
         if isinstance(out, tuple):
             assert len(out) == 2
@@ -691,7 +690,47 @@ class _AnalyzedCost(Cost[Any]):
 
     @staticmethod
     @jdc.jit
-    def _make(cost: Any) -> Any:
+    def _make(
+        cost_or_constraint: Any,
+    ) -> Any:
+        if isinstance(cost_or_constraint, Constraint):
+            constraint = cost_or_constraint
+            variables = constraint._get_variables()
+            assert len(variables) > 0
+
+            if not isinstance(variables[0].id, int):
+                batch_axes = variables[0].id.shape
+                assert len(batch_axes) in (0, 1)
+                for var in variables[1:]:
+                    assert (
+                        () if isinstance(var.id, int) else var.id.shape
+                    ) == batch_axes, "Batch axes of variables do not match."
+                if len(batch_axes) == 1:
+                    return jax.vmap(_AnalyzedCost._make)(constraint)
+
+            dummy_vals = jax.eval_shape(VarValues.make, variables)
+            constraint_dim = onp.prod(
+                jax.eval_shape(
+                    constraint.compute_constraint, dummy_vals, *constraint.args
+                ).shape
+            )
+
+            return _AnalyzedCost(
+                compute_residual=constraint.compute_constraint,
+                args=constraint.args,
+                jac_mode="auto",
+                jac_batch_size=None,
+                jac_custom_fn=None,
+                jac_custom_with_cache_fn=None,
+                name=constraint.name,
+                num_variables=len(variables),
+                sorted_ids_from_var_type=sort_and_stack_vars(variables),
+                residual_flat_dim=constraint_dim,
+                constraint_type=constraint.constraint_type,
+                al_params=None,
+            )
+
+        cost = cost_or_constraint
         variables = cost._get_variables()
         assert len(variables) > 0
 
@@ -705,8 +744,8 @@ class _AnalyzedCost(Cost[Any]):
             if len(batch_axes) == 1:
                 return jax.vmap(_AnalyzedCost._make)(cost)
 
-        def _residual_no_cache(*args, **kwargs) -> Any:
-            residual_out = cost.compute_residual(*args, **kwargs)
+        def _residual_no_cache(*args) -> Any:
+            residual_out = cost.compute_residual(*args)
             if isinstance(residual_out, tuple):
                 assert len(residual_out) == 2
                 return residual_out[0]
@@ -715,25 +754,11 @@ class _AnalyzedCost(Cost[Any]):
 
         dummy_vals = jax.eval_shape(VarValues.make, variables)
 
-        is_augmented = cost._al_constraint_index is not None
-
-        if is_augmented:
-            constraint_index = cost._al_constraint_index
-            total_dim = cost._al_total_dim
-
-            dummy_lagrange_mults = [
-                jnp.zeros(total_dim) for _ in range(constraint_index + 1)
-            ]
-            dummy_al_params = AugmentedLagrangianParams(
-                lagrange_multipliers=tuple(dummy_lagrange_mults),
-                penalty_param=jnp.array(1.0),
-            )
+        al_params = getattr(cost, "al_params", None)
+        if al_params is not None:
             residual_dim = onp.prod(
                 jax.eval_shape(
-                    _residual_no_cache,
-                    dummy_vals,
-                    *cost.args,
-                    al_params=dummy_al_params,
+                    _residual_no_cache, dummy_vals, *cost.args, al_params
                 ).shape
             )
         else:
@@ -741,11 +766,21 @@ class _AnalyzedCost(Cost[Any]):
                 jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
             )
 
+        constraint_type = getattr(cost, "constraint_type", None)
+
         return _AnalyzedCost(
-            **vars(cost),
+            compute_residual=cost.compute_residual,
+            args=cost.args,
+            jac_mode=cost.jac_mode,
+            jac_batch_size=cost.jac_batch_size,
+            jac_custom_fn=cost.jac_custom_fn,
+            jac_custom_with_cache_fn=cost.jac_custom_with_cache_fn,
+            name=cost.name,
             num_variables=len(variables),
             sorted_ids_from_var_type=sort_and_stack_vars(variables),
             residual_flat_dim=residual_dim,
+            constraint_type=constraint_type,
+            al_params=al_params,
         )
 
     def _compute_block_sparse_jac_indices(
@@ -778,7 +813,7 @@ class _AnalyzedCost(Cost[Any]):
 
 
 @jdc.pytree_dataclass
-class Constraint:
+class Constraint(_CostBase[Any]):
     @classmethod
     def __class_getitem__(cls, params):
         return cls
@@ -787,14 +822,9 @@ class Constraint:
 
     args: Any
 
-    constraint_type: jdc.Static[Any]
+    constraint_type: jdc.Static[Any] = "eq_zero"
 
     name: jdc.Static[Any] = None
-
-    def _get_name(self) -> Any:
-        if self.name is None:
-            return self.compute_constraint.__name__
-        return self.name
 
     @staticmethod
     def create_factory(
@@ -822,128 +852,34 @@ class Constraint:
             return decorator
         return decorator(compute_constraint)
 
-    def _get_variables(self) -> Any:
-        def get_variables(current: Any) -> Any:
-            children_and_meta = default_registry.flatten_one_level(current)
-            if children_and_meta is None:
-                return []
-
-            variables = []
-            for child in children_and_meta[0]:
-                if isinstance(child, Var):
-                    variables.append(child)
-                else:
-                    variables.extend(get_variables(child))
-            return variables
-
-        return tuple(get_variables(self.args))
-
-    def _get_batch_axes(self) -> Any:
-        variables = self._get_variables()
-        assert len(variables) != 0, "No variables found in constraint!"
-        return jnp.broadcast_shapes(
-            *[() if isinstance(v.id, int) else v.id.shape for v in variables]
-        )
-
-    def _broadcast_batch_axes(self) -> Any:
-        batch_axes = self._get_batch_axes()
-        if batch_axes is None:
-            return self
-        leaves, treedef = jax.tree.flatten(self)
-        broadcasted_leaves = []
-        for leaf in leaves:
-            if isinstance(leaf, (int, float)):
-                leaf = jnp.array(leaf)
-            try:
-                broadcasted_leaf = jnp.broadcast_to(
-                    leaf, batch_axes + leaf.shape[len(batch_axes) :]
-                )
-            except ValueError as e:
-                error_msg = (
-                    f"{str(e)}\n"
-                    f"Constraint name: '{self._get_name()}'\n"
-                    f"Detected batch axes: {batch_axes}\n"
-                    f"Flattened argument shapes: {[getattr(x, 'shape', ()) for x in leaves]}\n"
-                    f"All shapes should either have the same batch axis or have dimension (1,) for broadcasting."
-                )
-                raise ValueError(error_msg) from e
-            broadcasted_leaves.append(broadcasted_leaf)
-        return jax.tree.unflatten(treedef, broadcasted_leaves)
-
-
-@jdc.pytree_dataclass(kw_only=True)
-class _AnalyzedConstraint(Constraint[Any]):
-    @classmethod
-    def __class_getitem__(cls, params):
-        return cls
-
-    num_variables: jdc.Static[Any]
-    sorted_ids_from_var_type: Any
-    constraint_flat_dim: jdc.Static[Any] = 0
-
-    def compute_constraint_flat(self, vals: Any, *args: Any) -> Any:
-        out = self.compute_constraint(vals, *args)
-
-        return out.flatten()
-
-    @staticmethod
-    @jdc.jit
-    def _make(constraint: Any) -> Any:
-        variables = constraint._get_variables()
-        assert len(variables) > 0
-
-        if not isinstance(variables[0].id, int):
-            batch_axes = variables[0].id.shape
-            assert len(batch_axes) in (0, 1)
-            for var in variables[1:]:
-                assert (
-                    () if isinstance(var.id, int) else var.id.shape
-                ) == batch_axes, "Batch axes of variables do not match."
-            if len(batch_axes) == 1:
-                return jax.vmap(_AnalyzedConstraint._make)(constraint)
-
-        dummy_vals = jax.eval_shape(VarValues.make, variables)
-        constraint_dim = onp.prod(
-            jax.eval_shape(
-                constraint.compute_constraint, dummy_vals, *constraint.args
-            ).shape
-        )
-
-        return _AnalyzedConstraint(
-            **vars(constraint),
-            num_variables=len(variables),
-            sorted_ids_from_var_type=sort_and_stack_vars(variables),
-            constraint_flat_dim=constraint_dim,
-        )
-
 
 def create_augmented_constraint_cost(
-    constraint: Any,
+    analyzed_constraint: Any,
     constraint_index: Any,
     total_dim: Any,
+    al_params: Any,
 ) -> Any:
-    is_inequality = constraint.constraint_type == "leq_zero"
-    constraint_flat_dim = constraint.constraint_flat_dim
+    is_inequality = analyzed_constraint.constraint_type == "leq_zero"
+    constraint_flat_dim = analyzed_constraint.residual_flat_dim
 
     def augmented_residual_fn(
         vals: Any,
-        *args_with_index,
-        al_params: Any,
+        *args_with_index_and_params,
     ) -> Any:
-        # Split args: last element is instance_index, rest are constraint args
-        args = args_with_index[:-1]
-        instance_index = args_with_index[-1]
-        constraint_val = constraint.compute_constraint_flat(vals, *args)
+        args = args_with_index_and_params[:-2]
+        instance_index = args_with_index_and_params[-2]
+        al_params_inner: Any = args_with_index_and_params[-1]
 
-        # Get lambdas/rho for this specific instance
+        constraint_val = analyzed_constraint.compute_residual(vals, *args).flatten()
+
         start_idx = instance_index * constraint_flat_dim
         lambdas = jax.lax.dynamic_slice(
-            al_params.lagrange_multipliers[constraint_index],
+            al_params_inner.lagrange_multipliers[constraint_index],
             (start_idx,),
             (constraint_flat_dim,),
         )
         rho = jax.lax.dynamic_slice(
-            al_params.penalty_params[constraint_index],
+            al_params_inner.penalty_params[constraint_index],
             (start_idx,),
             (constraint_flat_dim,),
         )
@@ -953,16 +889,33 @@ def create_augmented_constraint_cost(
         else:
             return jnp.sqrt(rho) * (constraint_val + lambdas / rho)
 
-    # Determine constraint count from total_dim and flat_dim
     constraint_count = total_dim // constraint_flat_dim
 
-    # Add instance indices to args for proper slicing during vmap
     instance_indices = jnp.arange(constraint_count)
 
-    return Cost(
+    def broadcast_to_batch(arr: Any) -> Any:
+        return jnp.broadcast_to(arr, (constraint_count,) + arr.shape)
+
+    al_params_broadcasted = AugmentedLagrangianParams(
+        lagrange_multipliers=tuple(
+            broadcast_to_batch(arr) for arr in al_params.lagrange_multipliers
+        ),
+        penalty_params=tuple(
+            broadcast_to_batch(arr) for arr in al_params.penalty_params
+        ),
+    )
+
+    return _AnalyzedCost(
         compute_residual=augmented_residual_fn,
-        args=(*constraint.args, instance_indices),
-        name=f"augmented_{constraint._get_name()}",
-        _al_constraint_index=constraint_index,
-        _al_total_dim=total_dim,
+        args=(*analyzed_constraint.args, instance_indices),
+        jac_mode="auto",
+        jac_batch_size=None,
+        jac_custom_fn=None,
+        jac_custom_with_cache_fn=None,
+        name=f"augmented_{analyzed_constraint._get_name()}",
+        num_variables=analyzed_constraint.num_variables,
+        sorted_ids_from_var_type=analyzed_constraint.sorted_ids_from_var_type,
+        residual_flat_dim=constraint_flat_dim,
+        constraint_type=analyzed_constraint.constraint_type,
+        al_params=al_params_broadcasted,
     )
