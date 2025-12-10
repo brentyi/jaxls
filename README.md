@@ -79,9 +79,9 @@ pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[examples]"
 
 ### Supported features
 
-We provide a factor graph interface for specifying and solving least squares
-problems. **`jaxls`** takes advantage of structure in graphs: repeated cost and
-variable types are vectorized, and sparsity of adjacency is translated into
+We provide a factor graph interface for solving nonlinear least squares
+problems. **`jaxls`** is designed to exploit structure in graphs: repeated cost
+and variable types are vectorized, and sparsity of adjacency is translated into
 sparse matrix operations.
 
 Features include:
@@ -98,7 +98,7 @@ Features include:
   - Dense Cholesky.
     - Fast for small problems.
   - Sparse Cholesky, on CPU. (CHOLMOD)
-- Equality and inequality constraints, enforced via an augmented Lagrangian.
+- Augmented Langrangian solver for constrained problems.
   - Equality constraints: `h(x) = 0` with `mode="eq_zero"`
   - Inequality constraints: `g(x) ≤ 0` with `mode="leq_zero"`
   - Greater-than constraints: `g(x) ≥ 0` with `mode="geq_zero"`
