@@ -542,10 +542,13 @@ class NonlinearSolver:
             accept_flag = inner_state_final.accepted
 
             # Decrease lambda if step was good.
-            lambd_next = jnp.where(
-                accept_flag,
-                inner_state_final.lambd / trust_region.lambda_factor,
-                inner_state_final.lambd,
+            lambd_next = jnp.maximum(
+                trust_region.lambda_min,
+                jnp.where(
+                    accept_flag,
+                    inner_state_final.lambd / trust_region.lambda_factor,
+                    inner_state_final.lambd,
+                ),
             )
 
             # Build next state - always accept the proposed step from inner loop.
