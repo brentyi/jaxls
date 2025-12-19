@@ -442,10 +442,13 @@ class NonlinearSolver:
             local_delta = inner_state_final.local_delta
             accept_flag = inner_state_final.accepted
 
-            lambd_next = jnp.where(
-                accept_flag,
-                inner_state_final.lambd / trust_region.lambda_factor,
-                inner_state_final.lambd,
+            lambd_next = jnp.maximum(
+                trust_region.lambda_min,
+                jnp.where(
+                    accept_flag,
+                    inner_state_final.lambd / trust_region.lambda_factor,
+                    inner_state_final.lambd,
+                ),
             )
 
             with jdc.copy_and_mutate(state) as state_next:
