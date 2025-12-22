@@ -226,8 +226,14 @@ def main():
     print("=" * 70)
     print()
 
+    # Only use prior costs, no end effector constraint.
+    unconstrained_costs = [
+        joint_prior_cost(joint_angles[0], default_angle),
+        joint_prior_cost(joint_angles[1], default_angle),
+        joint_prior_cost(joint_angles[2], default_angle),
+    ]
     unconstrained_problem = jaxls.LeastSquaresProblem(
-        costs=costs,
+        costs=unconstrained_costs,
         variables=joint_angles,
     ).analyze()
     unconstrained_solution = jax.jit(unconstrained_problem.solve)(initial_vals)
