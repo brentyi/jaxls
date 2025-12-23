@@ -567,7 +567,7 @@ class TerminationConfig:
                 converged_cost,
                 converged_gradient,
                 converged_parameters,
-                iterations >= (self.max_iterations - 1),
+                iterations >= self.max_iterations,
             ]
         )
 
