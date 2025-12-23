@@ -19,6 +19,7 @@ import jax
 import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
+from jax.nn import relu
 from jax.tree_util import default_registry
 from loguru import logger
 from typing_extensions import deprecated
@@ -41,6 +42,26 @@ from ._sparse_matrices import (
     SparseCsrCoordinates,
 )
 from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
+
+
+@jdc.pytree_dataclass
+class _ResidualInfo:
+    """Bundled residual computation results."""
+
+    residual_vectors: tuple[jax.Array, ...]
+    """Per-group residual vectors (matches _stacked_costs structure)."""
+
+    residual_vector: jax.Array
+    """Concatenated residual vector for linear algebra operations."""
+
+    cost_total: jax.Array
+    """Total cost (sum of all squared residuals)."""
+
+    cost_nonconstraint: jax.Array
+    """Cost from l2_squared terms only (original objective, excludes constraint terms)."""
+
+    jac_cache: tuple[Any, ...] | None
+    """Jacobian cache if requested, otherwise None."""
 
 
 def _get_function_signature(func: Callable) -> Hashable:
@@ -295,31 +316,31 @@ class LeastSquaresProblem:
         )
 
         return AnalyzedLeastSquaresProblem(
-            stacked_costs=tuple(stacked_costs),
-            cost_counts=tuple(cost_counts),
-            sorted_ids_from_var_type=sorted_ids_from_var_type,
-            jac_coords_coo=jac_coords_coo,
-            jac_coords_csr=jac_coords_csr,
-            tangent_ordering=tangent_ordering,
-            tangent_start_from_var_type=tangent_start_from_var_type,
-            tangent_dim=tangent_dim_sum,
-            residual_dim=residual_dim_sum,
+            _stacked_costs=tuple(stacked_costs),
+            _cost_counts=tuple(cost_counts),
+            _sorted_ids_from_var_type=sorted_ids_from_var_type,
+            _jac_coords_coo=jac_coords_coo,
+            _jac_coords_csr=jac_coords_csr,
+            _tangent_ordering=tangent_ordering,
+            _tangent_start_from_var_type=tangent_start_from_var_type,
+            _tangent_dim=tangent_dim_sum,
+            _residual_dim=residual_dim_sum,
         )
 
 
 @jdc.pytree_dataclass
 class AnalyzedLeastSquaresProblem:
-    stacked_costs: tuple[_AnalyzedCost, ...]
+    _stacked_costs: tuple[_AnalyzedCost, ...]
     """All costs including constraint-mode costs. Constraint-mode costs have
     constraint is not None and args=(AugmentedLagrangianParams,)."""
-    cost_counts: jdc.Static[tuple[int, ...]]
-    sorted_ids_from_var_type: dict[type[Var], jax.Array]
-    jac_coords_coo: SparseCooCoordinates
-    jac_coords_csr: SparseCsrCoordinates
-    tangent_ordering: jdc.Static[VarTypeOrdering]
-    tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
-    tangent_dim: jdc.Static[int]
-    residual_dim: jdc.Static[int]
+    _cost_counts: jdc.Static[tuple[int, ...]]
+    _sorted_ids_from_var_type: dict[type[Var], jax.Array]
+    _jac_coords_coo: SparseCooCoordinates
+    _jac_coords_csr: SparseCsrCoordinates
+    _tangent_ordering: jdc.Static[VarTypeOrdering]
+    _tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
+    _tangent_dim: jdc.Static[int]
+    _residual_dim: jdc.Static[int]
 
     @overload
     def solve(
@@ -388,93 +409,48 @@ class AnalyzedLeastSquaresProblem:
         """
         if initial_vals is None:
             initial_vals = VarValues.make(
-                var_type(ids) for var_type, ids in self.sorted_ids_from_var_type.items()
+                var_type(ids)
+                for var_type, ids in self._sorted_ids_from_var_type.items()
             )
 
         # Check if we have constraints (costs with constraint is not None).
-        has_constraints = any(cost.kind != "l2_squared" for cost in self.stacked_costs)
+        has_constraints = any(cost.kind != "l2_squared" for cost in self._stacked_costs)
 
-        if has_constraints:
-            # Use Augmented Lagrangian solver for constrained problems.
-            # Import here to avoid circular imports.
-            from ._augmented_lagrangian import (
-                AugmentedLagrangianConfig,
-                AugmentedLagrangianSolver,
-            )
+        # Use default AL config if constraints present and none specified.
+        if has_constraints and augmented_lagrangian is None:
+            from ._augmented_lagrangian import AugmentedLagrangianConfig
 
-            if augmented_lagrangian is None:
-                augmented_lagrangian = AugmentedLagrangianConfig()
+            augmented_lagrangian = AugmentedLagrangianConfig()
 
-            # In our internal API, linear_solver needs to always be a string. The
-            # conjugate gradient config is a separate field. This is more
-            # convenient to implement, because then the former can be static while
-            # the latter is a pytree.
-            conjugate_gradient_config = None
-            if isinstance(linear_solver, ConjugateGradientConfig):
-                conjugate_gradient_config = linear_solver
-                linear_solver = "conjugate_gradient"
+        # In our internal API, linear_solver needs to always be a string. The
+        # conjugate gradient config is a separate field. This is more
+        # convenient to implement, because then the former can be static while
+        # the latter is a pytree.
+        conjugate_gradient_config = None
+        if isinstance(linear_solver, ConjugateGradientConfig):
+            conjugate_gradient_config = linear_solver
+            linear_solver = "conjugate_gradient"
 
-            # Create inner solver for unconstrained subproblems.
-            inner_solver = NonlinearSolver(
-                linear_solver,
-                trust_region,
-                termination,
-                conjugate_gradient_config,
-                sparse_mode,
-                verbose,
-            )
+        # Create unified solver (handles both constrained and unconstrained).
+        solver = NonlinearSolver(
+            linear_solver,
+            trust_region,
+            termination,
+            conjugate_gradient_config,
+            sparse_mode,
+            verbose,
+            augmented_lagrangian if has_constraints else None,
+        )
+        return solver.solve(
+            problem=self, initial_vals=initial_vals, return_summary=return_summary
+        )
 
-            # Create Augmented Lagrangian solver.
-            al_solver = AugmentedLagrangianSolver(
-                config=augmented_lagrangian,
-                inner_solver=inner_solver,
-                verbose=verbose,
-            )
-
-            return al_solver.solve(
-                problem=self, initial_vals=initial_vals, return_summary=return_summary
-            )
-        else:
-            # Use standard solver for unconstrained problems.
-            # In our internal API, linear_solver needs to always be a string. The
-            # conjugate gradient config is a separate field. This is more
-            # convenient to implement, because then the former can be static while
-            # the latter is a pytree.
-            conjugate_gradient_config = None
-            if isinstance(linear_solver, ConjugateGradientConfig):
-                conjugate_gradient_config = linear_solver
-                linear_solver = "conjugate_gradient"
-
-            solver = NonlinearSolver(
-                linear_solver,
-                trust_region,
-                termination,
-                conjugate_gradient_config,
-                sparse_mode,
-                verbose,
-            )
-            return solver.solve(
-                problem=self, initial_vals=initial_vals, return_summary=return_summary
-            )
-
-    @overload
-    def compute_residual_vector(
-        self, vals: VarValues, include_jac_cache: Literal[True]
-    ) -> tuple[jax.Array, CustomJacobianCache]: ...
-
-    @overload
-    def compute_residual_vector(
-        self, vals: VarValues, include_jac_cache: Literal[False] = False
-    ) -> jax.Array | tuple[jax.Array, tuple[CustomJacobianCache, ...]]: ...
-
-    def compute_residual_vector(
-        self, vals: VarValues, include_jac_cache: bool = False
-    ) -> jax.Array | tuple[jax.Array, tuple[CustomJacobianCache, ...]]:
+    def compute_residual_vector(self, vals: VarValues) -> jax.Array:
         """Compute the residual vector. The cost we are optimizing is defined
         as the sum of squared terms within this vector."""
         residual_slices = list[jax.Array]()
         jac_cache = list[CustomJacobianCache]()
-        for stacked_cost in self.stacked_costs:
+        for stacked_cost in self._stacked_costs:
             # Vmap over the entire cost object (including al_params if present).
             # This ensures consistency with Jacobian computation.
             compute_residual_out = jax.vmap(
@@ -489,20 +465,72 @@ class AnalyzedLeastSquaresProblem:
                 assert len(compute_residual_out.shape) == 2
                 residual_slices.append(compute_residual_out.reshape((-1,)))
                 jac_cache.append(None)
+        return jnp.concatenate(residual_slices, axis=0)
 
-        if include_jac_cache:
-            return jnp.concatenate(residual_slices, axis=0), tuple(jac_cache)
-        else:
-            return jnp.concatenate(residual_slices, axis=0)
+    def _compute_residual_info(
+        self, vals: VarValues, include_jac_cache: bool = False
+    ) -> _ResidualInfo:
+        """Compute residuals, costs, and optionally Jacobian cache in one pass.
+
+        This bundles all residual-related computation into a single call,
+        computing per-group residuals, concatenated residual, total cost,
+        and non-constraint cost (original objective) together.
+
+        Args:
+            vals: Variable values to evaluate at.
+            include_jac_cache: Whether to compute Jacobian cache.
+
+        Returns:
+            _ResidualInfo with all computed values.
+        """
+        residual_vectors: list[jax.Array] = []
+        jac_caches: list[Any] = []
+        cost_nonconstraint = jnp.array(0.0)
+
+        for stacked_cost in self._stacked_costs:
+            # Vmap over the entire cost object (including al_params if present).
+            compute_residual_out = jax.vmap(
+                lambda cost: cost.compute_residual_flat(vals, *cost.args)
+            )(stacked_cost)
+
+            if isinstance(compute_residual_out, tuple):
+                assert len(compute_residual_out) == 2
+                residual = compute_residual_out[0].reshape((-1,))
+                jac_caches.append(compute_residual_out[1])
+            else:
+                assert len(compute_residual_out.shape) == 2
+                residual = compute_residual_out.reshape((-1,))
+                jac_caches.append(None)
+
+            residual_vectors.append(residual)
+
+            # Accumulate cost from l2_squared terms only.
+            if stacked_cost.kind == "l2_squared":
+                cost_nonconstraint = cost_nonconstraint + jnp.sum(residual**2)
+
+        residual_vector = jnp.concatenate(residual_vectors, axis=0)
+        cost_total = jnp.sum(residual_vector**2)
+
+        return _ResidualInfo(
+            residual_vectors=tuple(residual_vectors),
+            residual_vector=residual_vector,
+            cost_total=cost_total,
+            cost_nonconstraint=cost_nonconstraint,
+            jac_cache=tuple(jac_caches) if include_jac_cache else None,
+        )
 
     def _compute_constraint_values(self, vals: VarValues) -> tuple[jax.Array, ...]:
         """Compute original constraint values (not augmented), one array per constraint group.
 
         For constraint-mode costs, this uses compute_residual_original to get
         the raw constraint values (before augmented Lagrangian transformation).
+
+        Returns:
+            Tuple of arrays, one per constraint group. Each has shape
+            (constraint_count, constraint_flat_dim).
         """
         constraint_slices = list[jax.Array]()
-        for stacked_cost in self.stacked_costs:
+        for stacked_cost in self._stacked_costs:
             if stacked_cost.kind == "l2_squared":
                 continue  # Skip regular costs
 
@@ -511,7 +539,8 @@ class AnalyzedLeastSquaresProblem:
             constraint_vals = jax.vmap(
                 lambda c: c.compute_residual_original(vals, *c.args)
             )(stacked_cost)
-            constraint_slices.append(constraint_vals.reshape((-1,)))
+            # Keep 2D shape (constraint_count, constraint_flat_dim) for AL state.
+            constraint_slices.append(constraint_vals)
 
         return tuple(constraint_slices)
 
@@ -524,7 +553,8 @@ class AnalyzedLeastSquaresProblem:
         constraint_slices = self._compute_constraint_values(vals)
         if len(constraint_slices) == 0:
             return jnp.array([])
-        return jnp.concatenate(constraint_slices, axis=0)
+        # Flatten each 2D slice before concatenating.
+        return jnp.concatenate([c.reshape(-1) for c in constraint_slices], axis=0)
 
     def _compute_jac_values(
         self, vals: VarValues, jac_cache: tuple[CustomJacobianCache, ...]
@@ -532,7 +562,7 @@ class AnalyzedLeastSquaresProblem:
         block_rows = list[SparseBlockRow]()
         residual_offset = 0
 
-        for i, cost in enumerate(self.stacked_costs):
+        for i, cost in enumerate(self._stacked_costs):
             # Shape should be: (count_from_group[group_key], single_residual_dim, sum_of_tangent_dims_of_variables).
             def compute_jac_with_perturb(
                 cost: _AnalyzedCost, jac_cache_i: CustomJacobianCache | None = None
@@ -542,7 +572,7 @@ class AnalyzedLeastSquaresProblem:
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
                         for var_type, ids in cost.sorted_ids_from_var_type.items()
                     },
-                    self.tangent_ordering,
+                    self._tangent_ordering,
                 )
 
                 # Shape should be: (residual_dim, sum_of_tangent_dims_of_variables).
@@ -568,7 +598,7 @@ class AnalyzedLeastSquaresProblem:
                 # compute_residual_flat handles al_params internally via self.al_params
                 return jacfunc(
                     lambda tangent: cost.compute_residual_flat(
-                        val_subset._retract(tangent, self.tangent_ordering),
+                        val_subset._retract(tangent, self._tangent_ordering),
                         *cost.args,
                     )
                 )(jnp.zeros((val_subset._get_tangent_dim(),)))
@@ -599,7 +629,7 @@ class AnalyzedLeastSquaresProblem:
             stacked_jac_start_col = 0
             start_cols = list[jax.Array]()
             block_widths = list[int]()
-            for var_type, ids in self.tangent_ordering.ordered_dict_items(
+            for var_type, ids in self._tangent_ordering.ordered_dict_items(
                 # This ordering shouldn't actually matter!
                 cost.sorted_ids_from_var_type
             ):
@@ -610,10 +640,10 @@ class AnalyzedLeastSquaresProblem:
                 for var_idx in range(ids.shape[-1]):
                     start_cols.append(
                         jnp.searchsorted(
-                            self.sorted_ids_from_var_type[var_type], ids[..., var_idx]
+                            self._sorted_ids_from_var_type[var_type], ids[..., var_idx]
                         )
                         * var_type.tangent_dim
-                        + self.tangent_start_from_var_type[var_type]
+                        + self._tangent_start_from_var_type[var_type]
                     )
                     block_widths.append(var_type.tangent_dim)
                     assert start_cols[-1].shape == (num_costs_,)
@@ -625,7 +655,7 @@ class AnalyzedLeastSquaresProblem:
 
             block_rows.append(
                 SparseBlockRow(
-                    num_cols=self.tangent_dim,
+                    num_cols=self._tangent_dim,
                     start_cols=tuple(start_cols),
                     block_num_cols=tuple(block_widths),
                     blocks_concat=stacked_jac,
@@ -633,11 +663,11 @@ class AnalyzedLeastSquaresProblem:
             )
 
             residual_offset += cost.residual_flat_dim * num_costs
-        assert residual_offset == self.residual_dim
+        assert residual_offset == self._residual_dim
 
         bsparse_jacobian = BlockRowSparseMatrix(
             block_rows=tuple(block_rows),
-            shape=(self.residual_dim, self.tangent_dim),
+            shape=(self._residual_dim, self._tangent_dim),
         )
         return bsparse_jacobian
 
@@ -686,7 +716,7 @@ class AugmentedLagrangianParams[*Args]:
     """Lagrange multipliers for this constraint. Shape: (constraint_flat_dim,)."""
 
     penalty_params: jax.Array
-    """Penalty parameters for this constraint. Shape: (constraint_flat_dim,)."""
+    """Penalty parameter for this constraint instance. Shape: () (scalar)."""
 
     original_args: tuple[*Args]
     """The original cost args to pass to compute_residual."""
@@ -703,46 +733,28 @@ class AugmentedLagrangianParams[*Args]:
 class Cost[*Args]:
     """A cost or constraint term in our optimization problem.
 
-    The `mode` field determines how the residual function is interpreted:
-    - `"l2_squared"` (default): Minimize squared L2 norm: `||r(x)||^2`
-    - `"constraint_eq_zero"`: Equality kind: `r(x) = 0`
-    - `"constraint_leq_zero"`: Inequality kind: `r(x) <= 0`
-    - `"constraint_geq_zero"`: Inequality kind: `r(x) >= 0`
+    The ``kind`` field determines how the residual function is interpreted:
 
-    The recommended way to create a cost is to use the `create_factory` decorator
-    on a function that computes the residual.
+    - ``"l2_squared"`` (default): Minimize squared L2 norm: ``||r(x)||^2``
+    - ``"constraint_eq_zero"``: Equality constraint: ``r(x) = 0``
+    - ``"constraint_leq_zero"``: Inequality constraint: ``r(x) <= 0``
+    - ``"constraint_geq_zero"``: Inequality constraint: ``r(x) >= 0``
 
-    ```python
-    # Standard cost (minimize squared residual)
-    @jaxls.Cost.create_factory
-    def my_cost(values: VarValues, [...args]) -> jax.Array:
-        return residual
+    Use the :meth:`~jaxls.Cost.factory` decorator to create costs from a
+    residual function.
 
-    # Equality kind: r(x) = 0
-    @jaxls.Cost.create_factory(kind="constraint_eq_zero")
-    def my_equality_constraint(values: VarValues, [...args]) -> jax.Array:
-        return values[var] - target
-
-    # Inequality kind: r(x) <= 0
-    @jaxls.Cost.create_factory(kind="constraint_leq_zero")
-    def my_inequality_constraint(values: VarValues, [...args]) -> jax.Array:
-        return values[var] - upper_bound
-
-    problem = jaxls.LeastSquaresProblem(
-        costs=[my_cost(...), my_equality_constraint(...), my_inequality_constraint(...)],
-    )
-    ```
-
-    Each `Cost.compute_residual` should take at least one argument that inherits
-    from the symbolic variable `jaxls.Var(id)`, where `id` must be a scalar
-    integer.
+    Each ``Cost.compute_residual`` must include at least one ``jaxls.Var(id)``
+    in its inputs, where ``id`` is a scalar integer. Variables can appear
+    anywhere in the input structure, including nested within pytrees (lists,
+    dicts, dataclasses, etc.).
 
     To create a batch of costs, a leading batch axis can be added to the
-    arguments passed to `Cost.args`:
+    arguments passed to ``Cost.args``:
+
     - The batch axis must be the same for all arguments. Leading axes of shape
-      `(1,)` are broadcasted.
-    - The `id` field of each `jaxls.Var` instance must have shape of either
-      `()` (unbatched) or `(batch_size,)` (batched).
+      ``(1,)`` are broadcasted.
+    - The ``id`` field of each ``jaxls.Var`` instance must have shape of either
+      ``()`` (unbatched) or ``(batch_size,)`` (batched).
     """
 
     compute_residual: jdc.Static[
@@ -915,38 +927,16 @@ class Cost[*Args]:
     ):
         """Decorator for creating costs from a residual function.
 
-        Examples:
+        The decorated function should take ``VarValues`` as its first argument
+        and return a residual array. The resulting factory will have the same
+        signature but without the ``VarValues`` argument.
 
-            # Standard cost (minimize squared residual)
-            @jaxls.Cost.factory
-            def my_cost(values: VarValues, var1: SE2Var) -> jax.Array:
-                ...
-
-            # Equality kind: r(x) = 0
-            @jaxls.Cost.factory(kind="constraint_eq_zero")
-            def my_equality_constraint(values: VarValues, var1: SE2Var) -> jax.Array:
-                return values[var1].translation()[0] - target
-
-            # Inequality kind: r(x) <= 0
-            @jaxls.Cost.factory(kind="constraint_leq_zero")
-            def my_inequality_constraint(values: VarValues, var1: ScalarVar) -> jax.Array:
-                return values[var1] - upper_bound
-
-            # Factory will have the same input signature as the wrapped
-            # residual function, but without the `VarValues` argument.
-            cost = my_cost(var1=SE2Var(0))
-            assert isinstance(cost, jaxls.Cost)
-
-        Keyword arguments can also be used for configuration. For example:
-
-            # To enforce forward-mode autodiff for Jacobians.
-            @Cost.factory(jac_mode="forward")
-            def cost(...): ...
-
-            # To reduce memory usage.
-            @Cost.factory(jac_batch_size=1)
-            def cost(...): ...
-
+        Args:
+            kind: How to interpret the residual (default: ``"l2_squared"``).
+            jac_mode: Autodiff mode for Jacobians (``"auto"``, ``"forward"``,
+                or ``"reverse"``).
+            jac_batch_size: Batch size for Jacobian computation. Set to 1 to
+                reduce memory usage.
         """
 
         def decorator(
@@ -1021,28 +1011,29 @@ class Cost[*Args]:
             name=name,
         )
 
-    @staticmethod
-    @deprecated("Use Factor() directly instead of Factor.make()")
-    def make[*Args_](
-        compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
-        args: tuple[*Args_],
-        jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
-        jac_custom_fn: jdc.Static[
-            Callable[[VarValues, *Args_], jax.Array] | None
-        ] = None,
-    ) -> Cost[*Args_]:
-        import warnings
+    if not TYPE_CHECKING:
 
-        warnings.warn(
-            "Use Factor() directly instead of Factor.make()", DeprecationWarning
-        )
-        return Cost(
-            compute_residual=compute_residual,
-            args=args,
-            jac_mode=jac_mode,
-            jac_batch_size=None,
-            jac_custom_fn=jac_custom_fn,
-        )
+        @staticmethod
+        def make[*Args_](
+            compute_residual: jdc.Static[Callable[[VarValues, *Args_], jax.Array]],
+            args: tuple[*Args_],
+            jac_mode: jdc.Static[Literal["auto", "forward", "reverse"]] = "auto",
+            jac_custom_fn: jdc.Static[
+                Callable[[VarValues, *Args_], jax.Array] | None
+            ] = None,
+        ) -> Cost[*Args_]:
+            import warnings
+
+            warnings.warn(
+                "Use Cost() directly instead of Cost.make()", DeprecationWarning
+            )
+            return Cost(
+                compute_residual=compute_residual,
+                args=args,
+                jac_mode=jac_mode,
+                jac_batch_size=None,
+                jac_custom_fn=jac_custom_fn,
+            )
 
 
 @jdc.pytree_dataclass(kw_only=True)
@@ -1119,8 +1110,8 @@ class _AnalyzedCost[*Args](Cost[*Args]):
 
         # Cache the residual dimension for this cost.
         dummy_vals = jax.eval_shape(VarValues.make, variables)
-        residual_dim = onp.prod(
-            jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape
+        residual_dim = int(
+            onp.prod(jax.eval_shape(_residual_no_cache, dummy_vals, *cost.args).shape)
         )
 
         return _AnalyzedCost(
@@ -1224,14 +1215,15 @@ def _augment_constraint_cost[*Args](
             return constraint_out
 
     dummy_vals = jax.eval_shape(VarValues.make, variables)
-    constraint_dim = onp.prod(
-        jax.eval_shape(_constraint_no_cache, dummy_vals, *cost.args).shape
+    constraint_dim = int(
+        onp.prod(jax.eval_shape(_constraint_no_cache, dummy_vals, *cost.args).shape)
     )
 
     # Create placeholder AL params.
+    # Note: penalty_params is scalar (per-instance), lagrange_multipliers is per-element.
     al_params = AugmentedLagrangianParams(
         lagrange_multipliers=jnp.zeros(constraint_dim),
-        penalty_params=jnp.ones(constraint_dim),
+        penalty_params=jnp.array(1.0),  # Scalar per-instance penalty.
         original_args=cost.args,
         constraint_index=constraint_index,
     )
@@ -1245,6 +1237,12 @@ def _augment_constraint_cost[*Args](
     is_geq = orig_kind == "constraint_geq_zero"
     is_inequality = is_leq or is_geq
 
+    # Determine if we need to return a cache for the active mask.
+    # This is needed when we have inequality constraints with custom Jacobians.
+    needs_active_mask_cache = is_inequality and (
+        cost.jac_custom_fn is not None or cost.jac_custom_with_cache_fn is not None
+    )
+
     def augmented_residual_fn(
         vals: VarValues,
         al_params_inner: AugmentedLagrangianParams[*Args],
@@ -1256,12 +1254,10 @@ def _augment_constraint_cost[*Args](
         if isinstance(constraint_out, tuple):
             assert len(constraint_out) == 2
             constraint_val = constraint_out[0].flatten()
-            jac_cache = constraint_out[1]
-            has_cache = True
+            orig_jac_cache = constraint_out[1]
         else:
             constraint_val = constraint_out.flatten()
-            jac_cache = None
-            has_cache = False
+            orig_jac_cache = None
 
         # For geq_zero, negate to convert to leq_zero form
         if is_geq:
@@ -1273,90 +1269,81 @@ def _augment_constraint_cost[*Args](
         rho = al_params_inner.penalty_params
         if is_inequality:
             # g(x) <= 0: penalize only when g(x) + lambda/rho > 0
-            residual = jnp.sqrt(rho) * jnp.maximum(0.0, constraint_val + lambdas / rho)
+            active = (constraint_val + lambdas / rho) > 0
+            residual = jnp.sqrt(rho) * relu(constraint_val + lambdas / rho)
         else:
             # h(x) = 0: always penalize
+            active = None
             residual = jnp.sqrt(rho) * (constraint_val + lambdas / rho)
 
-        if has_cache:
-            return residual, jac_cache
+        # Return cache if needed (either original cache or active mask for custom Jacobians).
+        if orig_jac_cache is not None or needs_active_mask_cache:
+            # Bundle original cache with active mask for inequality constraints.
+            return residual, (orig_jac_cache, active)
         return residual
 
     # Create wrapper Jacobian functions if original cost has custom Jacobians.
+    # When we have inequality constraints with custom Jacobians, we cache the active
+    # mask in the residual computation to avoid redundant constraint evaluation.
     wrapped_jac_custom_fn = None
     wrapped_jac_custom_with_cache_fn = None
 
     if cost.jac_custom_fn is not None:
         orig_jac_fn = cost.jac_custom_fn
 
-        def _wrapped_jac_custom_fn(
-            vals: VarValues,
-            al_params_inner: AugmentedLagrangianParams[*Args],
-        ) -> jax.Array:
-            """Wrapper Jacobian that applies chain rule for augmented residual."""
-            original_jac = orig_jac_fn(vals, *al_params_inner.original_args)
-
-            # For geq_zero, negate the Jacobian.
-            if is_geq:
-                original_jac = -original_jac
-
-            rho = al_params_inner.penalty_params
-            lambdas = al_params_inner.lagrange_multipliers
-
-            if is_inequality:
-                # g(x) <= 0: zero Jacobian when inactive.
-                constraint_out = orig_compute_residual(
-                    vals, *al_params_inner.original_args
-                )
-                if isinstance(constraint_out, tuple):
-                    constraint_val = constraint_out[0]
-                else:
-                    constraint_val = constraint_out
-                constraint_val = constraint_val.flatten()
+        if is_inequality:
+            # For inequality constraints, use cache-based wrapper to get active mask.
+            def _wrapped_jac_with_cache_from_custom_fn(
+                vals: VarValues,
+                jac_cache: tuple[None, jax.Array],
+                al_params_inner: AugmentedLagrangianParams[*Args],
+            ) -> jax.Array:
+                """Wrapper using cached active mask."""
+                original_jac = orig_jac_fn(vals, *al_params_inner.original_args)
                 if is_geq:
-                    constraint_val = -constraint_val
-                active = (constraint_val + lambdas / rho) > 0
-                return jnp.sqrt(rho)[:, None] * original_jac * active[:, None]
-            else:
-                return jnp.sqrt(rho)[:, None] * original_jac
+                    original_jac = -original_jac
+                rho = al_params_inner.penalty_params  # Scalar per-instance penalty.
+                _, active = jac_cache  # Extract cached active mask.
+                return jnp.sqrt(rho) * original_jac * active[:, None]
 
-        wrapped_jac_custom_fn = _wrapped_jac_custom_fn
+            wrapped_jac_custom_with_cache_fn = _wrapped_jac_with_cache_from_custom_fn
+        else:
+            # Equality constraints don't need active mask.
+            def _wrapped_jac_custom_fn(
+                vals: VarValues,
+                al_params_inner: AugmentedLagrangianParams[*Args],
+            ) -> jax.Array:
+                """Wrapper Jacobian for equality constraints."""
+                original_jac = orig_jac_fn(vals, *al_params_inner.original_args)
+                rho = al_params_inner.penalty_params  # Scalar per-instance penalty.
+                return jnp.sqrt(rho) * original_jac
+
+            wrapped_jac_custom_fn = _wrapped_jac_custom_fn
 
     if cost.jac_custom_with_cache_fn is not None:
         orig_jac_with_cache_fn = cost.jac_custom_with_cache_fn
 
         def _wrapped_jac_custom_with_cache_fn(
             vals: VarValues,
-            jac_cache: CustomJacobianCache,
+            jac_cache: tuple[CustomJacobianCache, jax.Array | None],
             al_params_inner: AugmentedLagrangianParams[*Args],
         ) -> jax.Array:
             """Wrapper Jacobian with cache that applies chain rule."""
+            orig_cache, active = jac_cache  # Unpack bundled cache.
             original_jac = orig_jac_with_cache_fn(
-                vals, jac_cache, *al_params_inner.original_args
+                vals, orig_cache, *al_params_inner.original_args
             )
 
             # For geq_zero, negate the Jacobian.
             if is_geq:
                 original_jac = -original_jac
 
-            rho = al_params_inner.penalty_params
-            lambdas = al_params_inner.lagrange_multipliers
-
+            rho = al_params_inner.penalty_params  # Scalar per-instance penalty.
             if is_inequality:
-                constraint_out = orig_compute_residual(
-                    vals, *al_params_inner.original_args
-                )
-                if isinstance(constraint_out, tuple):
-                    constraint_val = constraint_out[0]
-                else:
-                    constraint_val = constraint_out
-                constraint_val = constraint_val.flatten()
-                if is_geq:
-                    constraint_val = -constraint_val
-                active = (constraint_val + lambdas / rho) > 0
-                return jnp.sqrt(rho)[:, None] * original_jac * active[:, None]
+                assert active is not None
+                return jnp.sqrt(rho) * original_jac * active[:, None]
             else:
-                return jnp.sqrt(rho)[:, None] * original_jac
+                return jnp.sqrt(rho) * original_jac
 
         wrapped_jac_custom_with_cache_fn = _wrapped_jac_custom_with_cache_fn
 

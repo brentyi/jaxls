@@ -22,6 +22,7 @@ class PythonTranspiler(cst.CSTTransformer):
         self.needs_any_import = False
         self.has_any_import = False
         self.overloaded_functions = set()
+        self.needs_assert_never_import = False  # Track if we need typing_extensions.assert_never
 
     # ==================== Type Annotation Handling ====================
 
@@ -172,7 +173,6 @@ class PythonTranspiler(cst.CSTTransformer):
             "TypeVarTuple",
             "ParamSpec",
             "Concatenate",
-            "assert_never",
             "Optional",
             "NotRequired",
             "Required",
@@ -188,11 +188,16 @@ class PythonTranspiler(cst.CSTTransformer):
             "Callable",
             "Hashable",
             "Iterable",
+            "assert_never",  # Available in typing_extensions for Python 3.10
         }
 
         new_names = []
         for name in names:
             if isinstance(name, cst.ImportAlias):
+                # assert_never needs to come from typing_extensions for Python 3.10
+                if name.name.value == "assert_never":
+                    self.needs_assert_never_import = True
+                    continue  # Remove from typing imports, will add from typing_extensions
                 if (
                     name.name.value in runtime_types
                     or name.name.value not in typing_only
@@ -461,11 +466,12 @@ class PythonTranspiler(cst.CSTTransformer):
             return self._is_type_expression(node.value)
         elif isinstance(node, cst.BinaryOperation):
             # Union types using | operator (Python 3.10+)
-            if hasattr(node.operator, "value") and node.operator.value == "|":
-                return True
-            # Check for BitOr operator
-            elif isinstance(node.operator, cst.BitOr):
-                return True
+            # Only treat as type expression if BOTH operands look like types
+            # This avoids removing bitwise OR operations on regular values
+            if isinstance(node.operator, cst.BitOr):
+                return self._is_type_expression(
+                    node.left
+                ) and self._is_type_expression(node.right)
 
         return False
 
@@ -586,6 +592,12 @@ def transpile_file(input_path: Path, output_path: Path) -> None:
         if transformer.needs_any_import and not transformer.has_any_import:
             modified_tree = add_any_import(modified_tree)
 
+        # Add assert_never import from typing_extensions if needed
+        if transformer.needs_assert_never_import:
+            modified_tree = add_typing_extensions_import(
+                modified_tree, "assert_never"
+            )
+
         # Write output
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(modified_tree.code)
@@ -623,6 +635,35 @@ def add_any_import(tree):
     # Insert import
     new_body = list(tree.body)
     new_body.insert(insert_position, import_any)
+    return tree.with_changes(body=new_body)
+
+
+def add_typing_extensions_import(tree, name: str):
+    """Add 'from typing_extensions import <name>' to module."""
+    # Find position after __future__ and typing imports
+    insert_position = 0
+    for i, stmt in enumerate(tree.body):
+        if isinstance(stmt, cst.SimpleStatementLine):
+            for expr in stmt.body:
+                if isinstance(expr, cst.ImportFrom):
+                    if expr.module and expr.module.value in ("__future__", "typing"):
+                        insert_position = i + 1
+        elif not isinstance(stmt, (cst.SimpleStatementLine, cst.EmptyLine)):
+            break
+
+    # Create import statement
+    import_stmt = cst.SimpleStatementLine(
+        body=[
+            cst.ImportFrom(
+                module=cst.Name("typing_extensions"),
+                names=[cst.ImportAlias(name=cst.Name(name))],
+            )
+        ]
+    )
+
+    # Insert import
+    new_body = list(tree.body)
+    new_body.insert(insert_position, import_stmt)
     return tree.with_changes(body=new_body)
 
 

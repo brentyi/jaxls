@@ -45,8 +45,8 @@ def make_block_jacobi_precoditioner(
     # This list will store block diagonal gram matrices corresponding to each
     # variable.
     gram_diagonal_blocks = list[jax.Array]()
-    for var_type, ids in graph.tangent_ordering.ordered_dict_items(
-        graph.sorted_ids_from_var_type
+    for var_type, ids in graph._tangent_ordering.ordered_dict_items(
+        graph._sorted_ids_from_var_type
     ):
         (num_vars,) = ids.shape
         gram_diagonal_blocks.append(
@@ -54,18 +54,18 @@ def make_block_jacobi_precoditioner(
             + jnp.eye(var_type.tangent_dim) * 1e-6
         )
 
-    assert len(graph.stacked_costs) == len(A_blocksparse.block_rows)
-    for cost, block_row in zip(graph.stacked_costs, A_blocksparse.block_rows):
+    assert len(graph._stacked_costs) == len(A_blocksparse.block_rows)
+    for cost, block_row in zip(graph._stacked_costs, A_blocksparse.block_rows):
         assert block_row.blocks_concat.ndim == 3  # (N_block, rows, cols)
 
         # Current index we're looking at in the blocks_concat array.
         start_concat_col = 0
 
-        for var_type, ids in graph.tangent_ordering.ordered_dict_items(
+        for var_type, ids in graph._tangent_ordering.ordered_dict_items(
             cost.sorted_ids_from_var_type
         ):
             (num_costs, num_vars) = ids.shape
-            var_type_idx = graph.tangent_ordering.order_from_type[var_type]
+            var_type_idx = graph._tangent_ordering.order_from_type[var_type]
 
             # Extract the blocks corresponding to the current variable type.
             end_concat_col = start_concat_col + num_vars * var_type.tangent_dim
@@ -94,7 +94,7 @@ def make_block_jacobi_precoditioner(
 
             gram_diagonal_blocks[var_type_idx] = (
                 gram_diagonal_blocks[var_type_idx]
-                .at[jnp.searchsorted(graph.sorted_ids_from_var_type[var_type], ids)]
+                .at[jnp.searchsorted(graph._sorted_ids_from_var_type[var_type], ids)]
                 .add(gram_blocks)
             )
 

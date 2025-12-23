@@ -34,6 +34,7 @@ dependencies = [
     "termcolor",
     "tqdm",
     "rich>=13.0.0",
+    "typing_extensions>=4.5.0",
 ]
 
 [project.optional-dependencies]
@@ -48,6 +49,17 @@ examples = [
     "matplotlib",
     "viser",
     "scikit-sparse",
+]
+docs = [
+    "sphinx>=7.0.0",
+    "furo>=2024.0.0",
+    "sphinx-copybutton>=0.5.0",
+    "myst-nb>=1.0.0",
+    "ipykernel",
+    "matplotlib",
+    "plotly",
+    "opencv-python",
+    "scipy",
 ]
 
 [project.urls]

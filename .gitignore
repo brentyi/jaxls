@@ -2,3 +2,6 @@
 *.pyc
 *.egg-info
 __pycache__
+docs/build/
+.ipynb_checkpoints
+.jupyter_ystore.db

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any
 
+from typing_extensions import assert_never
 
 import jax
 import jax.flatten_util
@@ -14,6 +15,12 @@ from jaxls._preconditioning import (
     make_point_jacobi_precoditioner,
 )
 
+from ._augmented_lagrangian import (
+    check_al_convergence,
+    initialize_al_state,
+    update_al_state,
+    update_problem_al_params,
+)
 from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
 from .utils import jax_log
 
@@ -136,7 +143,8 @@ class SolveSummary:
 @jdc.pytree_dataclass
 class _SolutionState:
     vals: Any
-    cost: Any
+    cost_total: Any
+    cost_nonconstraint: Any
     residual_vector: Any
     jac_cache: Any
     cg_state: Any
@@ -157,6 +165,7 @@ class _LmOuterState:
     summary: Any
     lambd: Any
     jacobian_scaler: Any
+    al_state: Any
 
 
 @jdc.pytree_dataclass
@@ -167,6 +176,7 @@ class NonlinearSolver:
     conjugate_gradient_config: Any
     sparse_mode: jdc.Static[Any]
     verbose: jdc.Static[Any]
+    augmented_lagrangian: Any = None
 
     @jdc.jit
     def solve(
@@ -176,23 +186,35 @@ class NonlinearSolver:
         return_summary: jdc.Static[Any] = False,
     ) -> Any:
         vals = initial_vals
-        residual_vector, jac_cache = problem.compute_residual_vector(
-            vals, include_jac_cache=True
-        )
+        residual_info = problem._compute_residual_info(vals, include_jac_cache=True)
 
-        initial_cost = jnp.sum(residual_vector**2)
         cost_history = jnp.zeros(self.termination.max_iterations)
-        cost_history = cost_history.at[0].set(initial_cost)
+        cost_history = cost_history.at[0].set(residual_info.cost_nonconstraint)
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
 
+        al_state: Any = None
+        if self.augmented_lagrangian is not None:
+            al_state = initialize_al_state(
+                problem,
+                vals,
+                self.augmented_lagrangian,
+                verbose=self.verbose,
+            )
+
+            problem = update_problem_al_params(problem, al_state)
+
+            residual_info = problem._compute_residual_info(vals, include_jac_cache=True)
+            cost_history = cost_history.at[0].set(residual_info.cost_nonconstraint)
+
         state = _LmOuterState(
             solution=_SolutionState(
                 vals=vals,
-                cost=initial_cost,
-                residual_vector=residual_vector,
-                jac_cache=jac_cache,
+                cost_total=residual_info.cost_total,
+                cost_nonconstraint=residual_info.cost_nonconstraint,
+                residual_vector=residual_info.residual_vector,
+                jac_cache=residual_info.jac_cache,
                 cg_state=None
                 if self.linear_solver != "conjugate_gradient"
                 else _ConjugateGradientState(
@@ -214,14 +236,38 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
-            jacobian_scaler=jnp.ones(problem.tangent_dim),
+            jacobian_scaler=jnp.ones(problem._tangent_dim),
+            al_state=al_state,
         )
 
         if self.termination.early_termination:
+
+            def should_continue(state: Any) -> Any:
+                basic_checks = ~jnp.isnan(state.solution.cost_total) & (
+                    state.summary.iterations < self.termination.max_iterations
+                )
+
+                if self.augmented_lagrangian is None:
+                    return basic_checks & ~jnp.any(state.summary.termination_criteria)
+
+                assert state.al_state is not None
+                al_abs, al_rel = check_al_convergence(
+                    state.al_state, self.augmented_lagrangian
+                )
+                al_converged = al_abs & al_rel
+
+                lm_terminated = (
+                    state.summary.termination_criteria[0]
+                    | state.summary.termination_criteria[1]
+                    | state.summary.termination_criteria[2]
+                )
+                max_iters_reached = state.summary.termination_criteria[3]
+
+                should_stop = max_iters_reached | (lm_terminated & al_converged)
+                return basic_checks & ~should_stop
+
             state = jax.lax.while_loop(
-                cond_fun=lambda state: jnp.logical_not(
-                    jnp.any(state.summary.termination_criteria)
-                ),
+                cond_fun=should_continue,
                 body_fun=lambda state: self.lm_outer_step(problem, state),
                 init_val=state,
             )
@@ -236,7 +282,7 @@ class NonlinearSolver:
             jax_log(
                 "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
                 i=state.summary.iterations,
-                cost=state.solution.cost,
+                cost=state.solution.cost_total,
                 criteria=state.summary.termination_criteria.astype(jnp.int32),
                 cost_delta=state.summary.termination_deltas[0],
                 grad_mag=state.summary.termination_deltas[1],
@@ -286,7 +332,7 @@ class NonlinearSolver:
             local_delta, cg_state = cg_config._solve(
                 problem,
                 A_blocksparse,
-                lambda vec: AT_multiply(A_multiply(vec)) + lambd * vec,
+                lambda vec: AT_multiply(A_multiply(vec)) + (lambd + 1e-5) * vec,
                 ATb=ATb,
                 prev_linear_state=sol_prev.cg_state,
             )
@@ -299,7 +345,7 @@ class NonlinearSolver:
                     ],
                     axis=0,
                 ),
-                problem.jac_coords_csr,
+                problem._jac_coords_csr,
             )
             local_delta = _cholmod_solve(A_csr, ATb, lambd=lambd)
         elif self.linear_solver == "dense_cholesky":
@@ -314,25 +360,34 @@ class NonlinearSolver:
 
         scaled_local_delta = local_delta * jacobian_scaler
         proposed_vals = sol_prev.vals._retract(
-            scaled_local_delta, problem.tangent_ordering
+            scaled_local_delta, problem._tangent_ordering
         )
-        proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
+        proposed_residual_info = problem._compute_residual_info(
             proposed_vals, include_jac_cache=True
         )
-        proposed_cost = jnp.sum(proposed_residual_vector**2)
 
         if self.trust_region is not None:
-            step_quality = (proposed_cost - sol_prev.cost) / (
-                jnp.sum(
-                    (
-                        A_blocksparse.multiply(scaled_local_delta)
-                        + sol_prev.residual_vector
-                    )
-                    ** 2
-                )
-                - sol_prev.cost
+            predicted_cost = jnp.sum(
+                (A_blocksparse.multiply(scaled_local_delta) + sol_prev.residual_vector)
+                ** 2
             )
-            accepted = step_quality >= self.trust_region.step_quality_min
+            predicted_reduction = sol_prev.cost_total - predicted_cost
+            actual_reduction = sol_prev.cost_total - proposed_residual_info.cost_total
+
+            at_optimum = jnp.abs(predicted_reduction) < 1e-7 * sol_prev.cost_total
+            step_quality = jnp.where(
+                at_optimum,
+                1.0,
+                actual_reduction / predicted_reduction,
+            )
+
+            accepted = ~jnp.isnan(proposed_residual_info.cost_total) & (
+                (
+                    (step_quality >= self.trust_region.step_quality_min)
+                    & (actual_reduction > 0)
+                )
+                | (at_optimum & (actual_reduction >= -1e-7 * sol_prev.cost_total))
+            )
         else:
             accepted = jnp.array(True)
 
@@ -342,9 +397,10 @@ class NonlinearSolver:
             iterations=iterations,
             sol_proposed=_SolutionState(
                 vals=proposed_vals,
-                cost=proposed_cost,
-                residual_vector=proposed_residual_vector,
-                jac_cache=proposed_jac_cache,
+                cost_total=proposed_residual_info.cost_total,
+                cost_nonconstraint=proposed_residual_info.cost_nonconstraint,
+                residual_vector=proposed_residual_info.residual_vector,
+                jac_cache=proposed_residual_info.jac_cache,
                 cg_state=cg_state,
             ),
             local_delta=local_delta,
@@ -356,6 +412,9 @@ class NonlinearSolver:
         state: Any,
     ) -> Any:
         sol_prev = state.solution
+
+        if self.augmented_lagrangian is not None and state.al_state is not None:
+            problem = update_problem_al_params(problem, state.al_state)
 
         A_blocksparse = problem._compute_jac_values(sol_prev.vals, sol_prev.jac_cache)
 
@@ -383,14 +442,14 @@ class NonlinearSolver:
             AT_multiply = lambda vec: AT_multiply_(vec)[0]
         elif self.sparse_mode == "coo":
             A_coo = SparseCooMatrix(
-                values=jac_values, coords=problem.jac_coords_coo
+                values=jac_values, coords=problem._jac_coords_coo
             ).as_jax_bcoo()
             AT_coo = A_coo.transpose()
             A_multiply = lambda vec: A_coo @ vec
             AT_multiply = lambda vec: AT_coo @ vec
         elif self.sparse_mode == "csr":
             A_csr = SparseCsrMatrix(
-                values=jac_values, coords=problem.jac_coords_csr
+                values=jac_values, coords=problem._jac_coords_csr
             ).as_jax_bcsr()
             A_multiply = lambda vec: A_csr @ vec
             AT_multiply_ = jax.linear_transpose(
@@ -448,30 +507,84 @@ class NonlinearSolver:
             lambd_next = inner_state_final.lambd
 
         with jdc.copy_and_mutate(state) as state_next:
-            state_next.solution = inner_state_final.sol_proposed
+            state_next.solution = jax.tree.map(
+                lambda new, old: jnp.where(inner_state_final.accepted, new, old),
+                inner_state_final.sol_proposed,
+                sol_prev,
+            )
             state_next.lambd = lambd_next
+
+        if self.verbose:
+            jax_log(
+                "     accepted={accepted} ATb_norm={atb_norm:.2e} cost_prev={cost_prev:.4f} cost_new={cost_new:.4f}",
+                accepted=inner_state_final.accepted,
+                atb_norm=jnp.linalg.norm(ATb),
+                cost_prev=sol_prev.cost_total,
+                cost_new=inner_state_final.sol_proposed.cost_total,
+                ordered=True,
+            )
+
+        if self.augmented_lagrangian is not None:
+            state_next = self._update_al_state_and_recompute(
+                problem, state_next, state.al_state, inner_state_final.accepted
+            )
 
         with jdc.copy_and_mutate(state_next) as state_next:
             if self.termination.early_termination:
-                (
-                    state_next.summary.termination_criteria,
-                    state_next.summary.termination_deltas,
-                ) = self.termination._check_convergence(
-                    sol_prev,
-                    cost_updated=state_next.solution.cost,
-                    tangent=inner_state_final.local_delta,
-                    tangent_ordering=problem.tangent_ordering,
-                    ATb=ATb,
-                    iterations=inner_state_final.iterations,
+                termination_criteria, termination_deltas = (
+                    self.termination._check_convergence(
+                        sol_prev,
+                        cost_nonconstraint_updated=state_next.solution.cost_nonconstraint,
+                        tangent=inner_state_final.local_delta * state.jacobian_scaler,
+                        tangent_ordering=problem._tangent_ordering,
+                        ATb=ATb,
+                        iterations=inner_state_final.iterations,
+                    )
                 )
+                state_next.summary.termination_criteria = termination_criteria
+                state_next.summary.termination_deltas = termination_deltas
             state_next.summary.iterations = inner_state_final.iterations
             state_next.summary.cost_history = state_next.summary.cost_history.at[
                 state_next.summary.iterations
-            ].set(state_next.solution.cost)
+            ].set(state_next.solution.cost_nonconstraint)
             state_next.summary.lambda_history = state_next.summary.lambda_history.at[
                 state_next.summary.iterations
             ].set(state_next.lambd)
         return state_next
+
+    def _update_al_state_and_recompute(
+        self,
+        problem: Any,
+        state: Any,
+        al_state_prev: Any,
+        step_accepted: Any,
+    ) -> Any:
+        assert self.augmented_lagrangian is not None
+
+        al_state_updated = update_al_state(
+            problem,
+            state.solution.vals,
+            al_state_prev,
+            self.augmented_lagrangian,
+            current_cost=state.solution.cost_total,
+            step_accepted=step_accepted,
+            verbose=self.verbose,
+        )
+
+        problem_updated = update_problem_al_params(problem, al_state_updated)
+        new_residual_info = problem_updated._compute_residual_info(
+            state.solution.vals, include_jac_cache=True
+        )
+
+        with jdc.copy_and_mutate(state) as state_updated:
+            state_updated.al_state = al_state_updated
+            state_updated.solution.cost_total = new_residual_info.cost_total
+            state_updated.solution.cost_nonconstraint = (
+                new_residual_info.cost_nonconstraint
+            )
+            state_updated.solution.residual_vector = new_residual_info.residual_vector
+            state_updated.solution.jac_cache = new_residual_info.jac_cache
+        return state_updated
 
     @staticmethod
     def _log_state(
@@ -484,7 +597,7 @@ class NonlinearSolver:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f}",
                 i=iterations,
-                cost=sol.cost,
+                cost=sol.cost_total,
                 lambd=lambd,
                 ordered=True,
             )
@@ -492,13 +605,13 @@ class NonlinearSolver:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f} inexact_tol={inexact_tol:.1e}",
                 i=iterations,
-                cost=sol.cost,
+                cost=sol.cost_total,
                 lambd=lambd,
                 inexact_tol=sol.cg_state.eta,
                 ordered=True,
             )
         residual_index = 0
-        for f, count in zip(problem.stacked_costs, problem.cost_counts):
+        for f, count in zip(problem._stacked_costs, problem._cost_counts):
             stacked_dim = count * f.residual_flat_dim
             partial_cost = jnp.sum(
                 sol.residual_vector[residual_index : residual_index + stacked_dim] ** 2
@@ -519,7 +632,7 @@ class TrustRegionConfig:
     lambda_initial: Any = 5e-4
     lambda_factor: Any = 2.0
     lambda_min: Any = 1e-5
-    lambda_max: Any = 1e10
+    lambda_max: Any = 1e6
     step_quality_min: Any = 1e-3
 
 
@@ -535,13 +648,16 @@ class TerminationConfig:
     def _check_convergence(
         self,
         sol_prev: Any,
-        cost_updated: Any,
+        cost_nonconstraint_updated: Any,
         tangent: Any,
         tangent_ordering: Any,
         ATb: Any,
         iterations: Any,
     ) -> Any:
-        cost_reldelta = jnp.abs(cost_updated - sol_prev.cost) / sol_prev.cost
+        cost_reldelta = (
+            jnp.abs(cost_nonconstraint_updated - sol_prev.cost_nonconstraint)
+            / sol_prev.cost_nonconstraint
+        )
         converged_cost = cost_reldelta < self.cost_tolerance
 
         flat_vals = jax.flatten_util.ravel_pytree(sol_prev.vals)[0]
@@ -570,5 +686,4 @@ class TerminationConfig:
                 iterations >= self.max_iterations,
             ]
         )
-
         return term_flags, jnp.array([cost_reldelta, gradient_mag, param_delta])
