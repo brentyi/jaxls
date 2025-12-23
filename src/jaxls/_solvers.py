@@ -183,35 +183,40 @@ class SolveSummary:
 
 
 @jdc.pytree_dataclass
-class _LmInnerState:
-    """State for inner LM loop that tries different lambda values."""
+class _SolutionState:
+    """State associated with a single solution point."""
 
-    lambd: float | jax.Array
-    accepted: jax.Array
-    proposed_vals: VarValues
-    proposed_residual_vector: jax.Array
-    proposed_cost: jax.Array
-    proposed_jac_cache: tuple[CustomJacobianCache, ...]
-    local_delta: jax.Array
-    linear_state: _ConjugateGradientState | None
+    vals: VarValues
+    cost: jax.Array  # This should be equal to `jnp.sum(residual_vector**2)`.
+    residual_vector: jax.Array  # Shape: (num_residuals,)
+    jac_cache: tuple[CustomJacobianCache, ...]
+    cg_state: _ConjugateGradientState | None
 
 
 @jdc.pytree_dataclass
-class _NonlinearSolverState:
-    vals: VarValues
-    cost: jax.Array
-    residual_vector: jax.Array
+class _LmInnerState:
+    """State for inner loop that tries different lambda values.
+
+    For Levenberg-Marquardt, this loop searches for a good lambda. For
+    Gauss-Newton (trust_region=None), the loop runs exactly once with lambda=0.
+    """
+
+    lambd: float | jax.Array
+    accepted: jax.Array
+    iterations: jax.Array
+    sol_proposed: _SolutionState
+    local_delta: jax.Array
+
+
+@jdc.pytree_dataclass
+class _LmOuterState:
+    """State for outer loop. Each iteration corresponds to one accepted
+    step."""
+
+    solution: _SolutionState
     summary: SolveSummary
     lambd: float | jax.Array
-
-    jac_cache: tuple[CustomJacobianCache, ...]
-    """Cache used to save intermediate values from `compute_residual_vector`
-    for use in custom Jacobians."""
-
-    cg_state: _ConjugateGradientState | None
-    """Conjugate gradient state. Not used for other solvers."""
-
-    jacobian_scaler: jax.Array | None
+    jacobian_scaler: jax.Array
 
 
 @jdc.pytree_dataclass
@@ -270,10 +275,23 @@ class NonlinearSolver:
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
 
-        state = _NonlinearSolverState(
-            vals=vals,
-            cost=initial_cost,
-            residual_vector=residual_vector,
+        state = _LmOuterState(
+            solution=_SolutionState(
+                vals=vals,
+                cost=initial_cost,
+                residual_vector=residual_vector,
+                jac_cache=jac_cache,
+                cg_state=None
+                if self.linear_solver != "conjugate_gradient"
+                else _ConjugateGradientState(
+                    ATb_norm_prev=0.0,
+                    eta=(
+                        ConjugateGradientConfig()
+                        if self.conjugate_gradient_config is None
+                        else self.conjugate_gradient_config
+                    ).tolerance_max,
+                ),
+            ),
             summary=SolveSummary(
                 iterations=jnp.array(0),
                 cost_history=cost_history,
@@ -284,42 +302,31 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
-            cg_state=None
-            if self.linear_solver != "conjugate_gradient"
-            else _ConjugateGradientState(
-                ATb_norm_prev=0.0,
-                eta=(
-                    ConjugateGradientConfig()
-                    if self.conjugate_gradient_config is None
-                    else self.conjugate_gradient_config
-                ).tolerance_max,
-            ),
-            jac_cache=jac_cache,
-            jacobian_scaler=None,
+            # Initialize to ones; will be overwritten on first iteration.
+            jacobian_scaler=jnp.ones(problem.tangent_dim),
         )
 
         # Optimization.
-        state = self.step(problem, state, first=True)
         if self.termination.early_termination:
             state = jax.lax.while_loop(
                 cond_fun=lambda state: jnp.logical_not(
                     jnp.any(state.summary.termination_criteria)
                 ),
-                body_fun=lambda state: self.step(problem, state, first=False),
+                body_fun=lambda state: self.lm_outer_step(problem, state),
                 init_val=state,
             )
         else:
             state = jax.lax.fori_loop(
-                1,  # Start from 1 since we already did one step!
+                0,
                 self.termination.max_iterations,
-                body_fun=lambda step, state: self.step(problem, state, first=False),
+                body_fun=lambda _, state: self.lm_outer_step(problem, state),
                 init_val=state,
             )
         if self.verbose:
             jax_log(
                 "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
                 i=state.summary.iterations,
-                cost=state.cost,
+                cost=state.solution.cost,
                 criteria=state.summary.termination_criteria.astype(jnp.int32),
                 cost_delta=state.summary.termination_deltas[0],
                 grad_mag=state.summary.termination_deltas[1],
@@ -327,41 +334,60 @@ class NonlinearSolver:
             )
 
         if return_summary:
-            return state.vals, state.summary
+            return state.solution.vals, state.summary
         else:
-            return state.vals
+            return state.solution.vals
 
-    def _solve_and_evaluate(
+    def lm_inner_step(
         self,
         problem: AnalyzedLeastSquaresProblem,
-        state: _NonlinearSolverState,
+        inner_state: _LmInnerState,
+        sol_prev: _SolutionState,
+        jacobian_scaler: jax.Array,
         A_blocksparse: BlockRowSparseMatrix,
         A_multiply: Callable[[jax.Array], jax.Array],
         AT_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
-        lambd: float | jax.Array,
     ) -> _LmInnerState:
-        """Solve linear system with given lambda and evaluate proposed step."""
-        linear_state: _ConjugateGradientState | None = None
+        """Levenberg-Marquardt inner step. Tries one lambda value."""
+        # Compute lambda for this iteration.
+        # - For LM: multiply previous lambda by factor (initial state is pre-divided)
+        # - For GN: keep lambda at 0
+        if self.trust_region is not None:
+            lambd = jnp.minimum(
+                inner_state.lambd * self.trust_region.lambda_factor,
+                self.trust_region.lambda_max,
+            )
+        else:
+            lambd = inner_state.lambd  # stays at 0
+
+        iterations = inner_state.iterations + 1
+
+        # Log optimizer state for debugging.
+        if self.verbose:
+            self._log_state(problem, sol_prev, iterations, lambd)
+
+        # Solve the linear system.
+        cg_state: _ConjugateGradientState | None = None
         if (
             isinstance(self.linear_solver, ConjugateGradientConfig)
             or self.linear_solver == "conjugate_gradient"
         ):
-            # Use default CG config is specified as a string, otherwise use the provided config.
+            # Use default CG config if specified as a string, otherwise use the provided config.
             cg_config = (
                 ConjugateGradientConfig()
                 if self.linear_solver == "conjugate_gradient"
                 else self.linear_solver
             )
-            assert isinstance(state.cg_state, _ConjugateGradientState)
-            local_delta, linear_state = cg_config._solve(
+            assert isinstance(sol_prev.cg_state, _ConjugateGradientState)
+            local_delta, cg_state = cg_config._solve(
                 problem,
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
                 lambda vec: AT_multiply(A_multiply(vec)) + lambd * vec,
                 ATb=ATb,
-                prev_linear_state=state.cg_state,
+                prev_linear_state=sol_prev.cg_state,
             )
         elif self.linear_solver == "cholmod":
             # Use CHOLMOD for direct solve.
@@ -386,10 +412,8 @@ class NonlinearSolver:
         else:
             assert_never(self.linear_solver)
 
-        assert state.jacobian_scaler is not None
-        scaled_local_delta = local_delta * state.jacobian_scaler
-
-        proposed_vals = state.vals._retract(
+        scaled_local_delta = local_delta * jacobian_scaler
+        proposed_vals = sol_prev.vals._retract(
             scaled_local_delta, problem.tangent_ordering
         )
         proposed_residual_vector, proposed_jac_cache = problem.compute_residual_vector(
@@ -397,51 +421,57 @@ class NonlinearSolver:
         )
         proposed_cost = jnp.sum(proposed_residual_vector**2)
 
-        # Compute step quality and acceptance for LM.
-        step_quality = (proposed_cost - state.cost) / (
-            jnp.sum(
-                (A_blocksparse.multiply(scaled_local_delta) + state.residual_vector)
-                ** 2
+        # Compute step quality and acceptance.
+        # - For LM: accept if step quality meets threshold
+        # - For GN: always accept
+        if self.trust_region is not None:
+            step_quality = (proposed_cost - sol_prev.cost) / (
+                jnp.sum(
+                    (
+                        A_blocksparse.multiply(scaled_local_delta)
+                        + sol_prev.residual_vector
+                    )
+                    ** 2
+                )
+                - sol_prev.cost
             )
-            - state.cost
-        )
-        accepted: jax.Array = (
-            step_quality >= self.trust_region.step_quality_min
-            if self.trust_region is not None
-            else jnp.array(True)
-        )
+            accepted = step_quality >= self.trust_region.step_quality_min
+        else:
+            accepted = jnp.array(True)
 
         return _LmInnerState(
             lambd=lambd,
             accepted=accepted,
-            proposed_vals=proposed_vals,
-            proposed_residual_vector=proposed_residual_vector,
-            proposed_cost=proposed_cost,
-            proposed_jac_cache=proposed_jac_cache,
+            iterations=iterations,
+            sol_proposed=_SolutionState(
+                vals=proposed_vals,
+                cost=proposed_cost,
+                residual_vector=proposed_residual_vector,
+                jac_cache=proposed_jac_cache,
+                cg_state=cg_state,
+            ),
             local_delta=local_delta,
-            linear_state=linear_state,
         )
 
-    def step(
+    def lm_outer_step(
         self,
         problem: AnalyzedLeastSquaresProblem,
-        state: _NonlinearSolverState,
-        first: bool,
-    ) -> _NonlinearSolverState:
-        # Log optimizer state for debugging.
-        if self.verbose:
-            self._log_state(problem, state)
+        state: _LmOuterState,
+    ) -> _LmOuterState:
+        """Levenberg-Marquardt outer step. Each outer step applies one parameter update."""
+        sol_prev = state.solution
 
         # Get nonzero values of Jacobian.
-        A_blocksparse = problem._compute_jac_values(state.vals, state.jac_cache)
+        A_blocksparse = problem._compute_jac_values(sol_prev.vals, sol_prev.jac_cache)
 
-        # Compute Jacobian scaler.
-        if first:
-            with jdc.copy_and_mutate(state, validate=False) as state:
-                state.jacobian_scaler = (
-                    1.0 / (1.0 + A_blocksparse.compute_column_norms()) * 0.0 + 1.0
-                )
-        assert state.jacobian_scaler is not None
+        # Compute Jacobian scaler on first iteration only. We use jnp.where to
+        # avoid double JIT compilation (one trace for first=True, one for first=False).
+        with jdc.copy_and_mutate(state, validate=False) as state:
+            state.jacobian_scaler = jnp.where(
+                state.summary.iterations == 0,
+                1.0 / (1.0 + A_blocksparse.compute_column_norms()) + 1.0,
+                state.jacobian_scaler,
+            )
         A_blocksparse = A_blocksparse.scale_columns(state.jacobian_scaler)
 
         # Get flattened version for COO/CSR matrices.
@@ -480,88 +510,69 @@ class NonlinearSolver:
             assert_never(self.sparse_mode)
 
         # Compute right-hand side of normal equation.
-        ATb = -AT_multiply(state.residual_vector)
+        ATb = -AT_multiply(sol_prev.residual_vector)
 
-        # Always accept Gauss-Newton steps.
-        if self.trust_region is None:
-            result = self._solve_and_evaluate(
-                problem, state, A_blocksparse, A_multiply, AT_multiply, ATb, 0.0
-            )
-
-            with jdc.copy_and_mutate(state) as state_next:
-                if result.linear_state is not None:
-                    state_next.cg_state = result.linear_state
-
-                state_next.vals = result.proposed_vals
-                state_next.residual_vector = result.proposed_residual_vector
-                state_next.cost = result.proposed_cost
-                state_next.jac_cache = result.proposed_jac_cache
-
-            local_delta = result.local_delta
-            accept_flag = None
-
-        # For Levenberg-Marquardt, use inner loop to try different lambdas.
+        # Inner loop: search for a good lambda value.
+        #
+        # For Levenberg-Marquardt, we try increasing lambdas until the step is
+        # accepted or lambda is maxed out. For Gauss-Newton (trust_region=None),
+        # lambda stays at 0 and the step is always accepted, so the loop runs
+        # exactly once.
+        #
+        # We use the "pre-divide" trick: initialize with lambd/factor so that
+        # the first multiplication in _lm_inner_step gives us the correct starting
+        # lambda. For GN, lambda starts and stays at 0.
+        if self.trust_region is not None:
+            init_lambd = state.lambd / self.trust_region.lambda_factor
+            lambda_max = self.trust_region.lambda_max
         else:
-            trust_region = self.trust_region
+            init_lambd = jnp.zeros(())
+            lambda_max = jnp.inf
 
-            def lm_inner_step(inner_state: _LmInnerState) -> _LmInnerState:
-                """Try next lambda value."""
-                lambd_next = jnp.minimum(
-                    inner_state.lambd * trust_region.lambda_factor,
-                    trust_region.lambda_max,
-                )
-                return self._solve_and_evaluate(
-                    problem,
-                    state,
-                    A_blocksparse,
-                    A_multiply,
-                    AT_multiply,
-                    ATb,
-                    lambd_next,
-                )
+        init_inner_state = _LmInnerState(
+            lambd=init_lambd,
+            accepted=jnp.array(False),
+            iterations=state.summary.iterations,
+            # Dummy values - will be overwritten by first _lm_inner_step call.
+            sol_proposed=sol_prev,
+            local_delta=jnp.zeros_like(ATb),
+        )
+        inner_state_final = jax.lax.while_loop(
+            cond_fun=lambda s: (
+                ~s.accepted
+                & (s.lambd < lambda_max)
+                & (s.iterations < self.termination.max_iterations)
+            ),
+            body_fun=lambda s: self.lm_inner_step(
+                problem,
+                s,
+                sol_prev,
+                state.jacobian_scaler,
+                A_blocksparse,
+                A_multiply,
+                AT_multiply,
+                ATb,
+            ),
+            init_val=init_inner_state,
+        )
 
-            # Inner loop: keep trying larger lambdas until accepted or lambda maxed out.
-            inner_state_final = jax.lax.while_loop(
-                cond_fun=lambda s: jnp.logical_and(
-                    ~s.accepted,
-                    s.lambd < trust_region.lambda_max,
-                ),
-                body_fun=lm_inner_step,
-                init_val=self._solve_and_evaluate(
-                    problem,
-                    state,
-                    A_blocksparse,
-                    A_multiply,
-                    AT_multiply,
-                    ATb,
-                    state.lambd,
-                ),
-            )
-
-            local_delta = inner_state_final.local_delta
-            accept_flag = inner_state_final.accepted
-
-            # Decrease lambda if step was good.
+        # For LM, decrease lambda if step was good.
+        if self.trust_region is not None:
             lambd_next = jnp.maximum(
-                trust_region.lambda_min,
+                self.trust_region.lambda_min,
                 jnp.where(
-                    accept_flag,
-                    inner_state_final.lambd / trust_region.lambda_factor,
+                    inner_state_final.accepted,
+                    inner_state_final.lambd / self.trust_region.lambda_factor,
                     inner_state_final.lambd,
                 ),
             )
+        else:
+            lambd_next = inner_state_final.lambd  # stays at 0
 
-            # Build next state - always accept the proposed step from inner loop.
-            # If lambda maxed out, convergence criteria will detect no progress.
-            with jdc.copy_and_mutate(state) as state_next:
-                if inner_state_final.linear_state is not None:
-                    state_next.cg_state = inner_state_final.linear_state
-
-                state_next.vals = inner_state_final.proposed_vals
-                state_next.residual_vector = inner_state_final.proposed_residual_vector
-                state_next.cost = inner_state_final.proposed_cost
-                state_next.jac_cache = inner_state_final.proposed_jac_cache
-                state_next.lambd = lambd_next
+        # Build next state from inner loop result.
+        with jdc.copy_and_mutate(state) as state_next:
+            state_next.solution = inner_state_final.sol_proposed
+            state_next.lambd = lambd_next
 
         # Update termination criteria + summary.
         with jdc.copy_and_mutate(state_next) as state_next:
@@ -570,17 +581,17 @@ class NonlinearSolver:
                     state_next.summary.termination_criteria,
                     state_next.summary.termination_deltas,
                 ) = self.termination._check_convergence(
-                    state,
-                    cost_updated=state_next.cost,
-                    tangent=local_delta,
+                    sol_prev,
+                    cost_updated=state_next.solution.cost,
+                    tangent=inner_state_final.local_delta,
                     tangent_ordering=problem.tangent_ordering,
                     ATb=ATb,
-                    accept_flag=accept_flag,
+                    iterations=inner_state_final.iterations,
                 )
-            state_next.summary.iterations += 1
+            state_next.summary.iterations = inner_state_final.iterations
             state_next.summary.cost_history = state_next.summary.cost_history.at[
                 state_next.summary.iterations
-            ].set(state_next.cost)
+            ].set(state_next.solution.cost)
             state_next.summary.lambda_history = state_next.summary.lambda_history.at[
                 state_next.summary.iterations
             ].set(state_next.lambd)
@@ -588,37 +599,33 @@ class NonlinearSolver:
 
     @staticmethod
     def _log_state(
-        problem: AnalyzedLeastSquaresProblem, state: _NonlinearSolverState
+        problem: AnalyzedLeastSquaresProblem,
+        sol: _SolutionState,
+        iterations: jax.Array,
+        lambd: float | jax.Array,
     ) -> None:
-        if state.cg_state is None:
+        if sol.cg_state is None:
             jax_log(
-                " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
-                i=state.summary.iterations,
-                cost=state.cost,
-                lambd=state.lambd,
-                cost_delta=state.summary.termination_deltas[0],
-                grad_mag=state.summary.termination_deltas[1],
-                param_delta=state.summary.termination_deltas[2],
+                " step #{i}: cost={cost:.4f} lambd={lambd:.4f}",
+                i=iterations,
+                cost=sol.cost,
+                lambd=lambd,
                 ordered=True,
             )
         else:
             jax_log(
-                " step #{i}: cost={cost:.4f} lambd={lambd:.4f} term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e} inexact_tol={inexact_tol:.1e}",
-                i=state.summary.iterations,
-                cost=state.cost,
-                lambd=state.lambd,
-                cost_delta=state.summary.termination_deltas[0],
-                grad_mag=state.summary.termination_deltas[1],
-                param_delta=state.summary.termination_deltas[2],
-                inexact_tol=state.cg_state.eta,
+                " step #{i}: cost={cost:.4f} lambd={lambd:.4f} inexact_tol={inexact_tol:.1e}",
+                i=iterations,
+                cost=sol.cost,
+                lambd=lambd,
+                inexact_tol=sol.cg_state.eta,
                 ordered=True,
             )
         residual_index = 0
         for f, count in zip(problem.stacked_costs, problem.cost_counts):
             stacked_dim = count * f.residual_flat_dim
             partial_cost = jnp.sum(
-                state.residual_vector[residual_index : residual_index + stacked_dim]
-                ** 2
+                sol.residual_vector[residual_index : residual_index + stacked_dim] ** 2
             )
             residual_index += stacked_dim
             jax_log(
@@ -670,30 +677,29 @@ class TerminationConfig:
 
     def _check_convergence(
         self,
-        state_prev: _NonlinearSolverState,
+        sol_prev: _SolutionState,
         cost_updated: jax.Array,
         tangent: jax.Array,
         tangent_ordering: VarTypeOrdering,
         ATb: jax.Array,
-        accept_flag: jax.Array | None = None,
+        iterations: jax.Array,
     ) -> tuple[jax.Array, jax.Array]:
         """Check for convergence!"""
 
         # Cost tolerance.
-        cost_absdelta = jnp.abs(cost_updated - state_prev.cost)
-        cost_reldelta = cost_absdelta / state_prev.cost
+        cost_reldelta = jnp.abs(cost_updated - sol_prev.cost) / sol_prev.cost
         converged_cost = cost_reldelta < self.cost_tolerance
 
         # Gradient tolerance.
-        flat_vals = jax.flatten_util.ravel_pytree(state_prev.vals)[0]
+        flat_vals = jax.flatten_util.ravel_pytree(sol_prev.vals)[0]
         gradient_mag = jnp.max(
             flat_vals
             - jax.flatten_util.ravel_pytree(
-                state_prev.vals._retract(ATb, tangent_ordering)
+                sol_prev.vals._retract(ATb, tangent_ordering)
             )[0]
         )
         converged_gradient = jnp.where(
-            state_prev.summary.iterations >= self.gradient_tolerance_start_step,
+            iterations >= self.gradient_tolerance_start_step,
             gradient_mag < self.gradient_tolerance,
             False,
         )
@@ -710,18 +716,8 @@ class TerminationConfig:
                 converged_cost,
                 converged_gradient,
                 converged_parameters,
-                state_prev.summary.iterations >= (self.max_iterations - 1),
+                iterations >= self.max_iterations,
             ]
         )
-
-        # Only consider the first three conditions if steps are accepted.
-        if accept_flag is not None:
-            term_flags = term_flags.at[:3].set(
-                jnp.logical_and(
-                    term_flags[:3],
-                    # We ignore accept_flag if the cost _actually_ didn't change at all.
-                    jnp.logical_or(accept_flag, cost_absdelta == 0.0),
-                )
-            )
 
         return term_flags, jnp.array([cost_reldelta, gradient_mag, param_delta])
