@@ -1,0 +1,885 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../../genindex/"><link rel="search" title="Search" href="../../../search/"><link rel="next" title="Custom Jacobians" href="../custom_jacobians/"><link rel="prev" title="Advanced" href="../">
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
+        <title>Non-Euclidean variables - jaxls</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=6517d2d4" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-code-background: #f4f4f4;
+  --color-code-foreground: #000;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../"><div class="brand">jaxls</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a
+  class="sidebar-brand"
+  href="../../../"
+  style="margin-top: 0.75em"
+>
+  
+  <span class="sidebar-brand-text">jaxls</span>
+
+  
+</a>
+
+<div style="text-align: left; padding: 0 1em 1em 1em">
+  <a href="https://github.com/brentyi/jaxls">
+    <img src="https://img.shields.io/github/stars/brentyi/jaxls?style=social" alt="GitHub stars">
+  </a>
+</div><form class="sidebar-search-container" method="get" action="../../../search/" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tips_and_gotchas/">Tips and Gotchas</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../">Advanced</a><input aria-label="Toggle navigation of Advanced" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_jacobians/">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robust_costs/">Robust costs</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/mechanics/">Mechanics</a><input aria-label="Toggle navigation of Mechanics" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/spring_equilibrium/">Spring Equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/cloth_simulation/">Cloth Simulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/beam_bending/">Beam Bending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/truss_analysis/">Truss Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/vision/">Perception</a><input aria-label="Toggle navigation of Perception" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/robotics/">Robotics</a><input aria-label="Toggle navigation of Robotics" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/inverse_kinematics/">Inverse Kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/obstacle_avoidance/">Obstacle Avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/cart_pole_collocation/">Cart-Pole (Collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/cart_pole_shooting/">Cart-Pole (Shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/portfolio/">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/mean_variance/">Mean-Variance Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/manifold_allocation/">Manifold Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/reparameterized_allocation/">Reparameterized Allocation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/core/">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie Group Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver Configuration</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../../_sources/guide/advanced/non_euclidean.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="non-euclidean-variables">
+<h1>Non-Euclidean variables<a class="headerlink" href="#non-euclidean-variables" title="Link to this heading">¶</a></h1>
+<p>Many variables in optimization live on curved spaces (manifolds) rather than flat Euclidean space. Common examples include:</p>
+<ul class="simple">
+<li><p>Rotations: SO(2), SO(3), quaternions</p></li>
+<li><p>Rigid transformations: SE(2), SE(3)</p></li>
+<li><p>Unit vectors: points on spheres</p></li>
+<li><p>Probability simplices: points that sum to 1</p></li>
+<li><p>Low-rank matrices, positive-definite matrices, etc.</p></li>
+</ul>
+<p>Naive Euclidean optimization of these variables often fails because it ignores geometric constraints like unit norms or orthogonality.</p>
+<p>jaxls supports manifold optimization through custom <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code> and <code class="docutils literal notranslate"><span class="pre">tangent_dim</span></code> on variables. This example demonstrates the approach using rotation averaging on SO(3).</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/lie_group_variables/#jaxls.SO3Var" title="jaxls.SO3Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">SO3Var</span></code></a> for SO(3) rotation variables</p></li>
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a> with custom <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code> and <code class="docutils literal notranslate"><span class="pre">tangent_dim</span></code> for manifold variables</p></li>
+</ul>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jaxlie</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jaxls</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="the-problem-with-euclidean-parameterization">
+<h2>The problem with Euclidean parameterization<a class="headerlink" href="#the-problem-with-euclidean-parameterization" title="Link to this heading">¶</a></h2>
+<p>Rotations in 3D form a curved manifold called SO(3). Naive Euclidean approaches fail because quaternions must have unit norm, but averaging quaternion components produces non-unit results that require renormalization – losing the geometric structure of the problem.</p>
+<p>Let’s generate some noisy rotation measurements around a ground truth:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ground truth rotation (45 degrees around a diagonal axis).</span>
+<span class="n">ground_truth</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
+
+<span class="c1"># Generate noisy measurements by perturbing with small random rotations.</span>
+<span class="n">num_measurements</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">noise_std</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># Radians.</span>
+
+<span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">noise_tangents</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="n">num_measurements</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span> <span class="o">*</span> <span class="n">noise_std</span>
+
+<span class="c1"># Apply noise: measurement = ground_truth @ exp(noise).</span>
+<span class="n">measurements</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">delta</span><span class="p">:</span> <span class="n">ground_truth</span> <span class="o">@</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">delta</span><span class="p">))(</span>
+    <span class="n">noise_tangents</span>
+<span class="p">)</span>
+
+<span class="c1"># Simulate antipodal ambiguity: negate half of the quaternions.</span>
+<span class="c1"># (q and -q represent the same rotation, but naive averaging doesn&#39;t know this)</span>
+<span class="c1"># When half are negated, they nearly cancel out!</span>
+<span class="n">flip_mask</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">num_measurements</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_measurements</span> <span class="o">//</span> <span class="mi">2</span>
+<span class="n">flipped_wxyz</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">flip_mask</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="o">-</span><span class="n">measurements</span><span class="o">.</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">measurements</span><span class="o">.</span><span class="n">wxyz</span><span class="p">)</span>
+<span class="n">measurements_flipped</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">(</span><span class="n">wxyz</span><span class="o">=</span><span class="n">flipped_wxyz</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ground truth quaternion: </span><span class="si">{</span><span class="n">ground_truth</span><span class="o">.</span><span class="n">wxyz</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated </span><span class="si">{</span><span class="n">num_measurements</span><span class="si">}</span><span class="s2"> noisy measurements&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Negated </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">flip_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span><span class="si">}</span><span class="s2"> quaternions to simulate antipodal ambiguity&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Ground truth quaternion: [0.9381483  0.14689447 0.1958593  0.24482411]
+Generated 10 noisy measurements
+Negated 5 quaternions to simulate antipodal ambiguity
+</pre></div>
+</div>
+</div>
+</div>
+<section id="naive-euclidean-averaging-fails">
+<h3>Naive Euclidean averaging (fails)<a class="headerlink" href="#naive-euclidean-averaging-fails" title="Link to this heading">¶</a></h3>
+<p>A common mistake is to average quaternion components directly:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Average the quaternion components (wrong!).</span>
+<span class="c1"># This fails badly when quaternions have mixed signs due to antipodal ambiguity.</span>
+<span class="n">avg_quaternion</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">measurements_flipped</span><span class="o">.</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Averaged quaternion: </span><span class="si">{</span><span class="n">avg_quaternion</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Quaternion norm: </span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">avg_quaternion</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> (should be 1.0)&quot;</span><span class="p">)</span>
+
+<span class="c1"># Even if we renormalize, this approach is geometrically incorrect.</span>
+<span class="n">renormalized</span> <span class="o">=</span> <span class="n">avg_quaternion</span> <span class="o">/</span> <span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">avg_quaternion</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1e-8</span><span class="p">)</span>
+<span class="n">naive_result</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">(</span><span class="n">wxyz</span><span class="o">=</span><span class="n">renormalized</span><span class="p">)</span>
+
+<span class="c1"># Compute geodesic error (rotation angle between result and ground truth).</span>
+<span class="n">naive_error</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">((</span><span class="n">naive_result</span><span class="o">.</span><span class="n">inverse</span><span class="p">()</span> <span class="o">@</span> <span class="n">ground_truth</span><span class="p">)</span><span class="o">.</span><span class="n">log</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Naive approach geodesic error: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">naive_error</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> rad (</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">naive_error</span><span class="p">))</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> deg)&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Averaged quaternion: [ 0.00473162 -0.01714533 -0.00761085 -0.00510501]
+Quaternion norm: 0.0200 (should be 1.0)
+
+Naive approach geodesic error: 3.0596 rad (175.30 deg)
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="manifold-optimization">
+<h2>Manifold optimization<a class="headerlink" href="#manifold-optimization" title="Link to this heading">¶</a></h2>
+<p>The standard approach is to optimize on the manifold using:</p>
+<ol class="arabic simple">
+<li><p><strong>Tangent space</strong>: At each point on the manifold, there’s a local linear approximation (the tangent space). For SO(3), this is the 3D space of axis-angle vectors (the Lie algebra <span class="math notranslate nohighlight">\(\mathfrak{so}(3)\)</span>).</p></li>
+<li><p><strong>Retraction</strong>: A function that maps from the tangent space back to the manifold. For SO(3), this is the exponential map:
+$<span class="math notranslate nohighlight">\(R_{\text{new}} = R_{\text{current}} \cdot \exp(\delta)\)</span><span class="math notranslate nohighlight">\(
+where \)</span>\delta \in \mathbb{R}^3$ is an axis-angle perturbation.</p></li>
+</ol>
+<p>The solver optimizes in the tangent space (which is Euclidean), then uses retraction to update the manifold variable.</p>
+</section>
+<section id="using-so3var">
+<h2>Using SO3Var<a class="headerlink" href="#using-so3var" title="Link to this heading">¶</a></h2>
+<p>jaxls provides built-in Lie group variables through <code class="docutils literal notranslate"><span class="pre">jaxlie</span></code>. The <a class="reference internal" href="../../../api/lie_group_variables/#jaxls.SO3Var" title="jaxls.SO3Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">SO3Var</span></code></a> class handles manifold optimization automatically:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># SO3Var is defined as:</span>
+<span class="c1"># class SO3Var(</span>
+<span class="c1">#     Var[jaxlie.SO3],</span>
+<span class="c1">#     default_factory=jaxlie.SO3.identity,</span>
+<span class="c1">#     retract_fn=jaxlie.manifold.rplus,  # R_new = R_old @ exp(delta).</span>
+<span class="c1">#     tangent_dim=3,  # SO(3) has 3 degrees of freedom.</span>
+<span class="c1"># ): ...</span>
+
+<span class="n">rotation_var</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SO3Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SO3Var tangent dimension: </span><span class="si">{</span><span class="n">jaxls</span><span class="o">.</span><span class="n">SO3Var</span><span class="o">.</span><span class="n">tangent_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>SO3Var tangent dimension: 3
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="rotation-averaging-cost">
+<h2>Rotation averaging cost<a class="headerlink" href="#rotation-averaging-cost" title="Link to this heading">¶</a></h2>
+<p>For rotation averaging, we minimize the sum of squared geodesic distances to each measurement. The geodesic distance on SO(3) is the angle of rotation between two orientations:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[d(R, R_i) = \|\log(R^{-1} R_i)\|\]</div>
+</div>
+<p>The log map returns a 3D axis-angle vector whose norm is the rotation angle.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">rotation_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SO3Var</span><span class="p">,</span>
+    <span class="n">measurement</span><span class="p">:</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Penalize deviation from measurement using geodesic distance.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vals: Current variable values.</span>
+<span class="sd">        var: The rotation variable to optimize.</span>
+<span class="sd">        measurement: Target rotation measurement.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        3D residual vector (axis-angle difference).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">R</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="c1"># Geodesic error: log(R^{-1} @ measurement).</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">R</span><span class="o">.</span><span class="n">inverse</span><span class="p">()</span> <span class="o">@</span> <span class="n">measurement</span><span class="p">)</span><span class="o">.</span><span class="n">log</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="solving-with-manifold-optimization">
+<h2>Solving with manifold optimization<a class="headerlink" href="#solving-with-manifold-optimization" title="Link to this heading">¶</a></h2>
+<p>Create costs for each measurement and solve:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create batched costs for all measurements.</span>
+<span class="c1"># Note: we use the original measurements (with consistent quaternion signs).</span>
+<span class="c1"># The manifold approach works correctly regardless of quaternion sign.</span>
+<span class="n">costs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">rotation_cost</span><span class="p">(</span>
+        <span class="n">jaxls</span><span class="o">.</span><span class="n">SO3Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_measurements</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">)),</span>
+        <span class="n">measurements</span><span class="p">,</span>  <span class="c1"># Original measurements work fine.</span>
+    <span class="p">)</span>
+<span class="p">]</span>
+
+<span class="c1"># Start from identity rotation.</span>
+<span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">rotation_var</span><span class="p">])</span>
+
+<span class="c1"># Build and solve.</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">rotation_var</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+<span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 10 terms and 1 variables: 10 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 10 costs, 1 variables each: rotation_cost
+<span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=5.6207 lambd=0.0005 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - rotation_cost(10): 5.62067 (avg 0.18736)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.08e+00 cost_prev=5.6207 cost_new=0.2267
+<span class=" -Color -Color-Bold">INFO    </span> |  step #2: cost=0.2267 lambd=0.0003 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - rotation_cost(10): 0.22673 (avg 0.00756)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.78e-02 cost_prev=0.2267 cost_new=0.2267
+<span class=" -Color -Color-Bold">INFO    </span> |  step #3: cost=0.2267 lambd=0.0001 inexact_tol=8.4e-06
+<span class=" -Color -Color-Bold">INFO    </span> |      - rotation_cost(10): 0.22668 (avg 0.00756)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=8.53e-05 cost_prev=0.2267 cost_new=0.2267
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #3: cost=0.2267 criteria=[1 0 0 0], term_deltas=2.6e-07,1.5e-05,6.9e-06
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Extract result and compute error.</span>
+<span class="n">manifold_result</span> <span class="o">=</span> <span class="n">solution</span><span class="p">[</span><span class="n">rotation_var</span><span class="p">]</span>
+<span class="n">manifold_error</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">((</span><span class="n">manifold_result</span><span class="o">.</span><span class="n">inverse</span><span class="p">()</span> <span class="o">@</span> <span class="n">ground_truth</span><span class="p">)</span><span class="o">.</span><span class="n">log</span><span class="p">())</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ground truth quaternion:  </span><span class="si">{</span><span class="n">ground_truth</span><span class="o">.</span><span class="n">wxyz</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Manifold result quaternion: </span><span class="si">{</span><span class="n">manifold_result</span><span class="o">.</span><span class="n">wxyz</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Manifold approach geodesic error: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">manifold_error</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> rad (</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">manifold_error</span><span class="p">))</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> deg)&quot;</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Naive approach geodesic error:    </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">naive_error</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> rad (</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">naive_error</span><span class="p">))</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> deg)&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Ground truth quaternion:  [0.9381483  0.14689447 0.1958593  0.24482411]
+Manifold result quaternion: [0.93323416 0.13931717 0.20464188 0.26035807]
+
+Manifold approach geodesic error: 0.0400 rad (2.29 deg)
+Naive approach geodesic error:    3.0596 rad (175.30 deg)
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="defining-custom-manifold-variables">
+<h2>Defining custom manifold variables<a class="headerlink" href="#defining-custom-manifold-variables" title="Link to this heading">¶</a></h2>
+<p>To create your own manifold variable, subclass <a class="reference internal" href="../../../api/core/#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a> with:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">default_factory</span></code>: A callable returning the default value</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">retract_fn</span></code>: A function <code class="docutils literal notranslate"><span class="pre">(current_value,</span> <span class="pre">tangent_delta)</span> <span class="pre">-&gt;</span> <span class="pre">new_value</span></code> that applies a tangent space update</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tangent_dim</span></code>: The dimension of the local tangent space</p></li>
+</ul>
+<p>Here’s how SO3Var is implemented (you can define similar variables for other manifolds):</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Custom SO(3) variable (equivalent to jaxls.SO3Var).</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CustomSO3Var</span><span class="p">(</span>
+    <span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">],</span>
+    <span class="n">default_factory</span><span class="o">=</span><span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="o">.</span><span class="n">identity</span><span class="p">,</span>
+    <span class="n">retract_fn</span><span class="o">=</span><span class="n">jaxlie</span><span class="o">.</span><span class="n">manifold</span><span class="o">.</span><span class="n">rplus</span><span class="p">,</span>  <span class="c1"># rplus(R, delta) = R @ SO3.exp(delta).</span>
+    <span class="n">tangent_dim</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom SO(3) rotation variable.&quot;&quot;&quot;</span>
+
+
+<span class="c1"># Example: Unit sphere manifold (S^2).</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sphere_retract</span><span class="p">(</span><span class="n">point</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">delta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Retract from tangent plane back to sphere.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        point: Current point on unit sphere (3,).</span>
+<span class="sd">        delta: Tangent vector in local coordinates (2,).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        New point on unit sphere (3,).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Build orthonormal basis for tangent plane.</span>
+    <span class="c1"># Choose a vector not parallel to point.</span>
+    <span class="n">aux</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+        <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.9</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+    <span class="p">)</span>
+    <span class="n">e1</span> <span class="o">=</span> <span class="n">aux</span> <span class="o">-</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">aux</span><span class="p">,</span> <span class="n">point</span><span class="p">)</span> <span class="o">*</span> <span class="n">point</span>
+    <span class="n">e1</span> <span class="o">=</span> <span class="n">e1</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">e1</span><span class="p">)</span>
+    <span class="n">e2</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">e1</span><span class="p">)</span>
+
+    <span class="c1"># Move in tangent plane and project back to sphere.</span>
+    <span class="n">new_point</span> <span class="o">=</span> <span class="n">point</span> <span class="o">+</span> <span class="n">delta</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">e1</span> <span class="o">+</span> <span class="n">delta</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">e2</span>
+    <span class="k">return</span> <span class="n">new_point</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">new_point</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UnitSphereVar</span><span class="p">(</span>
+    <span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span>
+    <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]),</span>
+    <span class="n">retract_fn</span><span class="o">=</span><span class="n">sphere_retract</span><span class="p">,</span>
+    <span class="n">tangent_dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># Sphere is 2D manifold embedded in 3D.</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Point on the unit sphere S^2.&quot;&quot;&quot;</span>
+
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CustomSO3Var tangent_dim: </span><span class="si">{</span><span class="n">CustomSO3Var</span><span class="o">.</span><span class="n">tangent_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;UnitSphereVar tangent_dim: </span><span class="si">{</span><span class="n">UnitSphereVar</span><span class="o">.</span><span class="n">tangent_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>CustomSO3Var tangent_dim: 3
+UnitSphereVar tangent_dim: 2
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="visualization">
+<h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading">¶</a></h2>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">rotation_to_axes</span><span class="p">(</span>
+    <span class="n">R</span><span class="p">:</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get axis endpoints for visualizing a rotation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        R: Rotation to visualize.</span>
+<span class="sd">        origin: Origin point (3,).</span>
+<span class="sd">        scale: Length of axes.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of (x_axis, y_axis, z_axis) endpoints.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix</span> <span class="o">=</span> <span class="n">R</span><span class="o">.</span><span class="n">as_matrix</span><span class="p">()</span>
+    <span class="n">x_end</span> <span class="o">=</span> <span class="n">origin</span> <span class="o">+</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">matrix</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">y_end</span> <span class="o">=</span> <span class="n">origin</span> <span class="o">+</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">matrix</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">z_end</span> <span class="o">=</span> <span class="n">origin</span> <span class="o">+</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">matrix</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">x_end</span><span class="p">,</span> <span class="n">y_end</span><span class="p">,</span> <span class="n">z_end</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">add_frame_traces</span><span class="p">(</span>
+    <span class="n">fig</span><span class="p">:</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">,</span> <span class="n">R</span><span class="p">:</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">opacity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add coordinate frame visualization to figure.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        fig: Plotly figure to add traces to.</span>
+<span class="sd">        R: Rotation defining the frame orientation.</span>
+<span class="sd">        origin: Origin of the frame (3,).</span>
+<span class="sd">        name: Name prefix for legend.</span>
+<span class="sd">        opacity: Trace opacity.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">x_end</span><span class="p">,</span> <span class="n">y_end</span><span class="p">,</span> <span class="n">z_end</span> <span class="o">=</span> <span class="n">rotation_to_axes</span><span class="p">(</span><span class="n">R</span><span class="p">,</span> <span class="n">origin</span><span class="p">)</span>
+    <span class="n">colors</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="s2">&quot;blue&quot;</span><span class="p">]</span>
+    <span class="n">ends</span> <span class="o">=</span> <span class="p">[</span><span class="n">x_end</span><span class="p">,</span> <span class="n">y_end</span><span class="p">,</span> <span class="n">z_end</span><span class="p">]</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="s2">&quot;Y&quot;</span><span class="p">,</span> <span class="s2">&quot;Z&quot;</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">end</span><span class="p">,</span> <span class="n">color</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">colors</span><span class="p">,</span> <span class="n">labels</span><span class="p">):</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+            <span class="n">go</span><span class="o">.</span><span class="n">Scatter3d</span><span class="p">(</span>
+                <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">origin</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">end</span><span class="p">[</span><span class="mi">0</span><span class="p">])],</span>
+                <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">origin</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">end</span><span class="p">[</span><span class="mi">1</span><span class="p">])],</span>
+                <span class="n">z</span><span class="o">=</span><span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">end</span><span class="p">[</span><span class="mi">2</span><span class="p">])],</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+                <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">4</span> <span class="k">if</span> <span class="n">opacity</span> <span class="o">==</span> <span class="mf">1.0</span> <span class="k">else</span> <span class="mi">2</span><span class="p">),</span>
+                <span class="n">opacity</span><span class="o">=</span><span class="n">opacity</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">opacity</span> <span class="o">==</span> <span class="mf">1.0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">showlegend</span><span class="o">=</span><span class="p">(</span><span class="n">opacity</span> <span class="o">==</span> <span class="mf">1.0</span> <span class="ow">and</span> <span class="n">label</span> <span class="o">==</span> <span class="s2">&quot;X&quot;</span><span class="p">),</span>
+                <span class="n">legendgroup</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">hoverinfo</span><span class="o">=</span><span class="s2">&quot;skip&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">()</span>
+
+<span class="c1"># Add measurement frames (faded).</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_measurements</span><span class="p">):</span>
+    <span class="n">R_meas</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO3</span><span class="p">(</span><span class="n">wxyz</span><span class="o">=</span><span class="n">measurements</span><span class="o">.</span><span class="n">wxyz</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">add_frame_traces</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">R_meas</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Meas </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+
+<span class="c1"># Add ground truth (thick lines).</span>
+<span class="n">add_frame_traces</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">ground_truth</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="s2">&quot;Ground Truth&quot;</span><span class="p">)</span>
+
+<span class="c1"># Add manifold result (offset for visibility).</span>
+<span class="n">offset</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">add_frame_traces</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">manifold_result</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="s2">&quot;Manifold Result&quot;</span><span class="p">)</span>
+
+<span class="c1"># Add naive result.</span>
+<span class="n">offset2</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.6</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">add_frame_traces</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">naive_result</span><span class="p">,</span> <span class="n">offset2</span><span class="p">,</span> <span class="s2">&quot;Naive Result&quot;</span><span class="p">)</span>
+
+<span class="c1"># Add labels.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter3d</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">1.6</span><span class="p">],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="n">z</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.15</span><span class="p">],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;text&quot;</span><span class="p">,</span>
+        <span class="n">text</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Ground Truth&quot;</span><span class="p">,</span> <span class="s2">&quot;Manifold&quot;</span><span class="p">,</span> <span class="s2">&quot;Naive&quot;</span><span class="p">],</span>
+        <span class="n">textposition</span><span class="o">=</span><span class="s2">&quot;bottom center&quot;</span><span class="p">,</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">hoverinfo</span><span class="o">=</span><span class="s2">&quot;skip&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span>
+    <span class="n">scene</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">aspectmode</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">,</span>
+        <span class="n">xaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+            <span class="n">showbackground</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">showgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">zeroline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">showticklabels</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">yaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+            <span class="n">showbackground</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">showgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">zeroline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">showticklabels</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">zaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+            <span class="n">showbackground</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">showgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">zeroline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">showticklabels</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">camera</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">eye</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)),</span>
+    <span class="p">),</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">450</span><span class="p">,</span>
+    <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">20</span><span class="p">),</span>
+    <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="8c0b4b80-6b3a-41f5-828c-49d21d57c923" class="plotly-graph-div" style="height:450px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("8c0b4b80-6b3a-41f5-828c-49d21d57c923")) {                    Plotly.newPlot(                        "8c0b4b80-6b3a-41f5-828c-49d21d57c923",                        [{"hoverinfo":"skip","legendgroup":"Meas 0","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.23093678057193756],"y":[0.0,0.16475820541381836],"z":[0.0,-0.09758561104536057],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 0","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.12791450321674347],"y":[0.0,0.24650104343891144],"z":[0.0,0.11346863210201263],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 0","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.14249944686889648],"y":[0.0,-0.04573822394013405],"z":[0.0,0.2600037157535553],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 1","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.23999865353107452],"y":[0.0,0.15976721048355103],"z":[0.0,-0.08291617780923843],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 1","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.12374823540449142],"y":[0.0,0.24680264294147491],"z":[0.0,0.1173662543296814],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 1","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.13071736693382263],"y":[0.0,-0.05969003960490227],"z":[0.0,0.26334401965141296],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 2","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.22399678826332092],"y":[0.0,0.170340895652771],"z":[0.0,-0.10396835952997208],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 2","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.15159286558628082],"y":[0.0,0.24688532948493958],"z":[0.0,0.07789250463247299],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 2","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.12978847324848175],"y":[0.0,-0.00562269426882267],"z":[0.0,0.27041327953338623],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 3","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.2315339893102646],"y":[0.0,0.1796799749135971],"z":[0.0,-0.06408683955669403],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 3","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.13539084792137146],"y":[0.0,0.22577397525310516],"z":[0.0,0.1438591033220291],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 3","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.13439245522022247],"y":[0.0,-0.08210501074790955],"z":[0.0,0.2553378939628601],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 4","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.22512251138687134],"y":[0.0,0.1605340838432312],"z":[0.0,-0.11639872938394547],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 4","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.09714481234550476],"y":[0.0,0.24280917644500732],"z":[0.0,0.14699183404445648],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 4","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.17286625504493713],"y":[0.0,-0.07261212915182114],"z":[0.0,0.23418954014778137],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 5","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.2304462194442749],"y":[0.0,0.16386401653289795],"z":[0.0,-0.10021542757749557],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 5","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.11263088136911392],"y":[0.0,0.24206724762916565],"z":[0.0,0.13681280612945557],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 5","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.15559189021587372],"y":[0.0,-0.06746881455183029],"z":[0.0,0.24746541678905487],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 6","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.23401416838169098],"y":[0.0,0.15115763247013092],"z":[0.0,-0.11130477488040924],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 6","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.1339145451784134],"y":[0.0,0.2590845823287964],"z":[0.0,0.07029989361763],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 6","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.13154572248458862],"y":[0.0,-0.0051528047770261765],"z":[0.0,0.2695721983909607],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 7","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.2557879686355591],"y":[0.0,0.1535472273826599],"z":[0.0,-0.03155573830008507],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 7","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.14126741886138916],"y":[0.0,0.25196996331214905],"z":[0.0,0.08096091449260712],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 7","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.06794139742851257],"y":[0.0,-0.05417010560631752],"z":[0.0,0.2871403396129608],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 8","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.2380998581647873],"y":[0.0,0.1236511841416359],"z":[0.0,-0.13423427939414978],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 8","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.09053512662649155],"y":[0.0,0.2716124951839447],"z":[0.0,0.08961053937673569],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 8","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.15846718847751617],"y":[0.0,-0.03061114251613617],"z":[0.0,0.2528855800628662],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 9","line":{"color":"red","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.21559228003025055],"y":[0.0,0.19316770136356354],"z":[0.0,-0.07877954840660095],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 9","line":{"color":"green","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,-0.1628168523311615],"y":[0.0,0.22663219273090363],"z":[0.0,0.11012960970401764],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Meas 9","line":{"color":"blue","width":2},"mode":"lines","opacity":0.2,"showlegend":false,"x":[0.0,0.1304248720407486],"y":[0.0,-0.036388203501701355],"z":[0.0,0.26770368218421936],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Ground Truth","line":{"color":"red","width":4},"mode":"lines","name":"Ground Truth X","opacity":1.0,"showlegend":true,"x":[0.0,0.24102018773555756],"y":[0.0,0.1550711840391159],"z":[0.0,-0.08866904675960541],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Ground Truth","line":{"color":"green","width":4},"mode":"lines","name":"Ground Truth Y","opacity":1.0,"showlegend":false,"x":[0.0,-0.12054641544818878],"y":[0.0,0.2510899007320404],"z":[0.0,0.11145591735839844],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Ground Truth","line":{"color":"blue","width":4},"mode":"lines","name":"Ground Truth Z","opacity":1.0,"showlegend":false,"x":[0.0,0.1318250298500061],"y":[0.0,-0.053914625197649],"z":[0.0,0.26403671503067017],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Manifold Result","line":{"color":"red","width":4},"mode":"lines","name":"Manifold Result X","opacity":1.0,"showlegend":true,"x":[0.800000011920929,1.0342012643814087],"y":[0.0,0.16289113461971283],"z":[0.0,-0.09282389283180237],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Manifold Result","line":{"color":"green","width":4},"mode":"lines","name":"Manifold Result Y","opacity":1.0,"showlegend":false,"x":[0.800000011920929,0.6713210344314575],"y":[0.0,0.24768264591693878],"z":[0.0,0.10997743904590607],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Manifold Result","line":{"color":"blue","width":4},"mode":"lines","name":"Manifold Result Z","opacity":1.0,"showlegend":false,"x":[0.800000011920929,0.9363507032394409],"y":[0.0,-0.046041227877140045],"z":[0.0,0.2632274627685547],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Naive Result","line":{"color":"red","width":4},"mode":"lines","name":"Naive Result X","opacity":1.0,"showlegend":true,"x":[1.600000023841858,1.774126648902893],"y":[0.0,0.15936926007270813],"z":[0.0,0.18515223264694214],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Naive Result","line":{"color":"green","width":4},"mode":"lines","name":"Naive Result Y","opacity":1.0,"showlegend":false,"x":[1.600000023841858,1.831773281097412],"y":[0.0,-0.1796313375234604],"z":[0.0,-0.06335419416427612],"type":"scatter3d"},{"hoverinfo":"skip","legendgroup":"Naive Result","line":{"color":"blue","width":4},"mode":"lines","name":"Naive Result Z","opacity":1.0,"showlegend":false,"x":[1.600000023841858,1.6772081851959229],"y":[0.0,0.1798166036605835],"z":[0.0,-0.22738708555698395],"type":"scatter3d"},{"hoverinfo":"skip","mode":"text","showlegend":false,"text":["Ground Truth","Manifold","Naive"],"textposition":"bottom center","x":[0,0.8,1.6],"y":[0,0,0],"z":[-0.15,-0.15,-0.15],"type":"scatter3d"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"scene":{"xaxis":{"showbackground":false,"showgrid":false,"zeroline":false,"showticklabels":false,"title":{"text":""}},"yaxis":{"showbackground":false,"showgrid":false,"zeroline":false,"showticklabels":false,"title":{"text":""}},"zaxis":{"showbackground":false,"showgrid":false,"zeroline":false,"showticklabels":false,"title":{"text":""}},"camera":{"eye":{"x":1.5,"y":1.5,"z":1.0}},"aspectmode":"data"},"margin":{"t":20,"b":20,"l":20,"r":20},"height":450,"showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+<p>The manifold-aware approach consistently achieves lower error. The naive quaternion averaging fails because it ignores the geometry of the manifold.</p>
+<p>Key points:</p>
+<ul class="simple">
+<li><p>Define <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code> to map tangent space updates back to the manifold</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">tangent_dim</span></code> to the local degrees of freedom (not the ambient dimension)</p></li>
+<li><p>Use geodesic costs that respect manifold geometry (e.g., the log map for Lie groups)</p></li>
+</ul>
+<p>Built-in Lie group variables:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/lie_group_variables/#jaxls.SO2Var" title="jaxls.SO2Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.SO2Var</span></code></a>, <a class="reference internal" href="../../../api/lie_group_variables/#jaxls.SO3Var" title="jaxls.SO3Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.SO3Var</span></code></a> for rotations</p></li>
+<li><p><a class="reference internal" href="../../../api/lie_group_variables/#jaxls.SE2Var" title="jaxls.SE2Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.SE2Var</span></code></a>, <a class="reference internal" href="../../../api/lie_group_variables/#jaxls.SE3Var" title="jaxls.SE3Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.SE3Var</span></code></a> for rigid transformations</p></li>
+</ul>
+<p>For custom manifolds (spheres, simplices, etc.), define your own variable class with appropriate <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code> and <code class="docutils literal notranslate"><span class="pre">tangent_dim</span></code> as shown above.</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../custom_jacobians/">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Custom Jacobians</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="../">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Advanced</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/brentyi/jaxls" aria-label="GitHub">
+            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+        </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Non-Euclidean variables</a><ul>
+<li><a class="reference internal" href="#the-problem-with-euclidean-parameterization">The problem with Euclidean parameterization</a><ul>
+<li><a class="reference internal" href="#naive-euclidean-averaging-fails">Naive Euclidean averaging (fails)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#manifold-optimization">Manifold optimization</a></li>
+<li><a class="reference internal" href="#using-so3var">Using SO3Var</a></li>
+<li><a class="reference internal" href="#rotation-averaging-cost">Rotation averaging cost</a></li>
+<li><a class="reference internal" href="#solving-with-manifold-optimization">Solving with manifold optimization</a></li>
+<li><a class="reference internal" href="#defining-custom-manifold-variables">Defining custom manifold variables</a></li>
+<li><a class="reference internal" href="#visualization">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=187304be"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=fd10adb8"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

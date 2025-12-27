@@ -29,14 +29,14 @@ class AugmentedLagrangianConfig:
 
     penalty_initial: float | jax.Array | None = None
     """Initial penalty parameter. If None, uses ALGENCAN-style heuristic:
-    rho = 10 * max(1, |f|) / max(1, 0.5 * c²). Set to a fixed value (e.g., 1.0)
-    to override the automatic initialization."""
+    ``rho = 10 * max(1, |f|) / max(1, 0.5 * c^2)``. Set to a fixed value (e.g., 1.0) to
+    override the automatic initialization."""
 
     tolerance_absolute: float | jax.Array = 1e-5
-    """Absolute convergence tolerance: max(snorm, csupn) < tol."""
+    """Absolute convergence tolerance: ``max(snorm, csupn) < tol``."""
 
     tolerance_relative: float | jax.Array = 1e-4
-    """Relative convergence tolerance: snorm / snorm_initial < tol."""
+    """Relative convergence tolerance: ``snorm / snorm_initial < tol``."""
 
     violation_reduction_threshold: float | jax.Array = 0.9
     """Increase penalty if violation > threshold * previous_violation.
@@ -275,7 +275,9 @@ def update_al_state(
         lambda_candidate = lambda_group + penalty_group[:, None] * h_group
         if is_ineq:
             lambda_candidate = relu(lambda_candidate)
-        lambda_candidate = jnp.clip(lambda_candidate, config.lambda_min, config.lambda_max)
+        lambda_candidate = jnp.clip(
+            lambda_candidate, config.lambda_min, config.lambda_max
+        )
         # Update lambda when inner problem has converged (regardless of step acceptance).
         # This allows AL parameters to update even when LM rejects the step.
         lambda_new = jnp.where(al_should_update, lambda_candidate, lambda_group)

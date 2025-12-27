@@ -1,0 +1,369 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "cell-0",
+   "metadata": {},
+   "source": "# Constraints\n\nHow to handle constraints in nonlinear least squares problems using jaxls.\nThis guide covers equality and inequality constraints, with a portfolio optimization example.\n\nFeatures used:\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` with `kind` parameter for constraints\n- {class}`~jaxls.AugmentedLagrangianConfig` for solver tuning"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-1",
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "from loguru import logger\n",
+    "\n",
+    "logger.remove()\n",
+    "logger.add(sys.stdout, format=\"<level>{level: <8}</level> | {message}\");"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-imports",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import jax\n",
+    "import jax.numpy as jnp\n",
+    "import jaxls"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-3",
+   "metadata": {},
+   "source": "## Types of constraints\n\njaxls supports three constraint types, specified via the `kind` parameter in `@jaxls.Cost.factory`:\n\n| Constraint Type | `kind` Parameter | Mathematical Form |\n|----------------|------------------|-------------------|\n| Equality | `\"constraint_eq_zero\"` | $h(x) = 0$ |\n| Inequality (upper bound) | `\"constraint_leq_zero\"` | $g(x) \\leq 0$ |\n| Inequality (lower bound) | `\"constraint_geq_zero\"` | $g(x) \\geq 0$ |\n\nThe default `kind=\"l2_squared\"` creates a standard least-squares cost term."
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-4",
+   "metadata": {},
+   "source": "## Example: portfolio optimization\n\nWe'll optimize a portfolio of 4 assets to minimize variance (risk) subject to:\n- Budget constraint: weights sum to 1 (equality)\n- Return target: expected return >= minimum threshold (inequality)\n- No short-selling: all weights >= 0 (inequality)"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Asset data: 4 assets with expected returns and covariance.\n",
+    "n_assets = 4\n",
+    "asset_names = [\"Tech\", \"Healthcare\", \"Energy\", \"Bonds\"]\n",
+    "\n",
+    "# Expected annual returns.\n",
+    "expected_returns = jnp.array([0.12, 0.08, 0.10, 0.04])\n",
+    "\n",
+    "# Covariance matrix (annual).\n",
+    "covariance = jnp.array(\n",
+    "    [\n",
+    "        [0.04, 0.006, 0.010, -0.002],\n",
+    "        [0.006, 0.025, 0.004, 0.001],\n",
+    "        [0.010, 0.004, 0.035, -0.001],\n",
+    "        [-0.002, 0.001, -0.001, 0.005],\n",
+    "    ]\n",
+    ")\n",
+    "\n",
+    "print(\n",
+    "    \"Expected returns:\", {n: f\"{r:.1%}\" for n, r in zip(asset_names, expected_returns)}\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define the portfolio weights variable.\n",
+    "class WeightsVar(\n",
+    "    jaxls.Var[jax.Array], default_factory=lambda: jnp.ones(n_assets) / n_assets\n",
+    "):\n",
+    "    \"\"\"Portfolio weights (n_assets-dimensional vector).\"\"\"\n",
+    "\n",
+    "\n",
+    "weights_var = WeightsVar(id=0)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-7",
+   "metadata": {},
+   "source": "## Defining costs and constraints\n\n### Objective: minimize variance\n\nPortfolio variance is $w^T \\Sigma w$. We use the Cholesky factor $L$ where $\\Sigma = LL^T$,\nso minimizing $\\|L^T w\\|^2$ is equivalent to minimizing variance."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Cholesky decomposition for the variance cost.\n",
+    "cov_chol = jnp.linalg.cholesky(covariance)\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory  # Default kind=\"l2_squared\".\n",
+    "def variance_cost(\n",
+    "    vals: jaxls.VarValues, var: WeightsVar, cov_chol: jax.Array\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Minimize portfolio variance: ||L.T @ w||^2 = w.T @ cov @ w.\"\"\"\n",
+    "    return cov_chol.T @ vals[var]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-9",
+   "metadata": {},
+   "source": "### Budget constraint (equality)\n\nThe weights must sum to 1 (fully invested portfolio): $\\sum_i w_i = 1$\n\nWe write this as $h(w) = \\sum_i w_i - 1 = 0$."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-10",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "@jaxls.Cost.factory(kind=\"constraint_eq_zero\")\n",
+    "def budget_constraint(vals: jaxls.VarValues, var: WeightsVar) -> jax.Array:\n",
+    "    \"\"\"Weights must sum to 1 (fully invested).\"\"\"\n",
+    "    weights = vals[var]\n",
+    "    return jnp.array([jnp.sum(weights) - 1.0])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-11",
+   "metadata": {},
+   "source": "### Return target (inequality >= 0)\n\nExpected portfolio return must meet a minimum target: $w^T \\mu \\geq r_{\\text{target}}$\n\nWe write this as $g(w) = w^T \\mu - r_{\\text{target}} \\geq 0$."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "@jaxls.Cost.factory(kind=\"constraint_geq_zero\")\n",
+    "def return_constraint(\n",
+    "    vals: jaxls.VarValues, var: WeightsVar, exp_ret: jax.Array, target: float\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Expected return must meet target: E[r] >= target.\"\"\"\n",
+    "    weights = vals[var]\n",
+    "    return jnp.array([jnp.dot(weights, exp_ret) - target])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-13",
+   "metadata": {},
+   "source": "### No short-selling (inequality >= 0)\n\nAll weights must be non-negative: $w_i \\geq 0$ for all $i$\n\nThis returns the weights directly as the constraint output."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-14",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "@jaxls.Cost.factory(kind=\"constraint_geq_zero\")\n",
+    "def no_short_selling(vals: jaxls.VarValues, var: WeightsVar) -> jax.Array:\n",
+    "    \"\"\"No short-selling: weights >= 0.\"\"\"\n",
+    "    return vals[var]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-15",
+   "metadata": {},
+   "source": "## Solving the problem\n\nWe'll solve for a target return of 8% (between the lowest-return Bonds at 4% and highest-return Tech at 12%)."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-16",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "target_return = 0.08\n",
+    "\n",
+    "costs = [\n",
+    "    variance_cost(weights_var, cov_chol),\n",
+    "    budget_constraint(weights_var),\n",
+    "    return_constraint(weights_var, expected_returns, target_return),\n",
+    "    no_short_selling(weights_var),\n",
+    "]\n",
+    "\n",
+    "problem = jaxls.LeastSquaresProblem(costs, [weights_var]).analyze()\n",
+    "solution = problem.solve(\n",
+    "    linear_solver=\"dense_cholesky\",\n",
+    "    termination=jaxls.TerminationConfig(cost_tolerance=1e-8),\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Extract results.\n",
+    "optimal_weights = solution[weights_var]\n",
+    "\n",
+    "print(\"\\nOptimal allocation:\")\n",
+    "for name, w in zip(asset_names, optimal_weights):\n",
+    "    print(f\"  {name}: {float(w):.1%}\")\n",
+    "\n",
+    "portfolio_return = float(jnp.dot(optimal_weights, expected_returns))\n",
+    "portfolio_std = float(jnp.sqrt(optimal_weights @ covariance @ optimal_weights))\n",
+    "\n",
+    "print(\"\\nPortfolio metrics:\")\n",
+    "print(f\"  Expected return: {portfolio_return:.2%}\")\n",
+    "print(f\"  Std deviation: {portfolio_std:.2%}\")\n",
+    "print(f\"  Weights sum: {float(jnp.sum(optimal_weights)):.6f}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-18",
+   "metadata": {},
+   "source": "## Efficient frontier\n\nBy varying the target return, we can trace out the efficient frontier.\nUsing `jax.lax.scan`, we solve sequentially while using each solution as the\ninitial guess for the next (warm-starting)."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-19",
+   "metadata": {},
+   "outputs": [],
+   "source": "# Range of target returns.\nmin_return = float(expected_returns.min())\nmax_return = float(expected_returns.max())\ntarget_returns = jnp.linspace(min_return + 0.005, max_return - 0.005, 15)\n\n\ndef solve_for_target(\n    current_vals: jaxls.VarValues, target: jax.Array\n) -> tuple[jaxls.VarValues, jax.Array]:\n    \"\"\"Solve portfolio optimization for a given target return.\n\n    Args:\n        current_vals: Solution from previous target (used as initial guess).\n        target: Target return for this solve.\n\n    Returns:\n        Tuple of (solution values, optimal weights).\n    \"\"\"\n    costs = [\n        variance_cost(weights_var, cov_chol),\n        budget_constraint(weights_var),\n        return_constraint(weights_var, expected_returns, target),\n        no_short_selling(weights_var),\n    ]\n    problem = jaxls.LeastSquaresProblem(costs, [weights_var]).analyze()\n    solution = problem.solve(\n        current_vals,\n        verbose=False,\n        linear_solver=\"dense_cholesky\",\n        termination=jaxls.TerminationConfig(cost_tolerance=1e-8),\n    )\n    return solution, solution[weights_var]\n\n\n# Solve sequentially with warm-starting.\ninitial_vals = jaxls.VarValues.make([weights_var])\n_, all_weights = jax.lax.scan(solve_for_target, initial_vals, target_returns)\nreturns_achieved = jax.vmap(lambda w: jnp.dot(w, expected_returns))(all_weights)\nstd_devs = jax.vmap(lambda w: jnp.sqrt(w @ covariance @ w))(all_weights)\n\nprint(f\"Computed {len(target_returns)} points on the efficient frontier\")"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-20",
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [],
+   "source": [
+    "import plotly.graph_objects as go\n",
+    "from plotly.subplots import make_subplots\n",
+    "from IPython.display import HTML\n",
+    "\n",
+    "colors = [\"#2196F3\", \"#4CAF50\", \"#FF9800\", \"#9C27B0\"]\n",
+    "\n",
+    "# Convert JAX arrays to Python floats for Plotly\n",
+    "std_devs_list = [float(s) * 100 for s in std_devs]\n",
+    "returns_list = [float(r) * 100 for r in returns_achieved]\n",
+    "\n",
+    "fig = make_subplots(\n",
+    "    rows=1,\n",
+    "    cols=2,\n",
+    "    subplot_titles=(\"Efficient Frontier\", \"Asset Allocation\"),\n",
+    "    column_widths=[0.4, 0.6],\n",
+    ")\n",
+    "\n",
+    "# Left plot: Efficient frontier\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=std_devs_list,\n",
+    "        y=returns_list,\n",
+    "        mode=\"lines+markers\",\n",
+    "        marker=dict(size=6, color=returns_list, colorscale=\"Viridis\", showscale=False),\n",
+    "        line=dict(color=\"steelblue\", width=2),\n",
+    "        hovertemplate=\"Std Dev: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>\",\n",
+    "        showlegend=False,\n",
+    "    ),\n",
+    "    row=1,\n",
+    "    col=1,\n",
+    ")\n",
+    "\n",
+    "# Right plot: Asset allocation (use target_returns for x-axis to avoid stacking\n",
+    "# bars at duplicate achieved returns when return constraint isn't binding)\n",
+    "for i, (name, color) in enumerate(zip(asset_names, colors)):\n",
+    "    fig.add_trace(\n",
+    "        go.Bar(\n",
+    "            x=[float(t) * 100 for t in target_returns],\n",
+    "            y=[float(w) * 100 for w in all_weights[:, i]],\n",
+    "            name=name,\n",
+    "            marker_color=color,\n",
+    "            hovertemplate=f\"{name}: %{{y:.1f}}%<extra></extra>\",\n",
+    "        ),\n",
+    "        row=1,\n",
+    "        col=2,\n",
+    "    )\n",
+    "\n",
+    "fig.update_xaxes(title_text=\"Std Deviation (%)\", row=1, col=1)\n",
+    "fig.update_yaxes(title_text=\"Return (%)\", row=1, col=1)\n",
+    "fig.update_xaxes(title_text=\"Target Return (%)\", row=1, col=2)\n",
+    "fig.update_yaxes(title_text=\"Allocation (%)\", range=[0, 105], row=1, col=2)\n",
+    "\n",
+    "fig.update_layout(\n",
+    "    barmode=\"stack\",\n",
+    "    height=400,\n",
+    "    margin=dict(t=40, b=40, l=60, r=40),\n",
+    "    legend=dict(orientation=\"h\", yanchor=\"bottom\", y=-0.25, xanchor=\"center\", x=0.75),\n",
+    ")\n",
+    "HTML(fig.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-21",
+   "metadata": {},
+   "source": "## How it works: Augmented Lagrangian\n\nWhen constraints are present, jaxls uses an Augmented Lagrangian method.\n\n### The augmented Lagrangian\n\nThe method adds both a linear term (Lagrange multiplier $\\lambda$) and a quadratic penalty to the objective:\n\n$$\\mathcal{L}(x, \\lambda, \\rho) = f(x) + \\lambda \\cdot h(x) + \\frac{\\rho}{2} h(x)^2$$\n\nThe multiplier $\\lambda$ handles steady-state enforcement while the penalty $\\rho$ accelerates convergence.\n\n### Multiplier updates\n\nAs the solver runs, it updates the multipliers based on constraint violations:\n\n$$\\lambda_{\\text{new}} = \\lambda + \\rho \\cdot h(x)$$\n\nFor inequality constraints $g(x) \\leq 0$, this is projected to stay non-negative:\n$\\lambda_{\\text{new}} = \\max(0, \\lambda + \\rho \\cdot g(x))$.\n\nUpdates occur when the cost stabilizes, indicating the current subproblem is solved.\nThe penalty $\\rho$ increases if constraints aren't improving fast enough."
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-22",
+   "metadata": {},
+   "source": "## Advanced: tuning the solver\n\nFor difficult problems, you can tune the Augmented Lagrangian solver via {class}`~jaxls.AugmentedLagrangianConfig`.\nThe parameters map to the concepts above. Max iterations can be controlled via {class}`~jaxls.TerminationConfig`:"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-23",
+   "metadata": {},
+   "outputs": [],
+   "source": "# Custom configuration example.\nal_config = jaxls.AugmentedLagrangianConfig(\n    penalty_factor=10.0,  # Multiply rho by this when constraints stagnate.\n    penalty_max=1e7,  # Cap on rho to prevent ill-conditioning.\n    tolerance_absolute=1e-6,  # Constraint violation tolerance for convergence.\n)\n\n# Use with solve(). Max iterations is controlled via TerminationConfig.\nsolution = problem.solve(\n    verbose=False,\n    linear_solver=\"dense_cholesky\",\n    augmented_lagrangian=al_config,\n    termination=jaxls.TerminationConfig(max_iterations=150),\n)\n\nprint(\"Solution with custom config:\")\nfor name, w in zip(asset_names, solution[weights_var]):\n    print(f\"  {name}: {float(w):.1%}\")"
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-24",
+   "metadata": {},
+   "source": "## Alternative: manifold reformulation\n\nSome constraints can be reformulated as manifold optimization via custom `retract_fn`.\nFor example, the budget constraint (weights sum to 1) and no short-selling constraint\n(weights non-negative) together define the probability simplex, which is a manifold that can\nbe optimized directly without explicit constraints.\n\nThis approach can be more numerically stable when the constraints define a smooth manifold\nwith a simple retraction. See the [Manifold Allocation](../../examples/portfolio/manifold_allocation.ipynb) notebook for an example.\n\n## Summary\n\nKey points for constrained optimization in jaxls:\n\n- Use `kind=\"constraint_eq_zero\"` for equality constraints $h(x) = 0$\n- Use `kind=\"constraint_leq_zero\"` for upper bounds $g(x) \\leq 0$\n- Use `kind=\"constraint_geq_zero\"` for lower bounds $g(x) \\geq 0$\n- Constraints are handled automatically via Augmented Lagrangian\n- Tune with {class}`~jaxls.AugmentedLagrangianConfig` if needed\n\nFor more examples, see the [mean-variance portfolio notebook](../../examples/portfolio/mean_variance.ipynb)."
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

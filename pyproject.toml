@@ -44,12 +44,6 @@ dev = [
     "ruff",
     "libcst",
 ]
-examples = [
-    "tyro",
-    "matplotlib",
-    "viser",
-    "scikit-sparse",
-]
 docs = [
     "sphinx>=7.0.0",
     "furo>=2024.0.0",
@@ -60,6 +54,13 @@ docs = [
     "plotly",
     "opencv-python",
     "scipy",
+    "scikit-sparse",
+    "tyro",
+    "robot_descriptions",
+    "yourdfpy",
+    "trimesh",
+    "fast_simplification",
+    "jupyterlab",
 ]
 
 [project.urls]

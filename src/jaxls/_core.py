@@ -60,8 +60,8 @@ class _ResidualInfo:
     cost_nonconstraint: jax.Array
     """Cost from l2_squared terms only (original objective, excludes constraint terms)."""
 
-    jac_cache: tuple[Any, ...] | None
-    """Jacobian cache if requested, otherwise None."""
+    jac_cache: tuple[Any, ...]
+    """Jacobian cache."""
 
 
 def _get_function_signature(func: Callable) -> Hashable:
@@ -85,14 +85,16 @@ def _get_function_signature(func: Callable) -> Hashable:
 
 @jdc.pytree_dataclass
 class LeastSquaresProblem:
-    """We define least squares problem as bipartite graphs, which have two types of nodes:
+    """Least squares problems are bipartite graphs with two types of nodes:
 
-    - `jaxls.Cost`. These are cost terms or constraints.
-      - `kind=False` (default): Minimize squared L2 norm ||r(x)||^2
-      - `kind="constraint_eq_zero"`: Equality constraint r(x) = 0
-      - `kind="constraint_leq_zero"`: Inequality constraint r(x) <= 0
-      - `kind="constraint_geq_zero"`: Inequality constraint r(x) >= 0
-    - `jaxls.Var`. These are the parameters we want to optimize.
+    - :class:`~jaxls.Cost`: cost terms or constraints.
+
+        - ``kind="l2_squared"`` (default): Minimize squared L2 norm ``||r(x)||^2``
+        - ``kind="constraint_eq_zero"``: Equality constraint ``r(x) = 0``
+        - ``kind="constraint_leq_zero"``: Inequality constraint ``r(x) <= 0``
+        - ``kind="constraint_geq_zero"``: Inequality constraint ``r(x) >= 0``
+
+    - :class:`~jaxls.Var`: the parameters we want to optimize.
     """
 
     costs: Iterable[Cost]
@@ -467,10 +469,8 @@ class AnalyzedLeastSquaresProblem:
                 jac_cache.append(None)
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_residual_info(
-        self, vals: VarValues, include_jac_cache: bool = False
-    ) -> _ResidualInfo:
-        """Compute residuals, costs, and optionally Jacobian cache in one pass.
+    def _compute_residual_info(self, vals: VarValues) -> _ResidualInfo:
+        """Compute residuals, costs, and Jacobian cache in one pass.
 
         This bundles all residual-related computation into a single call,
         computing per-group residuals, concatenated residual, total cost,
@@ -516,7 +516,7 @@ class AnalyzedLeastSquaresProblem:
             residual_vector=residual_vector,
             cost_total=cost_total,
             cost_nonconstraint=cost_nonconstraint,
-            jac_cache=tuple(jac_caches) if include_jac_cache else None,
+            jac_cache=tuple(jac_caches),
         )
 
     def _compute_constraint_values(self, vals: VarValues) -> tuple[jax.Array, ...]:

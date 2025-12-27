@@ -1,0 +1,813 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../../genindex/"><link rel="search" title="Search" href="../../../search/"><link rel="next" title="Cart-Pole (Collocation)" href="../cart_pole_collocation/"><link rel="prev" title="Inverse Kinematics" href="../inverse_kinematics/">
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
+        <title>Obstacle Avoidance - jaxls</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=6517d2d4" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-code-background: #f4f4f4;
+  --color-code-foreground: #000;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../"><div class="brand">jaxls</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a
+  class="sidebar-brand"
+  href="../../../"
+  style="margin-top: 0.75em"
+>
+  
+  <span class="sidebar-brand-text">jaxls</span>
+
+  
+</a>
+
+<div style="text-align: left; padding: 0 1em 1em 1em">
+  <a href="https://github.com/brentyi/jaxls">
+    <img src="https://img.shields.io/github/stars/brentyi/jaxls?style=social" alt="GitHub stars">
+  </a>
+</div><form class="sidebar-search-container" method="get" action="../../../search/" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../guide/basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../guide/tips_and_gotchas/">Tips and Gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../guide/advanced/">Advanced</a><input aria-label="Toggle navigation of Advanced" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/robust_costs/">Robust costs</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../mechanics/">Mechanics</a><input aria-label="Toggle navigation of Mechanics" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/spring_equilibrium/">Spring Equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/cloth_simulation/">Cloth Simulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/beam_bending/">Beam Bending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/truss_analysis/">Truss Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../vision/">Perception</a><input aria-label="Toggle navigation of Perception" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../">Robotics</a><input aria-label="Toggle navigation of Robotics" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../inverse_kinematics/">Inverse Kinematics</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Obstacle Avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cart_pole_collocation/">Cart-Pole (Collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cart_pole_shooting/">Cart-Pole (Shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cam_design/">Cam profile optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../portfolio/">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/mean_variance/">Mean-Variance Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/cvar_optimization/">CVaR Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/black_litterman/">Black-Litterman Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/manifold_allocation/">Manifold Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/reparameterized_allocation/">Reparameterized Allocation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/core/">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie Group Variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver Configuration</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../../_sources/examples/robotics/obstacle_avoidance.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="obstacle-avoidance">
+<h1>Obstacle Avoidance<a class="headerlink" href="#obstacle-avoidance" title="Link to this heading">¶</a></h1>
+<p>Finding a smooth path from start to goal while avoiding circular obstacles.</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a> for 2D waypoint positions</p></li>
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-func docutils literal notranslate"><span class="pre">&#64;jaxls.Cost.factory</span></code></a> for smoothness and anchor costs</p></li>
+<li><p>Inequality constraints (<code class="docutils literal notranslate"><span class="pre">constraint_leq_zero</span></code>): obstacle avoidance</p></li>
+<li><p>Augmented Lagrangian solver for constrained optimization</p></li>
+</ul>
+<div class="cell tag_hide-cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell content</p>
+<p class="expanded admonition-title">Hide code cell content</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jaxls</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="problem-setup">
+<h2>Problem setup<a class="headerlink" href="#problem-setup" title="Link to this heading">¶</a></h2>
+<p>Plan a trajectory with 20 waypoints from start to goal, avoiding two obstacles:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Trajectory parameters</span>
+<span class="n">n_waypoints</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">goal</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+
+<span class="c1"># Obstacles: (center_x, center_y, radius)</span>
+<span class="n">obstacles</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="mf">3.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">),</span>
+    <span class="p">(</span><span class="mf">6.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">),</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="variables-and-costs">
+<h2>Variables and costs<a class="headerlink" href="#variables-and-costs" title="Link to this heading">¶</a></h2>
+<p>Variable instances are <a class="reference external" href="https://docs.jax.dev/en/latest/pytrees.html">PyTrees</a>. We define waypoints and cost functions:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">WaypointVar</span><span class="p">(</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;2D waypoint position.&quot;&quot;&quot;</span>
+
+
+<span class="c1"># Batched variable creation</span>
+<span class="n">waypoint_vars</span> <span class="o">=</span> <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_waypoints</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">smoothness_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var_prev</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">var_curr</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">var_next</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Penalize acceleration (second derivative).&quot;&quot;&quot;</span>
+    <span class="n">accel</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_prev</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_curr</span><span class="p">]</span> <span class="o">+</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_next</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">accel</span> <span class="o">*</span> <span class="mf">5.0</span>  <span class="c1"># Weight for smoothness</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">anchor_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pin waypoint to target position.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">-</span> <span class="n">target</span><span class="p">)</span> <span class="o">*</span> <span class="mf">10.0</span>  <span class="c1"># Strong weight</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;constraint_leq_zero&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">obstacle_constraint</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">center</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">radius</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stay outside obstacle: ||p - center|| &gt;= radius.&quot;&quot;&quot;</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">-</span> <span class="n">center</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">diff</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1e-6</span><span class="p">)</span>
+    <span class="c1"># Constraint: radius - dist &lt;= 0 (i.e., dist &gt;= radius)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">radius</span> <span class="o">-</span> <span class="n">dist</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="problem-construction">
+<h2>Problem construction<a class="headerlink" href="#problem-construction" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Indices for smoothness costs (interior waypoints)</span>
+<span class="n">smooth_prev</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_waypoints</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># 0, 1, ..., n-3</span>
+<span class="n">smooth_curr</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_waypoints</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># 1, 2, ..., n-2</span>
+<span class="n">smooth_next</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">)</span>  <span class="c1"># 2, 3, ..., n-1</span>
+
+<span class="c1"># Obstacle constraint: each waypoint x each obstacle</span>
+<span class="n">n_obstacles</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">obstacles</span><span class="p">)</span>
+<span class="n">waypoint_ids_for_obs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_waypoints</span><span class="p">),</span> <span class="n">n_obstacles</span><span class="p">)</span>
+<span class="n">obstacle_centers</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">]</span> <span class="k">for</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">obstacles</span><span class="p">])</span>
+<span class="n">obstacle_radii</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">obstacles</span><span class="p">])</span>
+<span class="c1"># Repeat each obstacle for all waypoints</span>
+<span class="n">centers_repeated</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">obstacle_centers</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">radii_repeated</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">obstacle_radii</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">)</span>
+
+<span class="c1"># Build costs using batched construction</span>
+<span class="n">costs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># Anchor start and goal</span>
+    <span class="n">anchor_cost</span><span class="p">(</span><span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">start</span><span class="p">),</span>
+    <span class="n">anchor_cost</span><span class="p">(</span><span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">n_waypoints</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="n">goal</span><span class="p">),</span>
+    <span class="c1"># Smoothness costs (batched)</span>
+    <span class="n">smoothness_cost</span><span class="p">(</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">smooth_prev</span><span class="p">),</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">smooth_curr</span><span class="p">),</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">smooth_next</span><span class="p">),</span>
+    <span class="p">),</span>
+    <span class="c1"># Obstacle avoidance constraints (batched)</span>
+    <span class="n">obstacle_constraint</span><span class="p">(</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">waypoint_ids_for_obs</span><span class="p">),</span>
+        <span class="n">centers_repeated</span><span class="p">,</span>
+        <span class="n">radii_repeated</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">costs</span><span class="p">)</span><span class="si">}</span><span class="s2"> batched cost objects&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Created 4 batched cost objects
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize with straight line (will collide with obstacles)</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">)</span>
+<span class="n">initial_positions</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">t</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">goal</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>  <span class="c1"># (n_waypoints, 2)</span>
+
+<span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">waypoint_vars</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">initial_positions</span><span class="p">)])</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">waypoint_vars</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 60 terms and 20 variables: 20 costs, 0 eq_zero, 40 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 2 costs, 1 variables each: anchor_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 40 constraints (constraint_leq_zero), 1 variables each: augmented_obstacle_constraint
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 18 costs, 3 variables each: smoothness_cost
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="solving">
+<h2>Solving<a class="headerlink" href="#solving" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Augmented Lagrangian: initial snorm=4.8317e-01, csupn=4.8317e-01, max_rho=1.0706e+01, constraint_dim=40
+<span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=11.4616 lambd=0.0005 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 11.46163 (avg 0.28654)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.19e+01 cost_prev=11.4616 cost_new=0.9302
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.2744e-02, csupn=6.2744e-02, max_rho=1.0706e+01, al_update=False
+<span class=" -Color -Color-Bold">INFO    </span> |  step #2: cost=0.9302 lambd=0.0003 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00119 (avg 0.00030)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.09714 (avg 0.00243)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.83190 (avg 0.02311)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.96e-01 cost_prev=0.9302 cost_new=0.8834
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.8712e-02, csupn=6.8712e-02, max_rho=1.0706e+01, al_update=False
+<span class=" -Color -Color-Bold">INFO    </span> |  step #3: cost=0.8834 lambd=0.0001 inexact_tol=6.3e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00125 (avg 0.00031)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.10585 (avg 0.00265)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.77627 (avg 0.02156)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.80e-02 cost_prev=0.8834 cost_new=0.8828
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.0235e-02, csupn=7.0235e-02, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #4: cost=1.2309 lambd=0.0001 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00122 (avg 0.00030)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.45974 (avg 0.01149)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.76997 (avg 0.02139)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.14e+00 cost_prev=1.2309 cost_new=1.1550
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.7977e-02, csupn=2.2938e-02, max_rho=1.0706e+01, al_update=False
+<span class=" -Color -Color-Bold">INFO    </span> |  step #5: cost=1.1550 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00146 (avg 0.00036)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.19640 (avg 0.00491)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95713 (avg 0.02659)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.73e-02 cost_prev=1.1550 cost_new=1.1547
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.0533e-02, csupn=2.0533e-02, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #6: cost=1.2663 lambd=0.0000 inexact_tol=1.5e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00149 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.29817 (avg 0.00745)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.96665 (avg 0.02685)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.34e-01 cost_prev=1.2663 cost_new=1.2594
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.6919e-02, csupn=4.4453e-03, max_rho=1.0706e+01, al_update=False
+<span class=" -Color -Color-Bold">INFO    </span> |  step #7: cost=1.2594 lambd=0.0000 inexact_tol=1.5e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00160 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22326 (avg 0.00558)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.03458 (avg 0.02874)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.62e-03 cost_prev=1.2594 cost_new=1.2594
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.6736e-02, csupn=4.4348e-03, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #8: cost=1.2683 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00160 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.23217 (avg 0.00580)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.03455 (avg 0.02874)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=7.70e-02 cost_prev=1.2683 cost_new=1.2681
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.7739e-02, csupn=1.6694e-03, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #9: cost=1.2672 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00162 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.21931 (avg 0.00548)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04625 (avg 0.02906)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.92e-02 cost_prev=1.2672 cost_new=1.2671
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.7237e-02, csupn=1.1708e-03, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #10: cost=1.2663 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00163 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.21651 (avg 0.00541)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04816 (avg 0.02912)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.37e-02 cost_prev=1.2663 cost_new=1.2663
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.6484e-02, csupn=1.0599e-03, max_rho=4.2824e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #11: cost=1.1094 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00163 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05929 (avg 0.00148)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04845 (avg 0.02912)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=7.40e-02 cost_prev=1.1094 cost_new=1.1093
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.6143e-02, csupn=2.9480e-04, max_rho=4.2824e+01, al_update=False
+<span class=" -Color -Color-Bold">INFO    </span> |  step #12: cost=1.1093 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00164 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05599 (avg 0.00140)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05164 (avg 0.02921)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.79e-03 cost_prev=1.1093 cost_new=1.1093
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.5962e-02, csupn=2.9469e-04, max_rho=4.2824e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #13: cost=1.1086 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00164 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05538 (avg 0.00138)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05162 (avg 0.02921)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.26e-02 cost_prev=1.1086 cost_new=1.1086
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.0064e-02, csupn=2.4927e-04, max_rho=4.2824e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #14: cost=1.1094 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05599 (avg 0.00140)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05175 (avg 0.02922)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.23e-02 cost_prev=1.1094 cost_new=1.1094
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.5259e-04, csupn=1.5259e-04, max_rho=4.2824e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #15: cost=1.1100 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05624 (avg 0.00141)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05215 (avg 0.02923)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.00e-02 cost_prev=1.1100 cost_new=1.1100
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=8.4639e-06, csupn=8.4639e-06, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> |  step #16: cost=1.2769 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22246 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05278 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.27e-04 cost_prev=1.2769 cost_new=1.2769
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.0266e-06, csupn=2.0266e-06, max_rho=1.0706e+01, al_update=False
+<span class=" -Color -Color-Bold">INFO    </span> |  step #17: cost=1.2769 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22243 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05281 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #18: cost=1.2769 lambd=0.0000 inexact_tol=5.5e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22243 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05281 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.61e-04 cost_prev=1.2769 cost_new=1.2769
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.9073e-06, csupn=1.9073e-06, max_rho=1.0706e+01, al_update=True
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #18: cost=1.2769 criteria=[1 0 0 0], term_deltas=2.3e-07,1.5e-04,3.6e-06
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="visualization">
+<h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading">¶</a></h2>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_trajectory_traces</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">name_prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Plotly traces for trajectory visualization.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vals: Variable values containing waypoint positions</span>
+<span class="sd">        name_prefix: Prefix for trace names</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of Plotly Scatter traces for path, start, and goal markers</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">traj</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">waypoint_vars</span><span class="p">]</span>  <span class="c1"># (n_waypoints, 2)</span>
+    <span class="n">traj_x</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">traj</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]]</span>
+    <span class="n">traj_y</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">traj</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]]</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="c1"># Trajectory line and points</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="n">traj_x</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">traj_y</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines+markers&quot;</span><span class="p">,</span>
+            <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+            <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">),</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}</span><span class="s2">Path&quot;</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;(%</span><span class="si">{x:.2f}</span><span class="s2">, %</span><span class="si">{y:.2f}</span><span class="s2">)&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="c1"># Start marker</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">traj_x</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+            <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">traj_y</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+            <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;circle&quot;</span><span class="p">),</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}</span><span class="s2">Start&quot;</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;Start (%</span><span class="si">{x:.2f}</span><span class="s2">, %</span><span class="si">{y:.2f}</span><span class="s2">)&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="c1"># Goal marker</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">traj_x</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span>
+            <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">traj_y</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+            <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;square&quot;</span><span class="p">),</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}</span><span class="s2">Goal&quot;</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;Goal (%</span><span class="si">{x:.2f}</span><span class="s2">, %</span><span class="si">{y:.2f}</span><span class="s2">)&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_obstacle_shapes</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Plotly shapes for obstacles.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of Plotly shape dictionaries for circular obstacles</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="nb">dict</span><span class="p">(</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;circle&quot;</span><span class="p">,</span>
+            <span class="n">xref</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span>
+            <span class="n">yref</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span>
+            <span class="n">x0</span><span class="o">=</span><span class="n">cx</span> <span class="o">-</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">y0</span><span class="o">=</span><span class="n">cy</span> <span class="o">-</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">x1</span><span class="o">=</span><span class="n">cx</span> <span class="o">+</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">y1</span><span class="o">=</span><span class="n">cy</span> <span class="o">+</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">fillcolor</span><span class="o">=</span><span class="s2">&quot;rgba(255, 99, 71, 0.3)&quot;</span><span class="p">,</span>
+            <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;tomato&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">obstacles</span>
+    <span class="p">]</span>
+
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">make_subplots</span><span class="p">(</span>
+    <span class="n">rows</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">cols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">subplot_titles</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;Initial (straight line)&quot;</span><span class="p">,</span> <span class="s2">&quot;Optimized (avoids obstacles)&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Add trajectory traces</span>
+<span class="k">for</span> <span class="n">trace</span> <span class="ow">in</span> <span class="n">get_trajectory_traces</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">):</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span><span class="n">trace</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">trace</span> <span class="ow">in</span> <span class="n">get_trajectory_traces</span><span class="p">(</span><span class="n">solution</span><span class="p">):</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span><span class="n">trace</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># Add obstacle shapes to both subplots</span>
+<span class="n">obstacle_shapes</span> <span class="o">=</span> <span class="n">get_obstacle_shapes</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">shape</span> <span class="ow">in</span> <span class="n">obstacle_shapes</span><span class="p">:</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_shape</span><span class="p">({</span><span class="o">**</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;yref&quot;</span><span class="p">:</span> <span class="s2">&quot;y&quot;</span><span class="p">},</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_shape</span><span class="p">({</span><span class="o">**</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="s2">&quot;x2&quot;</span><span class="p">,</span> <span class="s2">&quot;yref&quot;</span><span class="p">:</span> <span class="s2">&quot;y2&quot;</span><span class="p">},</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># Consistent axis ranges for both subplots</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">11</span><span class="p">],</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">11</span><span class="p">],</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span>
+    <span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span>
+    <span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;x2&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">))</span>
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="a1e9b031-48a9-4e7a-a8f5-8c578b0134bb" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("a1e9b031-48a9-4e7a-a8f5-8c578b0134bb")) {                    Plotly.newPlot(                        "a1e9b031-48a9-4e7a-a8f5-8c578b0134bb",                        [{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.0,0.5263158082962036,1.0526316165924072,1.5789473056793213,2.1052632331848145,2.6315789222717285,3.1578946113586426,3.6842105388641357,4.210526466369629,4.736842155456543,5.263157844543457,5.789473533630371,6.315789222717285,6.842105388641357,7.3684210777282715,7.894737243652344,8.421052932739258,8.947368621826172,9.473684310913086,10.0],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[10.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.0005203639157116413,0.555921196937561,1.1092405319213867,1.6583969593048096,2.2013089656829834,2.7358951568603516,3.2600741386413574,3.7717642784118652,4.268884658813477,4.757262706756592,5.242727279663086,5.731105804443359,6.228226661682129,6.739918231964111,7.264098167419434,7.7986860275268555,8.341599464416504,8.890756607055664,9.444077491760254,9.999479293823242],"y":[-0.002823987975716591,-0.16067002713680267,-0.30722013115882874,-0.43117833137512207,-0.5212487578392029,-0.5661354660987854,-0.5545424222946167,-0.4751737713813782,-0.3167334496974945,-0.11085006594657898,0.11084774881601334,0.31673136353492737,0.47517213225364685,0.5545412302017212,0.5661345720291138,0.5212481617927551,0.43117791414260864,0.30721983313560486,0.16066987812519073,0.0028239861130714417],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.0005203639157116413],"y":[-0.002823987975716591],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[9.999479293823242],"y":[0.0028239861130714417],"type":"scatter","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.45],"title":{"text":"x"},"range":[-1,11]},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x","scaleratio":1},"xaxis2":{"anchor":"y2","domain":[0.55,1.0],"title":{"text":"x"},"range":[-1,11]},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x2","scaleratio":1},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Initial (straight line)","x":0.225,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Optimized (avoids obstacles)","x":0.775,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"shapes":[{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x","y0":-0.5,"y1":2.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x2","y0":-0.5,"y1":2.5,"yref":"y2"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x","y0":-2.5,"y1":0.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x2","y0":-2.5,"y1":0.5,"yref":"y2"}],"margin":{"t":40,"b":40,"l":40,"r":40},"height":400,"showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+<p>The optimizer found a smooth trajectory that avoids both obstacles while connecting start to goal. The inequality constraints keep waypoints outside the obstacle regions.</p>
+<p>For solver configuration options, see <a class="reference internal" href="../../../api/solver_config/#jaxls.TrustRegionConfig" title="jaxls.TrustRegionConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.TrustRegionConfig</span></code></a> and <a class="reference internal" href="../../../api/solver_config/#jaxls.AugmentedLagrangianConfig" title="jaxls.AugmentedLagrangianConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.AugmentedLagrangianConfig</span></code></a>.</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../cart_pole_collocation/">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Cart-Pole (Collocation)</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="../inverse_kinematics/">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Inverse Kinematics</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/brentyi/jaxls" aria-label="GitHub">
+            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+        </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Obstacle Avoidance</a><ul>
+<li><a class="reference internal" href="#problem-setup">Problem setup</a></li>
+<li><a class="reference internal" href="#variables-and-costs">Variables and costs</a></li>
+<li><a class="reference internal" href="#problem-construction">Problem construction</a></li>
+<li><a class="reference internal" href="#solving">Solving</a></li>
+<li><a class="reference internal" href="#visualization">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=187304be"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=fd10adb8"></script>
+    </body>
+</html>

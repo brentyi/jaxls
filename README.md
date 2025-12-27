@@ -1,49 +1,12 @@
 # jaxls
 
+[**[ Documentation ]**](https://brentyi.github.io/jaxls)
+
 [![pyright](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg)](https://github.com/brentyi/jaxls/actions/workflows/pyright.yml)
-[![docs](https://github.com/brentyi/jaxls/actions/workflows/docs.yml/badge.svg)](https://brentyi.github.io/jaxls/)
 
-**`jaxls`** is a library for solving sparse, constrained, and/or non-Euclidean
-least squares problems in JAX.
+jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares problems in JAX.
 
-These problems are common in robotics and computer vision for applications like
-pose graph optimization, bundle adjustment, SLAM, camera calibration, inverse
-kinematics, motion planning, and motion retargeting.
-
-**[Documentation](https://brentyi.github.io/jaxls/)**
-
-### Installation
-
-```bash
-pip install "git+https://github.com/brentyi/jaxls.git"
-```
-
-### Quick example
-
-```python
-import jax
-import jaxlie
-import jaxls
-
-# Define a cost function.
-@jaxls.Cost.factory
-def prior_cost(
-    vals: jaxls.VarValues, var: jaxls.SE2Var, target: jaxlie.SE2
-) -> jax.Array:
-    return (vals[var] @ target.inverse()).log()
-
-# Create variables and costs.
-vars = [jaxls.SE2Var(0), jaxls.SE2Var(1)]
-costs = [
-    prior_cost(vars[0], jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),
-    prior_cost(vars[1], jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),
-]
-
-# Solve.
-solution = jaxls.LeastSquaresProblem(costs, vars).analyze().solve()
-```
-
-### In-the-wild examples
+#### Projects using jaxls
 
 <table>
   <tr>
@@ -103,3 +66,5 @@ solution = jaxls.LeastSquaresProblem(costs, vars).analyze().solve()
     </td>
   </tr>
 </table>
+
+For features and usage guide, see the [documentation](https://brentyi.github.io/jaxls)!

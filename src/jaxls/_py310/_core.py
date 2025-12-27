@@ -342,7 +342,7 @@ class AnalyzedLeastSquaresProblem:
                 jac_cache.append(None)
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_residual_info(self, vals: Any, include_jac_cache: Any = False) -> Any:
+    def _compute_residual_info(self, vals: Any) -> Any:
         residual_vectors: Any = []
         jac_caches: Any = []
         cost_nonconstraint = jnp.array(0.0)
@@ -374,7 +374,7 @@ class AnalyzedLeastSquaresProblem:
             residual_vector=residual_vector,
             cost_total=cost_total,
             cost_nonconstraint=cost_nonconstraint,
-            jac_cache=tuple(jac_caches) if include_jac_cache else None,
+            jac_cache=tuple(jac_caches),
         )
 
     def _compute_constraint_values(self, vals: Any) -> Any:

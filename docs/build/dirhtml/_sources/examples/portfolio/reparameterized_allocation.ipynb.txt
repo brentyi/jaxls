@@ -1,0 +1,310 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "cell-0",
+   "metadata": {},
+   "source": "# Reparameterized Allocation\n\nWe've now seen two approaches to portfolio allocation:\n- [Mean-Variance Allocation](mean_variance.ipynb): explicit constraints via Augmented Lagrangian\n- [Manifold Allocation](manifold_allocation.ipynb): constraints built into `retract_fn`\n\nHere we explore a third option: **reparameterization**. Since jaxls is a general nonlinear\nsolver, we can transform the problem so constraints are automatically satisfied.\n\nInstead of optimizing weights $w$ subject to $w_i \\geq 0$ and $\\sum w_i = 1$, we optimize\nunconstrained logits $\\ell \\in \\mathbb{R}^n$ and compute weights as $w = \\text{softmax}(\\ell)$.\n\nFeatures used:\n- {class}`~jaxls.Var` for unconstrained logit variables\n- Softmax reparameterization for automatic constraint satisfaction"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-1",
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "from loguru import logger\n",
+    "\n",
+    "logger.remove()\n",
+    "logger.add(sys.stdout, format=\"<level>{level: <8}</level> | {message}\");"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import jax\n",
+    "import jax.numpy as jnp\n",
+    "import jaxls"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-3",
+   "metadata": {},
+   "source": "## Softmax reparameterization\n\nThe softmax function maps unconstrained reals to the probability simplex:\n\n$$w_i = \\frac{\\exp(\\ell_i)}{\\sum_j \\exp(\\ell_j)}$$\n\nThis automatically ensures:\n- All weights are positive ($\\exp$ is always positive)\n- Weights sum to 1 (by construction)\n\nNo constraints or custom retractions needed, just standard unconstrained optimization."
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-4",
+   "metadata": {},
+   "source": "## Logit variable type\n\nWe define a variable for unconstrained logits. The default is zeros, which maps to\nuniform weights via softmax:"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "n_assets = 3\n",
+    "\n",
+    "\n",
+    "class LogitsVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(n_assets)):\n",
+    "    \"\"\"Unconstrained logits. Apply softmax to get portfolio weights.\"\"\"\n",
+    "\n",
+    "\n",
+    "# Verify softmax of zeros gives uniform weights.\n",
+    "test_logits = jnp.zeros(n_assets)\n",
+    "print(f\"Logits: {test_logits}\")\n",
+    "print(f\"Weights (softmax): {jax.nn.softmax(test_logits)}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-6",
+   "metadata": {},
+   "source": "## Asset data\n\nWe use the same historical stock data as the other portfolio notebooks."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "stock_names = [\"IBM\", \"WMT\", \"SEHI\"]\n",
+    "\n",
+    "# Monthly prices (13 months: Nov 2000 - Nov 2001).\n",
+    "prices = jnp.array(\n",
+    "    [\n",
+    "        [93.043, 51.826, 1.063],\n",
+    "        [84.585, 52.823, 0.938],\n",
+    "        [111.453, 56.477, 1.0],\n",
+    "        [99.525, 49.805, 0.938],\n",
+    "        [95.819, 50.287, 1.438],\n",
+    "        [114.708, 51.521, 1.7],\n",
+    "        [111.515, 51.531, 2.54],\n",
+    "        [113.211, 48.664, 2.39],\n",
+    "        [104.942, 55.744, 3.12],\n",
+    "        [99.827, 47.916, 2.98],\n",
+    "        [91.607, 49.438, 1.9],\n",
+    "        [107.937, 51.336, 1.75],\n",
+    "        [115.59, 55.081, 1.8],\n",
+    "    ]\n",
+    ")\n",
+    "\n",
+    "# Compute returns and covariance.\n",
+    "returns = jnp.diff(prices, axis=0) / prices[:-1]\n",
+    "expected_returns = jnp.mean(returns, axis=0)\n",
+    "returns_centered = returns - expected_returns\n",
+    "covariance = (returns_centered.T @ returns_centered) / (returns.shape[0] - 1)\n",
+    "cov_chol = jnp.linalg.cholesky(covariance)\n",
+    "\n",
+    "print(\"Expected monthly returns:\")\n",
+    "for name, r in zip(stock_names, expected_returns):\n",
+    "    print(f\"  {name}: {float(r) * 100:+.2f}%\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-8",
+   "metadata": {},
+   "source": "## Problem formulation\n\nThe key difference: our cost functions take logits as input and apply softmax internally\nto get weights. No constraints needed."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "logits_var = LogitsVar(id=0)\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def variance_cost(\n",
+    "    vals: jaxls.VarValues, var: LogitsVar, cov_chol: jax.Array\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Minimize portfolio variance.\"\"\"\n",
+    "    weights = jax.nn.softmax(vals[var])  # Convert logits to weights.\n",
+    "    return cov_chol.T @ weights\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory(kind=\"constraint_geq_zero\")\n",
+    "def return_constraint(\n",
+    "    vals: jaxls.VarValues, var: LogitsVar, exp_ret: jax.Array, target: float\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Expected return must meet target.\"\"\"\n",
+    "    weights = jax.nn.softmax(vals[var])  # Convert logits to weights.\n",
+    "    return jnp.array([jnp.dot(weights, exp_ret) - target])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-10",
+   "metadata": {},
+   "source": "## Efficient frontier\n\nWe compute the efficient frontier by solving for different target returns.\nOnly one constraint (return target) is needed; budget and non-negativity are handled by softmax.\n\nUsing `jax.lax.scan`, we solve sequentially while using each solution as the\ninitial guess for the next (warm-starting)."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-11",
+   "metadata": {},
+   "outputs": [],
+   "source": "min_return = float(expected_returns.min())\nmax_return = float(expected_returns.max())\ntarget_returns = jnp.linspace(min_return, max_return, 50)\n\n\ndef solve_for_target(\n    current_vals: jaxls.VarValues, target: jax.Array\n) -> tuple[jaxls.VarValues, jax.Array]:\n    \"\"\"Solve portfolio optimization for a given target return.\n\n    Args:\n        current_vals: Solution from previous target (used as initial guess).\n        target: Target return for this solve.\n\n    Returns:\n        Tuple of (solution values, optimal weights via softmax).\n    \"\"\"\n    costs = [\n        variance_cost(logits_var, cov_chol),\n        return_constraint(logits_var, expected_returns, target),\n    ]\n    problem = jaxls.LeastSquaresProblem(costs, [logits_var]).analyze()\n    solution = problem.solve(\n        current_vals,\n        verbose=False,\n        linear_solver=\"dense_cholesky\",\n        termination=jaxls.TerminationConfig(cost_tolerance=1e-8),\n    )\n    # Return weights (via softmax), not logits.\n    return solution, jax.nn.softmax(solution[logits_var])\n\n\n# Solve sequentially with warm-starting.\ninitial_vals = jaxls.VarValues.make([logits_var])\n_, all_weights = jax.lax.scan(solve_for_target, initial_vals, target_returns)\nvariances = jax.vmap(lambda w: w @ covariance @ w)(all_weights)\nreturns_achieved = jax.vmap(lambda w: jnp.dot(w, expected_returns))(all_weights)\n\nprint(f\"Computed {len(target_returns)} points on the efficient frontier\")"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Verify all solutions satisfy simplex constraints.\n",
+    "weight_sums = jnp.sum(all_weights, axis=1)\n",
+    "min_weights = jnp.min(all_weights, axis=1)\n",
+    "\n",
+    "print(\n",
+    "    f\"Weight sums: min={float(weight_sums.min()):.6f}, max={float(weight_sums.max()):.6f}\"\n",
+    ")\n",
+    "print(f\"Min weight across all solutions: {float(min_weights.min()):.6f}\")\n",
+    "print(\"Constraints satisfied by softmax construction!\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-13",
+   "metadata": {},
+   "source": "## Results"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-14",
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [],
+   "source": [
+    "import plotly.graph_objects as go\n",
+    "from plotly.subplots import make_subplots\n",
+    "from IPython.display import HTML\n",
+    "import math\n",
+    "\n",
+    "# Annualize returns and risk.\n",
+    "annual_factor = 12\n",
+    "risk_free_rate = 0.0\n",
+    "\n",
+    "std_devs_annual = [float(jnp.sqrt(v)) * math.sqrt(annual_factor) for v in variances]\n",
+    "returns_annual = [float(r) * annual_factor for r in returns_achieved]\n",
+    "sharpe_ratios = [\n",
+    "    (r - risk_free_rate) / s if s > 0 else 0.0\n",
+    "    for r, s in zip(returns_annual, std_devs_annual)\n",
+    "]\n",
+    "\n",
+    "colors = [\"#2196F3\", \"#4CAF50\", \"#FF9800\"]\n",
+    "\n",
+    "fig = make_subplots(\n",
+    "    rows=1,\n",
+    "    cols=3,\n",
+    "    subplot_titles=(\"Efficient Frontier\", \"Sharpe Ratio\", \"Asset Allocation\"),\n",
+    "    column_widths=[0.33, 0.33, 0.34],\n",
+    ")\n",
+    "\n",
+    "# Scale to $1000 investment.\n",
+    "std_dev_dollars = [s * 1000 for s in std_devs_annual]\n",
+    "return_dollars = [r * 1000 for r in returns_annual]\n",
+    "target_dollars = [float(t) * annual_factor * 1000 for t in target_returns]\n",
+    "\n",
+    "# Left plot: Efficient frontier.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=std_dev_dollars,\n",
+    "        y=return_dollars,\n",
+    "        mode=\"lines+markers\",\n",
+    "        marker=dict(size=6, color=sharpe_ratios, colorscale=\"Viridis\", showscale=False),\n",
+    "        line=dict(color=\"steelblue\", width=2),\n",
+    "        hovertemplate=\"Std Dev: $%{x:.0f}<br>Return: $%{y:.0f}<extra></extra>\",\n",
+    "        showlegend=False,\n",
+    "    ),\n",
+    "    row=1,\n",
+    "    col=1,\n",
+    ")\n",
+    "\n",
+    "# Middle plot: Sharpe ratio vs return.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=return_dollars,\n",
+    "        y=sharpe_ratios,\n",
+    "        mode=\"lines+markers\",\n",
+    "        marker=dict(size=6, color=sharpe_ratios, colorscale=\"Viridis\", showscale=False),\n",
+    "        line=dict(color=\"steelblue\", width=2),\n",
+    "        hovertemplate=\"Return: $%{x:.0f}<br>Sharpe: %{y:.2f}<extra></extra>\",\n",
+    "        showlegend=False,\n",
+    "    ),\n",
+    "    row=1,\n",
+    "    col=2,\n",
+    ")\n",
+    "\n",
+    "# Right plot: Asset allocation.\n",
+    "for i, (name, color) in enumerate(zip(stock_names, colors)):\n",
+    "    fig.add_trace(\n",
+    "        go.Bar(\n",
+    "            x=target_dollars,\n",
+    "            y=[float(w) * 1000 for w in all_weights[:, i]],\n",
+    "            name=name,\n",
+    "            marker_color=color,\n",
+    "            hovertemplate=f\"{name}: $%{{y:.0f}}<extra></extra>\",\n",
+    "        ),\n",
+    "        row=1,\n",
+    "        col=3,\n",
+    "    )\n",
+    "\n",
+    "fig.update_xaxes(title_text=\"Std Dev ($)\", row=1, col=1)\n",
+    "fig.update_yaxes(title_text=\"Return ($)\", row=1, col=1)\n",
+    "fig.update_xaxes(title_text=\"Return ($)\", row=1, col=2)\n",
+    "fig.update_yaxes(title_text=\"Sharpe Ratio\", row=1, col=2)\n",
+    "fig.update_xaxes(title_text=\"Target Return ($)\", row=1, col=3)\n",
+    "fig.update_yaxes(title_text=\"Investment ($)\", range=[0, 1050], row=1, col=3)\n",
+    "\n",
+    "fig.update_layout(\n",
+    "    barmode=\"stack\",\n",
+    "    height=400,\n",
+    "    margin=dict(t=40, b=40, l=60, r=40),\n",
+    "    legend=dict(orientation=\"h\", yanchor=\"bottom\", y=-0.25, xanchor=\"center\", x=0.83),\n",
+    ")\n",
+    "HTML(fig.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-15",
+   "metadata": {},
+   "source": "## Comparison of approaches\n\nAll three approaches produce the same efficient frontier:\n\n| Approach | Variables | Constraints | Implementation |\n|----------|-----------|-------------|----------------|\n| Constrained | Weights | Budget, non-negativity, return | Augmented Lagrangian |\n| Manifold | Weights | Return only | Log-space retraction |\n| Reparameterized | Logits | Return only | Softmax transformation |\n\nThe reparameterization approach is conceptually simple: transform the problem so constraints\ndisappear. The tradeoff is that the optimization landscape changes, since gradients flow through\nthe softmax, which can affect convergence."
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

@@ -44,7 +44,7 @@ def test_cost_create_factory_deprecated():
         assert any("Cost.factory" in str(x.message) for x in deprecation_warnings)
 
     # Verify the cost still works
-    cost = cost_fn(var, 1.0)
+    cost = cost_fn(var, 1.0)  # type: ignore
     problem = jaxls.LeastSquaresProblem(costs=[cost], variables=[var]).analyze()
     solution = problem.solve(verbose=False)
     assert jnp.abs(solution[var] - 1.0) < 1e-5
@@ -61,7 +61,7 @@ def test_cost_create_factory_with_kind_deprecated():
         warnings.simplefilter("always")
 
         # DEPRECATED: Use @jaxls.Cost.factory(kind="constraint_eq_zero") instead
-        @jaxls.Cost.create_factory(kind="constraint_eq_zero")
+        @jaxls.Cost.create_factory(kind="constraint_eq_zero")  # type: ignore
         def constraint_fn(
             vals: jaxls.VarValues, var: ScalarVar, target: float
         ) -> jax.Array:
@@ -81,7 +81,7 @@ def test_cost_create_factory_with_kind_deprecated():
 
     # Verify both costs work together
     problem = jaxls.LeastSquaresProblem(
-        costs=[cost_fn(var, 2.0), constraint_fn(var, 1.0)],
+        costs=[cost_fn(var, 2.0), constraint_fn(var, 1.0)],  # type: ignore
         variables=[var],
     ).analyze()
     solution = problem.solve(verbose=False)
@@ -102,7 +102,7 @@ def test_cost_make_deprecated():
         warnings.simplefilter("always")
 
         # DEPRECATED: Use Cost(...) directly
-        cost = jaxls.Cost.make(
+        cost = jaxls.Cost.make(  # type: ignore
             compute_residual=my_cost_fn,
             args=(var,),
         )

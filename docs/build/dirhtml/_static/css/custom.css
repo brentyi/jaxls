@@ -1,0 +1,25 @@
+/* Custom CSS for jaxls documentation */
+
+/* Make long text/stream outputs scrollable, but not HTML outputs (Plotly). */
+.cell_output .output_text,
+.cell_output .output_stream,
+.cell_output pre {
+    max-height: 400px;
+    overflow: auto;
+}
+
+/* Don't limit HTML outputs (Plotly plots). */
+.cell_output .output_html {
+    max-height: none;
+    overflow: visible;
+}
+
+/* Show copy button when hovering anywhere on cell_output. */
+.cell_output:hover button.copybtn {
+    opacity: 1;
+}
+
+/* Add background to copy button in output cells. */
+.cell_output button.copybtn {
+    background-color: #f6f8fa;
+}

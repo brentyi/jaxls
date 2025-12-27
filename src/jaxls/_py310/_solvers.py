@@ -186,7 +186,7 @@ class NonlinearSolver:
         return_summary: jdc.Static[Any] = False,
     ) -> Any:
         vals = initial_vals
-        residual_info = problem._compute_residual_info(vals, include_jac_cache=True)
+        residual_info = problem._compute_residual_info(vals)
 
         cost_history = jnp.zeros(self.termination.max_iterations)
         cost_history = cost_history.at[0].set(residual_info.cost_nonconstraint)
@@ -205,7 +205,7 @@ class NonlinearSolver:
 
             problem = update_problem_al_params(problem, al_state)
 
-            residual_info = problem._compute_residual_info(vals, include_jac_cache=True)
+            residual_info = problem._compute_residual_info(vals)
             cost_history = cost_history.at[0].set(residual_info.cost_nonconstraint)
 
         state = _LmOuterState(
@@ -362,9 +362,7 @@ class NonlinearSolver:
         proposed_vals = sol_prev.vals._retract(
             scaled_local_delta, problem._tangent_ordering
         )
-        proposed_residual_info = problem._compute_residual_info(
-            proposed_vals, include_jac_cache=True
-        )
+        proposed_residual_info = problem._compute_residual_info(proposed_vals)
 
         if self.trust_region is not None:
             predicted_cost = jnp.sum(
@@ -525,6 +523,7 @@ class NonlinearSolver:
             )
 
         if self.augmented_lagrangian is not None:
+            assert state.al_state is not None
             state_next = self._update_al_state_and_recompute(
                 problem, state_next, state.al_state, inner_state_final.accepted
             )
@@ -572,9 +571,7 @@ class NonlinearSolver:
         )
 
         problem_updated = update_problem_al_params(problem, al_state_updated)
-        new_residual_info = problem_updated._compute_residual_info(
-            state.solution.vals, include_jac_cache=True
-        )
+        new_residual_info = problem_updated._compute_residual_info(state.solution.vals)
 
         with jdc.copy_and_mutate(state) as state_updated:
             state_updated.al_state = al_state_updated

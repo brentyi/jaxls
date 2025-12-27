@@ -22,7 +22,9 @@ class PythonTranspiler(cst.CSTTransformer):
         self.needs_any_import = False
         self.has_any_import = False
         self.overloaded_functions = set()
-        self.needs_assert_never_import = False  # Track if we need typing_extensions.assert_never
+        self.needs_assert_never_import = (
+            False  # Track if we need typing_extensions.assert_never
+        )
 
     # ==================== Type Annotation Handling ====================
 
@@ -469,9 +471,9 @@ class PythonTranspiler(cst.CSTTransformer):
             # Only treat as type expression if BOTH operands look like types
             # This avoids removing bitwise OR operations on regular values
             if isinstance(node.operator, cst.BitOr):
-                return self._is_type_expression(
-                    node.left
-                ) and self._is_type_expression(node.right)
+                return self._is_type_expression(node.left) and self._is_type_expression(
+                    node.right
+                )
 
         return False
 
@@ -594,9 +596,7 @@ def transpile_file(input_path: Path, output_path: Path) -> None:
 
         # Add assert_never import from typing_extensions if needed
         if transformer.needs_assert_never_import:
-            modified_tree = add_typing_extensions_import(
-                modified_tree, "assert_never"
-            )
+            modified_tree = add_typing_extensions_import(modified_tree, "assert_never")
 
         # Write output
         output_path.parent.mkdir(parents=True, exist_ok=True)

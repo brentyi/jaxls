@@ -1,0 +1,433 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "cell-0",
+   "metadata": {},
+   "source": "# Manifold Allocation\n\nThe previous portfolio notebooks treat allocation as a classical constrained optimization problem:\nwe minimize variance subject to budget constraints (weights sum to 1) and no short-selling\n(weights non-negative).\n\nBut there's another perspective: the set of valid allocations forms a *manifold* called the\nprobability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\nwithout explicit constraints.\n\nFeatures used:\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n- Multiplicative retraction for smooth simplex optimization"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "cell-1",
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "from loguru import logger\n",
+    "\n",
+    "logger.remove()\n",
+    "logger.add(sys.stdout, format=\"<level>{level: <8}</level> | {message}\");"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "cell-2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import jax\n",
+    "import jax.numpy as jnp\n",
+    "import jaxls"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-3",
+   "metadata": {},
+   "source": [
+    "## The probability simplex\n",
+    "\n",
+    "The probability simplex $\\Delta^{n-1}$ is the set of valid portfolio allocations:\n",
+    "\n",
+    "$$\\Delta^{n-1} = \\{w \\in \\mathbb{R}^n : w_i \\geq 0, \\sum_i w_i = 1\\}$$\n",
+    "\n",
+    "This is an $(n-1)$-dimensional manifold embedded in $\\mathbb{R}^n$. The sum-to-one constraint\n",
+    "removes one degree of freedom.\n",
+    "\n",
+    "To optimize on this manifold, we need a **retraction**: a function that maps an arbitrary\n",
+    "update back to a valid point on the simplex."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-4",
+   "metadata": {},
+   "source": "## Simplex retraction\n\nOur retraction uses multiplicative updates, which are additive in log-space:\n1. Scale each weight: `weights * exp(delta)`\n2. Normalize: divide by sum to ensure sum-to-one\n\nThis is smooth everywhere. Assuming positive initialization, weights stay positive since\n`exp(delta)` is always positive."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-5",
+   "metadata": {},
+   "outputs": [],
+   "source": "def simplex_retract(weights: jax.Array, delta: jax.Array) -> jax.Array:\n    \"\"\"Multiplicative update that keeps weights positive and summing to 1.\"\"\"\n    v = weights * jnp.exp(delta)\n    return v / jnp.sum(v)"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "cell-6",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Initial weights: [0.5 0.3 0.2] (sum=1.0000)\n",
+      "After adding delta: [ 0.6        -0.09999999  0.3       ]\n",
+      "After retraction: [0.5669196  0.2063125  0.22676793] (sum=1.0000)\n",
+      "All non-negative: True\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Verify the retraction works.\n",
+    "test_weights = jnp.array([0.5, 0.3, 0.2])\n",
+    "test_delta = jnp.array([0.1, -0.4, 0.1])  # Would make middle weight negative.\n",
+    "\n",
+    "result = simplex_retract(test_weights, test_delta)\n",
+    "print(f\"Initial weights: {test_weights} (sum={float(jnp.sum(test_weights)):.4f})\")\n",
+    "print(f\"After adding delta: {test_weights + test_delta}\")\n",
+    "print(f\"After retraction: {result} (sum={float(jnp.sum(result)):.4f})\")\n",
+    "print(f\"All non-negative: {bool(jnp.all(result >= 0))}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-7",
+   "metadata": {},
+   "source": [
+    "## Simplex variable type\n",
+    "\n",
+    "Now we define a variable type that lives on the simplex. The `retract_fn` ensures all updates\n",
+    "produce valid allocations:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "cell-8",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "SimplexWeightsVar tangent_dim: 3\n"
+     ]
+    }
+   ],
+   "source": [
+    "n_assets = 3\n",
+    "\n",
+    "\n",
+    "class SimplexWeightsVar(\n",
+    "    jaxls.Var[jax.Array],\n",
+    "    default_factory=lambda: jnp.ones(n_assets) / n_assets,\n",
+    "    retract_fn=simplex_retract,\n",
+    "    tangent_dim=n_assets,  # Projection handles the constraint.\n",
+    "):\n",
+    "    \"\"\"Portfolio weights on the probability simplex.\"\"\"\n",
+    "\n",
+    "\n",
+    "print(f\"SimplexWeightsVar tangent_dim: {SimplexWeightsVar.tangent_dim}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-9",
+   "metadata": {},
+   "source": [
+    "## Asset data\n",
+    "\n",
+    "We use the same historical stock data as the mean-variance notebook."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "cell-10",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Expected monthly returns:\n",
+      "  IBM: +2.60%\n",
+      "  WMT: +0.81%\n",
+      "  SEHI: +7.37%\n"
+     ]
+    }
+   ],
+   "source": [
+    "stock_names = [\"IBM\", \"WMT\", \"SEHI\"]\n",
+    "\n",
+    "# Monthly prices (13 months: Nov 2000 - Nov 2001).\n",
+    "prices = jnp.array(\n",
+    "    [\n",
+    "        [93.043, 51.826, 1.063],\n",
+    "        [84.585, 52.823, 0.938],\n",
+    "        [111.453, 56.477, 1.0],\n",
+    "        [99.525, 49.805, 0.938],\n",
+    "        [95.819, 50.287, 1.438],\n",
+    "        [114.708, 51.521, 1.7],\n",
+    "        [111.515, 51.531, 2.54],\n",
+    "        [113.211, 48.664, 2.39],\n",
+    "        [104.942, 55.744, 3.12],\n",
+    "        [99.827, 47.916, 2.98],\n",
+    "        [91.607, 49.438, 1.9],\n",
+    "        [107.937, 51.336, 1.75],\n",
+    "        [115.59, 55.081, 1.8],\n",
+    "    ]\n",
+    ")\n",
+    "\n",
+    "# Compute returns and covariance.\n",
+    "returns = jnp.diff(prices, axis=0) / prices[:-1]\n",
+    "expected_returns = jnp.mean(returns, axis=0)\n",
+    "returns_centered = returns - expected_returns\n",
+    "covariance = (returns_centered.T @ returns_centered) / (returns.shape[0] - 1)\n",
+    "cov_chol = jnp.linalg.cholesky(covariance)\n",
+    "\n",
+    "print(\"Expected monthly returns:\")\n",
+    "for name, r in zip(stock_names, expected_returns):\n",
+    "    print(f\"  {name}: {float(r) * 100:+.2f}%\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-11",
+   "metadata": {},
+   "source": [
+    "## Problem formulation\n",
+    "\n",
+    "With the simplex variable, we only need a variance cost and a return constraint.\n",
+    "The budget and no short-selling constraints are handled implicitly by the manifold geometry."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "cell-12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "weights_var = SimplexWeightsVar(id=0)\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def variance_cost(\n",
+    "    vals: jaxls.VarValues, var: SimplexWeightsVar, cov_chol: jax.Array\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Minimize portfolio variance: ||L.T @ w||^2 = w.T @ cov @ w.\"\"\"\n",
+    "    return cov_chol.T @ vals[var]\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory(kind=\"constraint_geq_zero\")\n",
+    "def return_constraint(\n",
+    "    vals: jaxls.VarValues, var: SimplexWeightsVar, exp_ret: jax.Array, target: float\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Expected return must meet target: E[r] >= target.\"\"\"\n",
+    "    return jnp.array([jnp.dot(vals[var], exp_ret) - target])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-13",
+   "metadata": {},
+   "source": "## Efficient frontier\n\nWe compute the efficient frontier by solving for different target returns.\nNote that we only have one constraint (return target) instead of three.\n\nUsing `jax.lax.scan`, we solve sequentially while using each solution as the\ninitial guess for the next (warm-starting)."
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cell-14",
+   "metadata": {},
+   "outputs": [],
+   "source": "min_return = float(expected_returns.min())\nmax_return = float(expected_returns.max())\ntarget_returns = jnp.linspace(min_return, max_return, 50)\n\n\ndef solve_for_target(\n    current_vals: jaxls.VarValues, target: jax.Array\n) -> tuple[jaxls.VarValues, jax.Array]:\n    \"\"\"Solve portfolio optimization for a given target return.\n\n    Args:\n        current_vals: Solution from previous target (used as initial guess).\n        target: Target return for this solve.\n\n    Returns:\n        Tuple of (solution values, optimal weights).\n    \"\"\"\n    costs = [\n        variance_cost(weights_var, cov_chol),\n        return_constraint(weights_var, expected_returns, target),\n    ]\n    problem = jaxls.LeastSquaresProblem(costs, [weights_var]).analyze()\n    solution = problem.solve(\n        current_vals,\n        verbose=False,\n        linear_solver=\"dense_cholesky\",\n        termination=jaxls.TerminationConfig(cost_tolerance=1e-8),\n    )\n    return solution, solution[weights_var]\n\n\n# Solve sequentially with warm-starting.\ninitial_vals = jaxls.VarValues.make([weights_var])\n_, all_weights = jax.lax.scan(solve_for_target, initial_vals, target_returns)\nvariances = jax.vmap(lambda w: w @ covariance @ w)(all_weights)\nreturns_achieved = jax.vmap(lambda w: jnp.dot(w, expected_returns))(all_weights)\n\nprint(f\"Computed {len(target_returns)} points on the efficient frontier\")"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "cell-15",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Weight sums: min=1.000000, max=1.000000\n",
+      "Min weight across all solutions: 0.000001\n",
+      "All constraints satisfied by construction!\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Verify all solutions satisfy simplex constraints.\n",
+    "weight_sums = jnp.sum(all_weights, axis=1)\n",
+    "min_weights = jnp.min(all_weights, axis=1)\n",
+    "\n",
+    "print(\n",
+    "    f\"Weight sums: min={float(weight_sums.min()):.6f}, max={float(weight_sums.max()):.6f}\"\n",
+    ")\n",
+    "print(f\"Min weight across all solutions: {float(min_weights.min()):.6f}\")\n",
+    "print(\"All constraints satisfied by construction!\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-16",
+   "metadata": {},
+   "source": [
+    "## Results"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "cell-17",
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>                        <script type=\"text/javascript\">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>\n",
+       "        <script charset=\"utf-8\" src=\"https://cdn.plot.ly/plotly-3.1.0.min.js\" integrity=\"sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=\" crossorigin=\"anonymous\"></script>                <div id=\"0fea0b34-880e-4411-a2bc-a2005a9a0202\" class=\"plotly-graph-div\" style=\"height:400px; width:100%;\"></div>            <script type=\"text/javascript\">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById(\"0fea0b34-880e-4411-a2bc-a2005a9a0202\")) {                    Plotly.newPlot(                        \"0fea0b34-880e-4411-a2bc-a2005a9a0202\",                        [{\"hovertemplate\":\"Std Dev: $%{x:.0f}\\u003cbr\\u003eReturn: $%{y:.0f}\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"steelblue\",\"width\":2},\"marker\":{\"color\":[0.5677825713565403,0.5677825713565403,0.5677825713565403,0.5677825713565403,0.6042778103641306,0.6617978264151279,0.716405214514709,0.7676016318396058,0.8151599853084124,0.8588534023632322,0.8986102185477682,0.9344635339453814,0.9665368534912947,0.9950134349302817,1.0201154497873761,1.0421183094520314,1.061290653233016,1.0779073578465947,1.0922351610414476,1.104527032086482,1.1150176643378227,1.1239226892162832,1.1314364380130482,1.137733932745736,1.1429705036865268,1.147283812252942,1.1507951177377411,1.1536112008140038,1.155837331220174,1.1572758386673108,1.1562667996207678,1.1527234126265289,1.1470997054270675,1.1398428123677087,1.1313013670241385,1.1217869096064685,1.1115662392513528,1.1008161410189485,1.0897997243644562,1.078624394307034,1.0674070237039626,1.0562403115468335,1.0451948760698166,1.0343255628142334,1.0236728094475542,1.0132673959974956,1.0031295651083552,0.9932726939255845,0.9837193456018101,0.9744562208088628],\"colorscale\":[[0.0,\"#440154\"],[0.1111111111111111,\"#482878\"],[0.2222222222222222,\"#3e4989\"],[0.3333333333333333,\"#31688e\"],[0.4444444444444444,\"#26828e\"],[0.5555555555555556,\"#1f9e89\"],[0.6666666666666666,\"#35b779\"],[0.7777777777777778,\"#6ece58\"],[0.8888888888888888,\"#b5de2b\"],[1.0,\"#fde725\"]],\"showscale\":false,\"size\":6},\"mode\":\"lines+markers\",\"showlegend\":false,\"x\":[267.0690760658964,267.0690760658964,267.0690760658964,267.0690760658964,267.2465426573863,268.29456598694446,270.27317911038887,273.1586114153341,276.92686000328024,281.5408881437462,286.95999414755516,293.13947584244704,300.0333921968842,307.5935309373206,315.7685568324482,324.5161938094252,333.7900104549167,343.54757583867126,353.7487818915824,364.3564886448959,375.3363693728001,386.65696221156225,398.28920558729953,410.20731574130076,422.38759948988536,434.809718893249,447.4559943971203,460.3155085541169,473.46352206534203,486.7048629754659,500.8942409476329,516.3824596338985,532.9541639965381,550.4374623108105,568.7802708679272,587.9202337509251,607.7737795777152,628.3562392318555,649.4487475743356,671.0710231153209,693.1734598645786,715.7108394584826,738.6443443063406,761.9381507273808,785.5610291439847,809.4830920760849,833.6796655764059,858.1294825606857,882.7747812151146,907.6383771980514],\"y\":[151.63716673851013,151.63716673851013,151.63716673851013,151.63716673851013,161.49115562438965,177.55676060914993,193.62511485815048,209.67699587345123,225.73969513177872,241.80234968662262,257.86518305540085,273.9281505346298,289.9933308362961,306.05969578027725,322.12038338184357,338.18426728248596,354.24821823835373,370.3124597668648,386.37685775756836,402.4415910243988,418.5066819190979,434.5725327730179,450.63892006874084,466.706782579422,482.77656733989716,498.85015189647675,514.9301737546921,531.0251265764236,547.2468137741089,563.2517784833908,579.1673809289932,595.2461510896683,611.3515645265579,627.4121850728989,643.4618979692459,659.521222114563,675.5808144807816,691.7046904563904,707.7690660953522,723.8335758447647,739.898219704628,755.9626400470734,772.0272839069366,788.0921065807343,804.1574656963348,820.2228248119354,836.288720369339,852.3565828800201,868.4026300907135,884.4538629055023],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Return: $%{x:.0f}\\u003cbr\\u003eSharpe: %{y:.2f}\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"steelblue\",\"width\":2},\"marker\":{\"color\":[0.5677825713565403,0.5677825713565403,0.5677825713565403,0.5677825713565403,0.6042778103641306,0.6617978264151279,0.716405214514709,0.7676016318396058,0.8151599853084124,0.8588534023632322,0.8986102185477682,0.9344635339453814,0.9665368534912947,0.9950134349302817,1.0201154497873761,1.0421183094520314,1.061290653233016,1.0779073578465947,1.0922351610414476,1.104527032086482,1.1150176643378227,1.1239226892162832,1.1314364380130482,1.137733932745736,1.1429705036865268,1.147283812252942,1.1507951177377411,1.1536112008140038,1.155837331220174,1.1572758386673108,1.1562667996207678,1.1527234126265289,1.1470997054270675,1.1398428123677087,1.1313013670241385,1.1217869096064685,1.1115662392513528,1.1008161410189485,1.0897997243644562,1.078624394307034,1.0674070237039626,1.0562403115468335,1.0451948760698166,1.0343255628142334,1.0236728094475542,1.0132673959974956,1.0031295651083552,0.9932726939255845,0.9837193456018101,0.9744562208088628],\"colorscale\":[[0.0,\"#440154\"],[0.1111111111111111,\"#482878\"],[0.2222222222222222,\"#3e4989\"],[0.3333333333333333,\"#31688e\"],[0.4444444444444444,\"#26828e\"],[0.5555555555555556,\"#1f9e89\"],[0.6666666666666666,\"#35b779\"],[0.7777777777777778,\"#6ece58\"],[0.8888888888888888,\"#b5de2b\"],[1.0,\"#fde725\"]],\"showscale\":false,\"size\":6},\"mode\":\"lines+markers\",\"showlegend\":false,\"x\":[151.63716673851013,151.63716673851013,151.63716673851013,151.63716673851013,161.49115562438965,177.55676060914993,193.62511485815048,209.67699587345123,225.73969513177872,241.80234968662262,257.86518305540085,273.9281505346298,289.9933308362961,306.05969578027725,322.12038338184357,338.18426728248596,354.24821823835373,370.3124597668648,386.37685775756836,402.4415910243988,418.5066819190979,434.5725327730179,450.63892006874084,466.706782579422,482.77656733989716,498.85015189647675,514.9301737546921,531.0251265764236,547.2468137741089,563.2517784833908,579.1673809289932,595.2461510896683,611.3515645265579,627.4121850728989,643.4618979692459,659.521222114563,675.5808144807816,691.7046904563904,707.7690660953522,723.8335758447647,739.898219704628,755.9626400470734,772.0272839069366,788.0921065807343,804.1574656963348,820.2228248119354,836.288720369339,852.3565828800201,868.4026300907135,884.4538629055023],\"y\":[0.5677825713565403,0.5677825713565403,0.5677825713565403,0.5677825713565403,0.6042778103641306,0.6617978264151279,0.716405214514709,0.7676016318396058,0.8151599853084124,0.8588534023632322,0.8986102185477682,0.9344635339453814,0.9665368534912947,0.9950134349302817,1.0201154497873761,1.0421183094520314,1.061290653233016,1.0779073578465947,1.0922351610414476,1.104527032086482,1.1150176643378227,1.1239226892162832,1.1314364380130482,1.137733932745736,1.1429705036865268,1.147283812252942,1.1507951177377411,1.1536112008140038,1.155837331220174,1.1572758386673108,1.1562667996207678,1.1527234126265289,1.1470997054270675,1.1398428123677087,1.1313013670241385,1.1217869096064685,1.1115662392513528,1.1008161410189485,1.0897997243644562,1.078624394307034,1.0674070237039626,1.0562403115468335,1.0451948760698166,1.0343255628142334,1.0236728094475542,1.0132673959974956,1.0031295651083552,0.9932726939255845,0.9837193456018101,0.9744562208088628],\"type\":\"scatter\",\"xaxis\":\"x2\",\"yaxis\":\"y2\"},{\"hovertemplate\":\"IBM: $%{y:.0f}\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"marker\":{\"color\":\"#2196F3\"},\"name\":\"IBM\",\"x\":[97.21581637859344,113.28469589352608,129.35356423258781,145.42244374752045,161.49131208658218,177.56019160151482,193.62907111644745,209.6979394555092,225.7668301463127,241.83569848537445,257.9045668244362,273.9734351634979,290.04232585430145,306.1111941933632,322.1800848841667,338.24895322322845,354.3178215622902,370.3867122530937,386.45558059215546,402.524471282959,418.59331727027893,434.66220796108246,450.7310539484024,466.79994463920593,482.86883533000946,498.937726020813,515.0065720081329,531.0754626989365,547.14435338974,563.2131993770599,579.2820900678635,595.350980758667,611.4198267459869,627.4887174367905,643.557608127594,659.6264541149139,675.6953448057175,691.7641907930374,707.8330814838409,723.9019721746445,739.970862865448,756.039708852768,772.1085548400879,788.177490234375,804.246336221695,820.3151822090149,836.384117603302,852.452963590622,868.5218095779419,884.590744972229],\"y\":[159.79428589344025,159.79428589344025,159.79428589344025,159.79428589344025,169.83237862586975,186.1981898546219,202.5665044784546,218.9183086156845,235.28097569942474,251.643568277359,268.0063247680664,284.3693494796753,300.7345199584961,317.09975004196167,333.46158266067505,349.8254120349884,366.1893308162689,382.5535178184509,398.91794323921204,415.28260707855225,431.6475987434387,448.0132758617401,464.3794000148773,480.74689507484436,497.1160590648651,513.4887099266052,529.8661589622498,546.2555885314941,562.7993941307068,560.4265332221985,533.315896987915,505.2914023399353,477.1833121776581,449.1574168205261,421.11626267433167,393.0714428424835,365.02552032470703,336.86745166778564,308.81208181381226,280.7561755180359,252.70012021064758,224.64518249034882,196.58973813056946,168.53317618370056,140.47454297542572,112.4156191945076,84.35546606779099,56.2925823032856,28.269248083233833,0.2371478476561606],\"type\":\"bar\",\"xaxis\":\"x3\",\"yaxis\":\"y3\"},{\"hovertemplate\":\"WMT: $%{y:.0f}\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"marker\":{\"color\":\"#4CAF50\"},\"name\":\"WMT\",\"x\":[97.21581637859344,113.28469589352608,129.35356423258781,145.42244374752045,161.49131208658218,177.56019160151482,193.62907111644745,209.6979394555092,225.7668301463127,241.83569848537445,257.9045668244362,273.9734351634979,290.04232585430145,306.1111941933632,322.1800848841667,338.24895322322845,354.3178215622902,370.3867122530937,386.45558059215546,402.524471282959,418.59331727027893,434.66220796108246,450.7310539484024,466.79994463920593,482.86883533000946,498.937726020813,515.0065720081329,531.0754626989365,547.14435338974,563.2131993770599,579.2820900678635,595.350980758667,611.4198267459869,627.4887174367905,643.557608127594,659.6264541149139,675.6953448057175,691.7641907930374,707.8330814838409,723.9019721746445,739.970862865448,756.039708852768,772.1085548400879,788.177490234375,804.246336221695,820.3151822090149,836.384117603302,852.452963590622,868.5218095779419,884.590744972229],\"y\":[814.6829605102539,814.6829605102539,814.6829605102539,814.6829605102539,794.8684692382812,762.5635266304016,730.253279209137,697.9759931564331,665.677011013031,633.3782076835632,601.0790467262268,568.779468536377,536.4754796028137,504.1700601577759,471.8742072582245,439.57287073135376,407.2714149951935,374.9694526195526,342.66701340675354,310.3640675544739,278.0603766441345,245.7551807165146,213.44904601573944,181.14012479782104,148.8274186849594,116.5073812007904,84.17564630508423,51.81620642542839,19.183645024895668,0.5821707309223711,0.08307719690492377,0.041127514123218134,0.026318622985854745,0.00860558429849334,0.01581760989211034,0.013418141861620825,0.011525374247867148,0.009526603207632434,0.008500994226778857,0.007631100743310526,0.006709760327794356,0.005358317594073014,0.003915488377970178,0.0031709175800642697,0.00308370181301143,0.003465254621914937,0.0038682105696352664,0.003773672915485804,0.0027219259663979756,0.0014392703633347992],\"type\":\"bar\",\"xaxis\":\"x3\",\"yaxis\":\"y3\"},{\"hovertemplate\":\"SEHI: $%{y:.0f}\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"marker\":{\"color\":\"#FF9800\"},\"name\":\"SEHI\",\"x\":[97.21581637859344,113.28469589352608,129.35356423258781,145.42244374752045,161.49131208658218,177.56019160151482,193.62907111644745,209.6979394555092,225.7668301463127,241.83569848537445,257.9045668244362,273.9734351634979,290.04232585430145,306.1111941933632,322.1800848841667,338.24895322322845,354.3178215622902,370.3867122530937,386.45558059215546,402.524471282959,418.59331727027893,434.66220796108246,450.7310539484024,466.79994463920593,482.86883533000946,498.937726020813,515.0065720081329,531.0754626989365,547.14435338974,563.2131993770599,579.2820900678635,595.350980758667,611.4198267459869,627.4887174367905,643.557608127594,659.6264541149139,675.6953448057175,691.7641907930374,707.8330814838409,723.9019721746445,739.970862865448,756.039708852768,772.1085548400879,788.177490234375,804.246336221695,820.3151822090149,836.384117603302,852.452963590622,868.5218095779419,884.590744972229],\"y\":[25.522718206048012,25.522718206048012,25.522718206048012,25.522718206048012,35.29913350939751,51.23825743794441,67.18018651008606,83.10569822788239,99.04199093580246,114.97824639081955,130.91465830802917,146.85119688510895,162.7899706363678,178.73021960258484,194.66418027877808,210.60167253017426,226.53919458389282,242.47701466083527,258.41498374938965,274.3532955646515,290.29202461242676,306.2314987182617,322.17150926589966,338.11303973197937,354.05656695365906,370.00396847724915,385.958194732666,401.928186416626,418.0169403553009,438.9913082122803,466.60104393959045,494.6673810482025,522.7903723716736,550.8340001106262,578.8679122924805,606.9151163101196,634.9629163742065,663.1229519844055,691.1793947219849,719.2361950874329,747.2931742668152,775.349497795105,803.4063577651978,831.4636945724487,859.5223426818848,887.580931186676,915.640652179718,943.7036514282227,971.7280268669128,999.7614026069641],\"type\":\"bar\",\"xaxis\":\"x3\",\"yaxis\":\"y3\"}],                        {\"template\":{\"data\":{\"histogram2dcontour\":[{\"type\":\"histogram2dcontour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"choropleth\":[{\"type\":\"choropleth\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"histogram2d\":[{\"type\":\"histogram2d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"heatmap\":[{\"type\":\"heatmap\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"contourcarpet\":[{\"type\":\"contourcarpet\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"contour\":[{\"type\":\"contour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"surface\":[{\"type\":\"surface\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"mesh3d\":[{\"type\":\"mesh3d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"scatter\":[{\"fillpattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2},\"type\":\"scatter\"}],\"parcoords\":[{\"type\":\"parcoords\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolargl\":[{\"type\":\"scatterpolargl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"bar\":[{\"error_x\":{\"color\":\"#2a3f5f\"},\"error_y\":{\"color\":\"#2a3f5f\"},\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"bar\"}],\"scattergeo\":[{\"type\":\"scattergeo\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolar\":[{\"type\":\"scatterpolar\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"histogram\":[{\"marker\":{\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"histogram\"}],\"scattergl\":[{\"type\":\"scattergl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatter3d\":[{\"type\":\"scatter3d\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermap\":[{\"type\":\"scattermap\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermapbox\":[{\"type\":\"scattermapbox\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterternary\":[{\"type\":\"scatterternary\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattercarpet\":[{\"type\":\"scattercarpet\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"carpet\":[{\"aaxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"baxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"type\":\"carpet\"}],\"table\":[{\"cells\":{\"fill\":{\"color\":\"#EBF0F8\"},\"line\":{\"color\":\"white\"}},\"header\":{\"fill\":{\"color\":\"#C8D4E3\"},\"line\":{\"color\":\"white\"}},\"type\":\"table\"}],\"barpolar\":[{\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"barpolar\"}],\"pie\":[{\"automargin\":true,\"type\":\"pie\"}]},\"layout\":{\"autotypenumbers\":\"strict\",\"colorway\":[\"#636efa\",\"#EF553B\",\"#00cc96\",\"#ab63fa\",\"#FFA15A\",\"#19d3f3\",\"#FF6692\",\"#B6E880\",\"#FF97FF\",\"#FECB52\"],\"font\":{\"color\":\"#2a3f5f\"},\"hovermode\":\"closest\",\"hoverlabel\":{\"align\":\"left\"},\"paper_bgcolor\":\"white\",\"plot_bgcolor\":\"#E5ECF6\",\"polar\":{\"bgcolor\":\"#E5ECF6\",\"angularaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"radialaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"ternary\":{\"bgcolor\":\"#E5ECF6\",\"aaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"baxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"caxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"coloraxis\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"colorscale\":{\"sequential\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"sequentialminus\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"diverging\":[[0,\"#8e0152\"],[0.1,\"#c51b7d\"],[0.2,\"#de77ae\"],[0.3,\"#f1b6da\"],[0.4,\"#fde0ef\"],[0.5,\"#f7f7f7\"],[0.6,\"#e6f5d0\"],[0.7,\"#b8e186\"],[0.8,\"#7fbc41\"],[0.9,\"#4d9221\"],[1,\"#276419\"]]},\"xaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"yaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"scene\":{\"xaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"yaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"zaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2}},\"shapedefaults\":{\"line\":{\"color\":\"#2a3f5f\"}},\"annotationdefaults\":{\"arrowcolor\":\"#2a3f5f\",\"arrowhead\":0,\"arrowwidth\":1},\"geo\":{\"bgcolor\":\"white\",\"landcolor\":\"#E5ECF6\",\"subunitcolor\":\"white\",\"showland\":true,\"showlakes\":true,\"lakecolor\":\"white\"},\"title\":{\"x\":0.05},\"mapbox\":{\"style\":\"light\"}}},\"xaxis\":{\"anchor\":\"y\",\"domain\":[0.0,0.28600000000000003],\"title\":{\"text\":\"Std Dev ($)\"}},\"yaxis\":{\"anchor\":\"x\",\"domain\":[0.0,1.0],\"title\":{\"text\":\"Return ($)\"}},\"xaxis2\":{\"anchor\":\"y2\",\"domain\":[0.3526666666666667,0.6386666666666667],\"title\":{\"text\":\"Return ($)\"}},\"yaxis2\":{\"anchor\":\"x2\",\"domain\":[0.0,1.0],\"title\":{\"text\":\"Sharpe Ratio\"}},\"xaxis3\":{\"anchor\":\"y3\",\"domain\":[0.7053333333333334,1.0],\"title\":{\"text\":\"Target Return ($)\"}},\"yaxis3\":{\"anchor\":\"x3\",\"domain\":[0.0,1.0],\"title\":{\"text\":\"Investment ($)\"},\"range\":[0,1050]},\"annotations\":[{\"font\":{\"size\":16},\"showarrow\":false,\"text\":\"Efficient Frontier\",\"x\":0.14300000000000002,\"xanchor\":\"center\",\"xref\":\"paper\",\"y\":1.0,\"yanchor\":\"bottom\",\"yref\":\"paper\"},{\"font\":{\"size\":16},\"showarrow\":false,\"text\":\"Sharpe Ratio\",\"x\":0.4956666666666667,\"xanchor\":\"center\",\"xref\":\"paper\",\"y\":1.0,\"yanchor\":\"bottom\",\"yref\":\"paper\"},{\"font\":{\"size\":16},\"showarrow\":false,\"text\":\"Asset Allocation\",\"x\":0.8526666666666667,\"xanchor\":\"center\",\"xref\":\"paper\",\"y\":1.0,\"yanchor\":\"bottom\",\"yref\":\"paper\"}],\"margin\":{\"t\":40,\"b\":40,\"l\":60,\"r\":40},\"legend\":{\"orientation\":\"h\",\"yanchor\":\"bottom\",\"y\":-0.25,\"xanchor\":\"center\",\"x\":0.83},\"barmode\":\"stack\",\"height\":400},                        {\"responsive\": true}                    )                };            </script>        </div>"
+      ],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import plotly.graph_objects as go\n",
+    "from plotly.subplots import make_subplots\n",
+    "from IPython.display import HTML\n",
+    "import math\n",
+    "\n",
+    "# Annualize returns and risk.\n",
+    "annual_factor = 12\n",
+    "risk_free_rate = 0.0\n",
+    "\n",
+    "std_devs_annual = [float(jnp.sqrt(v)) * math.sqrt(annual_factor) for v in variances]\n",
+    "returns_annual = [float(r) * annual_factor for r in returns_achieved]\n",
+    "sharpe_ratios = [\n",
+    "    (r - risk_free_rate) / s if s > 0 else 0.0\n",
+    "    for r, s in zip(returns_annual, std_devs_annual)\n",
+    "]\n",
+    "\n",
+    "colors = [\"#2196F3\", \"#4CAF50\", \"#FF9800\"]\n",
+    "\n",
+    "fig = make_subplots(\n",
+    "    rows=1,\n",
+    "    cols=3,\n",
+    "    subplot_titles=(\"Efficient Frontier\", \"Sharpe Ratio\", \"Asset Allocation\"),\n",
+    "    column_widths=[0.33, 0.33, 0.34],\n",
+    ")\n",
+    "\n",
+    "# Scale to $1000 investment.\n",
+    "std_dev_dollars = [s * 1000 for s in std_devs_annual]\n",
+    "return_dollars = [r * 1000 for r in returns_annual]\n",
+    "target_dollars = [float(t) * annual_factor * 1000 for t in target_returns]\n",
+    "\n",
+    "# Left plot: Efficient frontier.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=std_dev_dollars,\n",
+    "        y=return_dollars,\n",
+    "        mode=\"lines+markers\",\n",
+    "        marker=dict(size=6, color=sharpe_ratios, colorscale=\"Viridis\", showscale=False),\n",
+    "        line=dict(color=\"steelblue\", width=2),\n",
+    "        hovertemplate=\"Std Dev: $%{x:.0f}<br>Return: $%{y:.0f}<extra></extra>\",\n",
+    "        showlegend=False,\n",
+    "    ),\n",
+    "    row=1,\n",
+    "    col=1,\n",
+    ")\n",
+    "\n",
+    "# Middle plot: Sharpe ratio vs return.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=return_dollars,\n",
+    "        y=sharpe_ratios,\n",
+    "        mode=\"lines+markers\",\n",
+    "        marker=dict(size=6, color=sharpe_ratios, colorscale=\"Viridis\", showscale=False),\n",
+    "        line=dict(color=\"steelblue\", width=2),\n",
+    "        hovertemplate=\"Return: $%{x:.0f}<br>Sharpe: %{y:.2f}<extra></extra>\",\n",
+    "        showlegend=False,\n",
+    "    ),\n",
+    "    row=1,\n",
+    "    col=2,\n",
+    ")\n",
+    "\n",
+    "# Right plot: Asset allocation.\n",
+    "for i, (name, color) in enumerate(zip(stock_names, colors)):\n",
+    "    fig.add_trace(\n",
+    "        go.Bar(\n",
+    "            x=target_dollars,\n",
+    "            y=[float(w) * 1000 for w in all_weights[:, i]],\n",
+    "            name=name,\n",
+    "            marker_color=color,\n",
+    "            hovertemplate=f\"{name}: $%{{y:.0f}}<extra></extra>\",\n",
+    "        ),\n",
+    "        row=1,\n",
+    "        col=3,\n",
+    "    )\n",
+    "\n",
+    "fig.update_xaxes(title_text=\"Std Dev ($)\", row=1, col=1)\n",
+    "fig.update_yaxes(title_text=\"Return ($)\", row=1, col=1)\n",
+    "fig.update_xaxes(title_text=\"Return ($)\", row=1, col=2)\n",
+    "fig.update_yaxes(title_text=\"Sharpe Ratio\", row=1, col=2)\n",
+    "fig.update_xaxes(title_text=\"Target Return ($)\", row=1, col=3)\n",
+    "fig.update_yaxes(title_text=\"Investment ($)\", range=[0, 1050], row=1, col=3)\n",
+    "\n",
+    "fig.update_layout(\n",
+    "    barmode=\"stack\",\n",
+    "    height=400,\n",
+    "    margin=dict(t=40, b=40, l=60, r=40),\n",
+    "    legend=dict(orientation=\"h\", yanchor=\"bottom\", y=-0.25, xanchor=\"center\", x=0.83),\n",
+    ")\n",
+    "HTML(fig.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-18",
+   "metadata": {},
+   "source": "## Comparison with constrained approach\n\nThe manifold and constrained approaches produce the same efficient frontier. The key difference\nis in how constraints are enforced:\n\n| Approach | Budget constraint | No short-selling | Implementation |\n|----------|------------------|------------------|----------------|\n| Constrained | Explicit equality constraint | Explicit inequality constraint | Augmented Lagrangian |\n| Manifold | Built into `retract_fn` | Built into `retract_fn` | Multiplicative retraction |\n\nThe manifold approach can be advantageous when:\n- Constraints define a smooth manifold with a simple retraction\n- You want to avoid the overhead of the Augmented Lagrangian solver"
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

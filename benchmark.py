@@ -76,7 +76,7 @@ def run_notebook_with_instrumentation(
         nb = nbformat.read(f, as_version=4)
 
     # Instrumentation code to inject at the start of the notebook
-    instrumentation_code = '''
+    instrumentation_code = """
 import jax
 import jaxls
 import jaxls._core
@@ -144,15 +144,15 @@ def _instrumented_solve(self, *args, **kwargs):
         raise
 
 jaxls._core.AnalyzedLeastSquaresProblem.solve = _instrumented_solve
-'''
+"""
 
     # Finalization code to print results
-    finalization_code = '''
+    finalization_code = """
 import json as _benchmark_json
 print("__BENCHMARK_RESULT_START__")
 print(_benchmark_json.dumps(_benchmark_result))
 print("__BENCHMARK_RESULT_END__")
-'''
+"""
 
     # Create new cells for instrumentation
     instrumentation_cell = nbformat.v4.new_code_cell(source=instrumentation_code)
@@ -205,7 +205,10 @@ print("__BENCHMARK_RESULT_END__")
             if cell.cell_type != "code":
                 continue
             for output in cell.get("outputs", []):
-                if output.get("output_type") == "stream" and output.get("name") == "stdout":
+                if (
+                    output.get("output_type") == "stream"
+                    and output.get("name") == "stdout"
+                ):
                     text = output.get("text", "")
                     if "__BENCHMARK_RESULT_START__" in text:
                         start_marker = "__BENCHMARK_RESULT_START__"
@@ -255,7 +258,7 @@ def display_results(results: list[SolveResult], console: Console) -> None:
     table.add_column("Status", justify="center")
 
     for r in results:
-        status = "[green]✓[/green]" if r.success else f"[red]✗[/red]"
+        status = "[green]✓[/green]" if r.success else "[red]✗[/red]"
         cost_str = f"{r.final_cost:.6g}" if r.success else "N/A"
         iter_str = str(r.iterations) if r.success else "N/A"
 
@@ -271,7 +274,9 @@ def display_results(results: list[SolveResult], console: Console) -> None:
     # Summary
     total = len(results)
     successful = sum(1 for r in results if r.success)
-    console.print(f"\n[bold]Summary:[/bold] {successful}/{total} notebooks with solve() calls")
+    console.print(
+        f"\n[bold]Summary:[/bold] {successful}/{total} notebooks with solve() calls"
+    )
 
 
 def export_txt(results: list[SolveResult], output_path: Path) -> None:

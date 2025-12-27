@@ -73,6 +73,7 @@ myst_enable_extensions = [
 html_theme = "furo"
 html_title = "jaxls"
 html_static_path = ["_static"]
+templates_path = ["_templates"]
 
 html_theme_options = {
     "light_css_variables": {
