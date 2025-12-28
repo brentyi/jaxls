@@ -5,7 +5,7 @@ Portfolio Optimization
    :maxdepth: 1
 
    mean_variance
-   cvar_optimization
-   black_litterman
    manifold_allocation
    reparameterized_allocation
+   cvar_optimization
+   black_litterman

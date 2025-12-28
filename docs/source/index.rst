@@ -26,16 +26,13 @@ Goals
 
 jaxls is designed to be:
 
-- Practical for robotics, computer vision, and general scientific
-  computing. It should be lightweight and hackable but still fast.
-- Python-native. jaxls combines recent Python typing constructs[#typing]_ with
+- Practical. It aims to be lightweight and hackable, but still fast for
+  real-world problems in robotics, vision, and scientific computing.
+- Python-native. jaxls combines recent Python typing constructs with
   a functional, `PyTree <https://docs.jax.dev/en/latest/pytrees.html>`_-first
-  implementation. This results in an API that's type-safe, compatible with
-  standard JAX `function transforms <https://docs.jax.dev/en/latest/key-concepts.html#transformations>`_, and
-  much more concise than traditional C++ libraries.
-
-.. [#typing] Notably: `variadic generics <https://peps.python.org/pep-0646/>`_
-   and :py:class:`~typing.ParamSpec`.
+  implementation. Its API is type-safe, compatible with standard JAX
+  `function transforms <https://docs.jax.dev/en/latest/key-concepts.html#transformations>`_,
+  and more concise than traditional C++ libraries.
 
 
 Features
@@ -112,6 +109,15 @@ Algorithmic references:
    api/core
    api/lie_group_variables
    api/solver_config
+
+.. toctree::
+   :caption: Design Notes
+   :hidden:
+   :maxdepth: 1
+
+   design/typed_api
+   design/sparse_matrices
+   design/traced_vs_static
 
 .. |pyright| image:: https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg
    :alt: Pyright status

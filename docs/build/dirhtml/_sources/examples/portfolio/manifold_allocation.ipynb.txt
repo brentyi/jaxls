@@ -4,7 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# Manifold Allocation\n\nThe previous portfolio notebooks treat allocation as a classical constrained optimization problem:\nwe minimize variance subject to budget constraints (weights sum to 1) and no short-selling\n(weights non-negative).\n\nBut there's another perspective: the set of valid allocations forms a *manifold* called the\nprobability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\nwithout explicit constraints.\n\nFeatures used:\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n- Multiplicative retraction for smooth simplex optimization"
+   "source": "# Manifold Allocation\n\nThe {doc}`mean-variance notebook <mean_variance>` treats allocation as a classical constrained\noptimization problem: we minimize variance subject to budget constraints (weights sum to 1)\nand no short-selling (weights non-negative).\n\nBut there's another perspective: the set of valid allocations forms a *manifold* called the\nprobability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\nwithout explicit constraints.\n\nFeatures used:\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n- Multiplicative retraction for smooth simplex optimization"
   },
   {
    "cell_type": "code",
@@ -40,25 +40,22 @@
    "cell_type": "markdown",
    "id": "cell-3",
    "metadata": {},
-   "source": [
-    "## The probability simplex\n",
-    "\n",
-    "The probability simplex $\\Delta^{n-1}$ is the set of valid portfolio allocations:\n",
-    "\n",
-    "$$\\Delta^{n-1} = \\{w \\in \\mathbb{R}^n : w_i \\geq 0, \\sum_i w_i = 1\\}$$\n",
-    "\n",
-    "This is an $(n-1)$-dimensional manifold embedded in $\\mathbb{R}^n$. The sum-to-one constraint\n",
-    "removes one degree of freedom.\n",
-    "\n",
-    "To optimize on this manifold, we need a **retraction**: a function that maps an arbitrary\n",
-    "update back to a valid point on the simplex."
-   ]
+   "source": "## The probability simplex\n\nThe probability simplex $\\Delta^{n-1}$ is the set of valid portfolio allocations:\n\n$$\\Delta^{n-1} = \\{w \\in \\mathbb{R}^n : w_i \\geq 0, \\sum_i w_i = 1\\}$$\n\nThis is an $(n-1)$-dimensional manifold embedded in $\\mathbb{R}^n$. The sum-to-one constraint\nremoves one degree of freedom.\n\nTo optimize on this manifold, we need a retraction: a function that maps an arbitrary\nupdate back to a valid point on the simplex."
   },
   {
    "cell_type": "markdown",
    "id": "cell-4",
    "metadata": {},
-   "source": "## Simplex retraction\n\nOur retraction uses multiplicative updates, which are additive in log-space:\n1. Scale each weight: `weights * exp(delta)`\n2. Normalize: divide by sum to ensure sum-to-one\n\nThis is smooth everywhere. Assuming positive initialization, weights stay positive since\n`exp(delta)` is always positive."
+   "source": [
+    "## Simplex retraction\n",
+    "\n",
+    "Our retraction uses multiplicative updates, which are additive in log-space:\n",
+    "1. Scale each weight: `weights * exp(delta)`\n",
+    "2. Normalize: divide by sum to ensure sum-to-one\n",
+    "\n",
+    "This is smooth everywhere. Assuming positive initialization, weights stay positive since\n",
+    "`exp(delta)` is always positive."
+   ]
   },
   {
    "cell_type": "code",
@@ -66,7 +63,12 @@
    "id": "cell-5",
    "metadata": {},
    "outputs": [],
-   "source": "def simplex_retract(weights: jax.Array, delta: jax.Array) -> jax.Array:\n    \"\"\"Multiplicative update that keeps weights positive and summing to 1.\"\"\"\n    v = weights * jnp.exp(delta)\n    return v / jnp.sum(v)"
+   "source": [
+    "def simplex_retract(weights: jax.Array, delta: jax.Array) -> jax.Array:\n",
+    "    \"\"\"Multiplicative update that keeps weights positive and summing to 1.\"\"\"\n",
+    "    v = weights * jnp.exp(delta)\n",
+    "    return v / jnp.sum(v)"
+   ]
   },
   {
    "cell_type": "code",
@@ -240,7 +242,15 @@
    "cell_type": "markdown",
    "id": "cell-13",
    "metadata": {},
-   "source": "## Efficient frontier\n\nWe compute the efficient frontier by solving for different target returns.\nNote that we only have one constraint (return target) instead of three.\n\nUsing `jax.lax.scan`, we solve sequentially while using each solution as the\ninitial guess for the next (warm-starting)."
+   "source": [
+    "## Efficient frontier\n",
+    "\n",
+    "We compute the efficient frontier by solving for different target returns.\n",
+    "Note that we only have one constraint (return target) instead of three.\n",
+    "\n",
+    "Using `jax.lax.scan`, we solve sequentially while using each solution as the\n",
+    "initial guess for the next (warm-starting)."
+   ]
   },
   {
    "cell_type": "code",
@@ -248,7 +258,46 @@
    "id": "cell-14",
    "metadata": {},
    "outputs": [],
-   "source": "min_return = float(expected_returns.min())\nmax_return = float(expected_returns.max())\ntarget_returns = jnp.linspace(min_return, max_return, 50)\n\n\ndef solve_for_target(\n    current_vals: jaxls.VarValues, target: jax.Array\n) -> tuple[jaxls.VarValues, jax.Array]:\n    \"\"\"Solve portfolio optimization for a given target return.\n\n    Args:\n        current_vals: Solution from previous target (used as initial guess).\n        target: Target return for this solve.\n\n    Returns:\n        Tuple of (solution values, optimal weights).\n    \"\"\"\n    costs = [\n        variance_cost(weights_var, cov_chol),\n        return_constraint(weights_var, expected_returns, target),\n    ]\n    problem = jaxls.LeastSquaresProblem(costs, [weights_var]).analyze()\n    solution = problem.solve(\n        current_vals,\n        verbose=False,\n        linear_solver=\"dense_cholesky\",\n        termination=jaxls.TerminationConfig(cost_tolerance=1e-8),\n    )\n    return solution, solution[weights_var]\n\n\n# Solve sequentially with warm-starting.\ninitial_vals = jaxls.VarValues.make([weights_var])\n_, all_weights = jax.lax.scan(solve_for_target, initial_vals, target_returns)\nvariances = jax.vmap(lambda w: w @ covariance @ w)(all_weights)\nreturns_achieved = jax.vmap(lambda w: jnp.dot(w, expected_returns))(all_weights)\n\nprint(f\"Computed {len(target_returns)} points on the efficient frontier\")"
+   "source": [
+    "min_return = float(expected_returns.min())\n",
+    "max_return = float(expected_returns.max())\n",
+    "target_returns = jnp.linspace(min_return, max_return, 50)\n",
+    "\n",
+    "\n",
+    "def solve_for_target(\n",
+    "    current_vals: jaxls.VarValues, target: jax.Array\n",
+    ") -> tuple[jaxls.VarValues, jax.Array]:\n",
+    "    \"\"\"Solve portfolio optimization for a given target return.\n",
+    "\n",
+    "    Args:\n",
+    "        current_vals: Solution from previous target (used as initial guess).\n",
+    "        target: Target return for this solve.\n",
+    "\n",
+    "    Returns:\n",
+    "        Tuple of (solution values, optimal weights).\n",
+    "    \"\"\"\n",
+    "    costs = [\n",
+    "        variance_cost(weights_var, cov_chol),\n",
+    "        return_constraint(weights_var, expected_returns, target),\n",
+    "    ]\n",
+    "    problem = jaxls.LeastSquaresProblem(costs, [weights_var]).analyze()\n",
+    "    solution = problem.solve(\n",
+    "        current_vals,\n",
+    "        verbose=False,\n",
+    "        linear_solver=\"dense_cholesky\",\n",
+    "        termination=jaxls.TerminationConfig(cost_tolerance=1e-8),\n",
+    "    )\n",
+    "    return solution, solution[weights_var]\n",
+    "\n",
+    "\n",
+    "# Solve sequentially with warm-starting.\n",
+    "initial_vals = jaxls.VarValues.make([weights_var])\n",
+    "_, all_weights = jax.lax.scan(solve_for_target, initial_vals, target_returns)\n",
+    "variances = jax.vmap(lambda w: w @ covariance @ w)(all_weights)\n",
+    "returns_achieved = jax.vmap(lambda w: jnp.dot(w, expected_returns))(all_weights)\n",
+    "\n",
+    "print(f\"Computed {len(target_returns)} points on the efficient frontier\")"
+   ]
   },
   {
    "cell_type": "code",
@@ -406,7 +455,21 @@
    "cell_type": "markdown",
    "id": "cell-18",
    "metadata": {},
-   "source": "## Comparison with constrained approach\n\nThe manifold and constrained approaches produce the same efficient frontier. The key difference\nis in how constraints are enforced:\n\n| Approach | Budget constraint | No short-selling | Implementation |\n|----------|------------------|------------------|----------------|\n| Constrained | Explicit equality constraint | Explicit inequality constraint | Augmented Lagrangian |\n| Manifold | Built into `retract_fn` | Built into `retract_fn` | Multiplicative retraction |\n\nThe manifold approach can be advantageous when:\n- Constraints define a smooth manifold with a simple retraction\n- You want to avoid the overhead of the Augmented Lagrangian solver"
+   "source": [
+    "## Comparison with constrained approach\n",
+    "\n",
+    "The manifold and constrained approaches produce the same efficient frontier. The key difference\n",
+    "is in how constraints are enforced:\n",
+    "\n",
+    "| Approach | Budget constraint | No short-selling | Implementation |\n",
+    "|----------|------------------|------------------|----------------|\n",
+    "| Constrained | Explicit equality constraint | Explicit inequality constraint | Augmented Lagrangian |\n",
+    "| Manifold | Built into `retract_fn` | Built into `retract_fn` | Multiplicative retraction |\n",
+    "\n",
+    "The manifold approach can be advantageous when:\n",
+    "- Constraints define a smooth manifold with a simple retraction\n",
+    "- You want to avoid the overhead of the Augmented Lagrangian solver"
+   ]
   }
  ],
  "metadata": {

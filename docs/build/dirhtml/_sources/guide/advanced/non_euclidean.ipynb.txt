@@ -4,7 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# Non-Euclidean variables\n\nMany variables in optimization live on curved spaces (manifolds) rather than flat Euclidean space. Common examples include:\n\n- Rotations: SO(2), SO(3), quaternions\n- Rigid transformations: SE(2), SE(3)\n- Unit vectors: points on spheres\n- Probability simplices: points that sum to 1\n- Low-rank matrices, positive-definite matrices, etc.\n\nNaive Euclidean optimization of these variables often fails because it ignores geometric constraints like unit norms or orthogonality.\n\njaxls supports manifold optimization through custom `retract_fn` and `tangent_dim` on variables. This example demonstrates the approach using rotation averaging on SO(3).\n\nFeatures used:\n- {class}`~jaxls.SO3Var` for SO(3) rotation variables\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables"
+   "source": "# Non-Euclidean variables\n\nMany variables in optimization live on non-Euclidean manifolds. Common examples include:\n\n- Rotations: SO(2), SO(3), quaternions\n- Rigid transformations: SE(2), SE(3)\n- Unit vectors: points on spheres\n- Probability simplices: points that sum to 1\n- Low-rank matrices, positive-definite matrices, etc.\n\nNaive Euclidean optimization of these variables often fails because it ignores geometric constraints like unit norms or orthogonality.\n\njaxls supports manifold optimization via custom `retract_fn` and `tangent_dim` parameters when defining variables.\n\nFeatures used:\n- {class}`~jaxls.SO3Var` for SO(3) rotation variables\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables"
   },
   {
    "cell_type": "code",
@@ -41,7 +41,7 @@
    "cell_type": "markdown",
    "id": "cell-3",
    "metadata": {},
-   "source": "## The problem with Euclidean parameterization\n\nRotations in 3D form a curved manifold called SO(3). Naive Euclidean approaches fail because quaternions must have unit norm, but averaging quaternion components produces non-unit results that require renormalization -- losing the geometric structure of the problem.\n\nLet's generate some noisy rotation measurements around a ground truth:"
+   "source": "## Example: Rotation Averaging\n\nRotations in 3D form the SO(3) manifold. Naive Euclidean approaches fail because quaternions must have unit norm, but averaging quaternion components produces non-unit results that require renormalization, losing the geometric structure of the problem.\n\nLet's generate some noisy rotation measurements around a ground truth:"
   },
   {
    "cell_type": "code",
@@ -112,13 +112,13 @@
    "cell_type": "markdown",
    "id": "cell-7",
    "metadata": {},
-   "source": "## Manifold optimization\n\nThe standard approach is to optimize on the manifold using:\n\n1. **Tangent space**: At each point on the manifold, there's a local linear approximation (the tangent space). For SO(3), this is the 3D space of axis-angle vectors (the Lie algebra $\\mathfrak{so}(3)$).\n\n2. **Retraction**: A function that maps from the tangent space back to the manifold. For SO(3), this is the exponential map:\n   $$R_{\\text{new}} = R_{\\text{current}} \\cdot \\exp(\\delta)$$\n   where $\\delta \\in \\mathbb{R}^3$ is an axis-angle perturbation.\n\nThe solver optimizes in the tangent space (which is Euclidean), then uses retraction to update the manifold variable."
+   "source": "## Manifold optimization\n\nThe standard approach is to optimize on the manifold using:\n\n1. **Tangent space**: At each point on the manifold, there's a local linear approximation (the tangent space). For SO(3), tangent spaces are 3-dimensional; we can parameterize local updates using axis-angle vectors.\n\n2. **Retraction**: A function that maps from the tangent space back to the manifold. For SO(3), we use the exponential map: $R_{\\text{new}} = R_{\\text{current}} \\cdot \\exp(\\delta)$, where $\\delta \\in \\mathbb{R}^3$ is an axis-angle perturbation.\n\nThe solver optimizes in the tangent space (which is Euclidean), then uses retraction to update the manifold variable."
   },
   {
    "cell_type": "markdown",
    "id": "cell-8",
    "metadata": {},
-   "source": "## Using SO3Var\n\njaxls provides built-in Lie group variables through `jaxlie`. The {class}`~jaxls.SO3Var` class handles manifold optimization automatically:"
+   "source": "## Using SO3Var\n\njaxls provides built-in Lie group variables through [jaxlie](https://github.com/brentyi/jaxlie). The {class}`~jaxls.SO3Var` class handles manifold optimization automatically:"
   },
   {
    "cell_type": "code",
@@ -128,9 +128,9 @@
    "outputs": [],
    "source": [
     "# SO3Var is defined as:\n",
-    "# class SO3Var(\n",
-    "#     Var[jaxlie.SO3],\n",
-    "#     default_factory=jaxlie.SO3.identity,\n",
+    "# class SO3Var(.\n",
+    "#     Var[jaxlie.SO3],.\n",
+    "#     default_factory=jaxlie.SO3.identity,.\n",
     "#     retract_fn=jaxlie.manifold.rplus,  # R_new = R_old @ exp(delta).\n",
     "#     tangent_dim=3,  # SO(3) has 3 degrees of freedom.\n",
     "# ): ...\n",
@@ -230,7 +230,7 @@
    "cell_type": "markdown",
    "id": "cell-15",
    "metadata": {},
-   "source": "## Defining custom manifold variables\n\nTo create your own manifold variable, subclass {class}`~jaxls.Var` with:\n\n- `default_factory`: A callable returning the default value\n- `retract_fn`: A function `(current_value, tangent_delta) -> new_value` that applies a tangent space update\n- `tangent_dim`: The dimension of the local tangent space\n\nHere's how SO3Var is implemented (you can define similar variables for other manifolds):"
+   "source": "## Defining custom manifold variables\n\nTo create your own manifold variable, subclass {class}`~jaxls.Var` with:\n\n- `default_factory`: A callable returning the default value\n- `retract_fn`: A function `(current_value, tangent_delta) -> new_value` that applies a tangent space update, where `tangent_delta` is a 1D array with shape `(tangent_dim,)`\n- `tangent_dim`: The dimension of the local tangent space\n\nHere's how SO3Var is implemented (you can define similar variables for other manifolds):"
   },
   {
    "cell_type": "code",

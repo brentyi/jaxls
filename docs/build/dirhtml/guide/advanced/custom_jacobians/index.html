@@ -245,10 +245,10 @@
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/portfolio/">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/mean_variance/">Mean-Variance Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/manifold_allocation/">Manifold Allocation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/reparameterized_allocation/">Reparameterized Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
 </ul>
 </li>
 </ul>
@@ -257,6 +257,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../api/core/">Core API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie Group Variables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver Configuration</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
 </div>
@@ -297,7 +303,7 @@
         <article role="main" id="furo-main-content">
           <section class="tex2jax_ignore mathjax_ignore" id="custom-jacobians">
 <h1>Custom Jacobians<a class="headerlink" href="#custom-jacobians" title="Link to this heading">¶</a></h1>
-<p>Using analytical Jacobians instead of autodiff for performance-critical costs.</p>
+<p>In nonlinear least squares, the Jacobian matrix <span class="math notranslate nohighlight">\(J\)</span> contains partial derivatives of residuals with respect to variables. It’s used to approximate the Hessian as <span class="math notranslate nohighlight">\(J^T J\)</span> for Gauss-Newton updates. By default, jaxls computes Jacobians automatically via JAX’s autodiff. This guide shows how to provide analytical Jacobians instead.</p>
 <p>Features used:</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="../../../api/core/#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-func docutils literal notranslate"><span class="pre">&#64;jaxls.Cost.factory</span></code></a> with <code class="docutils literal notranslate"><span class="pre">jac_custom_fn</span></code> for custom Jacobians</p></li>
@@ -335,9 +341,9 @@
 <h2>When to use custom Jacobians<a class="headerlink" href="#when-to-use-custom-jacobians" title="Link to this heading">¶</a></h2>
 <p>JAX’s automatic differentiation is powerful and efficient for most use cases. However, there are situations where providing analytical Jacobians can be beneficial:</p>
 <ol class="arabic simple">
-<li><p><strong>Known closed-form solutions</strong>: When the Jacobian has a simple analytical form that is faster to compute than autodiff.</p></li>
-<li><p><strong>Numerical stability</strong>: When the analytical form is more numerically stable than the autodiff computation.</p></li>
-<li><p><strong>Reusing intermediates</strong>: When the residual computation produces intermediate values that can be reused for the Jacobian.</p></li>
+<li><p><strong>Known closed-form solutions.</strong> When the Jacobian has a simple analytical form that is faster to compute than autodiff.</p></li>
+<li><p><strong>Numerical stability.</strong> When the analytical form is more numerically stable than the autodiff computation.</p></li>
+<li><p><strong>Reusing intermediates.</strong> When the residual computation produces intermediate values that can be reused for the Jacobian.</p></li>
 </ol>
 </section>
 <section id="problem-setup-2d-point-fitting">
@@ -556,7 +562,7 @@ Match: True
 <span class="n">result_cached</span> <span class="o">=</span> <span class="n">solve_with_cost_factory</span><span class="p">(</span><span class="n">distance_cost_cached</span><span class="p">,</span> <span class="s2">&quot;Cached &quot;</span><span class="p">)</span>
 
 <span class="c1"># The optimal point should be close to the mean of targets.</span>
-<span class="c1"># (for sum of squared distances, the minimum is at the geometric median,</span>
+<span class="c1"># (for sum of squared distances, the minimum is at the geometric median,.</span>
 <span class="c1"># which is close to the mean for normally distributed points)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Target mean: [</span><span class="si">{</span><span class="n">targets</span><span class="p">[:,</span><span class="w"> </span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">targets</span><span class="p">[:,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
 </pre></div>
@@ -633,15 +639,16 @@ Target mean: [-0.024155, 0.041008]
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Benchmarking solve times...
+
 <span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_autodiff
-Autodiff      : 0.165 ms (min of 20 runs)
+Autodiff      : 0.290 ms (min of 20 runs)
 <span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_custom
-Custom Jacobian: 0.162 ms (min of 20 runs)
+Custom Jacobian: 0.283 ms (min of 20 runs)
 <span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_cached
-With Cache     : 0.165 ms (min of 20 runs)
+With Cache     : 0.290 ms (min of 20 runs)
 </pre></div>
 </div>
 </div>

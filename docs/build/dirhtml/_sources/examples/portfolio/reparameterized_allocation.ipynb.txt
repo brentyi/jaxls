@@ -4,7 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# Reparameterized Allocation\n\nWe've now seen two approaches to portfolio allocation:\n- [Mean-Variance Allocation](mean_variance.ipynb): explicit constraints via Augmented Lagrangian\n- [Manifold Allocation](manifold_allocation.ipynb): constraints built into `retract_fn`\n\nHere we explore a third option: **reparameterization**. Since jaxls is a general nonlinear\nsolver, we can transform the problem so constraints are automatically satisfied.\n\nInstead of optimizing weights $w$ subject to $w_i \\geq 0$ and $\\sum w_i = 1$, we optimize\nunconstrained logits $\\ell \\in \\mathbb{R}^n$ and compute weights as $w = \\text{softmax}(\\ell)$.\n\nFeatures used:\n- {class}`~jaxls.Var` for unconstrained logit variables\n- Softmax reparameterization for automatic constraint satisfaction"
+   "source": "# Reparameterized Allocation\n\nWe've now seen two approaches to portfolio allocation:\n- [Mean-Variance Allocation](mean_variance.ipynb): explicit constraints via Augmented Lagrangian\n- [Manifold Allocation](manifold_allocation.ipynb): constraints built into `retract_fn`\n\nHere we explore a third option: reparameterization. Since jaxls is a general nonlinear\nsolver, we can transform the problem so constraints are automatically satisfied.\n\nInstead of optimizing weights $w$ subject to $w_i \\geq 0$ and $\\sum w_i = 1$, we optimize\nunconstrained logits $\\ell \\in \\mathbb{R}^n$ and compute weights as $w = \\text{softmax}(\\ell)$.\n\nFeatures used:\n- {class}`~jaxls.Var` for unconstrained logit variables\n- Softmax reparameterization for automatic constraint satisfaction"
   },
   {
    "cell_type": "code",

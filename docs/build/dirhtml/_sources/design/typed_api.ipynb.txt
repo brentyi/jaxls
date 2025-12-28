@@ -1,0 +1,77 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "cell-0",
+   "metadata": {},
+   "source": "# Typed API\n\njaxls aims to provide a typed API for nonlinear least squares. Type-safe APIs\nare easier to use: IDE autocomplete works, type checkers catch errors before runtime,\nand the code is self-documenting. You'll probably also see better results if you're\nwriting code with the help of an LLM, which you can ask to inspect the API or run\na type checker automatically.\n\nThis page discusses:\n- How jaxls's decorator-based approach preserves function signatures\n- How generic variables (`Var[T]`) preserve value types\n- The implementation using Python's variadic generics"
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-2",
+   "metadata": {},
+   "source": "## Type preservation in jaxls\n\njaxls uses a decorator-based approach where users write natural Python functions\nwith type hints, and the decorator preserves the function signature.\n\n### Before and after the decorator\n\nThe `@jaxls.Cost.factory` decorator transforms a residual function into a\ncost factory. The key transformation is removing the `VarValues` parameter:\n\n```python\n# Before: residual function\n# Signature: (VarValues, SE3Var, jax.Array) -> jax.Array\ndef pose_cost(\n    vals: jaxls.VarValues,\n    var: jaxls.SE3Var,\n    target: jax.Array,\n) -> jax.Array:\n    return (vals[var].inverse() @ jaxlie.SE3(target)).log()\n\n# After: cost factory (decorated)\n# Signature: (SE3Var, jax.Array) -> Cost\n@jaxls.Cost.factory\ndef pose_cost(\n    vals: jaxls.VarValues,\n    var: jaxls.SE3Var,\n    target: jax.Array,\n) -> jax.Array:\n    return (vals[var].inverse() @ jaxlie.SE3(target)).log()\n```\n\nAfter decoration, calling `pose_cost(my_var, my_target)` returns a `Cost` object.\nThe `VarValues` will be provided later during optimization."
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-3",
+   "metadata": {},
+   "source": "### Type preservation with `Var[T]`\n\nThe generic `Var[T]` class preserves value types throughout the API:\n\n```python\n# SE3Var is defined as Var[jaxlie.SE3]\nvar = jaxls.SE3Var(id=0)\n\n# vals[var] returns jaxlie.SE3, not a generic array\npose = vals[var]  # Type checker knows this is SE3\n\n# IDE autocomplete works for SE3 methods\nposition = pose.translation()  # Autocomplete suggests .translation(), .rotation(), etc.\n```\n\nThis is implemented via `VarValues.__getitem__`:\n\n```python\ndef __getitem__[T](self, var: Var[T]) -> T:\n    \"\"\"Get value for a variable, preserving type.\"\"\"\n    ...\n```\n\nThe generic parameter `T` flows from the variable definition through to the return type."
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-4",
+   "metadata": {},
+   "source": "## Implementation: variadic generics\n\nPreserving arbitrary function signatures requires Python's variadic generics\n(PEP 695, Python 3.12+). The key type aliases in jaxls are:\n\n```python\n# A residual function takes VarValues + arbitrary args, returns an array.\ntype ResidualFunc[**Args] = Callable[\n    Concatenate[VarValues, Args],\n    jax.Array,\n]\n\n# A cost factory takes arbitrary args (no VarValues), returns a Cost.\ntype CostFactory[**Args] = Callable[\n    Args,\n    Cost,\n]\n```\n\nThe `**Args` syntax captures all parameters after `VarValues` as a type tuple.\n`Concatenate[VarValues, Args]` prepends `VarValues` to form the full signature.\n\nThe decorator's type signature expresses the transformation:\n\n```python\n@staticmethod\ndef factory[**Args_](\n    compute_residual: ResidualFunc[Args_],\n) -> CostFactory[Args_]:\n    ...\n```\n\nThis says: given a residual function with signature `(VarValues, *Args) -> Array`,\nreturn a factory with signature `(*Args) -> Cost`."
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-5",
+   "metadata": {},
+   "source": [
+    "## Defining variable types\n",
+    "\n",
+    "Custom variable types use `__init_subclass__` for clean definition syntax:\n",
+    "\n",
+    "```python\n",
+    "# Simple Euclidean variable (tangent_dim inferred from default shape)\n",
+    "class PointVar(\n",
+    "    jaxls.Var[jax.Array],\n",
+    "    default_factory=lambda: jnp.zeros(3),\n",
+    "):\n",
+    "    \"\"\"A 3D point variable.\"\"\"\n",
+    "\n",
+    "# Manifold variable (explicit tangent_dim and retraction)\n",
+    "class SO3Var(\n",
+    "    jaxls.Var[jaxlie.SO3],\n",
+    "    default_factory=jaxlie.SO3.identity,\n",
+    "    retract_fn=jaxlie.manifold.rplus,\n",
+    "    tangent_dim=3,\n",
+    "):\n",
+    "    \"\"\"An SO(3) rotation variable.\"\"\"\n",
+    "```\n",
+    "\n",
+    "The type parameter (`jax.Array` or `jaxlie.SO3`) flows through to `vals[var]` returns."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-6",
+   "metadata": {},
+   "source": "## Python 3.10 compatibility\n\nThe full typing features used by jaxls require Python 3.12+. For Python 3.10/3.11 compatibility,\njaxls includes a transpiler (`transpile_py310.py`) that:\n\n1. Removes PEP 695 syntax (`type` aliases, `[T]` on classes)\n2. Strips type annotations that would fail at runtime\n3. Generates compatible code in `src/jaxls/_py310/`\n\nThe 3.10 version works correctly at runtime but loses some static type information."
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

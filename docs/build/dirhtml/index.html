@@ -245,10 +245,10 @@
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="examples/portfolio/">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="examples/portfolio/mean_variance/">Mean-Variance Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/portfolio/manifold_allocation/">Manifold Allocation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/portfolio/reparameterized_allocation/">Reparameterized Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
 </ul>
 </li>
 </ul>
@@ -257,6 +257,12 @@
 <li class="toctree-l1"><a class="reference internal" href="api/core/">Core API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/lie_group_variables/">Lie Group Variables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/solver_config/">Solver Configuration</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="design/typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
 </div>
@@ -316,21 +322,14 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 <h2>Goals<a class="headerlink" href="#goals" title="Link to this heading">¶</a></h2>
 <p>jaxls is designed to be:</p>
 <ul class="simple">
-<li><p>Practical for robotics, computer vision, and general scientific
-computing. It should be lightweight and hackable but still fast.</p></li>
-<li><p>Python-native. jaxls combines recent Python typing constructs[#typing]_ with
+<li><p>Practical. It aims to be lightweight and hackable, but still fast for
+real-world problems in robotics, vision, and scientific computing.</p></li>
+<li><p>Python-native. jaxls combines recent Python typing constructs with
 a functional, <a class="reference external" href="https://docs.jax.dev/en/latest/pytrees.html">PyTree</a>-first
-implementation. This results in an API that’s type-safe, compatible with
-standard JAX <a class="reference external" href="https://docs.jax.dev/en/latest/key-concepts.html#transformations">function transforms</a>, and
-much more concise than traditional C++ libraries.</p></li>
+implementation. Its API is type-safe, compatible with standard JAX
+<a class="reference external" href="https://docs.jax.dev/en/latest/key-concepts.html#transformations">function transforms</a>,
+and more concise than traditional C++ libraries.</p></li>
 </ul>
-<aside class="footnote-list brackets">
-<aside class="footnote brackets" id="typing" role="doc-footnote">
-<span class="label"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></span>
-<p>Notably: <a class="reference external" href="https://peps.python.org/pep-0646/">variadic generics</a>
-and <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ParamSpec" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ParamSpec</span></code></a>.</p>
-</aside>
-</aside>
 </section>
 <section id="features">
 <h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
@@ -379,6 +378,8 @@ and <a class="reference external" href="https://github.com/RainerKuemmerle/g2o">
 <li><p><a class="reference external" href="https://doi.org/10.1137/0917003">Eisenstat &amp; Walker (1996)</a>: adaptive inexact Newton tolerances for conjugate gradient.</p></li>
 <li><p><a class="reference external" href="https://doi.org/10.1137/1.9781611973365">Birgin &amp; Martínez (2014)</a>: ALGENCAN-style augmented Lagrangian method.</p></li>
 </ul>
+<div class="toctree-wrapper compound">
+</div>
 <div class="toctree-wrapper compound">
 </div>
 <div class="toctree-wrapper compound">
