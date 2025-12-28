@@ -32,7 +32,7 @@ class AugmentedLagrangianConfig:
     ``rho = 10 * max(1, |f|) / max(1, 0.5 * c^2)``. Set to a fixed value (e.g., 1.0) to
     override the automatic initialization."""
 
-    tolerance_absolute: float | jax.Array = 1e-5
+    tolerance_absolute: float | jax.Array = 1e-4
     """Absolute convergence tolerance: ``max(snorm, csupn) < tol``."""
 
     tolerance_relative: float | jax.Array = 1e-4
