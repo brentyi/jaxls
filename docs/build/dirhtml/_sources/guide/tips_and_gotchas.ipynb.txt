@@ -4,7 +4,18 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# Tips and Gotchas\n\nPractical guidance for getting the most out of jaxls.\n\nFeatures used:\n- Batched construction for efficient problem setup\n- Residual vector structure for proper Hessian approximation\n- Jacobian mode selection (`jac_mode`)\n- Linear solver selection (`linear_solver`)\n- Debugging with `return_summary`"
+   "source": [
+    "# Tips and Gotchas\n",
+    "\n",
+    "Practical guidance for getting the most out of jaxls.\n",
+    "\n",
+    "Features used:\n",
+    "- Batched construction for efficient problem setup\n",
+    "- Residual vector structure for proper Hessian approximation\n",
+    "- Jacobian mode selection (`jac_mode`)\n",
+    "- Linear solver selection (`linear_solver`)\n",
+    "- Debugging with `return_summary`"
+   ]
   },
   {
    "cell_type": "code",
@@ -805,7 +816,18 @@
    "cell_type": "markdown",
    "id": "cell-28",
    "metadata": {},
-   "source": "## Summary\n\n1. Use batched construction for large problems by passing arrays instead of looping\n2. Prefer higher-dimensional residuals when possible (e.g., 2D error vectors instead of scalar distances)\n3. `jac_mode=\"auto\"` usually works well; manual selection rarely needed\n4. Choose linear solver based on problem size: `dense_cholesky` for small, `conjugate_gradient` or `cholmod` for large\n5. Add epsilon to `sqrt()` and divisions for numerical stability\n6. Use `return_summary=True` to debug convergence issues\n\nFor more details, see {class}`jaxls.Cost`, {class}`jaxls.LeastSquaresProblem`, and {class}`jaxls.TerminationConfig`."
+   "source": [
+    "## Summary\n",
+    "\n",
+    "1. Use batched construction for large problems by passing arrays instead of looping\n",
+    "2. Prefer higher-dimensional residuals when possible (e.g., 2D error vectors instead of scalar distances)\n",
+    "3. `jac_mode=\"auto\"` usually works well; manual selection rarely needed\n",
+    "4. Choose linear solver based on problem size: `dense_cholesky` for small, `conjugate_gradient` or `cholmod` for large\n",
+    "5. Add epsilon to `sqrt()` and divisions for numerical stability\n",
+    "6. Use `return_summary=True` to debug convergence issues\n",
+    "\n",
+    "For more details, see {class}`jaxls.Cost`, {class}`jaxls.LeastSquaresProblem`, and {class}`jaxls.TerminationConfig`."
+   ]
   }
  ],
  "metadata": {

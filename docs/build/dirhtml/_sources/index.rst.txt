@@ -41,9 +41,11 @@ Features
 We currently support:
 
 - Automatic sparse Jacobians, defined analytically or via autodiff.
+  See :doc:`guide/advanced/custom_jacobians` and :doc:`design/sparse_matrices`.
 - Optimization on manifolds, including SO(2), SO(3), SE(2), SE(3).
+  See :doc:`guide/advanced/non_euclidean`.
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
-- Linear subproblem solvers:
+- Linear subproblem solvers. See :doc:`guide/tips_and_gotchas` for selection guidance.
 
   - Sparse iterative with Conjugate Gradient (recommended for most problems).
 
@@ -53,6 +55,7 @@ We currently support:
   - Sparse Cholesky on CPU (CHOLMOD).
 
 - Augmented Lagrangian solver for constrained problems.
+  See :doc:`guide/advanced/constraints`.
 
   - Automatic adaptive penalties for equalities and inequalities: ``h(x) = 0``, ``g(x) <= 0``.
 

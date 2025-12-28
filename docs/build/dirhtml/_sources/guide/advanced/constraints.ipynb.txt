@@ -3002,29 +3002,7 @@
    "cell_type": "markdown",
    "id": "cell-24",
    "metadata": {},
-   "source": [
-    "## Alternative: manifold reformulation\n",
-    "\n",
-    "Some constraints can be reformulated as manifold optimization via custom `retract_fn`.\n",
-    "For example, the budget constraint (weights sum to 1) and no short-selling constraint\n",
-    "(weights non-negative) together define the probability simplex, which is a manifold that can\n",
-    "be optimized directly without explicit constraints.\n",
-    "\n",
-    "This approach can be more numerically stable when the constraints define a smooth manifold\n",
-    "with a simple retraction. See the [Manifold Allocation](../../examples/portfolio/manifold_allocation.ipynb) notebook for an example.\n",
-    "\n",
-    "## Summary\n",
-    "\n",
-    "Key points for constrained optimization in jaxls:\n",
-    "\n",
-    "- Use `kind=\"constraint_eq_zero\"` for equality constraints $h(x) = 0$\n",
-    "- Use `kind=\"constraint_leq_zero\"` for upper bounds $g(x) \\leq 0$\n",
-    "- Use `kind=\"constraint_geq_zero\"` for lower bounds $g(x) \\geq 0$\n",
-    "- Constraints are handled automatically via Augmented Lagrangian\n",
-    "- Tune with {class}`~jaxls.AugmentedLagrangianConfig` if needed\n",
-    "\n",
-    "For more examples, see the [mean-variance portfolio notebook](../../examples/portfolio/mean_variance.ipynb)."
-   ]
+   "source": "## Alternative: manifold reformulation\n\nSome constraints can be reformulated as manifold optimization via custom `retract_fn`.\nFor example, the budget constraint (weights sum to 1) and no short-selling constraint\n(weights non-negative) together define the probability simplex, which is a manifold that can\nbe optimized directly without explicit constraints.\n\nThis approach can be more numerically stable when the constraints define a smooth manifold\nwith a simple retraction. See {doc}`../../examples/portfolio/manifold_allocation` for an example.\n\n## Summary\n\nKey points for constrained optimization in jaxls:\n\n- Use `kind=\"constraint_eq_zero\"` for equality constraints $h(x) = 0$\n- Use `kind=\"constraint_leq_zero\"` for upper bounds $g(x) \\leq 0$\n- Use `kind=\"constraint_geq_zero\"` for lower bounds $g(x) \\geq 0$\n- Constraints are handled automatically via Augmented Lagrangian\n- Tune with {class}`~jaxls.AugmentedLagrangianConfig` if needed\n\nFor more constraint examples, see:\n- {doc}`../../examples/portfolio/mean_variance`: Portfolio optimization with return targets\n- {doc}`../../examples/robotics/inverse_kinematics`: Position/orientation constraints with joint limits\n- {doc}`../../examples/robotics/obstacle_avoidance`: Collision avoidance inequalities\n- {doc}`../../examples/robotics/cart_pole_collocation`: Dynamics as equality constraints"
   }
  ],
  "metadata": {

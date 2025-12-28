@@ -28,31 +28,7 @@
    "cell_type": "markdown",
    "id": "cell-5",
    "metadata": {},
-   "source": [
-    "## Defining variable types\n",
-    "\n",
-    "Custom variable types use `__init_subclass__` for clean definition syntax:\n",
-    "\n",
-    "```python\n",
-    "# Simple Euclidean variable (tangent_dim inferred from default shape)\n",
-    "class PointVar(\n",
-    "    jaxls.Var[jax.Array],\n",
-    "    default_factory=lambda: jnp.zeros(3),\n",
-    "):\n",
-    "    \"\"\"A 3D point variable.\"\"\"\n",
-    "\n",
-    "# Manifold variable (explicit tangent_dim and retraction)\n",
-    "class SO3Var(\n",
-    "    jaxls.Var[jaxlie.SO3],\n",
-    "    default_factory=jaxlie.SO3.identity,\n",
-    "    retract_fn=jaxlie.manifold.rplus,\n",
-    "    tangent_dim=3,\n",
-    "):\n",
-    "    \"\"\"An SO(3) rotation variable.\"\"\"\n",
-    "```\n",
-    "\n",
-    "The type parameter (`jax.Array` or `jaxlie.SO3`) flows through to `vals[var]` returns."
-   ]
+   "source": "## Defining variable types\n\nCustom variable types use `__init_subclass__` for clean definition syntax:\n\n```python\n# Simple Euclidean variable (tangent_dim inferred from default shape)\nclass PointVar(\n    jaxls.Var[jax.Array],\n    default_factory=lambda: jnp.zeros(3),\n):\n    \"\"\"A 3D point variable.\"\"\"\n\n# Manifold variable (explicit tangent_dim and retraction)\nclass SO3Var(\n    jaxls.Var[jaxlie.SO3],\n    default_factory=jaxlie.SO3.identity,\n    retract_fn=jaxlie.manifold.rplus,\n    tangent_dim=3,\n):\n    \"\"\"An SO(3) rotation variable.\"\"\"\n```\n\nThe type parameter (`jax.Array` or `jaxlie.SO3`) flows through to `vals[var]` returns.\n\nFor more on manifold variables, see {doc}`../guide/advanced/non_euclidean`."
   },
   {
    "cell_type": "markdown",

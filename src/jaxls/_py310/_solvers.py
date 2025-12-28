@@ -282,7 +282,7 @@ class NonlinearSolver:
             jax_log(
                 "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
                 i=state.summary.iterations,
-                cost=state.solution.cost_total,
+                cost=state.solution.cost_nonconstraint,
                 criteria=state.summary.termination_criteria.astype(jnp.int32),
                 cost_delta=state.summary.termination_deltas[0],
                 grad_mag=state.summary.termination_deltas[1],
@@ -594,7 +594,7 @@ class NonlinearSolver:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f}",
                 i=iterations,
-                cost=sol.cost_total,
+                cost=sol.cost_nonconstraint,
                 lambd=lambd,
                 ordered=True,
             )
@@ -602,7 +602,7 @@ class NonlinearSolver:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f} inexact_tol={inexact_tol:.1e}",
                 i=iterations,
-                cost=sol.cost_total,
+                cost=sol.cost_nonconstraint,
                 lambd=lambd,
                 inexact_tol=sol.cg_state.eta,
                 ordered=True,

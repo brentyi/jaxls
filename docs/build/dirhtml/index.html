@@ -335,10 +335,12 @@ and more concise than traditional C++ libraries.</p></li>
 <h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
 <p>We currently support:</p>
 <ul class="simple">
-<li><p>Automatic sparse Jacobians, defined analytically or via autodiff.</p></li>
-<li><p>Optimization on manifolds, including SO(2), SO(3), SE(2), SE(3).</p></li>
+<li><p>Automatic sparse Jacobians, defined analytically or via autodiff.
+See <a class="reference internal" href="guide/advanced/custom_jacobians/"><span class="doc">Custom Jacobians</span></a> and <a class="reference internal" href="design/sparse_matrices/"><span class="doc">Sparse matrices</span></a>.</p></li>
+<li><p>Optimization on manifolds, including SO(2), SO(3), SE(2), SE(3).
+See <a class="reference internal" href="guide/advanced/non_euclidean/"><span class="doc">Non-Euclidean variables</span></a>.</p></li>
 <li><p>Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.</p></li>
-<li><p>Linear subproblem solvers:</p>
+<li><p>Linear subproblem solvers. See <a class="reference internal" href="guide/tips_and_gotchas/"><span class="doc">Tips and Gotchas</span></a> for selection guidance.</p>
 <ul>
 <li><p>Sparse iterative with Conjugate Gradient (recommended for most problems).</p>
 <ul>
@@ -349,7 +351,8 @@ and more concise than traditional C++ libraries.</p></li>
 <li><p>Sparse Cholesky on CPU (CHOLMOD).</p></li>
 </ul>
 </li>
-<li><p>Augmented Lagrangian solver for constrained problems.</p>
+<li><p>Augmented Lagrangian solver for constrained problems.
+See <a class="reference internal" href="guide/advanced/constraints/"><span class="doc">Constraints</span></a>.</p>
 <ul>
 <li><p>Automatic adaptive penalties for equalities and inequalities: <code class="docutils literal notranslate"><span class="pre">h(x)</span> <span class="pre">=</span> <span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">g(x)</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code>.</p></li>
 </ul>

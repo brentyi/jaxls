@@ -40,7 +40,7 @@
    "cell_type": "markdown",
    "id": "cell-3",
    "metadata": {},
-   "source": "## The problem: circle fitting\n\nGiven a set of noisy 2D points that lie approximately on a circle, we want to find the circle parameters (center and radius) that best fit the data.\n\nThis is a classic nonlinear least squares problem: we want to minimize the sum of squared distances from each point to the circle."
+   "source": "## The problem: circle fitting\n\nGiven a set of noisy 2D points that lie approximately on a circle, we want to find the circle parameters (center and radius) that best fit the data.\n\nThis is a classic nonlinear least squares problem: we define residual vectors that measure the error for each data point, then minimize the sum of squared residual norms. In jaxls, a \"cost\" is a term in this objective; each cost computes a residual vector, and the solver minimizes $\\sum_i \\|r_i(x)\\|^2$."
   },
   {
    "cell_type": "code",
@@ -307,7 +307,7 @@
    "cell_type": "markdown",
    "id": "cell-17",
    "metadata": {},
-   "source": "## Summary\n\nThe key steps for solving nonlinear least squares problems with jaxls:\n\n1. Define variables by subclassing {class}`~jaxls.Var` with a `default_factory`\n2. Define costs using {func}`@jaxls.Cost.factory <jaxls.Cost.factory>`, returning residual vectors\n3. Build the problem with {class}`~jaxls.LeastSquaresProblem` and call `.analyze()`\n4. Solve with `.solve()` and access results via the {class}`~jaxls.VarValues` object\n\nFor more advanced topics, see:\n- Batched variable construction for efficiency\n- Constrained optimization with equality and inequality constraints\n- Lie group variables ({class}`~jaxls.SE3Var`, {class}`~jaxls.SO3Var`) for rotations and poses"
+   "source": "## Summary\n\nThe key steps for solving nonlinear least squares problems with jaxls:\n\n1. Define variables by subclassing {class}`~jaxls.Var` with a `default_factory`\n2. Define costs using {func}`@jaxls.Cost.factory <jaxls.Cost.factory>`, returning residual vectors\n3. Build the problem with {class}`~jaxls.LeastSquaresProblem` and call `.analyze()`\n4. Solve with `.solve()` and access results via the {class}`~jaxls.VarValues` object\n\nFor more, see:\n- {doc}`tips_and_gotchas`: Batched construction, residual dimensions, solver selection\n- {doc}`advanced/constraints`: Equality and inequality constraints\n- {doc}`advanced/non_euclidean`: Lie group variables for rotations and poses\n- {doc}`advanced/robust_costs`: Handling outliers with M-estimators"
   }
  ],
  "metadata": {

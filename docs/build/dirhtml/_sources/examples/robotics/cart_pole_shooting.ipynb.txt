@@ -1267,15 +1267,7 @@
     }
    ],
    "source": [
-    "solution = problem.solve(\n",
-    "    initial_vals,\n",
-    "    trust_region=jaxls.TrustRegionConfig(lambda_initial=1e-4),\n",
-    "    termination=jaxls.TerminationConfig(\n",
-    "        cost_tolerance=1e-6,\n",
-    "        gradient_tolerance=1e-6,\n",
-    "        max_iterations=200,\n",
-    "    ),\n",
-    ")"
+    "solution = problem.solve(initial_vals)"
    ]
   },
   {

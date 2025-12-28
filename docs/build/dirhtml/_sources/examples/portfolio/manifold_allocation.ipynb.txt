@@ -4,7 +4,21 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# Manifold Allocation\n\nThe {doc}`mean-variance notebook <mean_variance>` treats allocation as a classical constrained\noptimization problem: we minimize variance subject to budget constraints (weights sum to 1)\nand no short-selling (weights non-negative).\n\nBut there's another perspective: the set of valid allocations forms a *manifold* called the\nprobability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\nwithout explicit constraints.\n\nFeatures used:\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n- Multiplicative retraction for smooth simplex optimization"
+   "source": [
+    "# Manifold Allocation\n",
+    "\n",
+    "The {doc}`mean-variance notebook <mean_variance>` treats allocation as a classical constrained\n",
+    "optimization problem: we minimize variance subject to budget constraints (weights sum to 1)\n",
+    "and no short-selling (weights non-negative).\n",
+    "\n",
+    "But there's another perspective: the set of valid allocations forms a *manifold* called the\n",
+    "probability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\n",
+    "without explicit constraints.\n",
+    "\n",
+    "Features used:\n",
+    "- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n",
+    "- Multiplicative retraction for smooth simplex optimization"
+   ]
   },
   {
    "cell_type": "code",
@@ -40,7 +54,19 @@
    "cell_type": "markdown",
    "id": "cell-3",
    "metadata": {},
-   "source": "## The probability simplex\n\nThe probability simplex $\\Delta^{n-1}$ is the set of valid portfolio allocations:\n\n$$\\Delta^{n-1} = \\{w \\in \\mathbb{R}^n : w_i \\geq 0, \\sum_i w_i = 1\\}$$\n\nThis is an $(n-1)$-dimensional manifold embedded in $\\mathbb{R}^n$. The sum-to-one constraint\nremoves one degree of freedom.\n\nTo optimize on this manifold, we need a retraction: a function that maps an arbitrary\nupdate back to a valid point on the simplex."
+   "source": [
+    "## The probability simplex\n",
+    "\n",
+    "The probability simplex $\\Delta^{n-1}$ is the set of valid portfolio allocations:\n",
+    "\n",
+    "$$\\Delta^{n-1} = \\{w \\in \\mathbb{R}^n : w_i \\geq 0, \\sum_i w_i = 1\\}$$\n",
+    "\n",
+    "This is an $(n-1)$-dimensional manifold embedded in $\\mathbb{R}^n$. The sum-to-one constraint\n",
+    "removes one degree of freedom.\n",
+    "\n",
+    "To optimize on this manifold, we need a retraction: a function that maps an arbitrary\n",
+    "update back to a valid point on the simplex."
+   ]
   },
   {
    "cell_type": "markdown",
