@@ -67,4 +67,18 @@ jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares pr
   </tr>
 </table>
 
-For features and usage guide, see the [documentation](https://brentyi.github.io/jaxls)!
+The [documentation](https://brentyi.github.io/jaxls) also covers how you can use it for things like cloth simulation:
+
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/ada16acb-e0d4-42db-b43b-4ee6be6066bf" />
+
+Camera calibration:
+
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/fec84454-d8ca-41bb-857d-8a3d8e7bf090" />
+
+Mesh optimization:
+
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/84ffb9b5-985a-488c-b75a-aacb52194463" />
+
+And optimal control:
+
+https://github.com/user-attachments/assets/82c2ad41-d688-4825-9671-8f6af9f2b252
