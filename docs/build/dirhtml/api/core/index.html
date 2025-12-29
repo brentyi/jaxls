@@ -3,14 +3,14 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex/"><link rel="search" title="Search" href="../../search/"><link rel="next" title="Lie Group Variables" href="../lie_group_variables/"><link rel="prev" title="Black-Litterman Allocation" href="../../examples/portfolio/black_litterman/">
+<link rel="index" title="Index" href="../../genindex/"><link rel="search" title="Search" href="../../search/"><link rel="next" title="Lie group variables" href="../lie_group_variables/"><link rel="prev" title="Black-Litterman allocation" href="../../examples/portfolio/black_litterman/">
 
     <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
         <title>Core API - jaxls</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
@@ -209,7 +209,7 @@
   <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../guide/basics/">Basics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and Gotchas</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/">Advanced</a><input aria-label="Toggle navigation of Advanced" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
@@ -221,42 +221,43 @@
 <p class="caption" role="heading"><span class="caption-text">Examples</span></p>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/mechanics/">Mechanics</a><input aria-label="Toggle navigation of Mechanics" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring Equilibrium</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_simulation/">Cloth Simulation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/beam_bending/">Beam Bending</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/beam_bending/">Beam bending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss analysis</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Perception</a><input aria-label="Toggle navigation of Perception" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Vision</a><input aria-label="Toggle navigation of Vision" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/camera_calibration/">Camera calibration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/robotics/">Robotics</a><input aria-label="Toggle navigation of Robotics" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse Kinematics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle Avoidance</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-Pole (Collocation)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-Pole (Shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/portfolio/">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-Variance Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman allocation</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Core API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../lie_group_variables/">Lie Group Variables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../solver_config/">Solver Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../solver_config/">Solver configuration</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
 <ul>
@@ -737,7 +738,7 @@ default value of the variable type.</p>
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Lie Group Variables</div>
+                <div class="title">Lie group variables</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -748,7 +749,7 @@ default value of the variable type.</p>
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Black-Litterman Allocation</div>
+                <div class="title">Black-Litterman allocation</div>
                 
               </div>
             </a>

@@ -18,15 +18,11 @@ class AugmentedLagrangianConfig:
 
     penalty_initial: Any = None
 
-    tolerance_absolute: Any = 1e-4
+    tolerance_absolute: Any = 1e-6
 
     tolerance_relative: Any = 1e-4
 
-    violation_reduction_threshold: Any = 0.9
-
-    penalty_decrease_threshold: Any = 0.1
-
-    penalty_decrease_factor: Any = 0.25
+    violation_reduction_threshold: Any = 0.5
 
     lambda_min: Any = -1e7
 
@@ -50,8 +46,6 @@ class AugmentedLagrangianState:
     constraint_violation: Any
 
     snorm_initial: Any
-
-    cost_at_last_update: Any
 
 
 def _compute_snorm_csupn(
@@ -147,7 +141,6 @@ def initialize_al_state(
         snorm=initial_snorm,
         constraint_violation=initial_csupn,
         snorm_initial=initial_snorm,
-        cost_at_last_update=initial_cost,
     )
 
 
@@ -156,16 +149,9 @@ def update_al_state(
     vals: Any,
     al_state: Any,
     config: Any,
-    current_cost: Any,
-    step_accepted: Any = True,
     verbose: Any = False,
 ) -> Any:
     h_vals = problem._compute_constraint_values(vals)
-
-    cost_reldelta = jnp.abs(current_cost - al_state.cost_at_last_update) / jnp.maximum(
-        jnp.abs(al_state.cost_at_last_update), 1e-8
-    )
-    al_should_update = cost_reldelta < config.inner_solve_tolerance
 
     lagrange_multipliers_updated = []
     penalty_params_updated = []
@@ -176,45 +162,27 @@ def update_al_state(
         al_state.constraint_values_prev,
         al_state.is_inequality,
     ):
-        lambda_candidate = lambda_group + penalty_group[:, None] * h_group
+        lambda_new = lambda_group + penalty_group[:, None] * h_group
         if is_ineq:
-            lambda_candidate = relu(lambda_candidate)
-        lambda_candidate = jnp.clip(
-            lambda_candidate, config.lambda_min, config.lambda_max
-        )
-
-        lambda_new = jnp.where(al_should_update, lambda_candidate, lambda_group)
+            lambda_new = relu(lambda_new)
+        lambda_new = jnp.clip(lambda_new, config.lambda_min, config.lambda_max)
         lagrange_multipliers_updated.append(lambda_new)
 
         if is_ineq:
-            max_violation = jnp.max(relu(h_group), axis=1)
-            max_violation_prev = jnp.max(relu(h_prev), axis=1)
+            violation = jnp.max(relu(h_group), axis=1)
+            violation_prev = jnp.max(relu(h_prev), axis=1)
         else:
-            max_violation = jnp.max(jnp.abs(h_group), axis=1)
-            max_violation_prev = jnp.max(jnp.abs(h_prev), axis=1)
+            violation = jnp.max(jnp.abs(h_group), axis=1)
+            violation_prev = jnp.max(jnp.abs(h_prev), axis=1)
 
-        insufficient_progress = max_violation > (
-            config.violation_reduction_threshold * max_violation_prev
+        insufficient_progress = violation > (
+            config.violation_reduction_threshold * violation_prev
         )
-        excellent_progress = max_violation < (
-            config.penalty_decrease_threshold * max_violation_prev
-        )
-
-        penalty_increased = jnp.minimum(
-            penalty_group * config.penalty_factor, config.penalty_max
-        )
-
-        penalty_decreased = jnp.maximum(
-            penalty_group * config.penalty_decrease_factor, config.penalty_min
-        )
-
-        penalty_candidate = jnp.where(
+        penalty_new = jnp.where(
             insufficient_progress,
-            penalty_increased,
-            jnp.where(excellent_progress, penalty_decreased, penalty_group),
+            jnp.minimum(penalty_group * config.penalty_factor, config.penalty_max),
+            penalty_group,
         )
-
-        penalty_new = jnp.where(al_should_update, penalty_candidate, penalty_group)
         penalty_params_updated.append(penalty_new)
 
     lagrange_multipliers_updated = tuple(lagrange_multipliers_updated)
@@ -227,30 +195,21 @@ def update_al_state(
     if verbose:
         max_penalty = jnp.max(jnp.array([jnp.max(p) for p in penalty_params_updated]))
         jax_log(
-            " AL update: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}, al_update={al_upd}",
+            " AL update: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}",
             snorm=snorm_new,
             csupn=csupn_new,
             max_rho=max_penalty,
-            al_upd=al_should_update,
             ordered=True,
         )
-
-    constraint_values_prev_new = tuple(
-        jnp.where(step_accepted & al_should_update, h_new, h_prev)
-        for h_new, h_prev in zip(h_vals, al_state.constraint_values_prev)
-    )
-
-    cost_at_last_update_new = current_cost
 
     return AugmentedLagrangianState(
         lagrange_multipliers=lagrange_multipliers_updated,
         penalty_params=penalty_params_updated,
-        constraint_values_prev=constraint_values_prev_new,
+        constraint_values_prev=h_vals,
         is_inequality=al_state.is_inequality,
         snorm=snorm_new,
         constraint_violation=csupn_new,
         snorm_initial=al_state.snorm_initial,
-        cost_at_last_update=cost_at_last_update_new,
     )
 
 

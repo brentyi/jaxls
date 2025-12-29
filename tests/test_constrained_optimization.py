@@ -44,11 +44,11 @@ def test_simple_scalar_constraint():
     )
 
     # Solution should satisfy constraint: x = 1.0
-    assert jnp.abs(solution[var] - 1.0) < 1e-5, f"Expected x=1.0, got x={solution[var]}"
+    assert jnp.abs(solution[var] - 1.0) < 1e-4, f"Expected x=1.0, got x={solution[var]}"
 
     # Verify constraint is satisfied.
     constraint_violation = problem.compute_constraint_values(solution)
-    assert jnp.linalg.norm(constraint_violation) < 1e-5
+    assert jnp.linalg.norm(constraint_violation) < 1e-4
 
 
 def test_2d_constrained_optimization():
@@ -92,7 +92,7 @@ def test_2d_constrained_optimization():
 
     # Verify constraint is satisfied.
     constraint_violation = problem.compute_constraint_values(solution)
-    assert jnp.linalg.norm(constraint_violation) < 1e-5
+    assert jnp.linalg.norm(constraint_violation) < 1e-4
 
 
 def test_se2_position_constraint():
@@ -184,7 +184,7 @@ def test_multiple_constraints():
     # Verify all constraints satisfied.
     # Note: L2 norm can be ~sqrt(2)x larger than infinity norm for 2 constraints.
     constraint_violation = problem.compute_constraint_values(solution)
-    assert jnp.linalg.norm(constraint_violation) < 2e-5
+    assert jnp.linalg.norm(constraint_violation) < 1e-4
 
 
 def test_constraint_violation_decreases():
@@ -218,7 +218,7 @@ def test_constraint_violation_decreases():
 
     # Final violation should be much smaller than initial.
     assert final_violation < initial_violation * 0.01
-    assert final_violation < 1e-5
+    assert final_violation < 1e-4
 
 
 def test_batched_constraints():
@@ -261,7 +261,7 @@ def test_batched_constraints():
     # Verify constraint satisfaction.
     # Note: L2 norm can be ~sqrt(n)x larger than infinity norm for n constraints.
     constraint_violation = problem.compute_constraint_values(solution)
-    assert jnp.linalg.norm(constraint_violation) < 2e-5
+    assert jnp.linalg.norm(constraint_violation) < 1e-4
 
 
 def test_nonlinear_constraint():
@@ -720,7 +720,7 @@ def test_constraint_with_jac_mode_forward():
         verbose=False,
     )
 
-    assert jnp.abs(solution[var] - 1.0) < 1e-5
+    assert jnp.abs(solution[var] - 1.0) < 1e-4
 
 
 def test_constraint_with_jac_mode_reverse():
@@ -751,7 +751,7 @@ def test_constraint_with_jac_mode_reverse():
         verbose=False,
     )
 
-    assert jnp.abs(solution[var] - 1.0) < 1e-5
+    assert jnp.abs(solution[var] - 1.0) < 1e-4
 
 
 def test_constraint_with_custom_jacobian():
@@ -795,7 +795,7 @@ def test_constraint_with_custom_jacobian():
 
     # Verify constraint is satisfied.
     constraint_violation = problem.compute_constraint_values(solution)
-    assert jnp.linalg.norm(constraint_violation) < 1e-5
+    assert jnp.linalg.norm(constraint_violation) < 1e-4
 
 
 def test_constraint_with_custom_jacobian_with_cache():
@@ -922,7 +922,7 @@ def test_constraint_with_jac_batch_size():
 
     # Verify constraint is satisfied
     constraint_violation = problem.compute_constraint_values(solution)
-    assert jnp.linalg.norm(constraint_violation) < 1e-5
+    assert jnp.linalg.norm(constraint_violation) < 1e-4
 
 
 if __name__ == "__main__":

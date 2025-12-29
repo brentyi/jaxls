@@ -45,8 +45,8 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
 @jdc.pytree_dataclass
-class _ResidualInfo:
-    """Bundled residual computation results."""
+class _CostInfo:
+    """Bundled cost computation results."""
 
     residual_vectors: tuple[jax.Array, ...]
     """Per-group residual vectors (matches _stacked_costs structure)."""
@@ -469,19 +469,18 @@ class AnalyzedLeastSquaresProblem:
                 jac_cache.append(None)
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_residual_info(self, vals: VarValues) -> _ResidualInfo:
+    def _compute_cost_info(self, vals: VarValues) -> _CostInfo:
         """Compute residuals, costs, and Jacobian cache in one pass.
 
-        This bundles all residual-related computation into a single call,
+        This bundles all cost-related computation into a single call,
         computing per-group residuals, concatenated residual, total cost,
         and non-constraint cost (original objective) together.
 
         Args:
             vals: Variable values to evaluate at.
-            include_jac_cache: Whether to compute Jacobian cache.
 
         Returns:
-            _ResidualInfo with all computed values.
+            _CostInfo with all computed values.
         """
         residual_vectors: list[jax.Array] = []
         jac_caches: list[Any] = []
@@ -511,7 +510,7 @@ class AnalyzedLeastSquaresProblem:
         residual_vector = jnp.concatenate(residual_vectors, axis=0)
         cost_total = jnp.sum(residual_vector**2)
 
-        return _ResidualInfo(
+        return _CostInfo(
             residual_vectors=tuple(residual_vectors),
             residual_vector=residual_vector,
             cost_total=cost_total,

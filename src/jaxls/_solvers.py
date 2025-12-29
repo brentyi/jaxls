@@ -37,7 +37,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._core import AnalyzedLeastSquaresProblem, CustomJacobianCache
+    from ._core import AnalyzedLeastSquaresProblem, _CostInfo
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
@@ -196,12 +196,7 @@ class _SolutionState:
     """State associated with a single solution point."""
 
     vals: VarValues
-    cost_total: jax.Array  # Total cost: jnp.sum(residual_vector**2)
-    cost_nonconstraint: (
-        jax.Array
-    )  # Cost from l2_squared terms only (original objective)
-    residual_vector: jax.Array  # Shape: (num_residuals,)
-    jac_cache: tuple[CustomJacobianCache, ...]
+    cost_info: _CostInfo
     cg_state: _ConjugateGradientState | None
 
 
@@ -215,9 +210,9 @@ class _LmInnerState:
 
     lambd: float | jax.Array
     accepted: jax.Array
-    iterations: jax.Array
     sol_proposed: _SolutionState
     local_delta: jax.Array
+    summary: SolveSummary
 
 
 @jdc.pytree_dataclass
@@ -279,10 +274,10 @@ class NonlinearSolver:
         return_summary: jdc.Static[bool] = False,
     ) -> VarValues | tuple[VarValues, SolveSummary]:
         vals = initial_vals
-        residual_info = problem._compute_residual_info(vals)
+        cost_info = problem._compute_cost_info(vals)
 
         cost_history = jnp.zeros(self.termination.max_iterations)
-        cost_history = cost_history.at[0].set(residual_info.cost_nonconstraint)
+        cost_history = cost_history.at[0].set(cost_info.cost_nonconstraint)
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
@@ -298,17 +293,14 @@ class NonlinearSolver:
             )
             # Update problem with initial AL params.
             problem = update_problem_al_params(problem, al_state)
-            # Recompute residual with updated AL params.
-            residual_info = problem._compute_residual_info(vals)
-            cost_history = cost_history.at[0].set(residual_info.cost_nonconstraint)
+            # Recompute cost with updated AL params.
+            cost_info = problem._compute_cost_info(vals)
+            cost_history = cost_history.at[0].set(cost_info.cost_nonconstraint)
 
         state = _LmOuterState(
             solution=_SolutionState(
                 vals=vals,
-                cost_total=residual_info.cost_total,
-                cost_nonconstraint=residual_info.cost_nonconstraint,
-                residual_vector=residual_info.residual_vector,
-                jac_cache=residual_info.jac_cache,
+                cost_info=cost_info,
                 cg_state=None
                 if self.linear_solver != "conjugate_gradient"
                 else _ConjugateGradientState(
@@ -324,7 +316,7 @@ class NonlinearSolver:
                 iterations=jnp.array(0),
                 cost_history=cost_history,
                 lambda_history=lambda_history,
-                termination_criteria=jnp.array([False, False, False, False]),
+                termination_criteria=jnp.array([False, False, False]),
                 termination_deltas=jnp.zeros(3),
             ),
             lambd=self.trust_region.lambda_initial
@@ -339,7 +331,7 @@ class NonlinearSolver:
 
             def should_continue(state: _LmOuterState) -> jax.Array:
                 # Basic checks: not NaN, within iteration limit.
-                basic_checks = ~jnp.isnan(state.solution.cost_total) & (
+                basic_checks = ~jnp.isnan(state.solution.cost_info.cost_total) & (
                     state.summary.iterations < self.termination.max_iterations
                 )
 
@@ -358,18 +350,13 @@ class NonlinearSolver:
                 # parameter) should only trigger when AL has converged. This ensures
                 # we don't stop when the original objective has converged but
                 # constraints are not yet satisfied.
-                # termination_criteria: [cost, gradient, parameter, max_iters]
-                lm_terminated = (
-                    state.summary.termination_criteria[0]  # cost
-                    | state.summary.termination_criteria[1]  # gradient
-                    | state.summary.termination_criteria[2]  # parameter
-                )
-                max_iters_reached = state.summary.termination_criteria[3]
+                # termination_criteria: [cost, gradient, parameter]
+                lm_terminated = jnp.any(state.summary.termination_criteria)
 
                 # Stop if:
                 # - max_iters reached (regardless of AL), OR
                 # - LM terminated AND AL converged
-                should_stop = max_iters_reached | (lm_terminated & al_converged)
+                should_stop = lm_terminated & al_converged
                 return basic_checks & ~should_stop
 
             state = jax.lax.while_loop(
@@ -388,7 +375,7 @@ class NonlinearSolver:
             jax_log(
                 "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
                 i=state.summary.iterations,
-                cost=state.solution.cost_nonconstraint,
+                cost=state.solution.cost_info.cost_nonconstraint,
                 criteria=state.summary.termination_criteria.astype(jnp.int32),
                 cost_delta=state.summary.termination_deltas[0],
                 grad_mag=state.summary.termination_deltas[1],
@@ -423,11 +410,9 @@ class NonlinearSolver:
         else:
             lambd = inner_state.lambd  # stays at 0
 
-        iterations = inner_state.iterations + 1
-
         # Log optimizer state for debugging.
         if self.verbose:
-            self._log_state(problem, sol_prev, iterations, lambd)
+            self._log_state(problem, sol_prev, inner_state.summary.iterations, lambd)
 
         # Solve the linear system.
         cg_state: _ConjugateGradientState | None = None
@@ -479,57 +464,59 @@ class NonlinearSolver:
         proposed_vals = sol_prev.vals._retract(
             scaled_local_delta, problem._tangent_ordering
         )
-        proposed_residual_info = problem._compute_residual_info(proposed_vals)
+        proposed_cost_info = problem._compute_cost_info(proposed_vals)
 
-        # Compute step quality and acceptance.
-        # - For LM: accept if step quality meets threshold
-        # - For GN: always accept
-        if self.trust_region is not None:
-            predicted_cost = jnp.sum(
-                (A_blocksparse.multiply(scaled_local_delta) + sol_prev.residual_vector)
+        # Compute step acceptance.
+        # - For GN: always accept.
+        # - For LM: accept if step quality meets threshold.
+        if self.trust_region is None:
+            accepted = jnp.array(True)
+        else:
+            cost_predicted = jnp.sum(
+                (
+                    A_blocksparse.multiply(scaled_local_delta)
+                    + sol_prev.cost_info.residual_vector
+                )
                 ** 2
             )
-            predicted_reduction = sol_prev.cost_total - predicted_cost
-            actual_reduction = sol_prev.cost_total - proposed_residual_info.cost_total
-
-            # Avoid division by very small numbers - if predicted reduction is tiny,
-            # consider step quality as 1.0 (accept the step since it's essentially zero).
-            # Use float32-appropriate threshold.
-            at_optimum = jnp.abs(predicted_reduction) < 1e-7 * sol_prev.cost_total
-            step_quality = jnp.where(
-                at_optimum,
-                1.0,
-                actual_reduction / predicted_reduction,
+            predicted_reduction = sol_prev.cost_info.cost_total - cost_predicted
+            actual_reduction = (
+                sol_prev.cost_info.cost_total - proposed_cost_info.cost_total
+            )
+            step_quality = actual_reduction / predicted_reduction
+            accepted = ~jnp.isnan(proposed_cost_info.cost_total) & (
+                step_quality >= self.trust_region.step_quality_min
             )
 
-            # Accept if:
-            # 1. Normal case: good step quality AND cost decreases, OR
-            # 2. At optimum: predicted reduction is tiny (converged) and cost
-            #    doesn't significantly increase.
-            accepted = ~jnp.isnan(proposed_residual_info.cost_total) & (
-                (
-                    (step_quality >= self.trust_region.step_quality_min)
-                    & (actual_reduction > 0)
-                )
-                | (at_optimum & (actual_reduction >= -1e-7 * sol_prev.cost_total))
-            )
-        else:
-            accepted = jnp.array(True)
-
-        return _LmInnerState(
-            lambd=lambd,
-            accepted=accepted,
+        iterations = inner_state.summary.iterations + 1
+        term_criteria, term_deltas = self.termination._check_convergence(
+            sol_prev,
+            cost_nonconstraint_updated=proposed_cost_info.cost_nonconstraint,
+            tangent=local_delta * jacobian_scaler,
+            tangent_ordering=problem._tangent_ordering,
+            ATb=ATb,
             iterations=iterations,
-            sol_proposed=_SolutionState(
-                vals=proposed_vals,
-                cost_total=proposed_residual_info.cost_total,
-                cost_nonconstraint=proposed_residual_info.cost_nonconstraint,
-                residual_vector=proposed_residual_info.residual_vector,
-                jac_cache=proposed_residual_info.jac_cache,
-                cg_state=cg_state,
-            ),
-            local_delta=local_delta,
         )
+        with jdc.copy_and_mutate(inner_state) as next:
+            next.lambd = lambd
+            next.accepted = accepted
+            next.sol_proposed = _SolutionState(
+                vals=proposed_vals,
+                cost_info=proposed_cost_info,
+                cg_state=cg_state,
+            )
+            next.local_delta = local_delta
+            next.summary = SolveSummary(
+                iterations=iterations,
+                termination_criteria=term_criteria,
+                termination_deltas=term_deltas,
+                cost_history=next.summary.cost_history.at[iterations].set(
+                    proposed_cost_info.cost_nonconstraint
+                ),
+                lambda_history=next.summary.lambda_history.at[iterations].set(lambd),
+            )
+
+        return next
 
     def lm_outer_step(
         self,
@@ -544,7 +531,9 @@ class NonlinearSolver:
             problem = update_problem_al_params(problem, state.al_state)
 
         # Get nonzero values of Jacobian.
-        A_blocksparse = problem._compute_jac_values(sol_prev.vals, sol_prev.jac_cache)
+        A_blocksparse = problem._compute_jac_values(
+            sol_prev.vals, sol_prev.cost_info.jac_cache
+        )
 
         # Compute Jacobian scaler on first iteration only. We use jnp.where to
         # avoid double JIT compilation (one trace for first=True, one for first=False).
@@ -592,7 +581,7 @@ class NonlinearSolver:
             assert_never(self.sparse_mode)
 
         # Compute right-hand side of normal equation.
-        ATb = -AT_multiply(sol_prev.residual_vector)
+        ATb = -AT_multiply(sol_prev.cost_info.residual_vector)
 
         # Inner loop: search for a good lambda value.
         #
@@ -611,19 +600,26 @@ class NonlinearSolver:
             init_lambd = jnp.zeros(())
             lambda_max = jnp.inf
 
+        # Reset termination criteria for this outer step. The criteria from the
+        # previous outer step should not prevent the inner loop from running.
+        with jdc.copy_and_mutate(state.summary, validate=False) as init_summary:
+            init_summary.termination_criteria = jnp.array([False, False, False])
+
         init_inner_state = _LmInnerState(
             lambd=init_lambd,
             accepted=jnp.array(False),
-            iterations=state.summary.iterations,
             # Dummy values - will be overwritten by first lm_inner_step call.
             sol_proposed=sol_prev,
             local_delta=jnp.zeros_like(ATb),
+            summary=init_summary,
         )
         inner_state_final = jax.lax.while_loop(
             cond_fun=lambda s: (
+                # Exit early if converged (cost, gradient, or parameter criteria).
                 ~s.accepted
+                & ~jnp.any(s.summary.termination_criteria)
                 & (s.lambd < lambda_max)
-                & (s.iterations < self.termination.max_iterations)
+                & (s.summary.iterations < self.termination.max_iterations)
             ),
             body_fun=lambda s: self.lm_inner_step(
                 problem,
@@ -666,91 +662,60 @@ class NonlinearSolver:
                 "     accepted={accepted} ATb_norm={atb_norm:.2e} cost_prev={cost_prev:.4f} cost_new={cost_new:.4f}",
                 accepted=inner_state_final.accepted,
                 atb_norm=jnp.linalg.norm(ATb),
-                cost_prev=sol_prev.cost_total,
-                cost_new=inner_state_final.sol_proposed.cost_total,
+                cost_prev=sol_prev.cost_info.cost_total,
+                cost_new=inner_state_final.sol_proposed.cost_info.cost_total,
                 ordered=True,
             )
 
-        # Update AL state if constraints present.
-        if self.augmented_lagrangian is not None:
-            assert state.al_state is not None
-            state_next = self._update_al_state_and_recompute(
-                problem, state_next, state.al_state, inner_state_final.accepted
+        # Update AL state when inner problem has converged (gradient small or terminated).
+        # Note: we update even if the step was rejected - if gradient is small, inner has converged.
+        if self.augmented_lagrangian is not None and state_next.al_state is not None:
+            should_update_al = (
+                jnp.linalg.norm(ATb) < self.augmented_lagrangian.inner_solve_tolerance
+            ) | jnp.any(inner_state_final.summary.termination_criteria)
+            state_next = jax.lax.cond(
+                should_update_al,
+                lambda s: self._update_al_state_and_recompute(problem, s),
+                lambda s: s,
+                state_next,
             )
 
-        # Update termination criteria + summary.
+        # Copy summary from inner state (convergence and histories already updated).
         with jdc.copy_and_mutate(state_next) as state_next:
-            if self.termination.early_termination:
-                termination_criteria, termination_deltas = (
-                    self.termination._check_convergence(
-                        sol_prev,
-                        cost_nonconstraint_updated=state_next.solution.cost_nonconstraint,
-                        tangent=inner_state_final.local_delta * state.jacobian_scaler,
-                        tangent_ordering=problem._tangent_ordering,
-                        ATb=ATb,
-                        iterations=inner_state_final.iterations,
-                    )
-                )
-                state_next.summary.termination_criteria = termination_criteria
-                state_next.summary.termination_deltas = termination_deltas
-            state_next.summary.iterations = inner_state_final.iterations
-            state_next.summary.cost_history = state_next.summary.cost_history.at[
-                state_next.summary.iterations
-            ].set(state_next.solution.cost_nonconstraint)
-            state_next.summary.lambda_history = state_next.summary.lambda_history.at[
-                state_next.summary.iterations
-            ].set(state_next.lambd)
+            state_next.summary = inner_state_final.summary
         return state_next
 
     def _update_al_state_and_recompute(
         self,
         problem: AnalyzedLeastSquaresProblem,
         state: _LmOuterState,
-        al_state_prev: AugmentedLagrangianState,
-        step_accepted: jax.Array,
     ) -> _LmOuterState:
-        """Update Augmented Lagrangian state and recompute residuals.
-
-        After each LM step, we update Lagrange multipliers and penalties,
-        then recompute the residual/cost/Jacobian cache with the new AL params.
-        This must happen even when a step is rejected, since penalties may
-        increase to enforce feasibility.
+        """Update Augmented Lagrangian state and recompute cost.
 
         Args:
             problem: The analyzed problem with constraints.
-            state: Current outer state (with solution already updated).
-            al_state_prev: Previous AL state (before this step).
-            step_accepted: Whether the LM step was accepted.
+            state: Current outer state.
 
         Returns:
-            Updated outer state with new AL params and recomputed residuals.
+            Updated outer state with new AL params and recomputed cost.
         """
         assert self.augmented_lagrangian is not None
+        assert state.al_state is not None
 
-        # Update AL state (multipliers, penalties) when inner converged.
         al_state_updated = update_al_state(
             problem,
             state.solution.vals,
-            al_state_prev,
+            state.al_state,
             self.augmented_lagrangian,
-            current_cost=state.solution.cost_total,
-            step_accepted=step_accepted,
             verbose=self.verbose,
         )
 
-        # Always recompute residual/cost/jac_cache with updated AL params.
-        # When λ or ρ changes, the augmented cost function changes.
         problem_updated = update_problem_al_params(problem, al_state_updated)
-        new_residual_info = problem_updated._compute_residual_info(state.solution.vals)
+        new_cost_info = problem_updated._compute_cost_info(state.solution.vals)
 
         with jdc.copy_and_mutate(state) as state_updated:
             state_updated.al_state = al_state_updated
-            state_updated.solution.cost_total = new_residual_info.cost_total
-            state_updated.solution.cost_nonconstraint = (
-                new_residual_info.cost_nonconstraint
-            )
-            state_updated.solution.residual_vector = new_residual_info.residual_vector
-            state_updated.solution.jac_cache = new_residual_info.jac_cache
+            state_updated.solution.cost_info = new_cost_info
         return state_updated
 
     @staticmethod
@@ -764,7 +729,7 @@ class NonlinearSolver:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f}",
                 i=iterations,
-                cost=sol.cost_nonconstraint,
+                cost=sol.cost_info.cost_nonconstraint,
                 lambd=lambd,
                 ordered=True,
             )
@@ -772,7 +737,7 @@ class NonlinearSolver:
             jax_log(
                 " step #{i}: cost={cost:.4f} lambd={lambd:.4f} inexact_tol={inexact_tol:.1e}",
                 i=iterations,
-                cost=sol.cost_nonconstraint,
+                cost=sol.cost_info.cost_nonconstraint,
                 lambd=lambd,
                 inexact_tol=sol.cg_state.eta,
                 ordered=True,
@@ -781,7 +746,10 @@ class NonlinearSolver:
         for f, count in zip(problem._stacked_costs, problem._cost_counts):
             stacked_dim = count * f.residual_flat_dim
             partial_cost = jnp.sum(
-                sol.residual_vector[residual_index : residual_index + stacked_dim] ** 2
+                sol.cost_info.residual_vector[
+                    residual_index : residual_index + stacked_dim
+                ]
+                ** 2
             )
             residual_index += stacked_dim
             jax_log(
@@ -846,18 +814,20 @@ class TerminationConfig:
         # For constrained problems, the total cost changes with each AL update,
         # but cost_nonconstraint (original objective) provides stable convergence.
         cost_reldelta = (
-            jnp.abs(cost_nonconstraint_updated - sol_prev.cost_nonconstraint)
-            / sol_prev.cost_nonconstraint
+            jnp.abs(cost_nonconstraint_updated - sol_prev.cost_info.cost_nonconstraint)
+            / sol_prev.cost_info.cost_nonconstraint
         )
         converged_cost = cost_reldelta < self.cost_tolerance
 
-        # Gradient tolerance.
+        # Gradient tolerance: infinity norm of the gradient step.
         flat_vals = jax.flatten_util.ravel_pytree(sol_prev.vals)[0]
         gradient_mag = jnp.max(
-            flat_vals
-            - jax.flatten_util.ravel_pytree(
-                sol_prev.vals._retract(ATb, tangent_ordering)
-            )[0]
+            jnp.abs(
+                flat_vals
+                - jax.flatten_util.ravel_pytree(
+                    sol_prev.vals._retract(ATb, tangent_ordering)
+                )[0]
+            )
         )
         converged_gradient = jnp.where(
             iterations >= self.gradient_tolerance_start_step,
@@ -873,11 +843,6 @@ class TerminationConfig:
 
         # Check termination flags. We'll terminate if any of the conditions are met.
         term_flags = jnp.array(
-            [
-                converged_cost,
-                converged_gradient,
-                converged_parameters,
-                iterations >= self.max_iterations,
-            ]
+            [converged_cost, converged_gradient, converged_parameters]
         )
         return term_flags, jnp.array([cost_reldelta, gradient_mag, param_delta])

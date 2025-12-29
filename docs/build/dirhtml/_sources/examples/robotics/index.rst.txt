@@ -9,3 +9,4 @@ Robotics
    cart_pole_collocation
    cart_pole_shooting
    cam_design
+   imu_sensor_fusion

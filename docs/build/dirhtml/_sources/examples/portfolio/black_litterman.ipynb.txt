@@ -4,23 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": [
-    "# Black-Litterman Allocation\n",
-    "\n",
-    "The [Black-Litterman model](https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model) combines\n",
-    "market equilibrium with investor views to produce optimal portfolio allocations.\n",
-    "\n",
-    "This approach addresses a key limitation of mean-variance optimization: sensitivity to expected\n",
-    "return estimates. By starting from market-implied returns (the \"prior\") and blending in investor\n",
-    "views (the \"likelihood\"), we get more stable and intuitive allocations.\n",
-    "\n",
-    "Features used:\n",
-    "- {class}`~jaxls.Var` with vector-valued default\n",
-    "- Equality constraints (`constraint_eq_zero`): budget constraint\n",
-    "- Inequality constraints (`constraint_geq_zero`): no short-selling\n",
-    "- Augmented Lagrangian solver for constrained optimization\n",
-    "- Comparison of prior vs posterior allocations"
-   ]
+   "source": "# Black-Litterman allocation\n\nIn this notebook, we solve a [Black-Litterman](https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model)\nportfolio optimization problem: combining market equilibrium returns with subjective investor views.\n\nThis approach addresses a key limitation of mean-variance optimization: sensitivity to expected\nreturn estimates. By starting from market-implied returns (the \"prior\") and blending in investor\nviews (the \"likelihood\"), we get more stable and intuitive allocations.\n\nFeatures used:\n- {class}`~jaxls.Var` with vector-valued default\n- Equality constraints (`constraint_eq_zero`): budget constraint\n- Inequality constraints (`constraint_geq_zero`): no short-selling\n- Augmented Lagrangian solver for constrained optimization\n- Comparison of prior vs posterior allocations"
   },
   {
    "cell_type": "code",

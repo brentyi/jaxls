@@ -4,19 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": [
-    "# Truss Analysis\n",
-    "\n",
-    "A 2D truss structure analysis: finding the equilibrium displacements of a pin-jointed frame under load.\n",
-    "\n",
-    "Features used:\n",
-    "- {class}`~jaxls.Var` subclassing for node displacement variables\n",
-    "- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for bar element strain energy\n",
-    "- Equality constraints for fixed supports\n",
-    "- Batched cost construction for all members\n",
-    "\n",
-    "This is a classic introductory finite element analysis (FEA) problem using 1D bar elements."
-   ]
+   "source": "# Truss analysis\n\nIn this notebook, we solve a truss analysis problem: computing forces and deformations\nin a 2D pin-jointed frame under load.\n\nFeatures used:\n- {class}`~jaxls.Var` subclassing for node displacement variables\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for bar element strain energy\n- Equality constraints for fixed supports\n- Batched cost construction for all members\n\nThis is a classic introductory finite element analysis (FEA) problem using 1D bar elements."
   },
   {
    "cell_type": "code",
@@ -109,7 +97,7 @@
     "    Args:\n",
     "        node_i, node_j: Displacement variables at each end.\n",
     "        pos_i, pos_j: Initial (undeformed) positions.\n",
-    "        EA: Axial stiffness (Young's modulus \u00d7 area).\n",
+    "        EA: Axial stiffness (Young's modulus × area).\n",
     "    \"\"\"\n",
     "    # Initial geometry.\n",
     "    L0_vec = pos_j - pos_i\n",

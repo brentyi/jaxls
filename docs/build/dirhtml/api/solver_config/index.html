@@ -3,14 +3,14 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex/"><link rel="search" title="Search" href="../../search/"><link rel="next" title="Typed API" href="../../design/typed_api/"><link rel="prev" title="Lie Group Variables" href="../lie_group_variables/">
+<link rel="index" title="Index" href="../../genindex/"><link rel="search" title="Search" href="../../search/"><link rel="next" title="Typed API" href="../../design/typed_api/"><link rel="prev" title="Lie group variables" href="../lie_group_variables/">
 
     <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
-        <title>Solver Configuration - jaxls</title>
+        <title>Solver configuration - jaxls</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
@@ -209,7 +209,7 @@
   <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../guide/basics/">Basics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and Gotchas</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/">Advanced</a><input aria-label="Toggle navigation of Advanced" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
@@ -221,42 +221,43 @@
 <p class="caption" role="heading"><span class="caption-text">Examples</span></p>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/mechanics/">Mechanics</a><input aria-label="Toggle navigation of Mechanics" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring Equilibrium</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_simulation/">Cloth Simulation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/beam_bending/">Beam Bending</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/beam_bending/">Beam bending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss analysis</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Perception</a><input aria-label="Toggle navigation of Perception" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Vision</a><input aria-label="Toggle navigation of Vision" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/camera_calibration/">Camera calibration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/robotics/">Robotics</a><input aria-label="Toggle navigation of Robotics" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse Kinematics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle Avoidance</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-Pole (Collocation)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-Pole (Shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/portfolio/">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-Variance Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman allocation</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../core/">Core API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../lie_group_variables/">Lie Group Variables</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Solver Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Solver configuration</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
 <ul>
@@ -302,7 +303,7 @@
         </div>
         <article role="main" id="furo-main-content">
           <section id="solver-configuration">
-<h1>Solver Configuration<a class="headerlink" href="#solver-configuration" title="Link to this heading">¶</a></h1>
+<h1>Solver configuration<a class="headerlink" href="#solver-configuration" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="jaxls.TrustRegionConfig">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">TrustRegionConfig</span></span><a class="reference internal" href="../../_modules/jaxls/_solvers/#TrustRegionConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.TrustRegionConfig" title="Link to this definition">¶</a></dt>
@@ -460,7 +461,7 @@ override the automatic initialization.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.tolerance_absolute">
-<span class="sig-name descname"><span class="pre">tolerance_absolute</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0001</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.tolerance_absolute" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">tolerance_absolute</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-05</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.tolerance_absolute" title="Link to this definition">¶</a></dt>
 <dd><p><code class="docutils literal notranslate"><span class="pre">max(snorm,</span> <span class="pre">csupn)</span> <span class="pre">&lt;</span> <span class="pre">tol</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
@@ -482,25 +483,10 @@ override the automatic initialization.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.violation_reduction_threshold">
-<span class="sig-name descname"><span class="pre">violation_reduction_threshold</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.9</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.violation_reduction_threshold" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">violation_reduction_threshold</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.5</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.violation_reduction_threshold" title="Link to this definition">¶</a></dt>
 <dd><p>Increase penalty if violation &gt; threshold * previous_violation.
 E.g., 0.9 requires ~10% reduction per update to avoid penalty growth.
 Use higher values (e.g., 0.99) for more lenient penalty updates.</p>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.penalty_decrease_threshold">
-<span class="sig-name descname"><span class="pre">penalty_decrease_threshold</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.1</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.penalty_decrease_threshold" title="Link to this definition">¶</a></dt>
-<dd><p>Decrease penalty if violation &lt; threshold * previous_violation.
-E.g., 0.1 means 90%+ reduction allows penalty decrease.
-Set to 0.0 to disable penalty decrease.</p>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.penalty_decrease_factor">
-<span class="sig-name descname"><span class="pre">penalty_decrease_factor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.25</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.penalty_decrease_factor" title="Link to this definition">¶</a></dt>
-<dd><p>Factor to multiply penalty by when constraints are well-satisfied.
-E.g., 0.25 means penalty decreases by 4x when violation drops significantly.</p>
 </dd></dl>
 
 <dl class="py attribute">
@@ -519,7 +505,7 @@ E.g., 0.25 means penalty decreases by 4x when violation drops significantly.</p>
 <dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.inner_solve_tolerance">
 <span class="sig-name descname"><span class="pre">inner_solve_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.01</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance" title="Link to this definition">¶</a></dt>
 <dd><p>Only update AL parameters when inner problem has converged.
-Update when cost_reldelta &lt; this tolerance, meaning the LM solver
+Update when <code class="docutils literal notranslate"><span class="pre">||gradient||</span> <span class="pre">&lt;</span> <span class="pre">tolerance</span></code>, meaning the LM solver
 has approximately solved the current augmented subproblem.</p>
 </dd></dl>
 
@@ -548,7 +534,7 @@ has approximately solved the current augmented subproblem.</p>
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Lie Group Variables</div>
+                <div class="title">Lie group variables</div>
                 
               </div>
             </a>
@@ -589,7 +575,7 @@ has approximately solved the current augmented subproblem.</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Solver Configuration</a><ul>
+<li><a class="reference internal" href="#">Solver configuration</a><ul>
 <li><a class="reference internal" href="#jaxls.TrustRegionConfig"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig</span></code></a><ul>
 <li><a class="reference internal" href="#jaxls.TrustRegionConfig.lambda_initial"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_initial</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.TrustRegionConfig.lambda_factor"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_factor</span></code></a></li>
@@ -623,8 +609,6 @@ has approximately solved the current augmented subproblem.</p>
 <li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.tolerance_absolute"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.tolerance_absolute</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.tolerance_relative"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.tolerance_relative</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.violation_reduction_threshold"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.violation_reduction_threshold</span></code></a></li>
-<li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.penalty_decrease_threshold"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_decrease_threshold</span></code></a></li>
-<li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.penalty_decrease_factor"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_decrease_factor</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.lambda_min"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_min</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.lambda_max"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_max</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.inner_solve_tolerance</span></code></a></li>

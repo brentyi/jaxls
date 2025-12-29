@@ -4,25 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": [
-    "# Inverse Kinematics\n",
-    "\n",
-    "Finding joint configurations for a 7-DOF robot arm (Franka Panda) to reach target poses.\n",
-    "\n",
-    "```{note}\n",
-    "This example demonstrates basic IK with jaxls. For kinematic optimization in practice,\n",
-    "see [PyRoki](https://github.com/chungmin99/pyroki), which provides a more complete\n",
-    "interface for robot kinematics problems.\n",
-    "```\n",
-    "\n",
-    "Features used:\n",
-    "- {class}`~jaxls.Var` for joint angle variables with batched IDs\n",
-    "- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for end-effector constraints and costs\n",
-    "- Equality constraints (`constraint_eq_zero`): position and orientation targets\n",
-    "- Inequality constraints (`constraint_leq_zero`): joint limit enforcement\n",
-    "- Augmented Lagrangian solver for constrained optimization\n",
-    "- Forward kinematics with URDF parsing"
-   ]
+   "source": "# Inverse kinematics\n\nIn this notebook, we solve an inverse kinematics problem: finding joint angles for a\n7-DOF Franka Panda arm to reach target poses.\n\n```{note}\nThis example demonstrates basic IK with jaxls. For kinematic optimization in practice,\nsee [PyRoki](https://github.com/chungmin99/pyroki), which provides a more complete\ninterface for robot kinematics problems.\n```\n\nFeatures used:\n- {class}`~jaxls.Var` for joint angle variables with batched IDs\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for end-effector constraints and costs\n- Equality constraints (`constraint_eq_zero`): position and orientation targets\n- Inequality constraints (`constraint_leq_zero`): joint limit enforcement\n- Augmented Lagrangian solver for constrained optimization\n- Forward kinematics with URDF parsing"
   },
   {
    "cell_type": "code",
@@ -5288,103 +5270,15 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 10,
+   "execution_count": null,
    "id": "cell-16",
    "metadata": {
     "tags": [
      "hide-input"
     ]
    },
-   "outputs": [
-    {
-     "data": {
-      "text/html": [
-       "<div>                        <script type=\"text/javascript\">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>\n",
-       "        <script charset=\"utf-8\" src=\"https://cdn.plot.ly/plotly-3.1.0.min.js\" integrity=\"sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=\" crossorigin=\"anonymous\"></script>                <div id=\"dc95bfa3-aad4-477c-8d87-1bba76cbea90\" class=\"plotly-graph-div\" style=\"height:500px; width:100%;\"></div>            <script type=\"text/javascript\">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById(\"dc95bfa3-aad4-477c-8d87-1bba76cbea90\")) {                    Plotly.newPlot(                        \"dc95bfa3-aad4-477c-8d87-1bba76cbea90\",                        [{\"hovertemplate\":\"Joint 1: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#1f77b4\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 1\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[-8.124034756550047e-13,-3.614676984398102e-7,1.4201409612724092e-6,-0.00010500034841243178,-4.944800366502022e-6,-0.000013995352674101014,-1.4587067198590375e-6,-1.7677848518360406e-7,-1.4957976190999034e-8,4.462474834099339e-11,-2.1721098164562136e-6,1.3406224752543494e-6,-0.00010157841461477801,-5.825449989060871e-7,5.857757059857249e-6,0.000047977722715586424],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Joint 2: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#ff7f0e\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 2\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[0.03821447864174843,-0.0461946502327919,-0.16975675523281097,-0.3262796700000763,-0.5050266981124878,-0.6910123229026794,-0.8636912107467651,-0.9911606311798096,-1.0189995765686035,-0.8761063814163208,-0.5781069993972778,-0.28335222601890564,-0.08342500030994415,0.029943011701107025,0.08007354289293289,0.08093597739934921],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Joint 3: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#2ca02c\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 3\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[8.194439050923652e-13,3.5632325534606935e-7,-1.3282977988637867e-6,0.00009123623749474064,3.9675064726907294e-6,0.000010570031008683145,1.0944288533210056e-6,1.4216865906746534e-7,1.4820045635133283e-8,-5.624700705197938e-11,2.827469870680943e-6,-1.5490395526285283e-6,0.00010494241723790765,5.792016963823698e-7,-5.842768587172031e-6,-0.00004842607449973002],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Joint 4: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#d62728\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 4\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[-2.1049084663391113,-2.0547728538513184,-2.06784987449646,-2.1422886848449707,-2.2682688236236572,-2.431429624557495,-2.6154019832611084,-2.8008337020874023,-2.9597063064575195,-3.0478310585021973,-3.023705005645752,-2.9003653526306152,-2.726311683654785,-2.5387632846832275,-2.3612067699432373,-2.2113723754882812],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Joint 5: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#9467bd\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 5\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[-3.5720558455576423e-14,1.7143946706710267e-8,-2.3698203222011216e-7,0.00003014913272636477,1.9557039649953367e-6,6.836606189608574e-6,8.471056389680598e-7,1.224838541702411e-7,1.3582621249952354e-8,-5.1874504691795664e-11,2.3998327378649265e-6,-8.585698196839076e-7,0.000018236331015941687,-2.9779414489894407e-8,7.235625503199117e-7,5.246538876235718e-6],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Joint 6: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#8c564b\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 6\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[2.143122911453247,2.008578300476074,1.8980931043624878,1.8160091638565063,1.7632421255111694,1.7404171228408813,1.7517106533050537,1.8096729516983032,1.9407068490982056,2.171724557876587,2.4455981254577637,2.6170132160186768,2.6428866386413574,2.568706512451172,2.4412803649902344,2.2923083305358887],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Joint 7: %{y:.3f} rad\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"#e377c2\"},\"marker\":{\"size\":5},\"mode\":\"lines+markers\",\"name\":\"Joint 7\",\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],\"type\":\"scatter\",\"xaxis\":\"x\",\"yaxis\":\"y\"},{\"hovertemplate\":\"Error: %{y:.2f} mm\\u003cextra\\u003e\\u003c\\u002fextra\\u003e\",\"line\":{\"color\":\"crimson\"},\"marker\":{\"size\":6},\"mode\":\"lines+markers\",\"name\":\"Position Error\",\"showlegend\":false,\"x\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],\"y\":[0.0006723710157530149,0.0013760800356976688,2.61084925380628e-9,0.0011465182296888088,0.0004053554221172817,0.000622290770024847,0.0004214684850012418,0.00006664578222626005,0.00009996003313972324,0.000029802322387695312,0.004350833023636369,0.001008446474770608,0.006111293714639032,0.00025463117481194786,0.00006664001972467304,0.0010289376177752274],\"type\":\"scatter\",\"xaxis\":\"x2\",\"yaxis\":\"y2\"}],                        {\"template\":{\"data\":{\"histogram2dcontour\":[{\"type\":\"histogram2dcontour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"choropleth\":[{\"type\":\"choropleth\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"histogram2d\":[{\"type\":\"histogram2d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"heatmap\":[{\"type\":\"heatmap\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"contourcarpet\":[{\"type\":\"contourcarpet\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"contour\":[{\"type\":\"contour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"surface\":[{\"type\":\"surface\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"mesh3d\":[{\"type\":\"mesh3d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"scatter\":[{\"fillpattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2},\"type\":\"scatter\"}],\"parcoords\":[{\"type\":\"parcoords\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolargl\":[{\"type\":\"scatterpolargl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"bar\":[{\"error_x\":{\"color\":\"#2a3f5f\"},\"error_y\":{\"color\":\"#2a3f5f\"},\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"bar\"}],\"scattergeo\":[{\"type\":\"scattergeo\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolar\":[{\"type\":\"scatterpolar\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"histogram\":[{\"marker\":{\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"histogram\"}],\"scattergl\":[{\"type\":\"scattergl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatter3d\":[{\"type\":\"scatter3d\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermap\":[{\"type\":\"scattermap\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermapbox\":[{\"type\":\"scattermapbox\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterternary\":[{\"type\":\"scatterternary\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattercarpet\":[{\"type\":\"scattercarpet\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"carpet\":[{\"aaxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"baxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"type\":\"carpet\"}],\"table\":[{\"cells\":{\"fill\":{\"color\":\"#EBF0F8\"},\"line\":{\"color\":\"white\"}},\"header\":{\"fill\":{\"color\":\"#C8D4E3\"},\"line\":{\"color\":\"white\"}},\"type\":\"table\"}],\"barpolar\":[{\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"barpolar\"}],\"pie\":[{\"automargin\":true,\"type\":\"pie\"}]},\"layout\":{\"autotypenumbers\":\"strict\",\"colorway\":[\"#636efa\",\"#EF553B\",\"#00cc96\",\"#ab63fa\",\"#FFA15A\",\"#19d3f3\",\"#FF6692\",\"#B6E880\",\"#FF97FF\",\"#FECB52\"],\"font\":{\"color\":\"#2a3f5f\"},\"hovermode\":\"closest\",\"hoverlabel\":{\"align\":\"left\"},\"paper_bgcolor\":\"white\",\"plot_bgcolor\":\"#E5ECF6\",\"polar\":{\"bgcolor\":\"#E5ECF6\",\"angularaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"radialaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"ternary\":{\"bgcolor\":\"#E5ECF6\",\"aaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"baxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"caxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"coloraxis\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"colorscale\":{\"sequential\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"sequentialminus\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"diverging\":[[0,\"#8e0152\"],[0.1,\"#c51b7d\"],[0.2,\"#de77ae\"],[0.3,\"#f1b6da\"],[0.4,\"#fde0ef\"],[0.5,\"#f7f7f7\"],[0.6,\"#e6f5d0\"],[0.7,\"#b8e186\"],[0.8,\"#7fbc41\"],[0.9,\"#4d9221\"],[1,\"#276419\"]]},\"xaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"yaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"scene\":{\"xaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"yaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"zaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2}},\"shapedefaults\":{\"line\":{\"color\":\"#2a3f5f\"}},\"annotationdefaults\":{\"arrowcolor\":\"#2a3f5f\",\"arrowhead\":0,\"arrowwidth\":1},\"geo\":{\"bgcolor\":\"white\",\"landcolor\":\"#E5ECF6\",\"subunitcolor\":\"white\",\"showland\":true,\"showlakes\":true,\"lakecolor\":\"white\"},\"title\":{\"x\":0.05},\"mapbox\":{\"style\":\"light\"}}},\"xaxis\":{\"anchor\":\"y\",\"domain\":[0.0,1.0],\"title\":{\"text\":\"Target Index\"}},\"yaxis\":{\"anchor\":\"x\",\"domain\":[0.575,1.0],\"title\":{\"text\":\"Angle (rad)\"}},\"xaxis2\":{\"anchor\":\"y2\",\"domain\":[0.0,1.0],\"title\":{\"text\":\"Target Index\"}},\"yaxis2\":{\"anchor\":\"x2\",\"domain\":[0.0,0.425],\"title\":{\"text\":\"Error (mm)\"}},\"annotations\":[{\"font\":{\"size\":16},\"showarrow\":false,\"text\":\"Joint Angles Along Path\",\"x\":0.5,\"xanchor\":\"center\",\"xref\":\"paper\",\"y\":1.0,\"yanchor\":\"bottom\",\"yref\":\"paper\"},{\"font\":{\"size\":16},\"showarrow\":false,\"text\":\"End-Effector Position Error\",\"x\":0.5,\"xanchor\":\"center\",\"xref\":\"paper\",\"y\":0.425,\"yanchor\":\"bottom\",\"yref\":\"paper\"}],\"shapes\":[{\"line\":{\"color\":\"#1f77b4\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":2.8973000049591064,\"y1\":2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#1f77b4\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-2.8973000049591064,\"y1\":-2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#ff7f0e\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":1.7627999782562256,\"y1\":1.7627999782562256,\"yref\":\"y\"},{\"line\":{\"color\":\"#ff7f0e\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-1.7627999782562256,\"y1\":-1.7627999782562256,\"yref\":\"y\"},{\"line\":{\"color\":\"#2ca02c\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":2.8973000049591064,\"y1\":2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#2ca02c\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-2.8973000049591064,\"y1\":-2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#d62728\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-0.0697999969124794,\"y1\":-0.0697999969124794,\"yref\":\"y\"},{\"line\":{\"color\":\"#d62728\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-3.0717999935150146,\"y1\":-3.0717999935150146,\"yref\":\"y\"},{\"line\":{\"color\":\"#9467bd\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":2.8973000049591064,\"y1\":2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#9467bd\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-2.8973000049591064,\"y1\":-2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#8c564b\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":3.752500057220459,\"y1\":3.752500057220459,\"yref\":\"y\"},{\"line\":{\"color\":\"#8c564b\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-0.017500000074505806,\"y1\":-0.017500000074505806,\"yref\":\"y\"},{\"line\":{\"color\":\"#e377c2\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":2.8973000049591064,\"y1\":2.8973000049591064,\"yref\":\"y\"},{\"line\":{\"color\":\"#e377c2\",\"dash\":\"dot\",\"width\":1},\"opacity\":0.5,\"type\":\"line\",\"x0\":0,\"x1\":1,\"xref\":\"x domain\",\"y0\":-2.8973000049591064,\"y1\":-2.8973000049591064,\"yref\":\"y\"}],\"margin\":{\"t\":40,\"b\":40,\"l\":60,\"r\":40},\"legend\":{\"orientation\":\"h\",\"yanchor\":\"bottom\",\"y\":-0.2,\"xanchor\":\"center\",\"x\":0.5},\"height\":500},                        {\"responsive\": true}                    )                };            </script>        </div>"
-      ],
-      "text/plain": [
-       "<IPython.core.display.HTML object>"
-      ]
-     },
-     "execution_count": 10,
-     "metadata": {},
-     "output_type": "execute_result"
-    }
-   ],
-   "source": [
-    "import plotly.graph_objects as go\n",
-    "from IPython.display import HTML\n",
-    "\n",
-    "fig = make_subplots(\n",
-    "    rows=2,\n",
-    "    cols=1,\n",
-    "    subplot_titles=(\"Joint Angles Along Path\", \"End-Effector Position Error\"),\n",
-    "    vertical_spacing=0.15,\n",
-    ")\n",
-    "\n",
-    "# Joint angles.\n",
-    "colors = [\"#1f77b4\", \"#ff7f0e\", \"#2ca02c\", \"#d62728\", \"#9467bd\", \"#8c564b\", \"#e377c2\"]\n",
-    "for j in range(7):\n",
-    "    fig.add_trace(\n",
-    "        go.Scatter(\n",
-    "            x=list(range(n_targets)),\n",
-    "            y=[float(solutions[i, j]) for i in range(n_targets)],\n",
-    "            mode=\"lines+markers\",\n",
-    "            name=f\"Joint {j + 1}\",\n",
-    "            line=dict(color=colors[j]),\n",
-    "            marker=dict(size=5),\n",
-    "            hovertemplate=f\"Joint {j + 1}: %{{y:.3f}} rad<extra></extra>\",\n",
-    "        ),\n",
-    "        row=1,\n",
-    "        col=1,\n",
-    "    )\n",
-    "\n",
-    "# Add joint limit bands (shaded regions)\n",
-    "for j in range(7):\n",
-    "    fig.add_hline(\n",
-    "        y=float(joint_limits_upper[j]),\n",
-    "        line=dict(color=colors[j], width=1, dash=\"dot\"),\n",
-    "        opacity=0.5,\n",
-    "        row=1,\n",
-    "        col=1,\n",
-    "    )\n",
-    "    fig.add_hline(\n",
-    "        y=float(joint_limits_lower[j]),\n",
-    "        line=dict(color=colors[j], width=1, dash=\"dot\"),\n",
-    "        opacity=0.5,\n",
-    "        row=1,\n",
-    "        col=1,\n",
-    "    )\n",
-    "\n",
-    "# Position error.\n",
-    "fig.add_trace(\n",
-    "    go.Scatter(\n",
-    "        x=list(range(n_targets)),\n",
-    "        y=[e * 1000 for e in position_errors],\n",
-    "        mode=\"lines+markers\",\n",
-    "        name=\"Position Error\",\n",
-    "        line=dict(color=\"crimson\"),\n",
-    "        marker=dict(size=6),\n",
-    "        hovertemplate=\"Error: %{y:.2f} mm<extra></extra>\",\n",
-    "        showlegend=False,\n",
-    "    ),\n",
-    "    row=2,\n",
-    "    col=1,\n",
-    ")\n",
-    "\n",
-    "fig.update_xaxes(title_text=\"Target Index\", row=1, col=1)\n",
-    "fig.update_yaxes(title_text=\"Angle (rad)\", row=1, col=1)\n",
-    "fig.update_xaxes(title_text=\"Target Index\", row=2, col=1)\n",
-    "fig.update_yaxes(title_text=\"Error (mm)\", row=2, col=1)\n",
-    "\n",
-    "fig.update_layout(\n",
-    "    height=500,\n",
-    "    margin=dict(t=40, b=40, l=60, r=40),\n",
-    "    legend=dict(orientation=\"h\", yanchor=\"bottom\", y=-0.2, xanchor=\"center\", x=0.5),\n",
-    ")\n",
-    "\n",
-    "HTML(fig.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
-   ]
+   "outputs": [],
+   "source": "import plotly.graph_objects as go\nfrom IPython.display import HTML\n\nfig = make_subplots(\n    rows=2,\n    cols=1,\n    subplot_titles=(\"Joint Angles Along Path\", \"End-Effector Position Error\"),\n    vertical_spacing=0.22,\n)\n\n# Joint angles.\ncolors = [\"#1f77b4\", \"#ff7f0e\", \"#2ca02c\", \"#d62728\", \"#9467bd\", \"#8c564b\", \"#e377c2\"]\nfor j in range(7):\n    fig.add_trace(\n        go.Scatter(\n            x=list(range(n_targets)),\n            y=[float(solutions[i, j]) for i in range(n_targets)],\n            mode=\"lines+markers\",\n            name=f\"Joint {j + 1}\",\n            line=dict(color=colors[j]),\n            marker=dict(size=5),\n            hovertemplate=f\"Joint {j + 1}: %{{y:.3f}} rad<extra></extra>\",\n        ),\n        row=1,\n        col=1,\n    )\n\n# Add joint limit bands (shaded regions)\nfor j in range(7):\n    fig.add_hline(\n        y=float(joint_limits_upper[j]),\n        line=dict(color=colors[j], width=1, dash=\"dot\"),\n        opacity=0.5,\n        row=1,\n        col=1,\n    )\n    fig.add_hline(\n        y=float(joint_limits_lower[j]),\n        line=dict(color=colors[j], width=1, dash=\"dot\"),\n        opacity=0.5,\n        row=1,\n        col=1,\n    )\n\n# Position error.\nfig.add_trace(\n    go.Scatter(\n        x=list(range(n_targets)),\n        y=[e * 1000 for e in position_errors],\n        mode=\"lines+markers\",\n        name=\"Position Error\",\n        line=dict(color=\"crimson\"),\n        marker=dict(size=6),\n        hovertemplate=\"Error: %{y:.2f} mm<extra></extra>\",\n        showlegend=False,\n    ),\n    row=2,\n    col=1,\n)\n\nfig.update_xaxes(title_text=\"Target Index\", row=1, col=1)\nfig.update_yaxes(title_text=\"Angle (rad)\", row=1, col=1)\nfig.update_xaxes(title_text=\"Target Index\", row=2, col=1)\nfig.update_yaxes(title_text=\"Error (mm)\", row=2, col=1)\n\nfig.update_layout(\n    height=500,\n    margin=dict(t=40, b=40, l=60, r=40),\n    legend=dict(orientation=\"h\", yanchor=\"bottom\", y=-0.2, xanchor=\"center\", x=0.5),\n)\n\nHTML(fig.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
   },
   {
    "cell_type": "markdown",

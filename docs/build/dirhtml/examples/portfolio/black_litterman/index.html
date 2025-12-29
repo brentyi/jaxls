@@ -3,14 +3,14 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../../genindex/"><link rel="search" title="Search" href="../../../search/"><link rel="next" title="Core API" href="../../../api/core/"><link rel="prev" title="CVaR Allocation" href="../cvar_optimization/">
+<link rel="index" title="Index" href="../../../genindex/"><link rel="search" title="Search" href="../../../search/"><link rel="next" title="Core API" href="../../../api/core/"><link rel="prev" title="CVaR allocation" href="../cvar_optimization/">
 
     <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
-        <title>Black-Litterman Allocation - jaxls</title>
+        <title>Black-Litterman allocation - jaxls</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=6517d2d4" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
@@ -209,7 +209,7 @@
   <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../guide/basics/">Basics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../guide/tips_and_gotchas/">Tips and Gotchas</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../guide/advanced/">Advanced</a><input aria-label="Toggle navigation of Advanced" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
@@ -221,42 +221,43 @@
 <p class="caption" role="heading"><span class="caption-text">Examples</span></p>
 <ul class="current">
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../mechanics/">Mechanics</a><input aria-label="Toggle navigation of Mechanics" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../mechanics/spring_equilibrium/">Spring Equilibrium</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../mechanics/cloth_simulation/">Cloth Simulation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../mechanics/beam_bending/">Beam Bending</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../mechanics/truss_analysis/">Truss Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/beam_bending/">Beam bending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/truss_analysis/">Truss analysis</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../vision/">Perception</a><input aria-label="Toggle navigation of Perception" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../vision/">Vision</a><input aria-label="Toggle navigation of Vision" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../vision/camera_calibration/">Camera calibration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../vision/pose_graph_2d/">SE(2) pose graph</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../vision/pose_graph_3d/">SE(3) pose graph</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../vision/bundle_adjustment/">Bundle adjustment</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../vision/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../robotics/">Robotics</a><input aria-label="Toggle navigation of Robotics" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../robotics/inverse_kinematics/">Inverse Kinematics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../robotics/obstacle_avoidance/">Obstacle Avoidance</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../robotics/cart_pole_collocation/">Cart-Pole (Collocation)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../robotics/cart_pole_shooting/">Cart-Pole (Shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../">Portfolio Optimization</a><input aria-label="Toggle navigation of Portfolio Optimization" checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../mean_variance/">Mean-Variance Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../manifold_allocation/">Manifold Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../reparameterized_allocation/">Reparameterized Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../cvar_optimization/">CVaR Allocation</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Black-Litterman Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Black-Litterman allocation</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../api/core/">Core API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie Group Variables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver configuration</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
 <ul>
@@ -302,9 +303,9 @@
         </div>
         <article role="main" id="furo-main-content">
           <section class="tex2jax_ignore mathjax_ignore" id="black-litterman-allocation">
-<h1>Black-Litterman Allocation<a class="headerlink" href="#black-litterman-allocation" title="Link to this heading">¶</a></h1>
-<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model">Black-Litterman model</a> combines
-market equilibrium with investor views to produce optimal portfolio allocations.</p>
+<h1>Black-Litterman allocation<a class="headerlink" href="#black-litterman-allocation" title="Link to this heading">¶</a></h1>
+<p>In this notebook, we solve a <a class="reference external" href="https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model">Black-Litterman</a>
+portfolio optimization problem: combining market equilibrium returns with subjective investor views.</p>
 <p>This approach addresses a key limitation of mean-variance optimization: sensitivity to expected
 return estimates. By starting from market-implied returns (the “prior”) and blending in investor
 views (the “likelihood”), we get more stable and intuitive allocations.</p>
@@ -344,7 +345,7 @@ views (the “likelihood”), we get more stable and intuitive allocations.</p>
 </div>
 <section id="historical-stock-data">
 <h2>Historical stock data<a class="headerlink" href="#historical-stock-data" title="Link to this heading">¶</a></h2>
-<p>We use the same three stocks from the <a class="reference internal" href="../mean_variance/"><span class="doc">Mean-Variance Allocation</span></a> example:
+<p>We use the same three stocks from the <a class="reference internal" href="../mean_variance/"><span class="doc">Mean-variance allocation</span></a> example:
 IBM, Walmart (WMT), and Southern Electric (SEHI).</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -647,18 +648,18 @@ We maximize expected return while minimizing variance (mean-variance optimizatio
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 1 constraints (constraint_geq_zero), 1 variables each: augmented_no_short_constraint
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: return_cost
 <span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 4 terms and 1 variables: 2 costs, 1 eq_zero, 0 leq_zero, 1 geq_zero
-<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: return_cost
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: variance_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: return_cost
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 1 constraints (constraint_eq_zero), 1 variables each: augmented_budget_constraint
 <span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 1 constraints (constraint_geq_zero), 1 variables each: augmented_no_short_constraint
 Optimal weights with PRIOR returns (market equilibrium):
-  IBM: 3.3%
-  WMT: 96.7%
+  IBM: 3.2%
+  WMT: 96.8%
   SEHI: -0.0%
 
 Optimal weights with POSTERIOR returns (after views):
-  IBM: 4.4%
-  WMT: 95.6%
+  IBM: 4.3%
+  WMT: 95.7%
   SEHI: -0.0%
 </pre></div>
 </div>
@@ -769,7 +770,7 @@ Optimal weights with POSTERIOR returns (after views):
 </details>
 <div class="cell_output docutils container">
 <div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
-        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="c0b58cb9-5ca7-40e8-b50f-f15d4bceb758" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("c0b58cb9-5ca7-40e8-b50f-f15d4bceb758")) {                    Plotly.newPlot(                        "c0b58cb9-5ca7-40e8-b50f-f15d4bceb758",                        [{"marker":{"color":"#2196F3"},"name":"Prior (Equilibrium)","offset":-0.175,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[1.9624445587396622,1.2435607612133026,6.2399812042713165],"type":"bar","xaxis":"x","yaxis":"y"},{"marker":{"color":"#FF9800"},"name":"Posterior (With Views)","offset":0.175,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[2.099168859422207,1.5818338841199875,6.689489632844925],"type":"bar","xaxis":"x","yaxis":"y"},{"marker":{"color":"#2196F3"},"name":"Prior (Equilibrium)","offset":-0.175,"showlegend":false,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[3.302224352955818,96.69845700263977,-0.0005136127583682537],"type":"bar","xaxis":"x2","yaxis":"y2"},{"marker":{"color":"#FF9800"},"name":"Posterior (With Views)","offset":0.175,"showlegend":false,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[4.436104372143745,95.56477069854736,-0.0007604015991091728],"type":"bar","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.45]},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"Return (%)"}},"xaxis2":{"anchor":"y2","domain":[0.55,1.0]},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"Weight (%)"}},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Expected Returns (Monthly)","x":0.225,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Portfolio Allocation","x":0.775,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"margin":{"t":60,"b":40,"l":60,"r":40},"legend":{"orientation":"h","yanchor":"bottom","y":1.08,"xanchor":"center","x":0.5},"height":400,"barmode":"group"},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="698a0c60-053f-478a-ab12-0084be0d92e4" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("698a0c60-053f-478a-ab12-0084be0d92e4")) {                    Plotly.newPlot(                        "698a0c60-053f-478a-ab12-0084be0d92e4",                        [{"marker":{"color":"#2196F3"},"name":"Prior (Equilibrium)","offset":-0.175,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[1.9624445587396622,1.2435607612133026,6.2399812042713165],"type":"bar","xaxis":"x","yaxis":"y"},{"marker":{"color":"#FF9800"},"name":"Posterior (With Views)","offset":0.175,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[2.099168859422207,1.5818338841199875,6.689489632844925],"type":"bar","xaxis":"x","yaxis":"y"},{"marker":{"color":"#2196F3"},"name":"Prior (Equilibrium)","offset":-0.175,"showlegend":false,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[3.1570497900247574,96.84299230575562,-6.284608389250934e-06],"type":"bar","xaxis":"x2","yaxis":"y2"},{"marker":{"color":"#FF9800"},"name":"Posterior (With Views)","offset":0.175,"showlegend":false,"width":0.35,"x":["IBM","WMT","SEHI"],"y":[4.283062368631363,95.71698904037476,-1.609332684893161e-05],"type":"bar","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.45]},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"Return (%)"}},"xaxis2":{"anchor":"y2","domain":[0.55,1.0]},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"Weight (%)"}},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Expected Returns (Monthly)","x":0.225,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Portfolio Allocation","x":0.775,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"margin":{"t":60,"b":40,"l":60,"r":40},"legend":{"orientation":"h","yanchor":"bottom","y":1.08,"xanchor":"center","x":0.5},"height":400,"barmode":"group"},                        {"responsive": true}                    )                };            </script>        </div></div></div>
 </div>
 </section>
 <section id="interpreting-the-results">
@@ -789,7 +790,7 @@ Optimal weights with POSTERIOR returns (after views):
 <p>This demonstrates the power of Black-Litterman: instead of directly specifying portfolio weights,
 we express our beliefs as views, and the model translates them into a coherent allocation that
 respects both market equilibrium and our specific insights.</p>
-<p>For more details on mean-variance optimization with jaxls, see <a class="reference internal" href="../mean_variance/"><span class="doc">Mean-Variance Allocation</span></a>.
+<p>For more details on mean-variance optimization with jaxls, see <a class="reference internal" href="../mean_variance/"><span class="doc">Mean-variance allocation</span></a>.
 For the core API, see <a class="reference internal" href="../../../api/core/#jaxls.Cost" title="jaxls.Cost"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.Cost</span></code></a> and <a class="reference internal" href="../../../api/core/#jaxls.LeastSquaresProblem" title="jaxls.LeastSquaresProblem"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.LeastSquaresProblem</span></code></a>.</p>
 </section>
 </section>
@@ -815,7 +816,7 @@ For the core API, see <a class="reference internal" href="../../../api/core/#jax
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">CVaR Allocation</div>
+                <div class="title">CVaR allocation</div>
                 
               </div>
             </a>
@@ -856,7 +857,7 @@ For the core API, see <a class="reference internal" href="../../../api/core/#jax
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Black-Litterman Allocation</a><ul>
+<li><a class="reference internal" href="#">Black-Litterman allocation</a><ul>
 <li><a class="reference internal" href="#historical-stock-data">Historical stock data</a></li>
 <li><a class="reference internal" href="#black-litterman-framework">Black-Litterman framework</a></li>
 <li><a class="reference internal" href="#step-1-computing-the-prior-equilibrium-returns">Step 1: Computing the prior (equilibrium returns)</a></li>

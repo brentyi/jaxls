@@ -4,18 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": [
-    "# Tips and Gotchas\n",
-    "\n",
-    "Practical guidance for getting the most out of jaxls.\n",
-    "\n",
-    "Features used:\n",
-    "- Batched construction for efficient problem setup\n",
-    "- Residual vector structure for proper Hessian approximation\n",
-    "- Jacobian mode selection (`jac_mode`)\n",
-    "- Linear solver selection (`linear_solver`)\n",
-    "- Debugging with `return_summary`"
-   ]
+   "source": "# Tips and gotchas\n\nPractical guidance for getting the most out of jaxls.\n\nFeatures used:\n- Batched construction for efficient problem setup\n- Residual vector structure for proper Hessian approximation\n- Jacobian mode selection (`jac_mode`)\n- Linear solver selection (`linear_solver`)\n- Debugging with `return_summary`"
   },
   {
    "cell_type": "code",
@@ -244,9 +233,7 @@
    "cell_type": "markdown",
    "id": "cell-9",
    "metadata": {},
-   "source": [
-    "Both approaches produce identical results and solve times, but batched construction is faster because it avoids Python loop and vectorization analysis overhead."
-   ]
+   "source": "jaxls's problem analysis step ensures that both approaches produce identical results and solve times, but batched construction is faster because it avoids Python loop and vectorization analysis overhead."
   },
   {
    "cell_type": "code",
@@ -278,17 +265,7 @@
    "cell_type": "markdown",
    "id": "cell-11",
    "metadata": {},
-   "source": [
-    "## Residual vector dimension\n",
-    "\n",
-    "In Gauss-Newton, the Hessian is approximated as $J^T J$ where $J$ is the Jacobian. The rank of this approximation is limited by the number of residual dimensions. Higher-dimensional residuals produce higher-rank Jacobians and better Hessian approximations.\n",
-    "\n",
-    "For circle fitting, consider two formulations:\n",
-    "- 1D residual: `[dist - r]`, the signed distance error (shape `(1,)`)\n",
-    "- 2D residual: `(dist - r) * direction`, the error vector pointing from circle to point (shape `(2,)`)\n",
-    "\n",
-    "Both have the same cost when squared, but the 2D version has a 2×3 Jacobian (rank 2) vs 1×3 (rank 1)."
-   ]
+   "source": "## Residual vector dimension\n\nIn Gauss-Newton, the Hessian is approximated as $J^T J$ where $J$ is the Jacobian of residuals with respect to parameters. The rank of this approximation is limited by the number of residual dimensions. Higher-dimensional residuals produce higher-rank Jacobians and better Hessian approximations.\n\nFor circle fitting, consider two formulations:\n- 1D residual: `[dist - r]`, the signed distance error (shape `(1,)`)\n- 2D residual: `(dist - r) * direction`, the error vector pointing from circle to point (shape `(2,)`)\n\nBoth have the same cost when squared, but the 2D version has a 2×3 Jacobian (rank 2) vs 1×3 (rank 1)."
   },
   {
    "cell_type": "code",
@@ -481,15 +458,7 @@
    "cell_type": "markdown",
    "id": "cell-17",
    "metadata": {},
-   "source": [
-    "## Linear solver choice\n",
-    "\n",
-    "jaxls supports multiple linear solvers for the normal equations:\n",
-    "\n",
-    "- `\"conjugate_gradient\"` (default): Iterative solver, scales well to large problems, runs on CPU/GPU\n",
-    "- `\"dense_cholesky\"`: Direct solver using dense matrices, fast for small problems (<500 variables)\n",
-    "- `\"cholmod\"`: Sparse direct solver, requires [scikit-sparse](https://github.com/scikit-sparse/scikit-sparse), excellent for medium-to-large sparse problems"
-   ]
+   "source": "## Linear solver choice\n\njaxls supports multiple linear solvers for the normal equations:\n\n- `\"conjugate_gradient\"` (default): Iterative solver, scales well to large problems, runs on CPU/GPU\n- `\"dense_cholesky\"`: Direct solver using dense matrices, fast for small problems (<500 variables)\n- `\"cholmod\"`: Sparse direct solver, requires [scikit-sparse](https://github.com/scikit-sparse/scikit-sparse), excellent for medium-to-large sparse problems, runs on CPU only"
   },
   {
    "cell_type": "code",

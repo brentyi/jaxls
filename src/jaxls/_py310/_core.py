@@ -30,7 +30,7 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
 @jdc.pytree_dataclass
-class _ResidualInfo:
+class _CostInfo:
     residual_vectors: Any
 
     residual_vector: Any
@@ -342,7 +342,7 @@ class AnalyzedLeastSquaresProblem:
                 jac_cache.append(None)
         return jnp.concatenate(residual_slices, axis=0)
 
-    def _compute_residual_info(self, vals: Any) -> Any:
+    def _compute_cost_info(self, vals: Any) -> Any:
         residual_vectors: Any = []
         jac_caches: Any = []
         cost_nonconstraint = jnp.array(0.0)
@@ -369,7 +369,7 @@ class AnalyzedLeastSquaresProblem:
         residual_vector = jnp.concatenate(residual_vectors, axis=0)
         cost_total = jnp.sum(residual_vector**2)
 
-        return _ResidualInfo(
+        return _CostInfo(
             residual_vectors=tuple(residual_vectors),
             residual_vector=residual_vector,
             cost_total=cost_total,

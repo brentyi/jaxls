@@ -4,21 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": [
-    "# Manifold Allocation\n",
-    "\n",
-    "The {doc}`mean-variance notebook <mean_variance>` treats allocation as a classical constrained\n",
-    "optimization problem: we minimize variance subject to budget constraints (weights sum to 1)\n",
-    "and no short-selling (weights non-negative).\n",
-    "\n",
-    "But there's another perspective: the set of valid allocations forms a *manifold* called the\n",
-    "probability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\n",
-    "without explicit constraints.\n",
-    "\n",
-    "Features used:\n",
-    "- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n",
-    "- Multiplicative retraction for smooth simplex optimization"
-   ]
+   "source": "# Manifold allocation\n\nThe {doc}`mean-variance notebook <mean_variance>` treats allocation as a classical constrained\noptimization problem: we minimize variance subject to budget constraints (weights sum to 1)\nand no short-selling (weights non-negative).\n\nAn alternative perspective: the set of valid allocations forms a *manifold* called the\nprobability simplex. By defining a custom `retract_fn`, we can optimize directly on this manifold\nwithout explicit constraints.\n\nFeatures used:\n- {class}`~jaxls.Var` with custom `retract_fn` and `tangent_dim` for manifold variables\n- Multiplicative retraction for smooth simplex optimization"
   },
   {
    "cell_type": "code",
@@ -64,8 +50,13 @@
     "This is an $(n-1)$-dimensional manifold embedded in $\\mathbb{R}^n$. The sum-to-one constraint\n",
     "removes one degree of freedom.\n",
     "\n",
-    "To optimize on this manifold, we need a retraction: a function that maps an arbitrary\n",
-    "update back to a valid point on the simplex."
+    "To optimize on this manifold, we need a **retraction**: a function `retract(x, delta)` that maps\n",
+    "a point $x$ on the manifold plus an update $\\delta$ back to a valid point on the manifold. A valid\n",
+    "retraction must satisfy:\n",
+    "\n",
+    "1. **Identity at zero**: `retract(x, 0) = x`\n",
+    "2. **Stays on manifold**: output always satisfies the manifold constraints\n",
+    "3. **Smoothness**: the function should be differentiable"
    ]
   },
   {
@@ -79,8 +70,10 @@
     "1. Scale each weight: `weights * exp(delta)`\n",
     "2. Normalize: divide by sum to ensure sum-to-one\n",
     "\n",
-    "This is smooth everywhere. Assuming positive initialization, weights stay positive since\n",
-    "`exp(delta)` is always positive."
+    "This satisfies the retraction requirements:\n",
+    "- **Identity at zero**: `exp(0) = 1`, so `retract(w, 0) = w / sum(w) = w`\n",
+    "- **Stays on manifold**: normalization ensures sum-to-one; `exp()` ensures positivity\n",
+    "- **Smoothness**: both `exp()` and division are smooth operations"
    ]
   },
   {

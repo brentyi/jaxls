@@ -4,7 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# Cam profile optimization\n\nDesigning a cam profile to produce a desired follower motion while satisfying manufacturing constraints.\n\n**Inputs:** Target dwell-rise-dwell-return displacement profile  \n**Outputs:** B-spline control points defining the cam shape\n\nFeatures used:\n- {class}`~jaxls.Var` for B-spline control point radii\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for motion tracking and smoothness\n- Inequality constraints for pressure angle and minimum radius limits"
+   "source": "# Cam profile optimization\n\nIn this notebook, we solve a cam design problem: finding cam profiles that produce\nsmooth follower motion while satisfying curvature constraints.\n\n**Inputs:** Target dwell-rise-dwell-return displacement profile  \n**Outputs:** B-spline control points defining the cam shape\n\nFeatures used:\n- {class}`~jaxls.Var` for B-spline control point radii\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for motion tracking and smoothness\n- Inequality constraints for pressure angle and minimum radius limits"
   },
   {
    "cell_type": "code",
@@ -2605,10 +2605,10 @@
     "## Target motion profile\n",
     "\n",
     "We design a cam for a dwell-rise-dwell-return motion:\n",
-    "- **Dwell** at low position (0-90\u00b0)\n",
-    "- **Rise** to high position (90-180\u00b0)\n",
-    "- **Dwell** at high position (180-270\u00b0)\n",
-    "- **Return** to low position (270-360\u00b0)\n",
+    "- **Dwell** at low position (0-90°)\n",
+    "- **Rise** to high position (90-180°)\n",
+    "- **Dwell** at high position (180-270°)\n",
+    "- **Return** to low position (270-360°)\n",
     "\n",
     "We use a modified sine (cycloidal) motion for smooth acceleration."
    ]
@@ -4399,8 +4399,8 @@
     "print(f\"  RMS error: {float(jnp.sqrt(jnp.mean(tracking_error**2))):.4f}\")\n",
     "print(f\"  Max error: {float(jnp.max(jnp.abs(tracking_error))):.4f}\")\n",
     "print(\"\\nPressure angle:\")\n",
-    "print(f\"  Max: {float(jnp.rad2deg(jnp.max(pressure_angles))):.1f}\u00b0\")\n",
-    "print(f\"  Limit: {float(jnp.rad2deg(MAX_PRESSURE_ANGLE)):.1f}\u00b0\")"
+    "print(f\"  Max: {float(jnp.rad2deg(jnp.max(pressure_angles))):.1f}°\")\n",
+    "print(f\"  Limit: {float(jnp.rad2deg(MAX_PRESSURE_ANGLE)):.1f}°\")"
    ]
   },
   {
@@ -4543,7 +4543,7 @@
     "\n",
     "fig.update_xaxes(scaleanchor=\"y\", scaleratio=1, title=\"x\", row=1, col=1)\n",
     "fig.update_yaxes(title=\"y\", row=1, col=1)\n",
-    "fig.update_xaxes(title=\"Cam angle (\u00b0)\", range=[0, 360], dtick=90, row=1, col=2)\n",
+    "fig.update_xaxes(title=\"Cam angle (°)\", range=[0, 360], dtick=90, row=1, col=2)\n",
     "fig.update_yaxes(title=\"Displacement\", row=1, col=2)\n",
     "\n",
     "fig.update_layout(\n",
@@ -4592,7 +4592,7 @@
     "fig.add_hline(\n",
     "    y=float(jnp.rad2deg(MAX_PRESSURE_ANGLE)),\n",
     "    line=dict(color=\"crimson\", width=2, dash=\"dash\"),\n",
-    "    annotation_text=f\"Limit ({float(jnp.rad2deg(MAX_PRESSURE_ANGLE)):.0f}\u00b0)\",\n",
+    "    annotation_text=f\"Limit ({float(jnp.rad2deg(MAX_PRESSURE_ANGLE)):.0f}°)\",\n",
     "    annotation_position=\"top right\",\n",
     ")\n",
     "\n",
@@ -4603,8 +4603,8 @@
     "fig.add_annotation(x=315, y=25, text=\"Return\", showarrow=False, font=dict(size=12))\n",
     "\n",
     "fig.update_layout(\n",
-    "    xaxis=dict(title=\"Cam angle (\u00b0)\", range=[0, 360], dtick=90),\n",
-    "    yaxis=dict(title=\"Pressure angle (\u00b0)\", range=[0, 40]),\n",
+    "    xaxis=dict(title=\"Cam angle (°)\", range=[0, 360], dtick=90),\n",
+    "    yaxis=dict(title=\"Pressure angle (°)\", range=[0, 40]),\n",
     "    height=300,\n",
     "    margin=dict(t=30, b=40, l=60, r=40),\n",
     "    showlegend=False,\n",
@@ -4621,9 +4621,9 @@
     "The optimized cam profile closely tracks the desired dwell-rise-dwell-return motion while keeping the pressure angle within acceptable limits. The B-spline parameterization ensures a smooth, manufacturable profile.\n",
     "\n",
     "Key design tradeoffs:\n",
-    "- **Larger base circle** \u2192 lower pressure angles but larger cam size\n",
-    "- **Slower rise/return** \u2192 lower pressure angles but reduced machine speed\n",
-    "- **More control points** \u2192 better motion tracking but more complex profile"
+    "- **Larger base circle** → lower pressure angles but larger cam size\n",
+    "- **Slower rise/return** → lower pressure angles but reduced machine speed\n",
+    "- **More control points** → better motion tracking but more complex profile"
    ]
   }
  ],

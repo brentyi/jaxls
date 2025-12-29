@@ -5,6 +5,6 @@ Mechanics
    :maxdepth: 1
 
    spring_equilibrium
-   cloth_simulation
+   cloth_draping
    beam_bending
    truss_analysis

@@ -1,4 +1,4 @@
-Solver Configuration
+Solver configuration
 ====================
 
 .. autoclass:: jaxls.TrustRegionConfig

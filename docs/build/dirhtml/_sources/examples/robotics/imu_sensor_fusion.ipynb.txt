@@ -4,7 +4,7 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# IMU fusion + calibration\n\nFusing IMU measurements with sparse position fixes to estimate poses, velocities, and sensor biases.\n\n**Inputs:** High-rate accelerometer/gyroscope data, occasional GPS-like position priors  \n**Outputs:** Trajectory (poses + velocities) and calibrated IMU biases\n\nFeatures used:\n- {class}`~jaxls.SE3Var` for 6-DOF poses\n- {class}`~jaxls.Var` subclassing for velocity and IMU bias variables\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for preintegration costs\n- Batched construction for efficient problem building"
+   "source": "# IMU fusion + calibration\n\nIn this notebook, we solve a sensor fusion problem: combining IMU measurements with\nsparse position fixes to estimate poses, velocities, and sensor biases.\n\n**Inputs:** High-rate accelerometer/gyroscope data, occasional GPS-like position priors  \n**Outputs:** Trajectory (poses + velocities) and calibrated IMU biases\n\nFeatures used:\n- {class}`~jaxls.SE3Var` for 6-DOF poses\n- {class}`~jaxls.Var` subclassing for velocity and IMU bias variables\n- {func}`@jaxls.Cost.factory <jaxls.Cost.factory>` for preintegration costs\n- Batched construction for efficient problem building"
   },
   {
    "cell_type": "code",
@@ -185,7 +185,7 @@
     "    def euler_at_t(t: jax.Array) -> jax.Array:\n",
     "        return state_at_t(t)[1]\n",
     "\n",
-    "    # Velocity = d(position)/dt, Acceleration = d\u00b2(position)/dt\u00b2.\n",
+    "    # Velocity = d(position)/dt, Acceleration = d²(position)/dt².\n",
     "    velocity_fn = jax.jacfwd(position_at_t)\n",
     "    accel_fn = jax.jacfwd(velocity_fn)\n",
     "\n",
@@ -372,7 +372,7 @@
     "    )\n",
     "\n",
     "fig_imu.update_xaxes(title_text=\"Time (s)\", row=2, col=1)\n",
-    "fig_imu.update_yaxes(title_text=\"Acceleration (m/s\u00b2)\", row=1, col=1)\n",
+    "fig_imu.update_yaxes(title_text=\"Acceleration (m/s²)\", row=1, col=1)\n",
     "fig_imu.update_yaxes(title_text=\"Angular velocity (rad/s)\", row=2, col=1)\n",
     "\n",
     "fig_imu.update_layout(\n",

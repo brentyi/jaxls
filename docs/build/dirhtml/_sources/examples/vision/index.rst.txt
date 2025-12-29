@@ -1,5 +1,5 @@
-Perception
-==========
+Vision
+======
 
 .. toctree::
    :maxdepth: 1
@@ -8,4 +8,4 @@ Perception
    pose_graph_2d
    pose_graph_3d
    bundle_adjustment
-   imu_sensor_fusion
+   smplh_shape_fitting

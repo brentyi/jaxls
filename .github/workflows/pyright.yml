@@ -1,4 +1,4 @@
-name: Pyright
+name: pyright
 
 on:
   push:
@@ -10,18 +10,12 @@ jobs:
   pyright:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.12"
-      - name: Install dependencies
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y libsuitesparse-dev
-          pip install uv
-          python -m pip install --upgrade pip
-          uv pip install --system -e ".[dev,examples]"
       - name: Run pyright
-        run: |
-          pyright .
+        run: uv run --python 3.12 --extra dev pyright .

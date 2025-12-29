@@ -6,7 +6,7 @@ jaxls
 jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares
 problems in JAX.
 
-We provide an API for defining optimization problems, which are then analyzed
+We provide an API for declaring least squares problems, which are then analyzed
 for fast solve times: we automatically vectorize repeated cost and variable
 operations, while translating sparse cost/variable relationships into sparse
 matrix operations.
@@ -26,13 +26,13 @@ Goals
 
 jaxls is designed to be:
 
-- Practical. It aims to be lightweight and hackable, but still fast for
-  real-world problems in robotics, vision, and scientific computing.
+- Lightweight and hackable, but fast. It aims to be practical for common
+  problems in robotics, vision, and scientific computing.
 - Python-native. jaxls combines recent Python typing constructs with
   a functional, `PyTree <https://docs.jax.dev/en/latest/pytrees.html>`_-first
   implementation. Its API is type-safe, compatible with standard JAX
   `function transforms <https://docs.jax.dev/en/latest/key-concepts.html#transformations>`_,
-  and more concise than traditional C++ libraries.
+  and more concise than traditional optimization tools.
 
 
 Features
@@ -72,7 +72,7 @@ Related projects
 Acknowledgements
 ----------------
 
-jaxls is in-part inspired by libraries like
+jaxls is inspired by libraries like
 `GTSAM <https://gtsam.org/>`_,
 `Ceres Solver <http://ceres-solver.org/>`_,
 `minisam <https://github.com/dongjing3309/minisam>`_,

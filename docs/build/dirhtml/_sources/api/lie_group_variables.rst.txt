@@ -1,4 +1,4 @@
-Lie Group Variables
+Lie group variables
 ===================
 
 Built-in variable types for optimization on Lie groups.

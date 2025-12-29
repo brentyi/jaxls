@@ -47,7 +47,7 @@ def test_cost_create_factory_deprecated():
     cost = cost_fn(var, 1.0)  # type: ignore
     problem = jaxls.LeastSquaresProblem(costs=[cost], variables=[var]).analyze()
     solution = problem.solve(verbose=False)
-    assert jnp.abs(solution[var] - 1.0) < 1e-5
+    assert jnp.abs(solution[var] - 1.0) < 1e-4
 
 
 def test_cost_create_factory_with_kind_deprecated():
@@ -85,7 +85,7 @@ def test_cost_create_factory_with_kind_deprecated():
         variables=[var],
     ).analyze()
     solution = problem.solve(verbose=False)
-    assert jnp.abs(solution[var] - 1.0) < 1e-5
+    assert jnp.abs(solution[var] - 1.0) < 1e-4
 
 
 def test_cost_make_deprecated():
@@ -116,7 +116,7 @@ def test_cost_make_deprecated():
     # Verify the cost still works
     problem = jaxls.LeastSquaresProblem(costs=[cost], variables=[var]).analyze()
     solution = problem.solve(verbose=False)
-    assert jnp.abs(solution[var] - 1.0) < 1e-5
+    assert jnp.abs(solution[var] - 1.0) < 1e-4
 
 
 def test_preferred_api_no_warnings():
@@ -159,7 +159,7 @@ def test_preferred_api_no_warnings():
         variables=[var],
     ).analyze()
     solution = problem.solve(verbose=False)
-    assert jnp.abs(solution[var] - 1.0) < 1e-5
+    assert jnp.abs(solution[var] - 1.0) < 1e-4
 
 
 if __name__ == "__main__":

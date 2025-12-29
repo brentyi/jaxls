@@ -32,25 +32,16 @@ class AugmentedLagrangianConfig:
     ``rho = 10 * max(1, |f|) / max(1, 0.5 * c^2)``. Set to a fixed value (e.g., 1.0) to
     override the automatic initialization."""
 
-    tolerance_absolute: float | jax.Array = 1e-4
+    tolerance_absolute: float | jax.Array = 1e-5
     """Absolute convergence tolerance: ``max(snorm, csupn) < tol``."""
 
     tolerance_relative: float | jax.Array = 1e-4
     """Relative convergence tolerance: ``snorm / snorm_initial < tol``."""
 
-    violation_reduction_threshold: float | jax.Array = 0.9
+    violation_reduction_threshold: float | jax.Array = 0.5
     """Increase penalty if violation > threshold * previous_violation.
     E.g., 0.9 requires ~10% reduction per update to avoid penalty growth.
     Use higher values (e.g., 0.99) for more lenient penalty updates."""
-
-    penalty_decrease_threshold: float | jax.Array = 0.1
-    """Decrease penalty if violation < threshold * previous_violation.
-    E.g., 0.1 means 90%+ reduction allows penalty decrease.
-    Set to 0.0 to disable penalty decrease."""
-
-    penalty_decrease_factor: float | jax.Array = 0.25
-    """Factor to multiply penalty by when constraints are well-satisfied.
-    E.g., 0.25 means penalty decreases by 4x when violation drops significantly."""
 
     lambda_min: float | jax.Array = -1e7
     """Minimum Lagrange multiplier (safeguard)."""
@@ -60,7 +51,7 @@ class AugmentedLagrangianConfig:
 
     inner_solve_tolerance: float | jax.Array = 1e-2
     """Only update AL parameters when inner problem has converged.
-    Update when cost_reldelta < this tolerance, meaning the LM solver
+    Update when ``||gradient|| < tolerance``, meaning the LM solver
     has approximately solved the current augmented subproblem."""
 
 
@@ -91,9 +82,6 @@ class AugmentedLagrangianState:
 
     snorm_initial: jax.Array
     """Initial snorm for relative tolerance check."""
-
-    cost_at_last_update: jax.Array
-    """Cost when AL parameters were last updated, for inner solve detection."""
 
 
 def _compute_snorm_csupn(
@@ -161,7 +149,7 @@ def initialize_al_state(
         h_vals, lagrange_multipliers, is_inequality
     )
 
-    # Compute initial cost for cost_at_last_update tracking.
+    # Compute initial cost for penalty initialization heuristic.
     residual_vector = problem.compute_residual_vector(initial_vals)
     initial_cost = jnp.sum(residual_vector**2)
 
@@ -216,7 +204,6 @@ def initialize_al_state(
         snorm=initial_snorm,
         constraint_violation=initial_csupn,
         snorm_initial=initial_snorm,
-        cost_at_last_update=initial_cost,
     )
 
 
@@ -225,42 +212,22 @@ def update_al_state(
     vals: VarValues,
     al_state: AugmentedLagrangianState,
     config: AugmentedLagrangianConfig,
-    current_cost: jax.Array,
-    step_accepted: jax.Array | bool = True,
     verbose: bool = False,
 ) -> AugmentedLagrangianState:
-    """Update AL state after an LM step.
-
-    Only updates Lagrange multipliers and penalties when the inner problem
-    has approximately converged (cost_reldelta < inner_solve_tolerance).
-    This prevents the cost surface from changing too frequently.
+    """Update AL state: Lagrange multipliers, penalties, and convergence metrics.
 
     Args:
         problem: The analyzed problem with constraints.
         vals: Current variable values.
         al_state: Current AL state.
         config: AL configuration.
-        current_cost: Current total cost (for inner convergence check).
-        step_accepted: Whether the LM step was accepted.
         verbose: Whether to log update info.
 
     Returns:
         Updated AL state.
     """
-    # Evaluate constraints at current solution (tuple of arrays).
     h_vals = problem._compute_constraint_values(vals)
 
-    # Check if we should update AL parameters: cost hasn't changed much since last update.
-    # This indicates the inner LM problem has approximately converged for the current AL landscape.
-    cost_reldelta = jnp.abs(current_cost - al_state.cost_at_last_update) / jnp.maximum(
-        jnp.abs(al_state.cost_at_last_update), 1e-8
-    )
-    al_should_update = cost_reldelta < config.inner_solve_tolerance
-
-    # Update Lagrange multipliers and penalties in a single pass.
-    # Only actually update when inner problem has converged.
-    # Note: penalty_group has shape (constraint_count,) - per-instance.
-    # lambda_group and h_group have shape (constraint_count, constraint_flat_dim).
     lagrange_multipliers_updated = []
     penalty_params_updated = []
     for lambda_group, penalty_group, h_group, h_prev, is_ineq in zip(
@@ -270,61 +237,34 @@ def update_al_state(
         al_state.constraint_values_prev,
         al_state.is_inequality,
     ):
-        # Compute new lambda: lambda_new = lambda_old + rho * h(x).
-        # Broadcast penalty_group from (constraint_count,) to (constraint_count, 1).
-        lambda_candidate = lambda_group + penalty_group[:, None] * h_group
+        # Update lambda: lambda = lambda + rho * h(x).
+        lambda_new = lambda_group + penalty_group[:, None] * h_group
         if is_ineq:
-            lambda_candidate = relu(lambda_candidate)
-        lambda_candidate = jnp.clip(
-            lambda_candidate, config.lambda_min, config.lambda_max
-        )
-        # Update lambda when inner problem has converged (regardless of step acceptance).
-        # This allows AL parameters to update even when LM rejects the step.
-        lambda_new = jnp.where(al_should_update, lambda_candidate, lambda_group)
+            lambda_new = relu(lambda_new)
+        lambda_new = jnp.clip(lambda_new, config.lambda_min, config.lambda_max)
         lagrange_multipliers_updated.append(lambda_new)
 
-        # Update penalty based on constraint progress (per-instance).
-        # Aggregate violations across elements using max for per-instance decision.
-        # - Increase if insufficient progress (max_violation > threshold * max_prev)
-        # - Decrease if excellent progress (max_violation < decrease_threshold * max_prev)
-        # - Otherwise keep the same
+        # Update penalty based on constraint progress.
         if is_ineq:
-            max_violation = jnp.max(relu(h_group), axis=1)
-            max_violation_prev = jnp.max(relu(h_prev), axis=1)
+            violation = jnp.max(relu(h_group), axis=1)
+            violation_prev = jnp.max(relu(h_prev), axis=1)
         else:
-            max_violation = jnp.max(jnp.abs(h_group), axis=1)
-            max_violation_prev = jnp.max(jnp.abs(h_prev), axis=1)
+            violation = jnp.max(jnp.abs(h_group), axis=1)
+            violation_prev = jnp.max(jnp.abs(h_prev), axis=1)
 
-        insufficient_progress = max_violation > (
-            config.violation_reduction_threshold * max_violation_prev
+        insufficient_progress = violation > (
+            config.violation_reduction_threshold * violation_prev
         )
-        excellent_progress = max_violation < (
-            config.penalty_decrease_threshold * max_violation_prev
-        )
-
-        # Increase penalty for insufficient progress.
-        penalty_increased = jnp.minimum(
-            penalty_group * config.penalty_factor, config.penalty_max
-        )
-        # Decrease penalty for excellent progress.
-        penalty_decreased = jnp.maximum(
-            penalty_group * config.penalty_decrease_factor, config.penalty_min
-        )
-
-        penalty_candidate = jnp.where(
+        penalty_new = jnp.where(
             insufficient_progress,
-            penalty_increased,
-            jnp.where(excellent_progress, penalty_decreased, penalty_group),
+            jnp.minimum(penalty_group * config.penalty_factor, config.penalty_max),
+            penalty_group,
         )
-        # Only update penalty when AL should update.
-        penalty_new = jnp.where(al_should_update, penalty_candidate, penalty_group)
         penalty_params_updated.append(penalty_new)
 
     lagrange_multipliers_updated = tuple(lagrange_multipliers_updated)
     penalty_params_updated = tuple(penalty_params_updated)
 
-    # Compute snorm (complementarity) and csupn (constraint violation).
-    # Always use current multipliers for measurement.
     snorm_new, csupn_new = _compute_snorm_csupn(
         h_vals, lagrange_multipliers_updated, al_state.is_inequality
     )
@@ -332,32 +272,21 @@ def update_al_state(
     if verbose:
         max_penalty = jnp.max(jnp.array([jnp.max(p) for p in penalty_params_updated]))
         jax_log(
-            " AL update: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}, al_update={al_upd}",
+            " AL update: snorm={snorm:.4e}, csupn={csupn:.4e}, max_rho={max_rho:.4e}",
             snorm=snorm_new,
             csupn=csupn_new,
             max_rho=max_penalty,
-            al_upd=al_should_update,
             ordered=True,
         )
-
-    # Update constraint_values_prev when step was accepted AND AL should update.
-    constraint_values_prev_new = tuple(
-        jnp.where(step_accepted & al_should_update, h_new, h_prev)
-        for h_new, h_prev in zip(h_vals, al_state.constraint_values_prev)
-    )
-
-    # Always update cost_at_last_update to track step-to-step changes.
-    cost_at_last_update_new = current_cost
 
     return AugmentedLagrangianState(
         lagrange_multipliers=lagrange_multipliers_updated,
         penalty_params=penalty_params_updated,
-        constraint_values_prev=constraint_values_prev_new,
+        constraint_values_prev=h_vals,
         is_inequality=al_state.is_inequality,
         snorm=snorm_new,
         constraint_violation=csupn_new,
         snorm_initial=al_state.snorm_initial,
-        cost_at_last_update=cost_at_last_update_new,
     )
 
 
