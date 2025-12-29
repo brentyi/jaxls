@@ -10,7 +10,7 @@
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
@@ -310,6 +310,7 @@ change between calls) and static values (that trigger recompilation if changed).
 <li><p>What’s traced vs static in jaxls</p></li>
 <li><p>Why variable IDs are traced</p></li>
 <li><p>What triggers recompilation</p></li>
+<li><p>Examples: leveraging traced values</p></li>
 </ul>
 <div class="cell tag_hide-input docutils container">
 <details class="admonition hide above-input">
@@ -336,12 +337,7 @@ Values can be:</p>
 <li><p>Traced: Represented as abstract shapes/dtypes during compilation. The actual
 values are substituted at runtime. Changing traced values doesn’t trigger recompilation.</p></li>
 <li><p>Static: Baked into the compiled code. Changing static values triggers a new
-compilation (cache miss).</p></li>
-</ul>
-<p>The challenge is choosing wisely what’s static vs traced to balance:</p>
-<ul class="simple">
-<li><p>Compilation time: Static values enable more optimization but cause more recompiles.</p></li>
-<li><p>Flexibility: Traced values allow runtime changes without recompilation.</p></li>
+compilation.</p></li>
 </ul>
 </section>
 <section id="jaxls-s-static-traced-split">
@@ -403,7 +399,6 @@ compilation (cache miss).</p></li>
 </tbody>
 </table>
 </div>
-<p>The pattern: structure is static, values are traced.</p>
 </section>
 </section>
 <section id="why-variable-ids-are-traced">
@@ -441,11 +436,7 @@ vmaps over the ID arrays to compute residuals and Jacobians in parallel.</p>
 </div>
 <p>Even though this creates 100 separate lambda objects, jaxls recognizes them as
 the same cost type using bytecode analysis: <code class="docutils literal notranslate"><span class="pre">dis.Bytecode</span></code> extracts the instruction
-sequence, which is identical across all 100 lambdas. Only the closure variables
-(captured <code class="docutils literal notranslate"><span class="pre">i</span></code> values) differ, and these become the traced data that gets stacked.</p>
-<p>This works because <code class="docutils literal notranslate"><span class="pre">Var.id</span></code> is traced: <code class="docutils literal notranslate"><span class="pre">VarValues</span></code> uses <code class="docutils literal notranslate"><span class="pre">jnp.searchsorted</span></code>
-for O(log n) lookup, which operates on traced arrays without data-dependent
-control flow.</p>
+sequence, which is identical across all 100 lambdas.</p>
 </section>
 <section id="implementation-jdc-static">
 <h2>Implementation: <code class="docutils literal notranslate"><span class="pre">jdc.Static</span></code><a class="headerlink" href="#implementation-jdc-static" title="Link to this heading">¶</a></h2>
@@ -490,14 +481,12 @@ compile-time constants.</p>
 the same structure are fast.</p>
 </section>
 </section>
-<section id="example-leveraging-traced-values">
-<h2>Example: leveraging traced values<a class="headerlink" href="#example-leveraging-traced-values" title="Link to this heading">¶</a></h2>
-<p>Because variable IDs and solver parameters are traced, the same compiled code
-can handle different problem configurations.</p>
+<section id="examples-leveraging-traced-values">
+<h2>Examples: leveraging traced values<a class="headerlink" href="#examples-leveraging-traced-values" title="Link to this heading">¶</a></h2>
 <section id="different-variable-assignments">
 <h3>Different variable assignments<a class="headerlink" href="#different-variable-assignments" title="Link to this heading">¶</a></h3>
 <p>The same cost structure can connect different variables without recompilation.
-With <a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.jit.html#jax.jit" title="(in JAX)"><code class="xref py py-func docutils literal notranslate"><span class="pre">jax.jit()</span></code></a>, the first call compiles and subsequent calls reuse the code:</p>
+<a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.jit.html#jax.jit" title="(in JAX)"><code class="xref py py-func docutils literal notranslate"><span class="pre">jax.jit()</span></code></a> will only compile the first call:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">solve_with_ids</span><span class="p">(</span>
     <span class="n">var_ids</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>  <span class="c1"># Which variables to use.</span>
@@ -543,15 +532,14 @@ previous solution as its initial guess:</p>
 </section>
 <section id="sweeping-solver-parameters">
 <h3>Sweeping solver parameters<a class="headerlink" href="#sweeping-solver-parameters" title="Link to this heading">¶</a></h3>
-<p>Solver parameters like damping are traced, so <a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.vmap.html#jax.vmap" title="(in JAX)"><code class="xref py py-func docutils literal notranslate"><span class="pre">jax.vmap()</span></code></a> can sweep over
-them without recompilation:</p>
+<p>Traced values can be sweeped over in parallel with <a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.vmap.html#jax.vmap" title="(in JAX)"><code class="xref py py-func docutils literal notranslate"><span class="pre">jax.vmap()</span></code></a>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">solve_with_damping</span><span class="p">(</span><span class="n">damping</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
         <span class="n">initial_vals</span><span class="p">,</span>
         <span class="n">trust_region</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">TrustRegionConfig</span><span class="p">(</span><span class="n">lambda_initial</span><span class="o">=</span><span class="n">damping</span><span class="p">),</span>
     <span class="p">)</span><span class="o">.</span><span class="n">vals</span>
 
-<span class="c1"># Sweep over damping values. All use the same compiled code.</span>
+<span class="c1"># Sweep over damping values.</span>
 <span class="n">solutions</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">solve_with_damping</span><span class="p">))(</span><span class="n">jnp</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
 </pre></div>
 </div>
@@ -634,7 +622,7 @@ them without recompilation:</p>
 <li><a class="reference internal" href="#triggers-recompilation">Triggers recompilation</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#example-leveraging-traced-values">Example: leveraging traced values</a><ul>
+<li><a class="reference internal" href="#examples-leveraging-traced-values">Examples: leveraging traced values</a><ul>
 <li><a class="reference internal" href="#different-variable-assignments">Different variable assignments</a></li>
 <li><a class="reference internal" href="#batched-solves-with-vmap">Batched solves with vmap</a></li>
 <li><a class="reference internal" href="#sequential-solves-with-scan">Sequential solves with scan</a></li>
