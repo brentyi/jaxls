@@ -351,7 +351,9 @@ class NonlinearSolver:
         )
         proposed_cost_info = problem._compute_cost_info(proposed_vals)
 
-        if self.trust_region is not None:
+        if self.trust_region is None:
+            accepted = jnp.array(True)
+        else:
             cost_predicted = jnp.sum(
                 (
                     A_blocksparse.multiply(scaled_local_delta)
@@ -359,13 +361,14 @@ class NonlinearSolver:
                 )
                 ** 2
             )
-            accepted = self._compute_step_acceptance(
-                sol_prev.cost_info.cost_total,
-                cost_predicted,
-                proposed_cost_info.cost_total,
+            predicted_reduction = sol_prev.cost_info.cost_total - cost_predicted
+            actual_reduction = (
+                sol_prev.cost_info.cost_total - proposed_cost_info.cost_total
             )
-        else:
-            accepted = jnp.array(True)
+            step_quality = actual_reduction / predicted_reduction
+            accepted = ~jnp.isnan(proposed_cost_info.cost_total) & (
+                step_quality >= self.trust_region.step_quality_min
+            )
 
         iterations = inner_state.summary.iterations + 1
         term_criteria, term_deltas = self.termination._check_convergence(
@@ -559,24 +562,6 @@ class NonlinearSolver:
             state_updated.al_state = al_state_updated
             state_updated.solution.cost_info = new_cost_info
         return state_updated
-
-    def _compute_step_acceptance(
-        self,
-        cost_prev: Any,
-        cost_predicted: Any,
-        cost_proposed: Any,
-    ) -> Any:
-        assert self.trust_region is not None
-        predicted_reduction = cost_prev - cost_predicted
-        actual_reduction = cost_prev - cost_proposed
-
-        step_quality = actual_reduction / predicted_reduction
-        normal_accept = step_quality >= self.trust_region.step_quality_min
-
-        at_optimum = jnp.abs(predicted_reduction) < (1e-7 * cost_prev)
-        optimum_accept = at_optimum & (actual_reduction >= 0.0)
-
-        return ~jnp.isnan(cost_proposed) & (normal_accept | optimum_accept)
 
     @staticmethod
     def _log_state(

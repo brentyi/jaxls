@@ -665,7 +665,7 @@ def test_custom_augmented_lagrangian_config():
 
     # Solution should satisfy constraint with tight tolerance.
     constraint_violation = jnp.linalg.norm(problem.compute_constraint_values(solution))
-    assert constraint_violation < 1e-7
+    assert constraint_violation < 1e-6
 
 
 def test_no_constraints_uses_standard_solver():

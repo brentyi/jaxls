@@ -18,7 +18,7 @@ class AugmentedLagrangianConfig:
 
     penalty_initial: Any = None
 
-    tolerance_absolute: Any = 1e-6
+    tolerance_absolute: Any = 1e-5
 
     tolerance_relative: Any = 1e-4
 
