@@ -23,7 +23,7 @@ uv run --extra dev pytest tests/
 uv run --extra dev ./transpile_py310.py
 
 # Build documentation.
-uv run --extra docs sphinx-build -b dirhtml docs/source docs/build/dirhtml
+uv run --extra docs sphinx-build -b dirhtml docs_source/source docs
 
 # Run benchmark on example notebooks.
 uv run --extra examples --extra docs python benchmark.py
