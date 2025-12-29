@@ -79,10 +79,10 @@ def run_notebook_with_instrumentation(
     instrumentation_code = """
 import jax
 import jaxls
-import jaxls._core
+import jaxls._problem
 
 _benchmark_result = None  # Only capture first solve
-_original_solve = jaxls._core.AnalyzedLeastSquaresProblem.solve
+_original_solve = jaxls._problem.AnalyzedLeastSquaresProblem.solve
 
 def _instrumented_solve(self, *args, **kwargs):
     global _benchmark_result
@@ -143,7 +143,7 @@ def _instrumented_solve(self, *args, **kwargs):
         }
         raise
 
-jaxls._core.AnalyzedLeastSquaresProblem.solve = _instrumented_solve
+jaxls._problem.AnalyzedLeastSquaresProblem.solve = _instrumented_solve
 """
 
     # Finalization code to print results

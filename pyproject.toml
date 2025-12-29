@@ -77,4 +77,4 @@ ignore = [
 ]
 
 [tool.pyright]
-exclude = ["transpile_py310.py", "**/_py310/**"]
+exclude = ["transpile_py310.py", "**/_py310/**", ".venv"]

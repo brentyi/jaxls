@@ -217,7 +217,7 @@ def update_problem_al_params(
     problem: Any,
     al_state: Any,
 ) -> Any:
-    from ._core import AugmentedLagrangianParams
+    from ._analyzed_cost import AugmentedLagrangianParams
 
     updated_costs = []
     constraint_group_idx = 0

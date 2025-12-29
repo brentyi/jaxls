@@ -6,7 +6,7 @@ import jax
 from jax import numpy as jnp
 
 if TYPE_CHECKING:
-    from ._core import AnalyzedLeastSquaresProblem
+    from ._problem import AnalyzedLeastSquaresProblem
     from ._sparse_matrices import BlockRowSparseMatrix
 
 

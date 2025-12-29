@@ -37,7 +37,7 @@ from .utils import jax_log
 if TYPE_CHECKING:
     import sksparse.cholmod
 
-    from ._core import AnalyzedLeastSquaresProblem, _CostInfo
+    from ._problem import AnalyzedLeastSquaresProblem, _CostInfo
 
 
 _cholmod_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}

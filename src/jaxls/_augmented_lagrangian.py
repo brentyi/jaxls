@@ -11,7 +11,8 @@ from ._variables import VarValues
 from .utils import jax_log
 
 if TYPE_CHECKING:
-    from ._core import AnalyzedLeastSquaresProblem, AugmentedLagrangianParams
+    from ._analyzed_cost import AugmentedLagrangianParams
+    from ._problem import AnalyzedLeastSquaresProblem
 
 
 @jdc.pytree_dataclass
@@ -304,7 +305,7 @@ def update_problem_al_params(
         Problem with updated AL params on constraint costs.
     """
     # Import here to avoid circular import at module load time.
-    from ._core import AugmentedLagrangianParams
+    from ._analyzed_cost import AugmentedLagrangianParams
 
     updated_costs = []
     constraint_group_idx = 0
