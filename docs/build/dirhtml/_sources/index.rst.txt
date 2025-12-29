@@ -18,8 +18,8 @@ To install (Python >=3.10 minimum, >=3.12 recommended):
    # Core package only
    pip install "git+https://github.com/brentyi/jaxls.git"
 
-   # Or, with examples:
-   pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[examples]"
+   # Or, with dev dependencies
+   pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[dev,docs]"
 
 Goals
 -----
