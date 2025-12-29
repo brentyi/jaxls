@@ -43,6 +43,7 @@ dev = [
     "pytest",
     "ruff",
     "libcst",
+    "viser",
 ]
 docs = [
     "sphinx>=7.0.0",
