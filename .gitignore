@@ -2,3 +2,7 @@
 *.pyc
 *.egg-info
 __pycache__
+.ipynb_checkpoints
+.jupyter_ystore.db
+.doctrees/
+jupyter_execute/

@@ -1,0 +1,876 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex/"><link rel="search" title="Search" href="../../search/"><link rel="next" title="Lie group variables" href="../lie_group_variables/"><link rel="prev" title="Black-Litterman allocation" href="../../examples/portfolio/black_litterman/">
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
+        <title>Core API - jaxls</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-code-background: #f4f4f4;
+  --color-code-foreground: #000;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../"><div class="brand">jaxls</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a
+  class="sidebar-brand"
+  href="../../"
+  style="margin-top: 0.75em"
+>
+  
+  <span class="sidebar-brand-text">jaxls</span>
+
+  
+</a>
+
+<div style="text-align: left; padding: 0 1em 1em 1em">
+  <a href="https://github.com/brentyi/jaxls">
+    <img src="https://img.shields.io/github/stars/brentyi/jaxls?style=social" alt="GitHub stars">
+  </a>
+</div><form class="sidebar-search-container" method="get" action="../../search/" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/">Advanced</a><input aria-label="Toggle navigation of Advanced" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/robust_costs/">Robust costs</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/mechanics/">Mechanics</a><input aria-label="Toggle navigation of Mechanics" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/beam_bending/">Beam bending</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Vision</a><input aria-label="Toggle navigation of Vision" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/robotics/">Robotics</a><input aria-label="Toggle navigation of Robotics" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/portfolio/">Portfolio optimization</a><input aria-label="Toggle navigation of Portfolio optimization" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman allocation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../solver_config/">Solver configuration</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../design/typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static/">What’s traced?</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/api/core.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="core-api">
+<h1>Core API<a class="headerlink" href="#core-api" title="Link to this heading">¶</a></h1>
+<section id="problem">
+<h2>Problem<a class="headerlink" href="#problem" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.LeastSquaresProblem">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">LeastSquaresProblem</span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#LeastSquaresProblem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.LeastSquaresProblem" title="Link to this definition">¶</a></dt>
+<dd><p>Least squares problems are bipartite graphs with two types of nodes:</p>
+<ul>
+<li><p><a class="reference internal" href="#jaxls.Cost" title="jaxls.Cost"><code class="xref py py-class docutils literal notranslate"><span class="pre">Cost</span></code></a>: cost terms or constraints.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">kind=&quot;l2_squared&quot;</span></code> (default): Minimize squared L2 norm <code class="docutils literal notranslate"><span class="pre">||r(x)||^2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kind=&quot;constraint_eq_zero&quot;</span></code>: Equality constraint <code class="docutils literal notranslate"><span class="pre">r(x)</span> <span class="pre">=</span> <span class="pre">0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kind=&quot;constraint_leq_zero&quot;</span></code>: Inequality constraint <code class="docutils literal notranslate"><span class="pre">r(x)</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kind=&quot;constraint_geq_zero&quot;</span></code>: Inequality constraint <code class="docutils literal notranslate"><span class="pre">r(x)</span> <span class="pre">&gt;=</span> <span class="pre">0</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><a class="reference internal" href="#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a>: the parameters we want to optimize.</p></li>
+</ul>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.costs">
+<span class="sig-name descname"><span class="pre">costs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.14)"><span class="pre">Iterable</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Cost" title="jaxls._cost.Cost"><span class="pre">Cost</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.LeastSquaresProblem.costs" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.variables">
+<span class="sig-name descname"><span class="pre">variables</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.14)"><span class="pre">Iterable</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.LeastSquaresProblem.variables" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.analyze">
+<span class="sig-name descname"><span class="pre">analyze</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">use_onp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem" title="jaxls._problem.AnalyzedLeastSquaresProblem"><span class="pre">AnalyzedLeastSquaresProblem</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#LeastSquaresProblem.analyze"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.LeastSquaresProblem.analyze" title="Link to this definition">¶</a></dt>
+<dd><p>Analyze sparsity pattern of least squares problem. Needed before solving.</p>
+<p>Processes all costs and variables to compute the sparse Jacobian structure,
+group costs by structure for vectorization, and prepare for optimization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>use_onp</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, use numpy instead of jax.numpy for index computations.
+Can be faster for problem setup on CPU.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An AnalyzedLeastSquaresProblem ready for solving.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem" title="jaxls._problem.AnalyzedLeastSquaresProblem"><em>AnalyzedLeastSquaresProblem</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.AnalyzedLeastSquaresProblem">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">AnalyzedLeastSquaresProblem</span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#AnalyzedLeastSquaresProblem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AnalyzedLeastSquaresProblem" title="Link to this definition">¶</a></dt>
+<dd><p>AnalyzedLeastSquaresProblem(_stacked_costs: ‘tuple[_AnalyzedCost, …]’, _cost_counts: ‘jdc.Static[tuple[int, …]]’, _sorted_ids_from_var_type: ‘dict[type[Var], jax.Array]’, _jac_coords_coo: ‘SparseCooCoordinates’, _jac_coords_csr: ‘SparseCsrCoordinates’, _tangent_ordering: ‘jdc.Static[VarTypeOrdering]’, _tangent_start_from_var_type: ‘jdc.Static[dict[type[Var[Any]], int]]’, _tangent_dim: ‘jdc.Static[int]’, _residual_dim: ‘jdc.Static[int]’)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.AnalyzedLeastSquaresProblem.solve">
+<span class="sig-name descname"><span class="pre">solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_vals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'conjugate_gradient'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'cholmod'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'dense_cholesky'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../solver_config/#jaxls.ConjugateGradientConfig" title="jaxls._solvers.ConjugateGradientConfig"><span class="pre">ConjugateGradientConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'conjugate_gradient'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trust_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.TrustRegionConfig" title="jaxls._solvers.TrustRegionConfig"><span class="pre">TrustRegionConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TrustRegionConfig()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">termination</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.TerminationConfig" title="jaxls._solvers.TerminationConfig"><span class="pre">TerminationConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TerminationConfig()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'blockrow'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'coo'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'csr'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'blockrow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">augmented_lagrangian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.AugmentedLagrangianConfig" title="jaxls.AugmentedLagrangianConfig"><span class="pre">AugmentedLagrangianConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_summary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="k"><span class="pre">False</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#AnalyzedLeastSquaresProblem.solve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AnalyzedLeastSquaresProblem.solve" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_vals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'conjugate_gradient'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'cholmod'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'dense_cholesky'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../solver_config/#jaxls.ConjugateGradientConfig" title="jaxls._solvers.ConjugateGradientConfig"><span class="pre">ConjugateGradientConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'conjugate_gradient'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trust_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.TrustRegionConfig" title="jaxls._solvers.TrustRegionConfig"><span class="pre">TrustRegionConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TrustRegionConfig()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">termination</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.TerminationConfig" title="jaxls._solvers.TerminationConfig"><span class="pre">TerminationConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TerminationConfig()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'blockrow'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'coo'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'csr'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'blockrow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">augmented_lagrangian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.AugmentedLagrangianConfig" title="jaxls.AugmentedLagrangianConfig"><span class="pre">AugmentedLagrangianConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_summary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="k"><span class="pre">True</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#jaxls.SolveSummary" title="jaxls._solvers.SolveSummary"><span class="pre">SolveSummary</span></a><span class="p"><span class="pre">]</span></span></span></span></dt>
+<dd><p>Solve the nonlinear least squares problem using either Gauss-Newton
+or Levenberg-Marquardt.</p>
+<p>For constrained problems (with equality constraints), the Augmented
+Lagrangian method will be automatically used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>initial_vals</strong> – Initial values for the variables. If None, default values will be used.</p></li>
+<li><p><strong>linear_solver</strong> – The linear solver to use.</p></li>
+<li><p><strong>trust_region</strong> – Configuration for Levenberg-Marquardt trust region.</p></li>
+<li><p><strong>termination</strong> – Configuration for termination criteria.</p></li>
+<li><p><strong>sparse_mode</strong> – The representation to use for sparse matrix
+multiplication. Can be “blockrow”, “coo”, or “csr”.</p></li>
+<li><p><strong>verbose</strong> – Whether to print verbose output during optimization.</p></li>
+<li><p><strong>augmented_lagrangian</strong> – Configuration for Augmented Lagrangian method.
+Only used if constraints are present. If None and constraints
+exist, a default configuration will be used.</p></li>
+<li><p><strong>return_summary</strong> – If <cite>True</cite>, return a summary of the solve.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optimized variable values.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.AnalyzedLeastSquaresProblem.compute_residual_vector">
+<span class="sig-name descname"><span class="pre">compute_residual_vector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#AnalyzedLeastSquaresProblem.compute_residual_vector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AnalyzedLeastSquaresProblem.compute_residual_vector" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the residual vector. The cost we are optimizing is defined
+as the sum of squared terms within this vector.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>vals</strong> (<a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><em>VarValues</em></a>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><em>Array</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.AnalyzedLeastSquaresProblem.compute_constraint_values">
+<span class="sig-name descname"><span class="pre">compute_constraint_values</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#AnalyzedLeastSquaresProblem.compute_constraint_values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AnalyzedLeastSquaresProblem.compute_constraint_values" title="Link to this definition">¶</a></dt>
+<dd><p>Compute all constraint values as a flat array.</p>
+<p>For equality constraints, these should all be zero at a feasible solution.
+For inequality constraints (g(x) &lt;= 0), these should be &lt;= 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>vals</strong> (<a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><em>VarValues</em></a>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><em>Array</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.SolveSummary">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">SolveSummary</span></span><a class="reference internal" href="../../_modules/jaxls/_solvers/#SolveSummary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.SolveSummary" title="Link to this definition">¶</a></dt>
+<dd><p>SolveSummary(iterations: ‘jax.Array’, termination_criteria: ‘jax.Array’, termination_deltas: ‘jax.Array’, cost_history: ‘jax.Array’, lambda_history: ‘jax.Array’)</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.SolveSummary.iterations">
+<span class="sig-name descname"><span class="pre">iterations</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><a class="headerlink" href="#jaxls.SolveSummary.iterations" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.SolveSummary.termination_criteria">
+<span class="sig-name descname"><span class="pre">termination_criteria</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><a class="headerlink" href="#jaxls.SolveSummary.termination_criteria" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.SolveSummary.termination_deltas">
+<span class="sig-name descname"><span class="pre">termination_deltas</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><a class="headerlink" href="#jaxls.SolveSummary.termination_deltas" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.SolveSummary.cost_history">
+<span class="sig-name descname"><span class="pre">cost_history</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><a class="headerlink" href="#jaxls.SolveSummary.cost_history" title="Link to this definition">¶</a></dt>
+<dd><p>History of non-augmented costs (l2_squared terms only, excludes constraint penalties).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.SolveSummary.lambda_history">
+<span class="sig-name descname"><span class="pre">lambda_history</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><a class="headerlink" href="#jaxls.SolveSummary.lambda_history" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="cost">
+<h2>Cost<a class="headerlink" href="#cost" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.Cost">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">Cost</span></span><a class="headerlink" href="#jaxls.Cost" title="Link to this definition">¶</a></dt>
+<dd><p>A cost or constraint term in our optimization problem.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">kind</span></code> field determines how the residual function is interpreted:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;l2_squared&quot;</span></code> (default): Minimize squared L2 norm: <code class="docutils literal notranslate"><span class="pre">||r(x)||^2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;constraint_eq_zero&quot;</span></code>: Equality constraint: <code class="docutils literal notranslate"><span class="pre">r(x)</span> <span class="pre">=</span> <span class="pre">0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;constraint_leq_zero&quot;</span></code>: Inequality constraint: <code class="docutils literal notranslate"><span class="pre">r(x)</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;constraint_geq_zero&quot;</span></code>: Inequality constraint: <code class="docutils literal notranslate"><span class="pre">r(x)</span> <span class="pre">&gt;=</span> <span class="pre">0</span></code></p></li>
+</ul>
+<p>Use the <a class="reference internal" href="#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-meth docutils literal notranslate"><span class="pre">factory()</span></code></a> decorator to create costs from a
+residual function.</p>
+<p>Each <code class="docutils literal notranslate"><span class="pre">Cost.compute_residual</span></code> must include at least one <code class="docutils literal notranslate"><span class="pre">jaxls.Var(id)</span></code>
+in its inputs, where <code class="docutils literal notranslate"><span class="pre">id</span></code> is a scalar integer. Variables can appear
+anywhere in the input structure, including nested within pytrees (lists,
+dicts, dataclasses, etc.).</p>
+<p>To create a batch of costs, a leading batch axis can be added to the
+arguments passed to <code class="docutils literal notranslate"><span class="pre">Cost.args</span></code>:</p>
+<ul class="simple">
+<li><p>The batch axis must be the same for all arguments. Leading axes of shape
+<code class="docutils literal notranslate"><span class="pre">(1,)</span></code> are broadcasted.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">id</span></code> field of each <code class="docutils literal notranslate"><span class="pre">jaxls.Var</span></code> instance must have shape of either
+<code class="docutils literal notranslate"><span class="pre">()</span></code> (unbatched) or <code class="docutils literal notranslate"><span class="pre">(batch_size,)</span></code> (batched).</p></li>
+</ul>
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.Cost.create_factory">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">create_factory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">compute_residual</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ResidualFunc</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kind</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CostKind</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'l2_squared'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'auto'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'forward'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'reverse'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_custom_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">JacobianFunc</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_custom_with_cache_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">JacobianFuncWithCache</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">ResidualFunc</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">CostFactory</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">ResidualFuncWithJacCache</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">CostFactory</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">CostFactory</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#jaxls.Cost.create_factory" title="Link to this definition">¶</a></dt>
+<dd><p>Deprecated: Use Cost.factory instead.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>compute_residual</strong> (<em>ResidualFunc</em><em>[</em><em>Args_</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>kind</strong> (<em>CostKind</em>)</p></li>
+<li><p><strong>jac_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><em>Literal</em></a><em>[</em><em>'auto'</em><em>, </em><em>'forward'</em><em>, </em><em>'reverse'</em><em>]</em>)</p></li>
+<li><p><strong>jac_batch_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>jac_custom_fn</strong> (<em>JacobianFunc</em><em>[</em><em>Args_</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>jac_custom_with_cache_fn</strong> (<em>JacobianFuncWithCache</em><em>[</em><em>Args_</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a>[[ResidualFunc[<em>Args_</em>]], CostFactory[<em>Args_</em>]] | <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a>[[ResidualFuncWithJacCache[<em>Args_</em>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a>]], CostFactory[<em>Args_</em>]] | CostFactory[<em>Args_</em>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.Cost.factory">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">factory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">compute_residual</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ResidualFunc</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kind</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CostKind</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'l2_squared'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'auto'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'forward'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'reverse'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_custom_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">JacobianFunc</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_custom_with_cache_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">JacobianFuncWithCache</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">ResidualFunc</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">CostFactory</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">ResidualFuncWithJacCache</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">CostFactory</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">CostFactory</span><span class="p"><span class="pre">[</span></span><span class="pre">Args_</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#jaxls.Cost.factory" title="Link to this definition">¶</a></dt>
+<dd><p>Decorator for creating costs from a residual function.</p>
+<p>The decorated function should take <code class="docutils literal notranslate"><span class="pre">VarValues</span></code> as its first argument
+and return a residual array. The resulting factory will have the same
+signature but without the <code class="docutils literal notranslate"><span class="pre">VarValues</span></code> argument.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kind</strong> (<em>CostKind</em>) – How to interpret the residual (default: <code class="docutils literal notranslate"><span class="pre">&quot;l2_squared&quot;</span></code>).</p></li>
+<li><p><strong>jac_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><em>Literal</em></a><em>[</em><em>'auto'</em><em>, </em><em>'forward'</em><em>, </em><em>'reverse'</em><em>]</em>) – Autodiff mode for Jacobians (<code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;forward&quot;</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">&quot;reverse&quot;</span></code>).</p></li>
+<li><p><strong>jac_batch_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><em>None</em>) – Batch size for Jacobian computation. Set to 1 to
+reduce memory usage.</p></li>
+<li><p><strong>compute_residual</strong> (<em>ResidualFunc</em><em>[</em><em>Args_</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>jac_custom_fn</strong> (<em>JacobianFunc</em><em>[</em><em>Args_</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>jac_custom_with_cache_fn</strong> (<em>JacobianFuncWithCache</em><em>[</em><em>Args_</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a>[[ResidualFunc[<em>Args_</em>]], CostFactory[<em>Args_</em>]] | <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><em>Callable</em></a>[[ResidualFuncWithJacCache[<em>Args_</em>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a>]], CostFactory[<em>Args_</em>]] | CostFactory[<em>Args_</em>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.jac_batch_size">
+<span class="sig-name descname"><span class="pre">jac_batch_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#jaxls.Cost.jac_batch_size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.jac_custom_fn">
+<span class="sig-name descname"><span class="pre">jac_custom_fn</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static[Callable[[VarValues,</span> <span class="pre">*Args],</span> <span class="pre">jax.Array]</span> <span class="pre">|</span> <span class="pre">None]</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#jaxls.Cost.jac_custom_fn" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.jac_custom_with_cache_fn">
+<span class="sig-name descname"><span class="pre">jac_custom_with_cache_fn</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static[Callable[[VarValues,</span> <span class="pre">Any,</span> <span class="pre">*Args],</span> <span class="pre">jax.Array]</span> <span class="pre">|</span> <span class="pre">None]</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#jaxls.Cost.jac_custom_with_cache_fn" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.jac_mode">
+<span class="sig-name descname"><span class="pre">jac_mode</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static</span><span class="p"><span class="pre">[</span></span><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'auto'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'forward'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'reverse'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'auto'</span></em><a class="headerlink" href="#jaxls.Cost.jac_mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.kind">
+<span class="sig-name descname"><span class="pre">kind</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static</span><span class="p"><span class="pre">[</span></span><span class="pre">CostKind</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'l2_squared'</span></em><a class="headerlink" href="#jaxls.Cost.kind" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.Cost.make">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">make</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">compute_residual:</span> <span class="pre">jdc.Static[Callable[[VarValues,</span> <span class="pre">*Args_],</span> <span class="pre">jax.Array]],</span> <span class="pre">args:</span> <span class="pre">tuple[*Args_,],</span> <span class="pre">jac_mode:</span> <span class="pre">jdc.Static[Literal['auto',</span> <span class="pre">'forward',</span> <span class="pre">'reverse']]</span> <span class="pre">=</span> <span class="pre">'auto',</span> <span class="pre">jac_custom_fn:</span> <span class="pre">jdc.Static[Callable[[VarValues,</span> <span class="pre">*Args_],</span> <span class="pre">jax.Array]</span> <span class="pre">|</span> <span class="pre">None]</span> <span class="pre">=</span> <span class="pre">None</span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Cost[*Args_,]</span></span></span><a class="headerlink" href="#jaxls.Cost.make" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>compute_residual</strong> (<em>jdc.Static</em><em>[</em><em>Callable</em><em>[</em><em>[</em><a class="reference internal" href="#jaxls.VarValues" title="jaxls.VarValues"><em>VarValues</em></a><em>, </em><em>*Args_</em><em>]</em><em>, </em><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><em>jax.Array</em></a><em>]</em><em>]</em>)</p></li>
+<li><p><strong>args</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><em>*Args_</em><em>,</em><em>]</em>)</p></li>
+<li><p><strong>jac_mode</strong> (<em>jdc.Static</em><em>[</em><em>Literal</em><em>[</em><em>'auto'</em><em>, </em><em>'forward'</em><em>, </em><em>'reverse'</em><em>]</em><em>]</em>)</p></li>
+<li><p><strong>jac_custom_fn</strong> (<em>jdc.Static</em><em>[</em><em>Callable</em><em>[</em><em>[</em><a class="reference internal" href="#jaxls.VarValues" title="jaxls.VarValues"><em>VarValues</em></a><em>, </em><em>*Args_</em><em>]</em><em>, </em><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><em>jax.Array</em></a><em>] </em><em>| </em><em>None</em><em>]</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#jaxls.Cost" title="jaxls.Cost">Cost</a>[*Args_,]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#jaxls.Cost.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.compute_residual">
+<span class="sig-name descname"><span class="pre">compute_residual</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">jdc.Static[Callable[[VarValues,</span> <span class="pre">*Args],</span> <span class="pre">jax.Array]</span> <span class="pre">|</span> <span class="pre">Callable[[VarValues,</span> <span class="pre">*Args],</span> <span class="pre">tuple[jax.Array,</span> <span class="pre">Any]]]</span></em><a class="headerlink" href="#jaxls.Cost.compute_residual" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Cost.args">
+<span class="sig-name descname"><span class="pre">args</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">tuple[*Args,]</span></em><a class="headerlink" href="#jaxls.Cost.args" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="variables">
+<h2>Variables<a class="headerlink" href="#variables" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.Var">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">Var</span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#Var"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.Var" title="Link to this definition">¶</a></dt>
+<dd><p>A symbolic representation of an optimization variable.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Var.id">
+<span class="sig-name descname"><span class="pre">id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></em><a class="headerlink" href="#jaxls.Var.id" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Var.tangent_dim">
+<span class="sig-name descname"><span class="pre">tangent_dim</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.Var.tangent_dim" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension of the tangent space.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.Var.retract_fn">
+<span class="sig-name descname"><span class="pre">retract_fn</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><span class="pre">ClassVar</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.14)"><span class="pre">Callable</span></a><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.Var.retract_fn" title="Link to this definition">¶</a></dt>
+<dd><p>Retraction function for the manifold. None for Euclidean space.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.Var.default_factory">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_factory</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#Var.default_factory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.Var.default_factory" title="Link to this definition">¶</a></dt>
+<dd><p>Default value for this variable.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>T</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.Var.with_value">
+<span class="sig-name descname"><span class="pre">with_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">VarWithValue</span><span class="p"><span class="pre">[</span></span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#Var.with_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.Var.with_value" title="Link to this definition">¶</a></dt>
+<dd><p>Assign a value to this variable. Returned value can be used as input
+for <cite>VarValues.make()</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>value</strong> (<em>T</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>VarWithValue[T]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.VarValues">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">VarValues</span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#VarValues"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.VarValues" title="Link to this definition">¶</a></dt>
+<dd><p>A mapping from variables to variable values.</p>
+<p>Given a variable object <code class="docutils literal notranslate"><span class="pre">var</span></code> and a values object <code class="docutils literal notranslate"><span class="pre">vals</span></code>, we can get the
+value by calling one of:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Equivalent.</span>
+<span class="n">vals</span><span class="o">.</span><span class="n">get_value</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
+<span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>To get all values of a specific type <code class="docutils literal notranslate"><span class="pre">var_type</span></code>, use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Equivalent.</span>
+<span class="n">vals</span><span class="o">.</span><span class="n">get_stacked_value</span><span class="p">(</span><span class="n">var_type</span><span class="p">)</span>
+<span class="n">vals</span><span class="p">[</span><span class="n">var_type</span><span class="p">]</span>
+</pre></div>
+</div>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.VarValues.vals_from_type">
+<span class="sig-name descname"><span class="pre">vals_from_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#type" title="(in Python v3.14)"><span class="pre">type</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.VarValues.vals_from_type" title="Link to this definition">¶</a></dt>
+<dd><p>Stacked values for each variable type. Will be sorted by ID (ascending).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.VarValues.ids_from_type">
+<span class="sig-name descname"><span class="pre">ids_from_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#type" title="(in Python v3.14)"><span class="pre">type</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.VarValues.ids_from_type" title="Link to this definition">¶</a></dt>
+<dd><p>Variable ID for each value, sorted in ascending order.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.VarValues.get_value">
+<span class="sig-name descname"><span class="pre">get_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#VarValues.get_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.VarValues.get_value" title="Link to this definition">¶</a></dt>
+<dd><p>Get the value of a specific variable or variables.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>var</strong> (<a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><em>Var</em></a>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>T</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.VarValues.get_stacked_value">
+<span class="sig-name descname"><span class="pre">get_stacked_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#type" title="(in Python v3.14)"><span class="pre">type</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#VarValues.get_stacked_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.VarValues.get_stacked_value" title="Link to this definition">¶</a></dt>
+<dd><p>Get the value of all variables of a specific type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>var_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#type" title="(in Python v3.14)"><em>type</em></a><em>[</em><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><em>Var</em></a><em>]</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>T</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.VarValues.make">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">make</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><span class="pre">Iterable</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">VarWithValue</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_variables/#VarValues.make"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.VarValues.make" title="Link to this definition">¶</a></dt>
+<dd><p>Create a VarValues object from a list of variables with or without
+values assigned to them. In the latter case, value are set to the
+default value of the variable type.</p>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">v1</span> <span class="o">=</span> <span class="n">SomeVar</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">v2</span> <span class="o">=</span> <span class="n">AnotherVar</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Set v1 to default, v2 to custom value:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">values</span> <span class="o">=</span> <span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">custom_value</span><span class="p">)])</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># The previous example is equivalent to:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">values</span> <span class="o">=</span> <span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">v1</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">v1</span><span class="o">.</span><span class="n">default_factory</span><span class="p">()),</span> <span class="n">v2</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">custom_value</span><span class="p">)])</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>variables</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><em>Var</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>] </em><em>| </em><em>VarWithValue</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em><em>]</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><em>VarValues</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../lie_group_variables/">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Lie group variables</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="../../examples/portfolio/black_litterman/">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Black-Litterman allocation</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/brentyi/jaxls" aria-label="GitHub">
+            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+        </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Core API</a><ul>
+<li><a class="reference internal" href="#problem">Problem</a><ul>
+<li><a class="reference internal" href="#jaxls.LeastSquaresProblem"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem</span></code></a><ul>
+<li><a class="reference internal" href="#jaxls.LeastSquaresProblem.costs"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.costs</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.LeastSquaresProblem.variables"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.variables</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.LeastSquaresProblem.analyze"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.analyze()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem"><code class="docutils literal notranslate"><span class="pre">AnalyzedLeastSquaresProblem</span></code></a><ul>
+<li><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem.solve"><code class="docutils literal notranslate"><span class="pre">AnalyzedLeastSquaresProblem.solve()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem.compute_residual_vector"><code class="docutils literal notranslate"><span class="pre">AnalyzedLeastSquaresProblem.compute_residual_vector()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem.compute_constraint_values"><code class="docutils literal notranslate"><span class="pre">AnalyzedLeastSquaresProblem.compute_constraint_values()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#jaxls.SolveSummary"><code class="docutils literal notranslate"><span class="pre">SolveSummary</span></code></a><ul>
+<li><a class="reference internal" href="#jaxls.SolveSummary.iterations"><code class="docutils literal notranslate"><span class="pre">SolveSummary.iterations</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.SolveSummary.termination_criteria"><code class="docutils literal notranslate"><span class="pre">SolveSummary.termination_criteria</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.SolveSummary.termination_deltas"><code class="docutils literal notranslate"><span class="pre">SolveSummary.termination_deltas</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.SolveSummary.cost_history"><code class="docutils literal notranslate"><span class="pre">SolveSummary.cost_history</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.SolveSummary.lambda_history"><code class="docutils literal notranslate"><span class="pre">SolveSummary.lambda_history</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cost">Cost</a><ul>
+<li><a class="reference internal" href="#jaxls.Cost"><code class="docutils literal notranslate"><span class="pre">Cost</span></code></a><ul>
+<li><a class="reference internal" href="#jaxls.Cost.create_factory"><code class="docutils literal notranslate"><span class="pre">Cost.create_factory()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.factory"><code class="docutils literal notranslate"><span class="pre">Cost.factory()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.jac_batch_size"><code class="docutils literal notranslate"><span class="pre">Cost.jac_batch_size</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.jac_custom_fn"><code class="docutils literal notranslate"><span class="pre">Cost.jac_custom_fn</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.jac_custom_with_cache_fn"><code class="docutils literal notranslate"><span class="pre">Cost.jac_custom_with_cache_fn</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.jac_mode"><code class="docutils literal notranslate"><span class="pre">Cost.jac_mode</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.kind"><code class="docutils literal notranslate"><span class="pre">Cost.kind</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.make"><code class="docutils literal notranslate"><span class="pre">Cost.make()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.name"><code class="docutils literal notranslate"><span class="pre">Cost.name</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.compute_residual"><code class="docutils literal notranslate"><span class="pre">Cost.compute_residual</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Cost.args"><code class="docutils literal notranslate"><span class="pre">Cost.args</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#variables">Variables</a><ul>
+<li><a class="reference internal" href="#jaxls.Var"><code class="docutils literal notranslate"><span class="pre">Var</span></code></a><ul>
+<li><a class="reference internal" href="#jaxls.Var.id"><code class="docutils literal notranslate"><span class="pre">Var.id</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Var.tangent_dim"><code class="docutils literal notranslate"><span class="pre">Var.tangent_dim</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Var.retract_fn"><code class="docutils literal notranslate"><span class="pre">Var.retract_fn</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Var.default_factory"><code class="docutils literal notranslate"><span class="pre">Var.default_factory()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.Var.with_value"><code class="docutils literal notranslate"><span class="pre">Var.with_value()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#jaxls.VarValues"><code class="docutils literal notranslate"><span class="pre">VarValues</span></code></a><ul>
+<li><a class="reference internal" href="#jaxls.VarValues.vals_from_type"><code class="docutils literal notranslate"><span class="pre">VarValues.vals_from_type</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.VarValues.ids_from_type"><code class="docutils literal notranslate"><span class="pre">VarValues.ids_from_type</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.VarValues.get_value"><code class="docutils literal notranslate"><span class="pre">VarValues.get_value()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.VarValues.get_stacked_value"><code class="docutils literal notranslate"><span class="pre">VarValues.get_stacked_value()</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.VarValues.make"><code class="docutils literal notranslate"><span class="pre">VarValues.make()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=187304be"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=fd10adb8"></script>
+    </body>
+</html>

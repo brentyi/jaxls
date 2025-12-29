@@ -163,14 +163,14 @@ class Var[T](metaclass=_HashableSortableMeta):
 class VarValues:
     """A mapping from variables to variable values.
 
-    Given a variable object `var` and a values of object `vals`, we can get the
-    value by calling one of:
+    Given a variable object ``var`` and a values object ``vals``, we can get the
+    value by calling one of::
 
         # Equivalent.
         vals.get_value(var)
         vals[var]
 
-    To get all values of a specific type `var_type`, use:
+    To get all values of a specific type ``var_type``, use::
 
         # Equivalent.
         vals.get_stacked_value(var_type)

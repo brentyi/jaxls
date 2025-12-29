@@ -6,13 +6,13 @@ if TYPE_CHECKING or sys.version_info >= (3, 12):
     from ._augmented_lagrangian import (
         AugmentedLagrangianConfig as AugmentedLagrangianConfig,
     )
-    from ._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
-    from ._core import Cost as Cost
-    from ._core import LeastSquaresProblem as LeastSquaresProblem
+    from ._cost import Cost as Cost
     from ._lie_group_variables import SE2Var as SE2Var
     from ._lie_group_variables import SE3Var as SE3Var
     from ._lie_group_variables import SO2Var as SO2Var
     from ._lie_group_variables import SO3Var as SO3Var
+    from ._problem import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
+    from ._problem import LeastSquaresProblem as LeastSquaresProblem
     from ._solvers import ConjugateGradientConfig as ConjugateGradientConfig
     from ._solvers import SolveSummary as SolveSummary
     from ._solvers import TerminationConfig as TerminationConfig
@@ -24,13 +24,15 @@ elif sys.version_info >= (3, 10):
     from ._py310._augmented_lagrangian import (
         AugmentedLagrangianConfig as AugmentedLagrangianConfig,
     )
-    from ._py310._core import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
-    from ._py310._core import Cost as Cost
-    from ._py310._core import LeastSquaresProblem as LeastSquaresProblem
+    from ._py310._cost import Cost as Cost
     from ._py310._lie_group_variables import SE2Var as SE2Var
     from ._py310._lie_group_variables import SE3Var as SE3Var
     from ._py310._lie_group_variables import SO2Var as SO2Var
     from ._py310._lie_group_variables import SO3Var as SO3Var
+    from ._py310._problem import (
+        AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem,
+    )
+    from ._py310._problem import LeastSquaresProblem as LeastSquaresProblem
     from ._py310._solvers import ConjugateGradientConfig as ConjugateGradientConfig
     from ._py310._solvers import SolveSummary as SolveSummary
     from ._py310._solvers import TerminationConfig as TerminationConfig

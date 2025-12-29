@@ -1,4 +1,4 @@
-name: Check Transpilation
+name: check transpilation
 
 on:
   push:
@@ -10,25 +10,14 @@ jobs:
   check-transpilation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.12"
-          
-      - name: Install dependencies
-        run: |
-          pip install uv
-          uv pip install --system -e ".[dev]"
-          
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
       - name: Run transpiler
-        run: |
-          python transpile_py310.py
-          
+        run: uv run --python 3.12 --extra dev python transpile_py310.py
       - name: Check for changes
         run: |
-          # Check if there are any changes to the transpiled files
+          # Check if there are any changes to the transpiled files.
           if ! git diff --quiet src/jaxls/_py310/; then
             echo "Error: Transpiled code is out of date!"
             echo "Changes detected:"
