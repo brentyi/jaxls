@@ -162,11 +162,7 @@
    "cell_type": "markdown",
    "id": "cell-9",
    "metadata": {},
-   "source": [
-    "## Approach 1: Naive construction\n",
-    "\n",
-    "The straightforward approach: create variables and costs one-by-one using Python loops."
-   ]
+   "source": "## Approach 1: naive construction\n\nThe straightforward approach: create variables and costs one-by-one using Python loops."
   },
   {
    "cell_type": "code",
@@ -231,11 +227,7 @@
    "cell_type": "markdown",
    "id": "cell-11",
    "metadata": {},
-   "source": [
-    "## Approach 2: Batched construction\n",
-    "\n",
-    "When variable IDs have a leading batch axis, a batch of costs is created in one call. This reduces Python overhead and speeds up problem analysis."
-   ]
+   "source": "## Approach 2: batched construction\n\nWhen variable IDs have a leading batch axis, a batch of costs is created in one call. This reduces Python overhead and speeds up problem analysis."
   },
   {
    "cell_type": "code",

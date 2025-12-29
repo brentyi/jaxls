@@ -388,17 +388,7 @@
    "cell_type": "markdown",
    "id": "cell-9",
    "metadata": {},
-   "source": [
-    "## IMU Preintegration\n",
-    "\n",
-    "Preintegration combines many high-frequency IMU measurements into a single relative motion constraint. Given IMU measurements between times $i$ and $j$, we compute:\n",
-    "\n",
-    "- $\\Delta R_{ij}$: Relative rotation\n",
-    "- $\\Delta v_{ij}$: Velocity change (in frame $i$)\n",
-    "- $\\Delta p_{ij}$: Position change (in frame $i$)\n",
-    "\n",
-    "These preintegrated measurements are independent of the absolute pose/velocity at time $i$, which allows efficient re-linearization during optimization."
-   ]
+   "source": "## IMU preintegration\n\nPreintegration combines many high-frequency IMU measurements into a single relative motion constraint. Given IMU measurements between times $i$ and $j$, we compute:\n\n- $\\Delta R_{ij}$: Relative rotation\n- $\\Delta v_{ij}$: Velocity change (in frame $i$)\n- $\\Delta p_{ij}$: Position change (in frame $i$)\n\nThese preintegrated measurements are independent of the absolute pose/velocity at time $i$, which allows efficient re-linearization during optimization."
   },
   {
    "cell_type": "code",
