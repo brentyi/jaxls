@@ -1233,13 +1233,15 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+cholmod = [
+    { name = "scikit-sparse" },
+]
 dev = [
     { name = "libcst" },
     { name = "nbconvert" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "ruff" },
-    { name = "scikit-sparse" },
     { name = "viser" },
 ]
 docs = [
@@ -1284,7 +1286,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0.0" },
     { name = "robot-descriptions", marker = "extra == 'docs'" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scikit-sparse", marker = "extra == 'dev'" },
+    { name = "scikit-sparse", marker = "extra == 'cholmod'" },
     { name = "scikit-sparse", marker = "extra == 'docs'" },
     { name = "scipy", marker = "extra == 'docs'" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
@@ -1297,7 +1299,7 @@ requires-dist = [
     { name = "viser", marker = "extra == 'dev'" },
     { name = "yourdfpy", marker = "extra == 'docs'" },
 ]
-provides-extras = ["dev", "docs"]
+provides-extras = ["cholmod", "dev", "docs"]
 
 [[package]]
 name = "jedi"

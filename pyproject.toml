@@ -45,7 +45,6 @@ dev = [
     "libcst",
     "viser",
     "nbconvert",
-    "scikit-sparse",
 ]
 docs = [
     "sphinx>=7.0.0",
@@ -65,6 +64,7 @@ docs = [
     "fast_simplification",
     "jupyterlab",
 ]
+cholmod = ["scikit-sparse"]
 
 [project.urls]
 "GitHub" = "https://github.com/brentyi/jaxls"

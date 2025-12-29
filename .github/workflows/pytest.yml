@@ -22,4 +22,4 @@ jobs:
           sudo apt update
           sudo apt install -y libsuitesparse-dev
       - name: Test with pytest
-        run: uv run --python ${{ matrix.python-version }} --extra dev pytest
+        run: uv run --python ${{ matrix.python-version }} --extra dev --extra cholmod pytest
