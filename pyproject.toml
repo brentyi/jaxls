@@ -44,6 +44,8 @@ dev = [
     "ruff",
     "libcst",
     "viser",
+    "nbconvert",
+    "scikit-sparse",
 ]
 docs = [
     "sphinx>=7.0.0",

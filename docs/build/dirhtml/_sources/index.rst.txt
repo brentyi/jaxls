@@ -27,7 +27,7 @@ Goals
 jaxls is designed to be:
 
 - Lightweight and hackable, but fast. It aims to be practical for common
-  problems in robotics, vision, and scientific computing.
+  scientific computing problems.
 - Python-native. jaxls combines recent Python typing constructs with
   a functional, `PyTree <https://docs.jax.dev/en/latest/pytrees.html>`_-first
   implementation. Its API is type-safe, compatible with standard JAX

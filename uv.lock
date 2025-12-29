@@ -1235,9 +1235,11 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "libcst" },
+    { name = "nbconvert" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "scikit-sparse" },
     { name = "viser" },
 ]
 docs = [
@@ -1274,6 +1276,7 @@ requires-dist = [
     { name = "loguru" },
     { name = "matplotlib", marker = "extra == 'docs'" },
     { name = "myst-nb", marker = "extra == 'docs'", specifier = ">=1.0.0" },
+    { name = "nbconvert", marker = "extra == 'dev'" },
     { name = "opencv-python", marker = "extra == 'docs'" },
     { name = "plotly", marker = "extra == 'docs'" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.308" },
@@ -1281,6 +1284,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0.0" },
     { name = "robot-descriptions", marker = "extra == 'docs'" },
     { name = "ruff", marker = "extra == 'dev'" },
+    { name = "scikit-sparse", marker = "extra == 'dev'" },
     { name = "scikit-sparse", marker = "extra == 'docs'" },
     { name = "scipy", marker = "extra == 'docs'" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },

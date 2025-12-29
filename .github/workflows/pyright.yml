@@ -18,4 +18,4 @@ jobs:
           sudo apt update
           sudo apt install -y libsuitesparse-dev
       - name: Run pyright
-        run: uv run --python 3.12 --extra dev pyright .
+        run: uv run --python 3.12 --extra dev --extra docs pyright .
