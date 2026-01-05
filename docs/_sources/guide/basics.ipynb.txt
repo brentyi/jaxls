@@ -156,7 +156,7 @@
    "cell_type": "markdown",
    "id": "cell-11",
    "metadata": {},
-   "source": "## Building problems\n\nA {class}`~jaxls.LeastSquaresProblem` bundles costs and variables together. Call `.analyze()` to prepare the problem structure for solving:"
+   "source": "## Building problems\n\nA {class}`~jaxls.LeastSquaresProblem` bundles costs and variables together.\n\nWe can call {meth}`.show() <jaxls.LeastSquaresProblem.show>` to visualize the problem structure. In notebooks this displays inline; outside notebooks it opens in a browser."
   },
   {
    "cell_type": "code",
@@ -164,7 +164,15 @@
    "id": "cell-12",
    "metadata": {},
    "outputs": [],
-   "source": "# Build the problem.\nproblem = jaxls.LeastSquaresProblem(costs, [circle_var]).analyze()\n\nprint(f\"Problem has {len(costs)} cost terms\")\nprint(f\"Optimizing {circle_var} (3 parameters)\")"
+   "source": "# Build the problem.\nproblem = jaxls.LeastSquaresProblem(costs, [circle_var])\n\n# Visualize the problem structure.\nproblem.show()"
+  },
+  {
+   "cell_type": "code",
+   "id": "hscb8zmhn1",
+   "source": "# Analyze the problem structure for efficient solving.\nproblem = problem.analyze()",
+   "metadata": {},
+   "execution_count": null,
+   "outputs": []
   },
   {
    "cell_type": "markdown",

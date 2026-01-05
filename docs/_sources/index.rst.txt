@@ -6,10 +6,10 @@ jaxls
 jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares
 problems in JAX.
 
-We provide an API for declaring least squares problems, which are then analyzed
-for fast solve times: we automatically vectorize repeated cost and variable
-operations, while translating sparse cost/variable relationships into sparse
-matrix operations.
+We provide an API for declaring and solving least squares problems. We analyze
+and exploit problem structure: we automatically vectorize repeated cost and
+variable operations, while translating sparse cost/variable relationships into
+sparse matrix operations.
 
 To install (Python >=3.10 minimum, >=3.12 recommended):
 
@@ -71,6 +71,8 @@ Related projects
 
 Acknowledgements
 ----------------
+
+Thanks to Nick Heppert, Chung Min Kim, and Yuqing Du for technical feedback.
 
 jaxls is inspired by libraries like
 `GTSAM <https://gtsam.org/>`_,

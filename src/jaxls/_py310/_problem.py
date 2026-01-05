@@ -62,6 +62,24 @@ class LeastSquaresProblem:
     costs: Any
     variables: Any
 
+    def show(
+        self,
+        *,
+        width: Any = 800,
+        height: Any = 500,
+        max_costs: Any = 1000,
+        max_variables: Any = 500,
+    ) -> Any:
+        from ._visualization import problem_show
+
+        problem_show(
+            self,
+            width=width,
+            height=height,
+            max_costs=max_costs,
+            max_variables=max_variables,
+        )
+
     def analyze(self, use_onp: Any = False) -> Any:
         if use_onp:
             jnp = onp

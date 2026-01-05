@@ -63,6 +63,7 @@ docs = [
     "trimesh",
     "fast_simplification",
     "jupyterlab",
+    "graphviz",
 ]
 cholmod = ["scikit-sparse"]
 

@@ -410,6 +410,40 @@
     <span class="n">costs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Cost</span><span class="p">]</span>
     <span class="n">variables</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Var</span><span class="p">]</span>
 
+<div class="viewcode-block" id="LeastSquaresProblem.show">
+<a class="viewcode-back" href="../../../api/core/#jaxls.LeastSquaresProblem.show">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">800</span><span class="p">,</span>
+        <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+        <span class="n">max_costs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="n">max_variables</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Display an interactive graph showing costs and variables.</span>
+
+<span class="sd">        In Jupyter/JupyterLab/VS Code notebooks, displays inline. Otherwise,</span>
+<span class="sd">        opens in the default web browser.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            width: Maximum width of the visualization in pixels.</span>
+<span class="sd">            height: Height of the visualization in pixels.</span>
+<span class="sd">            max_costs: Maximum number of cost nodes to show. When multiple cost</span>
+<span class="sd">                types exist, the limit is distributed proportionally across types.</span>
+<span class="sd">            max_variables: Maximum number of variables per type to show.</span>
+<span class="sd">                Only costs where all variables are visible are shown.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._visualization</span><span class="w"> </span><span class="kn">import</span> <span class="n">problem_show</span>
+
+        <span class="n">problem_show</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
+            <span class="n">height</span><span class="o">=</span><span class="n">height</span><span class="p">,</span>
+            <span class="n">max_costs</span><span class="o">=</span><span class="n">max_costs</span><span class="p">,</span>
+            <span class="n">max_variables</span><span class="o">=</span><span class="n">max_variables</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="LeastSquaresProblem.analyze">
 <a class="viewcode-back" href="../../../api/core/#jaxls.LeastSquaresProblem.analyze">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">analyze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_onp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnalyzedLeastSquaresProblem</span><span class="p">:</span>

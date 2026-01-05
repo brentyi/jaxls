@@ -310,31 +310,19 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 9,
+   "execution_count": null,
    "id": "cell-13",
    "metadata": {},
-   "outputs": [
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "\u001b[1mINFO    \u001b[0m | Building optimization problem with 3 terms and 1 variables: 3 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero\n",
-      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 1 variables each: terminal_cost\n",
-      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 1 variables each: hold_cost\n",
-      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 1 variables each: control_regularization\n"
-     ]
-    }
-   ],
-   "source": [
-    "# Initial guess: small random controls to break symmetry.\n",
-    "key = jax.random.PRNGKey(42)\n",
-    "initial_controls = jax.random.normal(key, (n_steps, 1)) * 0.1\n",
-    "\n",
-    "initial_vals = jaxls.VarValues.make([control_var.with_value(initial_controls)])\n",
-    "\n",
-    "# Create and analyze problem.\n",
-    "problem = jaxls.LeastSquaresProblem(costs, [control_var]).analyze()"
-   ]
+   "outputs": [],
+   "source": "# Initial guess: small random controls to break symmetry.\nkey = jax.random.PRNGKey(42)\ninitial_controls = jax.random.normal(key, (n_steps, 1)) * 0.1\n\ninitial_vals = jaxls.VarValues.make([control_var.with_value(initial_controls)])\n\n# Create the problem.\nproblem = jaxls.LeastSquaresProblem(costs, [control_var])\n\n# Visualize the problem structure structure.\nproblem.show()"
+  },
+  {
+   "cell_type": "code",
+   "id": "114h6f96rap",
+   "source": "# Analyze the problem.\nproblem = problem.analyze()",
+   "metadata": {},
+   "execution_count": null,
+   "outputs": []
   },
   {
    "cell_type": "code",

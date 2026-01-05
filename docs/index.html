@@ -306,10 +306,10 @@
 <p><a class="reference external" href="https://github.com/brentyi/jaxls/actions/workflows/pyright.yml"><img alt="Pyright status" src="https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg" /></a></p>
 <p>jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares
 problems in JAX.</p>
-<p>We provide an API for declaring least squares problems, which are then analyzed
-for fast solve times: we automatically vectorize repeated cost and variable
-operations, while translating sparse cost/variable relationships into sparse
-matrix operations.</p>
+<p>We provide an API for declaring and solving least squares problems. We analyze
+and exploit problem structure: we automatically vectorize repeated cost and
+variable operations, while translating sparse cost/variable relationships into
+sparse matrix operations.</p>
 <p>To install (Python &gt;=3.10 minimum, &gt;=3.12 recommended):</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Core package only</span>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/brentyi/jaxls.git&quot;</span>
@@ -370,6 +370,7 @@ library for robots, built on jaxls.</p></li>
 </section>
 <section id="acknowledgements">
 <h2>Acknowledgements<a class="headerlink" href="#acknowledgements" title="Link to this heading">¶</a></h2>
+<p>Thanks to Nick Heppert, Chung Min Kim, and Yuqing Du for technical feedback.</p>
 <p>jaxls is inspired by libraries like
 <a class="reference external" href="https://gtsam.org/">GTSAM</a>,
 <a class="reference external" href="http://ceres-solver.org/">Ceres Solver</a>,

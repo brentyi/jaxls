@@ -195,30 +195,19 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 7,
+   "execution_count": null,
    "id": "cell-10",
    "metadata": {},
-   "outputs": [
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "\u001b[1mINFO    \u001b[0m | Building optimization problem with 60 terms and 20 variables: 20 costs, 0 eq_zero, 40 leq_zero, 0 geq_zero\n",
-      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 2 costs, 1 variables each: anchor_cost\n",
-      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 18 costs, 3 variables each: smoothness_cost\n",
-      "\u001b[1mINFO    \u001b[0m | Vectorizing constraint group with 40 constraints (constraint_leq_zero), 1 variables each: augmented_obstacle_constraint\n"
-     ]
-    }
-   ],
-   "source": [
-    "# Initialize with straight line (will collide with obstacles)\n",
-    "t = jnp.linspace(0, 1, n_waypoints)\n",
-    "initial_positions = start + t[:, None] * (goal - start)  # (n_waypoints, 2)\n",
-    "\n",
-    "initial_vals = jaxls.VarValues.make([waypoint_vars.with_value(initial_positions)])\n",
-    "\n",
-    "problem = jaxls.LeastSquaresProblem(costs, [waypoint_vars]).analyze()"
-   ]
+   "outputs": [],
+   "source": "# Initialize with straight line (will collide with obstacles)\nt = jnp.linspace(0, 1, n_waypoints)\ninitial_positions = start + t[:, None] * (goal - start)  # (n_waypoints, 2)\n\ninitial_vals = jaxls.VarValues.make([waypoint_vars.with_value(initial_positions)])\n\n# Create the problem.\nproblem = jaxls.LeastSquaresProblem(costs, [waypoint_vars])\n\n# Visualize the problem structure structure.\nproblem.show()"
+  },
+  {
+   "cell_type": "code",
+   "id": "b8zellbd2b",
+   "source": "# Analyze the problem.\nproblem = problem.analyze()",
+   "metadata": {},
+   "execution_count": null,
+   "outputs": []
   },
   {
    "cell_type": "markdown",

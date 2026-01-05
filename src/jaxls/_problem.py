@@ -111,6 +111,37 @@ class LeastSquaresProblem:
     costs: Iterable[Cost]
     variables: Iterable[Var]
 
+    def show(
+        self,
+        *,
+        width: int = 800,
+        height: int = 500,
+        max_costs: int = 1000,
+        max_variables: int = 500,
+    ) -> None:
+        """Display an interactive graph showing costs and variables.
+
+        In Jupyter/JupyterLab/VS Code notebooks, displays inline. Otherwise,
+        opens in the default web browser.
+
+        Args:
+            width: Maximum width of the visualization in pixels.
+            height: Height of the visualization in pixels.
+            max_costs: Maximum number of cost nodes to show. When multiple cost
+                types exist, the limit is distributed proportionally across types.
+            max_variables: Maximum number of variables per type to show.
+                Only costs where all variables are visible are shown.
+        """
+        from ._visualization import problem_show
+
+        problem_show(
+            self,
+            width=width,
+            height=height,
+            max_costs=max_costs,
+            max_variables=max_variables,
+        )
+
     def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving.
 

@@ -123,30 +123,15 @@
    "id": "cell-7",
    "metadata": {},
    "outputs": [],
-   "source": [
-    "# Create variable and costs.\n",
-    "circle_var = CircleVar(id=0)\n",
-    "\n",
-    "# Initial guess: centroid of points, average distance as radius.\n",
-    "centroid = jnp.mean(points, axis=0)\n",
-    "avg_dist = jnp.mean(jnp.sqrt(jnp.sum((points - centroid) ** 2, axis=-1)))\n",
-    "initial_params = jnp.array([centroid[0], centroid[1], avg_dist])\n",
-    "\n",
-    "# Build problem with batched point indices.\n",
-    "costs_standard = [\n",
-    "    circle_residual(CircleVar(id=jnp.zeros(n_points, dtype=jnp.int32)), points)\n",
-    "]\n",
-    "\n",
-    "initial_vals = jaxls.VarValues.make([circle_var.with_value(initial_params)])\n",
-    "problem_standard = jaxls.LeastSquaresProblem(costs_standard, [circle_var]).analyze()\n",
-    "solution_standard = problem_standard.solve(initial_vals)\n",
-    "\n",
-    "params_standard = solution_standard[circle_var]\n",
-    "print(\n",
-    "    f\"Standard LS result: center=({params_standard[0]:.3f}, {params_standard[1]:.3f}), radius={params_standard[2]:.3f}\"\n",
-    ")\n",
-    "print(f\"True parameters:    center=({true_cx:.3f}, {true_cy:.3f}), radius={true_r:.3f}\")"
-   ]
+   "source": "# Create variable and costs.\ncircle_var = CircleVar(id=0)\n\n# Initial guess: centroid of points, average distance as radius.\ncentroid = jnp.mean(points, axis=0)\navg_dist = jnp.mean(jnp.sqrt(jnp.sum((points - centroid) ** 2, axis=-1)))\ninitial_params = jnp.array([centroid[0], centroid[1], avg_dist])\n\n# Build problem with batched point indices.\ncosts_standard = [\n    circle_residual(CircleVar(id=jnp.zeros(n_points, dtype=jnp.int32)), points)\n]\n\ninitial_vals = jaxls.VarValues.make([circle_var.with_value(initial_params)])\n\n# Build the problem.\nproblem_standard = jaxls.LeastSquaresProblem(costs_standard, [circle_var])\n\n# Visualize the problem structure structure.\nproblem_standard.show()"
+  },
+  {
+   "cell_type": "code",
+   "id": "ccz2b9d3lxj",
+   "source": "# Analyze and solve.\nproblem_standard = problem_standard.analyze()\nsolution_standard = problem_standard.solve(initial_vals)\n\nparams_standard = solution_standard[circle_var]\nprint(\n    f\"Standard LS result: center=({params_standard[0]:.3f}, {params_standard[1]:.3f}), radius={params_standard[2]:.3f}\"\n)\nprint(f\"True parameters:    center=({true_cx:.3f}, {true_cy:.3f}), radius={true_r:.3f}\")",
+   "metadata": {},
+   "execution_count": null,
+   "outputs": []
   },
   {
    "cell_type": "code",

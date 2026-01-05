@@ -48,10 +48,13 @@ costs = [
 # This goes through costs, and preprocesses them to enable vectorization of
 # computations. If we have 1000 prior costs, we will internally stack all of
 # the associated values and batch computations.
-problem = jaxls.LeastSquaresProblem(costs, vars).analyze()
+problem = jaxls.LeastSquaresProblem(costs, vars) #.analyze()
+
+# Visualize the variables and costs.
+problem.visualize()
 
 # Solve the optimization problem.
-solution = problem.solve()
+solution = problem.analyze().solve()
 print("All solutions", solution)
 print("Pose 0", solution[vars[0]])
 print("Pose 1", solution[vars[1]])

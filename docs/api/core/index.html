@@ -10,7 +10,7 @@
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
@@ -331,6 +331,29 @@
 <dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.variables">
 <span class="sig-name descname"><span class="pre">variables</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.14)"><span class="pre">Iterable</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#jaxls.LeastSquaresProblem.variables" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.show">
+<span class="sig-name descname"><span class="pre">show</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">800</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">500</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_costs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_variables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">500</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#LeastSquaresProblem.show"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.LeastSquaresProblem.show" title="Link to this definition">¶</a></dt>
+<dd><p>Display an interactive graph showing costs and variables.</p>
+<p>In Jupyter/JupyterLab/VS Code notebooks, displays inline. Otherwise,
+opens in the default web browser.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>width</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Maximum width of the visualization in pixels.</p></li>
+<li><p><strong>height</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Height of the visualization in pixels.</p></li>
+<li><p><strong>max_costs</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Maximum number of cost nodes to show. When multiple cost
+types exist, the limit is distributed proportionally across types.</p></li>
+<li><p><strong>max_variables</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Maximum number of variables per type to show.
+Only costs where all variables are visible are shown.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.analyze">
@@ -799,6 +822,7 @@ default value of the variable type.</p>
 <li><a class="reference internal" href="#jaxls.LeastSquaresProblem"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem</span></code></a><ul>
 <li><a class="reference internal" href="#jaxls.LeastSquaresProblem.costs"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.costs</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.LeastSquaresProblem.variables"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.variables</span></code></a></li>
+<li><a class="reference internal" href="#jaxls.LeastSquaresProblem.show"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.show()</span></code></a></li>
 <li><a class="reference internal" href="#jaxls.LeastSquaresProblem.analyze"><code class="docutils literal notranslate"><span class="pre">LeastSquaresProblem.analyze()</span></code></a></li>
 </ul>
 </li>
