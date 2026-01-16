@@ -6,4 +6,5 @@ Mechanics
 
    spring_equilibrium
    cloth_draping
+   cloth_falling
    truss_analysis

@@ -48,7 +48,7 @@ dev = [
 ]
 docs = [
     "sphinx>=7.0.0",
-    "furo>=2024.0.0",
+    "sphinx-book-theme>=1.0.0",
     "sphinx-copybutton>=0.5.0",
     "myst-nb>=1.0.0",
     "ipykernel",
@@ -64,6 +64,7 @@ docs = [
     "fast_simplification",
     "jupyterlab",
     "graphviz",
+    "viser>=1.0.18",
 ]
 cholmod = ["scikit-sparse"]
 

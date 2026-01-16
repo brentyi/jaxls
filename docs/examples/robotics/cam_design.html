@@ -1,0 +1,1058 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="IMU fusion + calibration" href="imu_sensor_fusion.html" /><link rel="prev" title="Cart-pole (shooting)" href="cart_pole_shooting.html" />
+
+    <!-- Generated with Sphinx 8.0.2 and Furo 2024.08.06 -->
+        <title>Cam profile optimization - jaxls</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=302659d7" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-code-background: #f4f4f4;
+  --color-code-foreground: #000;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">jaxls</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a
+  class="sidebar-brand"
+  href="../../index.html"
+  style="margin-top: 0.75em"
+>
+  
+  <span class="sidebar-brand-text">jaxls</span>
+
+  
+</a>
+
+<div style="text-align: left; padding: 0 1em 1em 1em">
+  <a href="https://github.com/brentyi/jaxls">
+    <img src="https://img.shields.io/github/stars/brentyi/jaxls?style=social" alt="GitHub stars">
+  </a>
+</div><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/basics.html">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas.html">Tips and gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/index.html">Advanced</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Advanced</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean.html">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians.html">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/constraints.html">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/robust_costs.html">Robust costs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/covariance.html">Covariance estimation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../mechanics/index.html">Mechanics</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Mechanics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../mechanics/spring_equilibrium.html">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../mechanics/cloth_draping.html">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../mechanics/truss_analysis.html">Truss analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../vision/index.html">Vision</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Vision</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vision/camera_calibration.html">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/pose_graph_2d.html">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/pose_graph_3d.html">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/bundle_adjustment.html">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/smplh_shape_fitting.html">SMPL-H shape fitting</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Robotics</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Robotics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="inverse_kinematics.html">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="obstacle_avoidance.html">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cart_pole_collocation.html">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cart_pole_shooting.html">Cart-pole (shooting)</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="imu_sensor_fusion.html">IMU fusion + calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../portfolio/index.html">Portfolio optimization</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Portfolio optimization</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../portfolio/mean_variance.html">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../portfolio/manifold_allocation.html">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../portfolio/reparameterized_allocation.html">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../portfolio/cvar_optimization.html">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../portfolio/black_litterman.html">Black-Litterman allocation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/core.html">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/lie_group_variables.html">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/solver_config.html">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/covariance.html">Covariance Estimation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../design/typed_api.html">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices.html">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static.html">What’s traced?</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/examples/robotics/cam_design.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="cam-profile-optimization">
+<h1>Cam profile optimization<a class="headerlink" href="#cam-profile-optimization" title="Link to this heading">¶</a></h1>
+<p>In this notebook, we solve a cam design problem: finding cam profiles that produce
+smooth follower motion while satisfying curvature constraints.</p>
+<p><strong>Inputs:</strong> Target dwell-rise-dwell-return displacement profile<br />
+<strong>Outputs:</strong> B-spline control points defining the cam shape</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../api/core.html#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a> for B-spline control point radii</p></li>
+<li><p><a class="reference internal" href="../../api/core.html#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-func docutils literal notranslate"><span class="pre">&#64;jaxls.Cost.factory</span></code></a> for motion tracking and smoothness</p></li>
+<li><p>Inequality constraints for pressure angle and minimum radius limits</p></li>
+</ul>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">loguru</span> <span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jaxls</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="cam-geometry">
+<h2>Cam geometry<a class="headerlink" href="#cam-geometry" title="Link to this heading">¶</a></h2>
+<p>We model a radial plate cam with a translating knife-edge follower. The cam profile is defined by radii <span class="math notranslate nohighlight">\(r(\theta)\)</span> at discrete angles. The follower displacement equals <span class="math notranslate nohighlight">\(r(\theta) - r_{base}\)</span> where <span class="math notranslate nohighlight">\(r_{base}\)</span> is the base circle radius.</p>
+<p>The <strong>pressure angle</strong> <span class="math notranslate nohighlight">\(\alpha\)</span> is the angle between the follower motion direction and the normal to the cam surface. Large pressure angles cause high side loads on the follower guide:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\tan(\alpha) = \frac{dr/d\theta}{r}\]</div>
+</div>
+<p>We use a B-spline parameterization for smooth, manufacturable cam profiles.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">cubic_bspline_basis</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_ctrl</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate cubic B-spline basis function i at parameter t.</span>
+
+<span class="sd">    Uses uniform periodic knots for a closed curve.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Map t to [0, n] with wrapping</span>
+    <span class="n">u</span> <span class="o">=</span> <span class="n">t</span> <span class="o">*</span> <span class="n">n_ctrl</span>
+
+    <span class="c1"># Local parameter within the basis function support</span>
+    <span class="n">local_u</span> <span class="o">=</span> <span class="p">(</span><span class="n">u</span> <span class="o">-</span> <span class="n">i</span><span class="p">)</span> <span class="o">%</span> <span class="n">n_ctrl</span>
+
+    <span class="c1"># Cubic B-spline basis (Cox-de Boor for uniform knots)</span>
+    <span class="c1"># Only non-zero in [0, 4)</span>
+    <span class="n">basis</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+        <span class="n">local_u</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">local_u</span><span class="o">**</span><span class="mi">3</span> <span class="o">/</span> <span class="mi">6</span><span class="p">,</span>
+        <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">local_u</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="p">(</span><span class="o">-</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">local_u</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">local_u</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">local_u</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="o">/</span> <span class="mi">6</span><span class="p">,</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+                <span class="n">local_u</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">,</span>
+                <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">local_u</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">-</span> <span class="mi">6</span> <span class="o">*</span> <span class="p">(</span><span class="n">local_u</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">4</span><span class="p">)</span> <span class="o">/</span> <span class="mi">6</span><span class="p">,</span>
+                <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">local_u</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">local_u</span> <span class="o">-</span> <span class="mi">3</span><span class="p">))</span> <span class="o">**</span> <span class="mi">3</span> <span class="o">/</span> <span class="mi">6</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="p">),</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">basis</span>
+
+
+<span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span> <span class="nf">eval_cam_radius</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate cam radius at angle theta using B-spline interpolation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ctrl_points: B-spline control point radii (n_ctrl,)</span>
+<span class="sd">        theta: Cam angle in [0, 2*pi]</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Cam radius at theta</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_ctrl</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">)</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>  <span class="c1"># Normalize to [0, 1]</span>
+
+    <span class="c1"># Sum basis functions weighted by control points</span>
+    <span class="n">radius</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">ctrl_points</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">cubic_bspline_basis</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">n_ctrl</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_ctrl</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">radius</span>
+
+
+<span class="k">def</span> <span class="nf">cam_profile_xy</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">360</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate cam profile as (x, y) points.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ctrl_points: B-spline control point radii</span>
+<span class="sd">        n_points: Number of points around the profile</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (n_points, 2) array of (x, y) coordinates</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">thetas</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">n_points</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">radii</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">th</span><span class="p">:</span> <span class="n">eval_cam_radius</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">,</span> <span class="n">th</span><span class="p">))(</span><span class="n">thetas</span><span class="p">)</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">radii</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">radii</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span> <span class="nf">compute_pressure_angle</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute pressure angle at given cam angle.</span>
+
+<span class="sd">    The pressure angle is arctan(dr/dtheta / r).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ctrl_points: B-spline control point radii</span>
+<span class="sd">        theta: Cam angle</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Pressure angle in radians</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">eval_cam_radius</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">,</span> <span class="n">theta</span><span class="p">)</span>
+    <span class="n">dr_dtheta</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">th</span><span class="p">:</span> <span class="n">eval_cam_radius</span><span class="p">(</span><span class="n">ctrl_points</span><span class="p">,</span> <span class="n">th</span><span class="p">))(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">dr_dtheta</span><span class="p">),</span> <span class="n">r</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="target-motion-profile">
+<h2>Target motion profile<a class="headerlink" href="#target-motion-profile" title="Link to this heading">¶</a></h2>
+<p>We design a cam for a dwell-rise-dwell-return motion:</p>
+<ul class="simple">
+<li><p><strong>Dwell</strong> at low position (0-90°)</p></li>
+<li><p><strong>Rise</strong> to high position (90-180°)</p></li>
+<li><p><strong>Dwell</strong> at high position (180-270°)</p></li>
+<li><p><strong>Return</strong> to low position (270-360°)</p></li>
+</ul>
+<p>We use a modified sine (cycloidal) motion for smooth acceleration.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">cycloidal_rise</span><span class="p">(</span><span class="n">beta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Cycloidal rise motion: smooth acceleration profile.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        beta: Normalized angle [0, 1].</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Displacement [0, 1].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">beta</span> <span class="o">-</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">target_displacement</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">lift</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Target follower displacement for dwell-rise-dwell-return motion.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        theta: Cam angle in radians.</span>
+<span class="sd">        lift: Total follower lift.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Target displacement from base position.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">theta_deg</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">%</span> <span class="mi">360</span>
+
+    <span class="c1"># Dwell at low (0-90).</span>
+    <span class="n">low_dwell</span> <span class="o">=</span> <span class="n">theta_deg</span> <span class="o">&lt;</span> <span class="mi">90</span>
+
+    <span class="c1"># Rise (90-180).</span>
+    <span class="n">rise</span> <span class="o">=</span> <span class="p">(</span><span class="n">theta_deg</span> <span class="o">&gt;=</span> <span class="mi">90</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">theta_deg</span> <span class="o">&lt;</span> <span class="mi">180</span><span class="p">)</span>
+    <span class="n">rise_beta</span> <span class="o">=</span> <span class="p">(</span><span class="n">theta_deg</span> <span class="o">-</span> <span class="mi">90</span><span class="p">)</span> <span class="o">/</span> <span class="mi">90</span>
+
+    <span class="c1"># Dwell at high (180-270).</span>
+    <span class="n">high_dwell</span> <span class="o">=</span> <span class="p">(</span><span class="n">theta_deg</span> <span class="o">&gt;=</span> <span class="mi">180</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">theta_deg</span> <span class="o">&lt;</span> <span class="mi">270</span><span class="p">)</span>
+
+    <span class="c1"># Return (270-360).</span>
+    <span class="n">ret_beta</span> <span class="o">=</span> <span class="p">(</span><span class="n">theta_deg</span> <span class="o">-</span> <span class="mi">270</span><span class="p">)</span> <span class="o">/</span> <span class="mi">90</span>
+
+    <span class="n">displacement</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+        <span class="n">low_dwell</span><span class="p">,</span>
+        <span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">rise</span><span class="p">,</span>
+            <span class="n">lift</span> <span class="o">*</span> <span class="n">cycloidal_rise</span><span class="p">(</span><span class="n">rise_beta</span><span class="p">),</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">high_dwell</span><span class="p">,</span> <span class="n">lift</span><span class="p">,</span> <span class="n">lift</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">cycloidal_rise</span><span class="p">(</span><span class="n">ret_beta</span><span class="p">))),</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">displacement</span>
+
+
+<span class="c1"># Base circle radius.</span>
+<span class="n">R_BASE</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">LIFT</span> <span class="o">=</span> <span class="mf">0.3</span>
+
+<span class="c1"># Generate target profile.</span>
+<span class="n">n_sample</span> <span class="o">=</span> <span class="mi">72</span>
+<span class="n">sample_thetas</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">n_sample</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">target_radii</span> <span class="o">=</span> <span class="n">R_BASE</span> <span class="o">+</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">th</span><span class="p">:</span> <span class="n">target_displacement</span><span class="p">(</span><span class="n">th</span><span class="p">,</span> <span class="n">LIFT</span><span class="p">))(</span>
+    <span class="n">sample_thetas</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Target motion: dwell-rise-dwell-return&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Base radius: </span><span class="si">{</span><span class="n">R_BASE</span><span class="si">}</span><span class="s2">, Lift: </span><span class="si">{</span><span class="n">LIFT</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling </span><span class="si">{</span><span class="n">n_sample</span><span class="si">}</span><span class="s2"> points around the cam&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Target motion: dwell-rise-dwell-return
+Base radius: 1.0, Lift: 0.3
+Sampling 72 points around the cam
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="optimization-variables-and-costs">
+<h2>Optimization variables and costs<a class="headerlink" href="#optimization-variables-and-costs" title="Link to this heading">¶</a></h2>
+<p>We optimize B-spline control points to match the target motion while satisfying constraints.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Number of B-spline control points.</span>
+<span class="n">N_CTRL</span> <span class="o">=</span> <span class="mi">16</span>
+
+
+<span class="k">class</span> <span class="nc">CamControlPointsVar</span><span class="p">(</span>
+    <span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span>
+    <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">N_CTRL</span><span class="p">)</span> <span class="o">*</span> <span class="n">R_BASE</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;B-spline control point radii for cam profile.&quot;&quot;&quot;</span>
+
+
+<span class="n">cam_var</span> <span class="o">=</span> <span class="n">CamControlPointsVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">motion_tracking_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">CamControlPointsVar</span><span class="p">,</span>
+    <span class="n">theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">target_r</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Cost for cam radius to match target displacement.&quot;&quot;&quot;</span>
+    <span class="n">ctrl_pts</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="n">actual_r</span> <span class="o">=</span> <span class="n">eval_cam_radius</span><span class="p">(</span><span class="n">ctrl_pts</span><span class="p">,</span> <span class="n">theta</span><span class="p">)</span>
+    <span class="c1"># Weight the error by 10 to prioritize motion tracking.</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">actual_r</span> <span class="o">-</span> <span class="n">target_r</span><span class="p">)</span> <span class="o">*</span> <span class="mf">10.0</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;constraint_leq_zero&quot;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">min_radius_constraint</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">CamControlPointsVar</span><span class="p">,</span>
+    <span class="n">min_radius</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;All control points must be &gt;= minimum radius.&quot;&quot;&quot;</span>
+    <span class="n">ctrl_pts</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">min_radius</span> <span class="o">-</span> <span class="n">ctrl_pts</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;constraint_leq_zero&quot;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">pressure_angle_constraint</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">CamControlPointsVar</span><span class="p">,</span>
+    <span class="n">theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">max_angle</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pressure angle must be &lt;= maximum allowed.&quot;&quot;&quot;</span>
+    <span class="n">ctrl_pts</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="n">compute_pressure_angle</span><span class="p">(</span><span class="n">ctrl_pts</span><span class="p">,</span> <span class="n">theta</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">alpha</span> <span class="o">-</span> <span class="n">max_angle</span><span class="p">])</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">smoothness_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">CamControlPointsVar</span><span class="p">,</span>
+    <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">n_ctrl</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Penalize second differences for smooth profile.&quot;&quot;&quot;</span>
+    <span class="n">ctrl_pts</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="c1"># Second difference (discrete curvature)</span>
+    <span class="n">prev_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">index</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n_ctrl</span>
+    <span class="n">next_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n_ctrl</span>
+    <span class="n">curvature</span> <span class="o">=</span> <span class="n">ctrl_pts</span><span class="p">[</span><span class="n">prev_idx</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ctrl_pts</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">+</span> <span class="n">ctrl_pts</span><span class="p">[</span><span class="n">next_idx</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">curvature</span> <span class="o">*</span> <span class="mf">0.5</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="solve-the-cam-design-problem">
+<h2>Solve the cam design problem<a class="headerlink" href="#solve-the-cam-design-problem" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Maximum allowed pressure angle (30 degrees is typical limit).</span>
+<span class="n">MAX_PRESSURE_ANGLE</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+<span class="n">MIN_RADIUS</span> <span class="o">=</span> <span class="mf">0.7</span>
+
+<span class="c1"># Build costs.</span>
+<span class="c1"># Note: loops used for clarity; batched construction is more efficient.</span>
+<span class="n">costs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="c1"># Motion tracking at sample points.</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_sample</span><span class="p">):</span>
+    <span class="n">costs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">motion_tracking_cost</span><span class="p">(</span><span class="n">cam_var</span><span class="p">,</span> <span class="n">sample_thetas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">target_radii</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+
+<span class="c1"># Minimum radius constraint.</span>
+<span class="n">costs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">min_radius_constraint</span><span class="p">(</span><span class="n">cam_var</span><span class="p">,</span> <span class="n">MIN_RADIUS</span><span class="p">))</span>
+
+<span class="c1"># Pressure angle constraints at key points (during rise and return phases).</span>
+<span class="n">pressure_check_angles</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span>
+    <span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">95</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">175</span><span class="p">),</span> <span class="mi">8</span>
+<span class="p">)</span>  <span class="c1"># Rise phase.</span>
+<span class="n">pressure_check_angles</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+    <span class="p">[</span><span class="n">pressure_check_angles</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">275</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mi">355</span><span class="p">),</span> <span class="mi">8</span><span class="p">)]</span>
+<span class="p">)</span>  <span class="c1"># Return phase.</span>
+
+<span class="k">for</span> <span class="n">theta</span> <span class="ow">in</span> <span class="n">pressure_check_angles</span><span class="p">:</span>
+    <span class="n">costs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pressure_angle_constraint</span><span class="p">(</span><span class="n">cam_var</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">MAX_PRESSURE_ANGLE</span><span class="p">))</span>
+
+<span class="c1"># Smoothness regularization.</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_CTRL</span><span class="p">):</span>
+    <span class="n">costs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">smoothness_cost</span><span class="p">(</span><span class="n">cam_var</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">N_CTRL</span><span class="p">))</span>
+
+<span class="c1"># Initial guess: sample target radii at control point angles.</span>
+<span class="n">ctrl_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_sample</span><span class="p">,</span> <span class="n">N_CTRL</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<span class="n">initial_ctrl</span> <span class="o">=</span> <span class="n">target_radii</span><span class="p">[</span><span class="n">ctrl_indices</span><span class="p">]</span>
+
+<span class="c1"># Create the problem.</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">cam_var</span><span class="p">])</span>
+
+<span class="c1"># Visualize the problem structure structure.</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html">
+        <iframe
+            width="100%"
+            height="500"
+            src="data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KICAgIDxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KICAgIDxzdHlsZT4KICAgICAgICBib2R5IHsgbWFyZ2luOiAwOyBvdmVyZmxvdzogaGlkZGVuOyB9CiAgICAgICAgI2NvbnRhaW5lciB7IHdpZHRoOiAxMDAlOyBoZWlnaHQ6IDEwMHZoOyBwb3NpdGlvbjogcmVsYXRpdmU7IH0KICAgICAgICBjYW52YXMgeyBkaXNwbGF5OiBibG9jazsgd2lkdGg6IDEwMCU7IGhlaWdodDogMTAwJTsgfQogICAgICAgIC5zdGF0dXMgeyBwb3NpdGlvbjogYWJzb2x1dGU7IGJvdHRvbTogNXB4OyByaWdodDogMTBweDsgZm9udC1zaXplOiAxMHB4OyBjb2xvcjogIzY2NjsgZm9udC1mYW1pbHk6IEhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWY7IGJhY2tncm91bmQ6IHJnYmEoMjU1LDI1NSwyNTUsMC44KTsgcGFkZGluZzogMnB4IDVweDsgYm9yZGVyLXJhZGl1czogM3B4OyB9CiAgICA8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgogICAgPGRpdiBpZD0iY29udGFpbmVyIj4KICAgICAgICA8Y2FudmFzPjwvY2FudmFzPgogICAgICAgIDxkaXYgY2xhc3M9InN0YXR1cyI+MTA1IGNvc3RzLCAxIHZhcmlhYmxlczwvZGl2PgogICAgPC9kaXY+CiAgICA8c2NyaXB0IHNyYz0iaHR0cHM6Ly9kM2pzLm9yZy9kMy52Ny5taW4uanMiPjwvc2NyaXB0PgogICAgPHNjcmlwdD4KICAgIChmdW5jdGlvbigpIHsKICAgICAgICBjb25zdCBkYXRhID0geyJub2RlcyI6IFt7ImlkIjogInZhcl8wIiwgImxhYmVsIjogIkNhbUNvbnRyb2xQb2ludHNWYXIoMCkiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJDYW1Db250cm9sUG9pbnRzVmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogImNvc3RfMCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMiIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMyIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNiIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNyIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTAiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzExIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMiIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTMiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzE0IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xNSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTYiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzE3IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xOCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTkiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzIwIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8yMSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMjIiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzIzIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8yNCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMjUiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzI2IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8yNyIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMjgiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzI5IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8zMCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMzEiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzMyIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8zMyIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMzQiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzM1IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8zNiIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMzciLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzM4IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8zOSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNDAiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzQxIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF80MiIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNDMiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzQ0IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF80NSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNDYiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzQ3IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF80OCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNDkiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzUwIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF81MSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNTIiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzUzIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF81NCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNTUiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzU2IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF81NyIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNTgiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzU5IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF82MCIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNjEiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzYyIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF82MyIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNjQiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzY1IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF82NiIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNjciLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzY4IiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF82OSIsICJsYWJlbCI6ICJtb3Rpb25fdHJhY2tpbmdfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNzAiLCAibGFiZWwiOiAibW90aW9uX3RyYWNraW5nX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzcxIiwgImxhYmVsIjogIm1vdGlvbl90cmFja2luZ19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF83MiIsICJsYWJlbCI6ICJtaW5fcmFkaXVzX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzczIiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzc0IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzc1IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzc2IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzc3IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzc4IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzc5IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzgwIiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzgxIiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzgyIiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzgzIiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzg0IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzg1IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzg2IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzg3IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzg4IiwgImxhYmVsIjogInByZXNzdXJlX2FuZ2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0Xzg5IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOTAiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF85MSIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzkyIiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOTMiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF85NCIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0Xzk1IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOTYiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF85NyIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0Xzk4IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOTkiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMDAiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMDEiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMDIiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMDMiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMDQiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In1dLCAibGlua3MiOiBbeyJzb3VyY2UiOiAiY29zdF8wIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEiLCAidGFyZ2V0IjogInZhcl8wIn0sIHsic291cmNlIjogImNvc3RfMiIsICJ0YXJnZXQiOiAidmFyXzAifSwgeyJzb3VyY2UiOiAiY29zdF8zIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQiLCAidGFyZ2V0IjogInZhcl8wIn0sIHsic291cmNlIjogImNvc3RfNSIsICJ0YXJnZXQiOiAidmFyXzAifSwgeyJzb3VyY2UiOiAiY29zdF82IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzciLCAidGFyZ2V0IjogInZhcl8wIn0sIHsic291cmNlIjogImNvc3RfOCIsICJ0YXJnZXQiOiAidmFyXzAifSwgeyJzb3VyY2UiOiAiY29zdF85IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzExIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzIwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzIxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzIyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzIzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzMwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzMxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzMyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzMzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQ0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQ1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQ2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQ3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQ4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzQ5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzUwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzUxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzUyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzUzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzYwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzYxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzYyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzYzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzY0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzY1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzY2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzY3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzY4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzY5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzcwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzcxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzcyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzczIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzc0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzc1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzc2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzc3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzc4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzc5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzgwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzgxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzgyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzgzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzg0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzg1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzg2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzg3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzg4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzg5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzkwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzkxIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzkyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzkzIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzk0IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzk1IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzk2IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzk3IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzk4IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0Xzk5IiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEwMCIsICJ0YXJnZXQiOiAidmFyXzAifSwgeyJzb3VyY2UiOiAiY29zdF8xMDEiLCAidGFyZ2V0IjogInZhcl8wIn0sIHsic291cmNlIjogImNvc3RfMTAyIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEwMyIsICJ0YXJnZXQiOiAidmFyXzAifSwgeyJzb3VyY2UiOiAiY29zdF8xMDQiLCAidGFyZ2V0IjogInZhcl8wIn1dLCAidHJ1bmNhdGVkIjogZmFsc2V9OwogICAgICAgIGNvbnN0IGNvbnRhaW5lciA9IGQzLnNlbGVjdCgiI2NvbnRhaW5lciIpOwogICAgICAgIGNvbnN0IGNhbnZhcyA9IGNvbnRhaW5lci5zZWxlY3QoImNhbnZhcyIpLm5vZGUoKTsKICAgICAgICBjb25zdCBjdHggPSBjYW52YXMuZ2V0Q29udGV4dCgiMmQiKTsKCiAgICAvLyBHZXQgYWN0dWFsIGNvbnRhaW5lciBkaW1lbnNpb25zLgogICAgY29uc3QgcmVjdCA9IGNvbnRhaW5lci5ub2RlKCkuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCk7CiAgICBjb25zdCB3aWR0aCA9IHJlY3Qud2lkdGg7CiAgICBjb25zdCBoZWlnaHQgPSByZWN0LmhlaWdodDsKCiAgICAvLyBOb2RlIHNpemluZy4KICAgIGNvbnN0IHZhclJ4ID0gNDUsIHZhclJ5ID0gMTQ7ICAvLyBFbGxpcHNlIHJhZGlpIGZvciB2YXJpYWJsZXMuCiAgICBjb25zdCBjb3N0VyA9IDkwLCBjb3N0SCA9IDIyOyAgIC8vIFJlY3Qgc2l6ZSBmb3IgY29zdHMuCgogICAgLy8gU2V0IHVwIGhpZ2gtRFBJIGNhbnZhcy4KICAgIGNvbnN0IGRwciA9IHdpbmRvdy5kZXZpY2VQaXhlbFJhdGlvIHx8IDE7CiAgICBjYW52YXMud2lkdGggPSB3aWR0aCAqIGRwcjsKICAgIGNhbnZhcy5oZWlnaHQgPSBoZWlnaHQgKiBkcHI7CiAgICBjdHguc2NhbGUoZHByLCBkcHIpOwoKICAgIC8vIFRyYWNrIHRyYW5zZm9ybSBmb3Igem9vbS9wYW4uCiAgICBsZXQgdHJhbnNmb3JtID0gZDMuem9vbUlkZW50aXR5OwoKICAgIC8vIENyZWF0ZSBmb3JjZSBzaW11bGF0aW9uLgogICAgY29uc3Qgc2ltdWxhdGlvbiA9IGQzLmZvcmNlU2ltdWxhdGlvbihkYXRhLm5vZGVzKQogICAgICAgIC5mb3JjZSgibGluayIsIGQzLmZvcmNlTGluayhkYXRhLmxpbmtzKS5pZChkID0+IGQuaWQpLmRpc3RhbmNlKDYwKSkKICAgICAgICAuZm9yY2UoImNoYXJnZSIsIGQzLmZvcmNlTWFueUJvZHkoKS5zdHJlbmd0aCgtMTUwKS5kaXN0YW5jZU1heCgyNTApKQogICAgICAgIC5mb3JjZSgiY2VudGVyIiwgZDMuZm9yY2VDZW50ZXIod2lkdGggLyAyLCBoZWlnaHQgLyAyKSkKICAgICAgICAuZm9yY2UoImNvbGxpc2lvbiIsIGQzLmZvcmNlQ29sbGlkZSgpLnJhZGl1cygzNSkpOwoKICAgIC8vIERyYWcgc3RhdGUuCiAgICBsZXQgZHJhZ05vZGUgPSBudWxsOwoKICAgIC8vIEZpbmQgbm9kZSBhdCBwb3NpdGlvbi4KICAgIGZ1bmN0aW9uIG5vZGVBdCh4LCB5KSB7CiAgICAgICAgY29uc3QgdHggPSAoeCAtIHRyYW5zZm9ybS54KSAvIHRyYW5zZm9ybS5rOwogICAgICAgIGNvbnN0IHR5ID0gKHkgLSB0cmFuc2Zvcm0ueSkgLyB0cmFuc2Zvcm0uazsKICAgICAgICBmb3IgKGxldCBpID0gZGF0YS5ub2Rlcy5sZW5ndGggLSAxOyBpID49IDA7IGktLSkgewogICAgICAgICAgICBjb25zdCBkID0gZGF0YS5ub2Rlc1tpXTsKICAgICAgICAgICAgY29uc3QgZHggPSB0eCAtIGQueDsKICAgICAgICAgICAgY29uc3QgZHkgPSB0eSAtIGQueTsKICAgICAgICAgICAgaWYgKGQudHlwZSA9PT0gInZhcmlhYmxlIikgewogICAgICAgICAgICAgICAgaWYgKChkeCpkeCkvKHZhclJ4KnZhclJ4KSArIChkeSpkeSkvKHZhclJ5KnZhclJ5KSA8IDEpIHJldHVybiBkOwogICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgaWYgKE1hdGguYWJzKGR4KSA8IGNvc3RXLzIgJiYgTWF0aC5hYnMoZHkpIDwgY29zdEgvMikgcmV0dXJuIGQ7CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICAgICAgcmV0dXJuIG51bGw7CiAgICB9CgogICAgZnVuY3Rpb24gZHJhdygpIHsKICAgICAgICBjdHguc2F2ZSgpOwogICAgICAgIGN0eC5jbGVhclJlY3QoMCwgMCwgd2lkdGgsIGhlaWdodCk7CiAgICAgICAgY3R4LnRyYW5zbGF0ZSh0cmFuc2Zvcm0ueCwgdHJhbnNmb3JtLnkpOwogICAgICAgIGN0eC5zY2FsZSh0cmFuc2Zvcm0uaywgdHJhbnNmb3JtLmspOwoKICAgICAgICAvLyBEcmF3IGxpbmtzLgogICAgICAgIGN0eC5zdHJva2VTdHlsZSA9ICIjOTk5IjsKICAgICAgICBjdHguZ2xvYmFsQWxwaGEgPSAwLjY7CiAgICAgICAgY3R4LmxpbmVXaWR0aCA9IDEuNSAvIHRyYW5zZm9ybS5rOwogICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICBkYXRhLmxpbmtzLmZvckVhY2goZCA9PiB7CiAgICAgICAgICAgIGN0eC5tb3ZlVG8oZC5zb3VyY2UueCwgZC5zb3VyY2UueSk7CiAgICAgICAgICAgIGN0eC5saW5lVG8oZC50YXJnZXQueCwgZC50YXJnZXQueSk7CiAgICAgICAgfSk7CiAgICAgICAgY3R4LnN0cm9rZSgpOwogICAgICAgIGN0eC5nbG9iYWxBbHBoYSA9IDEuMDsKCiAgICAgICAgLy8gRHJhdyBub2Rlcy4KICAgICAgICBkYXRhLm5vZGVzLmZvckVhY2goZCA9PiB7CiAgICAgICAgICAgIGN0eC5zYXZlKCk7CiAgICAgICAgICAgIGN0eC50cmFuc2xhdGUoZC54LCBkLnkpOwoKICAgICAgICAgICAgaWYgKGQudHlwZSA9PT0gInZhcmlhYmxlIikgewogICAgICAgICAgICAgICAgLy8gRWxsaXBzZSBmb3IgdmFyaWFibGVzLgogICAgICAgICAgICAgICAgY3R4LmJlZ2luUGF0aCgpOwogICAgICAgICAgICAgICAgY3R4LmVsbGlwc2UoMCwgMCwgdmFyUngsIHZhclJ5LCAwLCAwLCAyICogTWF0aC5QSSk7CiAgICAgICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gZC5maWxsOwogICAgICAgICAgICAgICAgY3R4LmZpbGwoKTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2VTdHlsZSA9IGQuc3Ryb2tlOwogICAgICAgICAgICAgICAgY3R4LmxpbmVXaWR0aCA9IDEuNSAvIHRyYW5zZm9ybS5rOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZSgpOwogICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgLy8gUm91bmRlZCByZWN0IGZvciBjb3N0cy4KICAgICAgICAgICAgICAgIGNvbnN0IHcgPSBjb3N0VywgaCA9IGNvc3RILCByID0gNDsKICAgICAgICAgICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICAgICAgICAgIGN0eC5tb3ZlVG8oLXcvMiArIHIsIC1oLzIpOwogICAgICAgICAgICAgICAgY3R4LmxpbmVUbyh3LzIgLSByLCAtaC8yKTsKICAgICAgICAgICAgICAgIGN0eC5xdWFkcmF0aWNDdXJ2ZVRvKHcvMiwgLWgvMiwgdy8yLCAtaC8yICsgcik7CiAgICAgICAgICAgICAgICBjdHgubGluZVRvKHcvMiwgaC8yIC0gcik7CiAgICAgICAgICAgICAgICBjdHgucXVhZHJhdGljQ3VydmVUbyh3LzIsIGgvMiwgdy8yIC0gciwgaC8yKTsKICAgICAgICAgICAgICAgIGN0eC5saW5lVG8oLXcvMiArIHIsIGgvMik7CiAgICAgICAgICAgICAgICBjdHgucXVhZHJhdGljQ3VydmVUbygtdy8yLCBoLzIsIC13LzIsIGgvMiAtIHIpOwogICAgICAgICAgICAgICAgY3R4LmxpbmVUbygtdy8yLCAtaC8yICsgcik7CiAgICAgICAgICAgICAgICBjdHgucXVhZHJhdGljQ3VydmVUbygtdy8yLCAtaC8yLCAtdy8yICsgciwgLWgvMik7CiAgICAgICAgICAgICAgICBjdHguY2xvc2VQYXRoKCk7CiAgICAgICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gZC5maWxsOwogICAgICAgICAgICAgICAgY3R4LmZpbGwoKTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2VTdHlsZSA9IGQuc3Ryb2tlOwogICAgICAgICAgICAgICAgY3R4LmxpbmVXaWR0aCA9IDEuNSAvIHRyYW5zZm9ybS5rOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZSgpOwogICAgICAgICAgICB9CgogICAgICAgICAgICAvLyBEcmF3IGxhYmVsLgogICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gIiMwMDAiOwogICAgICAgICAgICBjdHguZm9udCA9ICI5cHggSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI7CiAgICAgICAgICAgIGN0eC50ZXh0QWxpZ24gPSAiY2VudGVyIjsKICAgICAgICAgICAgY3R4LnRleHRCYXNlbGluZSA9ICJtaWRkbGUiOwogICAgICAgICAgICBjdHguZmlsbFRleHQoZC5sYWJlbCwgMCwgMCk7CgogICAgICAgICAgICBjdHgucmVzdG9yZSgpOwogICAgICAgIH0pOwoKICAgICAgICAvLyBEcmF3IGxlZ2VuZC4KICAgICAgICBjdHgucmVzdG9yZSgpOwogICAgICAgIGRyYXdMZWdlbmQoKTsKICAgIH0KCiAgICBmdW5jdGlvbiBkcmF3TGVnZW5kKCkgewogICAgICAgIC8vIEJ1aWxkIGxlZ2VuZCBkeW5hbWljYWxseSBmcm9tIGFjdHVhbCBub2Rlcy4KICAgICAgICBjb25zdCBsZWdlbmREYXRhID0gW107CgogICAgICAgIC8vIENvbGxlY3QgdW5pcXVlIGNvc3Qga2luZHMuCiAgICAgICAgY29uc3QgY29zdEtpbmRMYWJlbHMgPSB7CiAgICAgICAgICAgICJsMl9zcXVhcmVkIjogIkNvc3QgKEwyKSIsCiAgICAgICAgICAgICJjb25zdHJhaW50X2VxX3plcm8iOiAiRXF1YWxpdHkiLAogICAgICAgICAgICAiY29uc3RyYWludF9sZXFfemVybyI6ICJJbmVxdWFsaXR5ICjiiaQpIiwKICAgICAgICAgICAgImNvbnN0cmFpbnRfZ2VxX3plcm8iOiAiSW5lcXVhbGl0eSAo4omlKSIKICAgICAgICB9OwogICAgICAgIGNvbnN0IHNlZW5Db3N0S2luZHMgPSBuZXcgU2V0KCk7CiAgICAgICAgZGF0YS5ub2Rlcy5maWx0ZXIobiA9PiBuLnR5cGUgPT09ICJjb3N0IikuZm9yRWFjaChuID0+IHNlZW5Db3N0S2luZHMuYWRkKG4ua2luZCkpOwogICAgICAgIGZvciAoY29uc3Qga2luZCBvZiBbImwyX3NxdWFyZWQiLCAiY29uc3RyYWludF9lcV96ZXJvIiwgImNvbnN0cmFpbnRfbGVxX3plcm8iLCAiY29uc3RyYWludF9nZXFfemVybyJdKSB7CiAgICAgICAgICAgIGlmIChzZWVuQ29zdEtpbmRzLmhhcyhraW5kKSkgewogICAgICAgICAgICAgICAgY29uc3Qgbm9kZSA9IGRhdGEubm9kZXMuZmluZChuID0+IG4udHlwZSA9PT0gImNvc3QiICYmIG4ua2luZCA9PT0ga2luZCk7CiAgICAgICAgICAgICAgICBsZWdlbmREYXRhLnB1c2goewogICAgICAgICAgICAgICAgICAgIGxhYmVsOiBjb3N0S2luZExhYmVsc1traW5kXSwKICAgICAgICAgICAgICAgICAgICBmaWxsOiBub2RlLmZpbGwsCiAgICAgICAgICAgICAgICAgICAgc3Ryb2tlOiBub2RlLnN0cm9rZSwKICAgICAgICAgICAgICAgICAgICB0eXBlOiAiY29zdCIKICAgICAgICAgICAgICAgIH0pOwogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICAvLyBDb2xsZWN0IHVuaXF1ZSB2YXJpYWJsZSB0eXBlcy4KICAgICAgICBjb25zdCBzZWVuVmFyVHlwZXMgPSBuZXcgTWFwKCk7ICAvLyB2YXJfdHlwZSAtPiB7ZmlsbCwgc3Ryb2tlfQogICAgICAgIGRhdGEubm9kZXMuZmlsdGVyKG4gPT4gbi50eXBlID09PSAidmFyaWFibGUiKS5mb3JFYWNoKG4gPT4gewogICAgICAgICAgICBpZiAoIXNlZW5WYXJUeXBlcy5oYXMobi52YXJfdHlwZSkpIHsKICAgICAgICAgICAgICAgIHNlZW5WYXJUeXBlcy5zZXQobi52YXJfdHlwZSwgeyBmaWxsOiBuLmZpbGwsIHN0cm9rZTogbi5zdHJva2UgfSk7CiAgICAgICAgICAgIH0KICAgICAgICB9KTsKICAgICAgICBmb3IgKGNvbnN0IFt2YXJUeXBlLCBjb2xvcnNdIG9mIHNlZW5WYXJUeXBlcykgewogICAgICAgICAgICBsZWdlbmREYXRhLnB1c2goewogICAgICAgICAgICAgICAgbGFiZWw6IHZhclR5cGUsCiAgICAgICAgICAgICAgICBmaWxsOiBjb2xvcnMuZmlsbCwKICAgICAgICAgICAgICAgIHN0cm9rZTogY29sb3JzLnN0cm9rZSwKICAgICAgICAgICAgICAgIHR5cGU6ICJ2YXJpYWJsZSIKICAgICAgICAgICAgfSk7CiAgICAgICAgfQoKICAgICAgICBjdHguc2F2ZSgpOwogICAgICAgIGN0eC50cmFuc2xhdGUoMTAsIDEwKTsKCiAgICAgICAgbGVnZW5kRGF0YS5mb3JFYWNoKChkLCBpKSA9PiB7CiAgICAgICAgICAgIGNvbnN0IHkgPSBpICogMTg7CiAgICAgICAgICAgIGlmIChkLnR5cGUgPT09ICJ2YXJpYWJsZSIpIHsKICAgICAgICAgICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICAgICAgICAgIGN0eC5lbGxpcHNlKDEyLCB5ICsgNiwgMTIsIDYsIDAsIDAsIDIgKiBNYXRoLlBJKTsKICAgICAgICAgICAgICAgIGN0eC5maWxsU3R5bGUgPSBkLmZpbGw7CiAgICAgICAgICAgICAgICBjdHguZmlsbCgpOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZVN0eWxlID0gZC5zdHJva2U7CiAgICAgICAgICAgICAgICBjdHgubGluZVdpZHRoID0gMTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2UoKTsKICAgICAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICAgICAgICAgIGN0eC5yb3VuZFJlY3QoMCwgeSwgMjQsIDEyLCAyKTsKICAgICAgICAgICAgICAgIGN0eC5maWxsU3R5bGUgPSBkLmZpbGw7CiAgICAgICAgICAgICAgICBjdHguZmlsbCgpOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZVN0eWxlID0gZC5zdHJva2U7CiAgICAgICAgICAgICAgICBjdHgubGluZVdpZHRoID0gMTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2UoKTsKICAgICAgICAgICAgfQogICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gIiMwMDAiOwogICAgICAgICAgICBjdHguZm9udCA9ICI5cHggSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI7CiAgICAgICAgICAgIGN0eC50ZXh0QWxpZ24gPSAibGVmdCI7CiAgICAgICAgICAgIGN0eC50ZXh0QmFzZWxpbmUgPSAibWlkZGxlIjsKICAgICAgICAgICAgY3R4LmZpbGxUZXh0KGQubGFiZWwsIDMwLCB5ICsgNik7CiAgICAgICAgfSk7CgogICAgICAgIGN0eC5yZXN0b3JlKCk7CiAgICB9CgogICAgc2ltdWxhdGlvbi5vbigidGljayIsIGRyYXcpOwoKICAgIC8vIFpvb20gYmVoYXZpb3Igd2l0aCBmaWx0ZXIgdG8gYWxsb3cgbm9kZSBkcmFnZ2luZy4KICAgIGNvbnN0IHpvb20gPSBkMy56b29tKCkKICAgICAgICAuc2NhbGVFeHRlbnQoWzAuMSwgNF0pCiAgICAgICAgLmZpbHRlcigoZXZlbnQpID0+IHsKICAgICAgICAgICAgLy8gQmxvY2sgem9vbSBpZiBjbGlja2luZyBvbiBhIG5vZGUgKGFsbG93IG5vZGUgZHJhZyBpbnN0ZWFkKS4KICAgICAgICAgICAgaWYgKGV2ZW50LnR5cGUgPT09ICJtb3VzZWRvd24iKSB7CiAgICAgICAgICAgICAgICBjb25zdCBbeCwgeV0gPSBkMy5wb2ludGVyKGV2ZW50KTsKICAgICAgICAgICAgICAgIGlmIChub2RlQXQoeCwgeSkpIHJldHVybiBmYWxzZTsKICAgICAgICAgICAgfQogICAgICAgICAgICByZXR1cm4gdHJ1ZTsKICAgICAgICB9KQogICAgICAgIC5vbigiem9vbSIsIChldmVudCkgPT4gewogICAgICAgICAgICB0cmFuc2Zvcm0gPSBldmVudC50cmFuc2Zvcm07CiAgICAgICAgICAgIGRyYXcoKTsKICAgICAgICB9KTsKCiAgICBkMy5zZWxlY3QoY2FudmFzKQogICAgICAgIC5jYWxsKHpvb20pCiAgICAgICAgLm9uKCJtb3VzZWRvd24uZHJhZyIsIChldmVudCkgPT4gewogICAgICAgICAgICBjb25zdCBbeCwgeV0gPSBkMy5wb2ludGVyKGV2ZW50KTsKICAgICAgICAgICAgY29uc3Qgbm9kZSA9IG5vZGVBdCh4LCB5KTsKICAgICAgICAgICAgaWYgKG5vZGUpIHsKICAgICAgICAgICAgICAgIGRyYWdOb2RlID0gbm9kZTsKICAgICAgICAgICAgICAgIHNpbXVsYXRpb24uYWxwaGFUYXJnZXQoMC4zKS5yZXN0YXJ0KCk7CiAgICAgICAgICAgICAgICBkcmFnTm9kZS5meCA9IGRyYWdOb2RlLng7CiAgICAgICAgICAgICAgICBkcmFnTm9kZS5meSA9IGRyYWdOb2RlLnk7CiAgICAgICAgICAgIH0KICAgICAgICB9KQogICAgICAgIC5vbigibW91c2Vtb3ZlLmRyYWciLCAoZXZlbnQpID0+IHsKICAgICAgICAgICAgaWYgKGRyYWdOb2RlKSB7CiAgICAgICAgICAgICAgICBjb25zdCBbeCwgeV0gPSBkMy5wb2ludGVyKGV2ZW50KTsKICAgICAgICAgICAgICAgIGRyYWdOb2RlLmZ4ID0gdHJhbnNmb3JtLmludmVydFgoeCk7CiAgICAgICAgICAgICAgICBkcmFnTm9kZS5meSA9IHRyYW5zZm9ybS5pbnZlcnRZKHkpOwogICAgICAgICAgICAgICAgZHJhdygpOwogICAgICAgICAgICB9CiAgICAgICAgfSkKICAgICAgICAub24oIm1vdXNldXAuZHJhZyBtb3VzZWxlYXZlLmRyYWciLCAoKSA9PiB7CiAgICAgICAgICAgIGlmIChkcmFnTm9kZSkgewogICAgICAgICAgICAgICAgc2ltdWxhdGlvbi5hbHBoYVRhcmdldCgwKTsKICAgICAgICAgICAgICAgIGRyYWdOb2RlLmZ4ID0gbnVsbDsKICAgICAgICAgICAgICAgIGRyYWdOb2RlLmZ5ID0gbnVsbDsKICAgICAgICAgICAgICAgIGRyYWdOb2RlID0gbnVsbDsKICAgICAgICAgICAgfQogICAgICAgIH0pOwoKICAgICAgICAvLyBJbml0aWFsIGRyYXcuCiAgICAgICAgZHJhdygpOwogICAgfSkoKTsKICAgIDwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4="
+            frameborder="0"
+            allowfullscreen
+            
+        ></iframe>
+        </div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Analyze and solve.</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+<span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+    <span class="n">initial_vals</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">cam_var</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">initial_ctrl</span><span class="p">)]),</span>
+    <span class="n">termination</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">TerminationConfig</span><span class="p">(</span><span class="n">cost_tolerance</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">opt_ctrl</span> <span class="o">=</span> <span class="n">solution</span><span class="p">[</span><span class="n">cam_var</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Optimized </span><span class="si">{</span><span class="n">N_CTRL</span><span class="si">}</span><span class="s2"> control points&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Radius range: [</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">opt_ctrl</span><span class="p">))</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">opt_ctrl</span><span class="p">))</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 105 terms and 1 variables: 88 costs, 0 eq_zero, 17 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 72 costs, 1 variables each: motion_tracking_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 1 constraints (constraint_leq_zero), 1 variables each: augmented_min_radius_constraint
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 16 costs, 1 variables each: smoothness_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 16 constraints (constraint_leq_zero), 1 variables each: augmented_pressure_angle_constraint
+<span class=" -Color -Color-Bold">INFO    </span> | Augmented Lagrangian: initial snorm=0.0000e+00, csupn=0.0000e+00, max_rho=9.2798e+02, constraint_dim=32
+<span class=" -Color -Color-Bold">INFO    </span> |  step #0: cost=92.7978 lambd=0.0005 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - motion_tracking_cost(72): 92.78764 (avg 1.28872)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_min_radius_constraint(1): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(16): 0.01011 (avg 0.00063)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_pressure_angle_constraint(16): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.03e+02 cost_prev=92.7977 cost_new=0.0211
+<span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=0.0211 lambd=0.0003 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - motion_tracking_cost(72): 0.00084 (avg 0.00001)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_min_radius_constraint(1): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(16): 0.02025 (avg 0.00127)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_pressure_angle_constraint(16): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=2.44e-04 cost_prev=0.0211 cost_new=0.0211
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=0.0000e+00, csupn=0.0000e+00, max_rho=9.2798e+02
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #2: cost=0.0211 criteria=[1 0 1], term_deltas=4.4e-07,1.4e-04,1.7e-07
+Optimized 16 control points
+Radius range: [0.999, 1.301]
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Evaluate optimized cam.</span>
+<span class="n">eval_thetas</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">360</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">achieved_radii</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">th</span><span class="p">:</span> <span class="n">eval_cam_radius</span><span class="p">(</span><span class="n">opt_ctrl</span><span class="p">,</span> <span class="n">th</span><span class="p">))(</span><span class="n">eval_thetas</span><span class="p">)</span>
+<span class="n">target_radii_fine</span> <span class="o">=</span> <span class="n">R_BASE</span> <span class="o">+</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">th</span><span class="p">:</span> <span class="n">target_displacement</span><span class="p">(</span><span class="n">th</span><span class="p">,</span> <span class="n">LIFT</span><span class="p">))(</span>
+    <span class="n">eval_thetas</span>
+<span class="p">)</span>
+
+<span class="c1"># Compute pressure angles.</span>
+<span class="n">pressure_angles</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">th</span><span class="p">:</span> <span class="n">compute_pressure_angle</span><span class="p">(</span><span class="n">opt_ctrl</span><span class="p">,</span> <span class="n">th</span><span class="p">))(</span><span class="n">eval_thetas</span><span class="p">)</span>
+
+<span class="c1"># Compute errors.</span>
+<span class="n">tracking_error</span> <span class="o">=</span> <span class="n">achieved_radii</span> <span class="o">-</span> <span class="n">target_radii_fine</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Motion tracking:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  RMS error: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">tracking_error</span><span class="o">**</span><span class="mi">2</span><span class="p">)))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Max error: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">tracking_error</span><span class="p">)))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Pressure angle:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Max: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">pressure_angles</span><span class="p">)))</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">°&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Limit: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">MAX_PRESSURE_ANGLE</span><span class="p">))</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">°&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Motion tracking:
+  RMS error: 0.0003
+  Max error: 0.0009
+
+Pressure angle:
+  Max: 18.1°
+  Limit: 30.0°
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="visualization">
+<h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading">¶</a></h2>
+<p>View the optimized cam profile and its motion characteristics:</p>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">plotly.graph_objects</span> <span class="k">as</span> <span class="nn">go</span>
+<span class="kn">from</span> <span class="nn">plotly.subplots</span> <span class="kn">import</span> <span class="n">make_subplots</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">HTML</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">make_subplots</span><span class="p">(</span>
+    <span class="n">rows</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">cols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">specs</span><span class="o">=</span><span class="p">[[{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;xy&quot;</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;xy&quot;</span><span class="p">}]],</span>
+    <span class="n">subplot_titles</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;Cam Profile&quot;</span><span class="p">,</span> <span class="s2">&quot;Follower Displacement&quot;</span><span class="p">),</span>
+    <span class="n">horizontal_spacing</span><span class="o">=</span><span class="mf">0.12</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Cam profile (polar to cartesian)</span>
+<span class="n">cam_xy</span> <span class="o">=</span> <span class="n">cam_profile_xy</span><span class="p">(</span><span class="n">opt_ctrl</span><span class="p">,</span> <span class="mi">360</span><span class="p">)</span>
+<span class="n">target_xy</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">target_radii_fine</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">eval_thetas</span><span class="p">),</span>
+        <span class="n">target_radii_fine</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">eval_thetas</span><span class="p">),</span>
+    <span class="p">],</span>
+    <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Target profile.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">target_xy</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">target_xy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">target_xy</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">target_xy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]),</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;crimson&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">dash</span><span class="o">=</span><span class="s2">&quot;dash&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Target&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Optimized cam.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cam_xy</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">cam_xy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cam_xy</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cam_xy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]),</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">3</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Optimized&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Base circle.</span>
+<span class="n">base_theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">R_BASE</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">base_theta</span><span class="p">),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">R_BASE</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">base_theta</span><span class="p">),</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dash</span><span class="o">=</span><span class="s2">&quot;dot&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Base circle&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Control points.</span>
+<span class="n">ctrl_thetas</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">N_CTRL</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">ctrl_x</span> <span class="o">=</span> <span class="n">opt_ctrl</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">ctrl_thetas</span><span class="p">)</span>
+<span class="n">ctrl_y</span> <span class="o">=</span> <span class="n">opt_ctrl</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">ctrl_thetas</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">ctrl_x</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">ctrl_y</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#e67e22&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Control pts&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Follower displacement.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">eval_thetas</span><span class="p">),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">target_radii_fine</span> <span class="o">-</span> <span class="n">R_BASE</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;crimson&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">dash</span><span class="o">=</span><span class="s2">&quot;dash&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Target&quot;</span><span class="p">,</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">eval_thetas</span><span class="p">),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">achieved_radii</span> <span class="o">-</span> <span class="n">R_BASE</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Achieved&quot;</span><span class="p">,</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Mark motion phases with alternating colors.</span>
+<span class="n">phase_colors</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;rgba(200,200,200,0.2)&quot;</span><span class="p">,</span> <span class="s2">&quot;rgba(100,149,237,0.2)&quot;</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">90</span><span class="p">),</span> <span class="p">(</span><span class="mi">90</span><span class="p">,</span> <span class="mi">180</span><span class="p">),</span> <span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="mi">270</span><span class="p">),</span> <span class="p">(</span><span class="mi">270</span><span class="p">,</span> <span class="mi">360</span><span class="p">)]):</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_vrect</span><span class="p">(</span>
+        <span class="n">x0</span><span class="o">=</span><span class="n">start</span><span class="p">,</span>
+        <span class="n">x1</span><span class="o">=</span><span class="n">end</span><span class="p">,</span>
+        <span class="n">fillcolor</span><span class="o">=</span><span class="n">phase_colors</span><span class="p">[</span><span class="n">i</span> <span class="o">%</span> <span class="mi">2</span><span class="p">],</span>
+        <span class="n">line_width</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Cam angle (°)&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">360</span><span class="p">],</span> <span class="n">dtick</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Displacement&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+    <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">),</span>
+    <span class="n">legend</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">0.98</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.1.0.min.js" integrity="sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=" crossorigin="anonymous"></script>                <div id="2c58cc01-2a02-4fed-81d0-89d9d9488d3a" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("2c58cc01-2a02-4fed-81d0-89d9d9488d3a")) {                    Plotly.newPlot(                        "2c58cc01-2a02-4fed-81d0-89d9d9488d3a",                        [{"line":{"color":"crimson","dash":"dash","width":2},"mode":"lines","name":"Target","x":{"dtype":"f4","bdata":"AACAPwX2fz8U2H8\u002fL6Z\u002fP1xgfz+eBn8\u002f\u002fZh+P4EXfj81gn0\u002fJdl8P1wcfD\u002frS3s\u002f4md6P1FweT9NZXg\u002f6kZ3Pz8Vdj9j0HQ\u002fcHhzP4ENcj+yj3A\u002fIP9uP+xbbT80pms\u002fHd5pP8kDaD9dF2Y\u002fARlkP9oIYj8T518\u002f17NdP1FvWz+uGVk\u002fHbNWP847VD\u002fys1E\u002fvBtPP2BzTD8Su0k\u002fCfNGP3wbRD+lNEE\u002fvD4+P\u002f45Oz+mJjg\u002f8gQ1PyDVMT9xly4\u002fJEwrP3vzJz+6jSQ\u002fIxshP\u002fybHT+MEBo\u002fF3kWP+bVEj9DJw8\u002fdW0LP8ioBz+H2QM\u002f\u002fP\u002f\u002fPvY4+D6SXvA+b3HoPity4D5oYdg+xD\u002fQPuQNyD5tzL8+\u002fnu3PkAdrz7asKY+dTeePrmxlT5VII0+64OEPli6dz6JWWY+w+ZUPmNjQz7H0DE+VTAgPl2DDj6Qlvk98BLWPZ5+sj1h3I49H15WPabyDj0N+I48TO8utNb4jrzI8w69V2JWvdzijr0ojrK94DLWvV3R+b0+tQ6+yH8gviZJMr6AEkS+EN1VvkCqZ76fe3m+aqmFvsiYjr7VjJe+dYagvo6Gqb78jbK+nZ27vjW2xL6J2M2+PgXXvuw84L78f+m+1c7yvrgp\u002fL5XyAK\u002f34EHv1RBDL+KBhG\u002fRNEVvyKhGr\u002fAdR+\u002fj04kv\u002f0qKb9TCi6\u002fz+syv5fON7+ysTy\u002fJZRBv850Rr+NUku\u002fHCxQvzgAVb+MzVm\u002fqpJevy1OY7+X\u002fme\u002fa6Jsvyo4cb9LvnW\u002fSzN6v6GVfr\u002focYG\u002fLo6Dv+eehb9io4e\u002f7pqJv+OEi7+iYI2\u002flC2PvynrkL\u002ffmJK\u002fPjaUv9fClb9LPpe\u002fRaiYv3wAmr+4Rpu\u002fy3qcv5acnb8HrJ6\u002fG6mfv9mToL9ZbKG\u002fvDKivzLnor\u002f3iaO\u002fTxukv4ybpL8IC6W\u002fJmqlv1G5pb\u002f9+KW\u002foimmv75Lpr\u002fTX6a\u002fZmamv+lfpr9zTKa\u002fBSymv6H+pb9MxKW\u002fCn2lv+Aopb\u002fVx6S\u002f8Vmkvzvfo7++V6O\u002fhMOiv5oior8KdaG\u002f5LqgvzT0n78MIZ+\u002fekGev5JVnb9mXZy\u002fBlmbv4tImr8HLJm\u002fkQOYv0LPlr8uj5W\u002fckOUvyXskr9kiZG\u002fSRuQv\u002fKhjr98HY2\u002fBI6Lv6vzib+OToi\u002f0p6Gv5XkhL\u002f9H4O\u002fK1GBv4Pwfr\u002fSKnu\u002fiFF3v\u002flkc79uZW+\u002fNVNrv6YuZ78M+GK\u002fw69evxlWWr9o61W\u002fDHBRv1zkTL+wSEi\u002faJ1Dv9XiPr9oGTq\u002feUE1v2ZbML+UZyu\u002fW2YmvzFYIb9yPRy\u002fgxYXv83jEb+tpQy\u002fn1wHvwMJAr+FVvm+f4fuvvSl476nsti+da7Nvjmawr68dre+BUWsvt4Fob4pupW+x2KKvg4Bfr7mKGe+uD5Qvk1EOb5vOyK+wSULvscK6L3zt7m9o1aLvUXUOb3a2rm8to8qNWzduTzP1Dk9TVWLPU2yuT0S\u002fOc9NBYLPkkeIj7WEjk+sO9PPvGwZj5aUn0+weeJPgISlT5vJaA+uh+rPnj+tT5Pv8A+p1\u002fLPibd1T5pNeA+E2bqPuts9D6SR\u002f4++vkDPwW4CD\u002f0XA0\u002f5ucRP\u002fZXFj9prBo\u002fkeQeP9X\u002fIj+4\u002fSY\u002fwN0qP52fLj8TQzI\u002fAsg1P1QuOT8Zdjw\u002fc58\u002fP5+qQj\u002f3l0U\u002f12dIP8EaSz9LsU0\u002fGixQP+uLUj990VQ\u002fqf1WP1cRWT95DVs\u002fAfNcP\u002fDCXj9MfmA\u002fIiZiP3y7Yz9hP2U\u002f17JmP+AWaD97bGk\u002fmrRqPyLwaz\u002fsH20\u002fxkRuP3Jfbz+XcHA\u002fznhxP5x4cj9zcHM\u002frmB0P41JdT9AK3Y\u002f2AV3P1bZdz+ipXg\u002fhGp5P7cnej\u002fa3Ho\u002feYl7PwktfD\u002fqxnw\u002fbFZ9P8nafT8zU34\u002fx75+P5Ycfz+la38\u002f9qp\u002fP4DZfz8z9n8\u002fAACAPw=="},"y":{"dtype":"f4","bdata":"AAAAAFr4jjzH8g49PF5WPXzcjj23frI9BhPWPaSW+T1mgw4+XTAgPtbQMT5wY0M+z+ZUPpNZZj5hunc+74OEPlggjT6\u002fsZU+ezeePt+wpj5FHa8+Any3PnDMvz7rDcg+yj\u002fQPm1h2D4wcuA+c3HoPpVe8D75OPg+AQAAP4rZAz\u002fLqAc\u002feG0LP0UnDz\u002fp1RI\u002fGXkWP40QGj\u002f+mx0\u002fJRshP7yNJD998yc\u002fJkwrP3OXLj8i1TE\u002f9AQ1P6gmOD8AOjs\u002fvj4+P6c0QT9+G0Q\u002fC\u002fNGPxS7ST9hc0w\u002fvhtPP\u002fSzUT\u002fPO1Q\u002fHrNWP68ZWT9Sb1s\u002f2bNdPxTnXz\u002fbCGI\u002fAhlkP18XZj\u002fKA2g\u002fH95pPzamaz\u002fsW20\u002fIf9uP7OPcD+CDXI\u002fcXhzP2TQdD8\u002fFXY\u002f60Z3P01leD9ScHk\u002f4md6P+xLez9dHHw\u002fJdl8PzaCfT+BF34\u002f\u002fZh+P54Gfz9cYH8\u002fL6Z\u002fPxTYfz8F9n8\u002fAACAPzP2fz+A2X8\u002f9ap\u002fP6Rrfz+UHH8\u002fxb5+PzJTfj\u002fK2n0\u002falZ9P+jGfD8GLXw\u002fd4l7P9fcej+0J3o\u002fgGp5P5+leD9V2Xc\u002f1QV3Pzwrdj+KSXU\u002frGB0P3Fwcz+aeHI\u002fynhxP5RwcD9vX28\u002fxkRuP+gfbT8c8Gs\u002flbRqP3lsaT\u002feFmg\u002f0bJmP1s\u002fZT92u2M\u002fHyZiP0d+YD\u002fpwl4\u002f+vJcP3INWz9UEVk\u002fpP1WP3fRVD\u002fii1I\u002fFSxQP0axTT+5Gks\u002fzWdIP+uXRT+ZqkI\u002fbJ8\u002fPw52PD9KLjk\u002f9cc1PwxDMj+Qny4\u002ftN0qP679Jj\u002fN\u002fyI\u002fieQeP1ysGj\u002foVxY\u002f1OcRP+tcDT\u002f7twg\u002f6\u002fkDP3NH\u002fj7CbPQ+\u002fmXqPkk14D4I3dU+h1\u002fLPiW\u002fwD5h\u002frU+mR+rPk0loD7gEZU+queJPilSfT6rsGY+au9PPnsSOT4XHiI+AhYLPoT75z2\u002fsbk9lVSLPQfUOT0y27k8SWrjtBLduby11Tm9B1eLvYG4ub1VC+i9CCYLvqE7Ir5+RDm+\u002fj5QviwpZ75nAX6+4GKKvkK6lb4BBqG+J0Wsvuh2t75SmsK+l67Nvsmy2L4VpuO+qofuvp1W+b4TCQK\u002fr1wHv76lDL\u002fZ4xG\u002fjxYXv4E9HL9AWCG\u002fb2Ymv59nK79yWzC\u002fh0E1v3cZOr\u002fo4j6\u002fcp1Dv79ISL9q5Ey\u002fGnBRv3nrVb8mVlq\u002f0a9evxn4Yr+wLme\u002fQlNrv3dlb78FZXO\u002flFF3v94qe7+R8H6\u002fMFGBvwIgg7+a5IS\u002f1Z6Gv5VOiL+v84m\u002fCI6Lv4Adjb\u002f2oY6\u002fTxuQv2mJkb8q7JK\u002fdUOUvzGPlb9Gz5a\u002flQOYvwosmb+OSJq\u002fClmbv2hdnL+VVZ2\u002ffUGevw4hn7839J+\u002f5rqgvw11ob+bIqK\u002fhsOiv8BXo78936O\u002f8lmkv9bHpL\u002fhKKW\u002fC32lv03Epb+i\u002fqW\u002fBSymv3NMpr\u002fpX6a\u002fZmamv9Nfpr++S6a\u002foSmmv\u002f34pb9RuaW\u002fJWqlvwgLpb+Lm6S\u002fThukv\u002faJo78w56K\u002fujKiv1Zsob\u002fWk6C\u002fGKmfvwWsnr+SnJ2\u002fx3qcv7RGm795AJq\u002fQqiYv0Y+l7\u002fTwpW\u002fOTaUv9uYkr8l65C\u002fji2Pv5xgjb\u002fehIu\u002f6ZqJv12jh7\u002fgnoW\u002fJ46Dv+Jxgb+WlX6\u002fOTN6vz6+db8eOHG\u002fYaJsv4z+Z78dTmO\u002fnJJev33NWb8tAFW\u002fESxQv3pSS7+\u002fdEa\u002fFZRBv6axPL+Czje\u002fwesyv0YKLr\u002fvKim\u002fhE4kv6x1H78UoRq\u002fNtEVv38GEb9KQQy\u002fzIEHv0rIAr+bKfy+wM7yvul\u002f6b7GPOC+IgXXvnHYzb4htsS+eZ27vt2Nsr5zhqm+X4agvsKMl76pmI6+S6mFvmp7eb4Tqme+6dxVvkESRL7xSDK+kn8gvg+1Dr4Q0fm9YzLWvbuNsr1\u002f4o69vWFWva3yDr3g9o68AAAAAA=="},"type":"scatter","xaxis":"x","yaxis":"y"},{"line":{"color":"steelblue","width":3},"mode":"lines","name":"Optimized","x":{"dtype":"f4","bdata":"zu5\u002fP67hfz9vwX8\u002fA45\u002fP2BHfz967X4\u002fSIB+P8H\u002ffT\u002fka30\u002fqMR8PwcKfD8IPHs\u002folp6P9tleT+3XXg\u002fNkJ3P2UTdj9J0XQ\u002f6HtzP1kTcj+el3A\u002f0QhvPwFnbT86sms\u002fq+ppP38QaD\u002fWI2Y\u002f+CRkPwUUYj9A8V8\u002f0bxdP\u002fh2Wz\u002fqH1k\u002f07dWP\u002fw+VD+ctVE\u002f3htPPxVyTD9yuEk\u002fK+9GP48WRD\u002fMLkE\u002fMzg+P\u002fsyOz9dHzg\u002fq\u002f00PxbOMT\u002fjkC4\u002fQkYrP2nuJz+XiSQ\u002fBRghP+uZHT+TDxo\u002fM3kWPw7XEj9qKQ8\u002fh3ALP62sBz8i3gM\u002fMQUAP0FE+D54avA+oX3oPll+4D4\u002fbdg+80rQPhsYyD5g1b8+cYO3Pgcjrz7gtKY+uTmePkWylT5FH40+Z4GEPseydz7gT2Y+gNtUPgdXQz7ZwzE+WCMgPtB2Dj47f\u002fk9J\u002f7VPQNtsj1mzo492ElWPf7lDj2v7I48ieMutHHxjrzy7g69M19WvYjjjr1QkrK9eTvWvfje+b2Yvg6+e4sgvrNWMr4oIUS+0etVvuq3Z77bhnm+Iq2FvvKZjr7jipe+B4Ggvoh9qb6mgbK+to67vh6mxL5cyc2+UPnWvj824L4sgOm+Dtfyvrk6\u002fL5n1QK\u002fcpMHvytXDL85IBG\u002fN+4Vv6DAGr\u002fzlh+\u002fi3Akv8lMKb\u002ftKi6\u002fNwozv9XpN7\u002feyDy\u002fcKZBv4KBRr8bWUu\u002fGyxQv235VL\u002fov1m\u002fVn5ev4AzY78c3me\u002f23xsv20Ocb9tkXW\u002fgQR6vzNmfr+PWoG\u002f4XeDv1eKhb80kYe\u002ftIuJvxp5i7+hWI2\u002fiSmPvw\u002frkL9xnJK\u002f7zyUv8bLlb8+SJe\u002f9rGYv\u002fQImr9CTZu\u002f9n6cvyuenb8Bq56\u002foKWfvzSOoL\u002fvZKG\u002fCyqiv8Ldor9YgKO\u002fERKkvzeTpL8YBKW\u002fBWWlv1a2pb9h+KW\u002ffiumvwxQpr9tZqa\u002f\u002fm6mvxNqpr\u002fDV6a\u002fGDimvx0Lpr\u002fd0KW\u002fY4mlv700pb\u002f90qS\u002fLmSkv2Poo7+tX6O\u002fI8qiv9Mnor\u002fTeKG\u002fPL2gvyD1n7+YIJ+\u002fuz+ev6VSnb9uWZy\u002fLVSbv\u002f9Cmr8CJpm\u002fSP2Xv+jIlr\u002fviJW\u002fdj2Uv4zmkr9LhJG\u002fyBaQvxyejr9dGo2\u002fpYuLvxHyib+6TYi\u002fvp6GvzrlhL9NIYO\u002fF1OBv3L1fr+lMHu\u002fEFh3v\u002f1rc7+0bG+\u002fe1prv6w1Z7+X\u002fmK\u002fo7VevyhbWr+K71W\u002fKnNRv2nmTL+oSUi\u002fSp1Dv6zhPr8\u002fFzq\u002fZD41v4BXML\u002f5Yiu\u002fKGEmv4pSIb9+Nxy\u002faRAXv7bdEb\u002fAnwy\u002fB1cHv+YDAr+PTfm+C4Duviug476grti+MazNvquZwr7Ld7e+iUesvqcJob79vpW+aWiKvmgNfr7TNWe+tEtQvtlQOb4ZRyK+JTALvmIc6L3txbm9x2CLve3gOb045rm8iZgqNc\u002fkuTyk2Tk93laLPaGxuT3o9+c95xELPnsXIj56CTk+\u002fONPPmOjZj6xQ30+YOCJPi0LlT7RH6A+ARyrPlD9tT5BwcA+E2XLPirm1T6\u002fQeA++nTqPgF99D6+Vv4+8f8DP1u7CD\u002fdXA0\u002fyeMRP3RPFj9Znxo\u002f\u002ftIeP\u002f7pIj8J5CY\u002fzcAqPx2ALj\u002fgITI\u002fBaY1P4YMOT99VTw\u002fCYE\u002fP2GPQj\u002fJgEU\u002fi1VIPw0OSz+\u002fqk0\u002fHCxQP7eSUj8d31Q\u002f\u002fBFXPwMsWT\u002f1LVs\u002fjhhdP63sXj8pq2A\u002f7FRiP+vqYz8VbmU\u002fb99mP\u002f4\u002faD\u002fYkGk\u002fD9NqP7QHbD\u002fuL20\u002f3UxuP6Vfbz9yaXA\u002fbWtxP75mcj+PXHM\u002fSU10P504dT8rHnY\u002fgP12PyvWdz+up3g\u002feXF5PwEzej+p63o\u002f15p7P+c\u002ffD8n2nw\u002f5Wh9P3PrfT8TYX4\u002fAsl+P4oifz\u002fcbH8\u002fPKd\u002fP9zQfz\u002f86H8\u002fzu5\u002fPw=="},"y":{"dtype":"f4","bdata":"AAAAAP3sjjwg5g49+ElWPYLOjj0ebbI9QP7VPU9\u002f+T3adg4+YiMgPujDMT4WV0M+i9tUPupPZj7Rsnc+aoGEPkgfjT5LspU+vDmePuW0pj4JI68+c4O3PmXVvz4gGMg++ErQPkdt2D5afuA+pX3oPnVq8D5BRPg+MAUAPyPeAz+wrAc\u002fh3ALP2opDz8T1xI\u002fMnkWP5MPGj\u002fxmR0\u002fAxghP5qJJD9n7ic\u002fREYrP+mQLj8ZzjE\u002frf00P14fOD\u002f4Mjs\u002fNjg+P9EuQT+QFkQ\u002fMu9GP2+4ST8Xckw\u002f5RtPP5u1UT8AP1Q\u002f2bdWP+sfWT\u002f9dls\u002f2rxdP0TxXz8LFGI\u002f+SRkP9sjZj98EGg\u002fr+ppPz6yaz\u002f\u002fZm0\u002f1AhvP6OXcD9aE3I\u002f7XtzP0rRdD9lE3Y\u002fOEJ3P7ZdeD\u002fcZXk\u002fo1p6Pwc8ez8ICnw\u002fpcR8P+NrfT\u002fB\u002f30\u002fRYB+P3ftfj9eR38\u002fAI5\u002fP23Bfz+r4X8\u002fyu5\u002fP\u002ffofz\u002fX0H8\u002fN6d\u002fP9dsfz+EIn8\u002f\u002fsh+Pwxhfj9s630\u002f4Wh9Px\u002fafD\u002fgP3w\u002f0pp7P6Trej\u002f4Mno\u002fcXF5P6aneD8m1nc\u002fef12PyIedj+WOHU\u002fQU10P4hccz+5ZnI\u002fZWtxP2tpcD+gX28\u002f10xuP+UvbT+tB2w\u002fBtNqP9KQaT\u002f5P2g\u002fZt9mPwtuZT\u002fg6mM\u002f5lRiPyCrYD+j7F4\u002fhhhdP+ktWz\u002f9K1k\u002f9BFXPxbfVD+sklI\u002fFCxQP7aqTT8BDks\u002ff1VIP7uART9Yj0I\u002fAYE\u002fP3JVPD96DDk\u002f96U1P9YhMj8RgC4\u002fvsAqP\u002frjJj\u002f06SI\u002f9NIeP0ufGj9lTxY\u002fteMRP9BcDT9Puwg\u002f4f8DP55W\u002fj7XfPQ+4HTqPp5B4D4J5tU+8mTLPhTBwD41\u002fbU+3hurPqwfoD4IC5U+RuCJPnxDfT4Zo2Y+s+NPPh0JOT5GFyI+shELPlj35z0Qsbk9JVaLPdfYOT2S4rk8B3bjtGzoubxZ4jm9KGGLvXnGub3rHOi9azALvkhHIr4JUTm+90tQvhY2Z76+DX6+gGiKvhS\u002flb7ICaG+qkesvvZ3t77EmcK+UqzNvsKu2L5PoOO+N4DuvqdN+b73AwK\u002fF1cHv9GfDL\u002fB3RG\u002fdRAXv403HL+aUiG\u002fPGEmvwJjK7+LVzC\u002fdD41v04XOr+\u002f4T6\u002fVp1Dv7hJSL945ky\u002fOHNRv5zvVb82W1q\u002fs7Vev6T+Yr+1NWe\u002fiFprv71sb78JbHO\u002fGlh3v68we79+9X6\u002fHVOBv1Ihg78\u002f5YS\u002fwZ6Gv8FNiL8V8om\u002fqYuLv2Eajb8gno6\u002fzhaQv1CEkb+R5pK\u002fdz2Uv\u002fKIlb\u002fryJa\u002fTf2XvwQmmb8CQ5q\u002fMFSbv3BZnL+pUp2\u002fvz+ev5ogn78k9Z+\u002fP72gv9h4ob\u002fVJ6K\u002fJcqiv7Jfo79n6KO\u002fMWSkv\u002f\u002fSpL\u002fBNKW\u002fZomlv+DQpb8gC6a\u002fHTimv8ZXpr8Xaqa\u002fAW+mv3Bmpr8QUKa\u002fgCumv2P4pb9YtqW\u002fCGWlvxoEpb84k6S\u002fERKkv1mAo7\u002fD3aK\u002fDCqiv\u002fBkob80jqC\u002fn6WfvwKrnr8pnp2\u002f836cvz9Nm7\u002fyCJq\u002f9rGYvzpIl7\u002fCy5W\u002f7DyUv26ckr8O65C\u002fhCmPv51Yjb8VeYu\u002fsIuJvzGRh79TioW\u002f3XeDv4hagb8sZn6\u002fcQR6v2KRdb9iDnG\u002f0nxsvxTeZ79yM2O\u002fSn5ev96\u002fWb9k+VS\u002fEyxQvwlZS790gUa\u002fYaZBv9fIPL\u002fE6Te\u002fKQozv+IqLr+9TCm\u002fg3Akv+OWH7+VwBq\u002fK+4VvzAgEb8jVwy\u002fYpMHv1vVAr+iOvy+\u002ftbyvhqA6b4cNuC+OPnWvkXJzb4OpsS+lY67vomBsr5wfam+84CgvtKKl77WmY6+Ba2FvqyGeb6\u002ft2e+rutVvuwgRL6CVjK+Rosgvm2+Dr6x3vm9\u002fjrWveaRsr0t4469nF5WvdrtDr1+7468AAAAAA=="},"type":"scatter","xaxis":"x","yaxis":"y"},{"line":{"color":"gray","dash":"dot","width":1},"mode":"lines","name":"Base circle","x":{"dtype":"f8","bdata":"AAAAAAAA8D+VSynBge\u002fvP2j6BgUYvu8\u002fJek3u\u002fVr7z8jfxaOb\u002fnuP\u002fFJcov7Zu4\u002fXLHeqjC17T9+NRQyxuTsP1+hBPiS9us\u002fuvBkh4zr6j9WMpEhxsTpPzlQz6Jvg+g\u002ftTkVSdQo5z+WUJVeWbblP0ATccl8LeQ\u002fA6sNgtOP4j9cLKDxB9\u002fgP1a1P3WwOd4\u002fthLH2SiW2j+KU4hOOdfWP1tDY1G+ANM\u002fjFrgSlktzj+Mcwt+GjrGPyLsuGvkX7w\u002fcyCwKKhcqD\u002fN+ijPKj+QvwzJ6KS5SbS\u002f3kQPZF83wr9P3qvaGjfKv5OAwi7oDdG\u002fPSGBd67u1L83i\u002fTn4LnYv4vJmF6Wa9y\u002fAgAAAAAA4L\u002fP5tyRtrnhv860DJEnYeO\u002fh1h3f5705L\u002fbPrV2e3Lmv11Sx9Q02ee\u002fJuDa0Vgn6b9dHHf9jlvqv4pZi6GZdOu\u002fwfLvCVdx7L\u002fZTwivwlDtvxstUkL2Ee6\u002fV1DNmyq07r9D8kaHuDbvvwQ9tXAZme+\u002fXjTx7ufa778HB0As4PvvvwcHQCzg+++\u002fXjTx7ufa778EPbVwGZnvv0PyRoe4Nu+\u002fV1DNmyq07r8cLVJC9hHuv9lPCK\u002fCUO2\u002fwvLvCVdx7L+JWYuhmXTrv14cd\u002f2OW+q\u002fJeDa0Vgn6b9eUsfUNNnnv9o+tXZ7cua\u002fiFh3f5705L\u002fMtAyRJ2Hjv9Hm3JG2ueG\u002f+f\u002f\u002f\u002f\u002f\u002f\u002f37+IyZhelmvcvzeL9Ofgudi\u002fQSGBd67u1L+MgMIu6A3Rv0jeq9oaN8q\u002f3kQPZF83wr8eyeikuUm0v1T6KM8qP5C\u002fkCCwKKhcqD8R7Lhr5F+8P3xzC34aOsY\u002fk1rgSlktzj9aQ2NRvgDTP4ZTiE4519Y\u002fvRLH2SiW2j9ZtT91sDneP1wsoPEH3+A\u002fAasNgtOP4j9DE3HJfC3kP5dQlV5ZtuU\u002ftDkVSdQo5z83UM+ib4PoP1gykSHGxOk\u002fuvBkh4zr6j9foQT4kvbrP301FDLG5Ow\u002fXbHeqjC17T\u002fxSXKL+2buPyN\u002fFo5v+e4\u002fJuk3u\u002fVr7z9o+gYFGL7vP5VLKcGB7+8\u002fAAAAAAAA8D8="},"y":{"dtype":"f8","bdata":"AAAAAAAAAAADhrXMjDywP\u002fCDAnguNMA\u002fkayggGI5yD+aiNkBzxLQP9kfIiFb+NM\u002f+5MNU1HJ1z+CQNqEwoHbPxlNPurYHd8\u002fC1i7+O1M4T9GhZoMGvniPxwWPFK3keQ\u002fABg\u002flCAV5j+GGZN4xoHnP4hAIRwx1ug\u002flkFFlgER6j93zoZi8zDrPzKcHq\u002fdNOw\u002fEyzujrQb7T\u002fB8a4NiuTtP\u002f0jPCWPju4\u002f3176khQZ7z8XHIGMi4PvPzTGy1KGze8\u002fg6xao7j27z\u002fvOc8G+P7vP2Zmsvw75u8\u002f70I4BJ6s7z+\u002fl\u002feBWVLvPwOssILL1+4\u002fxVNiW3I97j+TIxAn7YPtP1EHwCL7q+w\u002fqkxY6Hq26z+RVimJaaTqP5aCD4nhduk\u002foSg6uxkv6D+258MBZM7mP9KHZvErVuU\u002f8nixWvXH4z8mRkW6WiXiP2ITsJELcOA\u002f8qg+VZVT3T\u002fagWKM2KjZP\u002fgLinSo49U\u002fv412\u002fecH0j\u002flKaSyIjPMP+bENsZjOcQ\u002f3FNHxZdVuD+s23zJpD6gP8nbfMmkPqC\u002f6lNHxZdVuL\u002ftxDbGYznEv9wppLIiM8y\u002fwo12\u002fecH0r\u002f0C4p0qOPVv92BYozYqNm\u002f7qg+VZVT3b9jE7CRC3DgvyRGRbpaJeK\u002f83ixWvXH47\u002fRh2bxK1blv7fnwwFkzua\u002foCg6uxkv6L+Xgg+J4Xbpv5BWKYlppOq\u002frExY6Hq2679SB8Ai+6vsv5MjECftg+2\u002fxFNiW3I97r8ErLCCy9fuv7+X94FZUu+\u002f70I4BJ6s779lZrL8O+bvv+85zwb4\u002fu+\u002fg6xao7j27780xstShs3vvxgcgYyLg++\u002f3176khQZ77\u002f9Izwlj47uv8Lxrg2K5O2\u002fEizujrQb7b8xnB6v3TTsv3fOhmLzMOu\u002fl0FFlgER6r+GQCEcMdbov4UZk3jGgee\u002fABg\u002flCAV5r8fFjxSt5Hkv0SFmgwa+eK\u002fC1i7+O1M4b8bTT7q2B3fv4dA2oTCgdu\u002f9ZMNU1HJ17\u002fZHyIhW\u002fjTv52I2QHPEtC\u002fgKyggGI5yL\u002fogwJ4LjTAvwSGtcyMPLC\u002fB1wUMyamsbw="},"type":"scatter","xaxis":"x","yaxis":"y"},{"marker":{"color":"#e67e22","size":8},"mode":"markers","name":"Control pts","x":{"dtype":"f4","bdata":"ZtZ\u002fP7OzbD+8wzQ\u002fXpLEPlrmV7OHE\u002f6+a5Rrv6Gjmb8xe6a\u002fnqOZv26Ua794E\u002f6+GZlrMmeSxD7DwzQ\u002fsLNsPw=="},"y":{"dtype":"f4","bdata":"AAAAACAXxD68wzQ\u002feUhtPzIzkz87WZk\u002fa5RrP76O\u002fj4HLvSzxI7+vnOUa78+WZm\u002fMjOTv3tIbb+7wzS\u002fHBfEvg=="},"type":"scatter","xaxis":"x","yaxis":"y"},{"line":{"color":"crimson","dash":"dash","width":2},"mode":"lines","name":"Target","showlegend":false,"x":{"dtype":"f4","bdata":"AAAAAAAAgD8AAABAAQBAQAAAgEABAKBAAQDAQAAA4EAAAABBAQAQQQEAIEEAADBBAQBAQQEAUEEAAGBBAQBwQQAAgEEAAIhBAQCQQQAAmEEBAKBBAQCoQQAAsEEBALhBAQDAQQAAyEEBANBBAQDYQQAA4EEBAOhBAQDwQQAA+EEAAABCAQAEQgAACEIAAAxCAQAQQgAAFEIAABhCAQAcQgEAIEIAACRCAQAoQgEALEIAADBCAQA0QgEAOEIAADxCAQBAQgEAREIAAEhCAQBMQgEAUEIAAFRCAQBYQgEAXEIAAGBCAABkQgEAaEIBAGxCAQBwQgAAdEIAAHhCAAB8QgAAgEIBAIJCAQCEQgEAhkIAAIhCAACKQgAAjEIAAI5CAQCQQgEAkkIAAJRCAACWQgAAmEIAAJpCAQCcQgEAnkIBAKBCAACiQgAApEIAAKZCAQCoQgEAqkIBAKxCAACuQgAAsEIAALJCAQC0QgEAtkIBALhCAAC6QgAAvEIAAL5CAQDAQgEAwkIBAMRCAQDGQgAAyEIAAMpCAQDMQgEAzkIBANBCAQDSQgAA1EIAANZCAQDYQgEA2kIBANxCAQDeQgAA4EIAAOJCAADkQgIA5kIBAOhCAADqQgEA7EIAAO5CAQDwQgEA8kIAAPRCAQD2QgAA+EIBAPpCAAD8QgEA\u002fkIAAABDAAABQwEAAkMAAANDAQAEQwAABUMBAAZDAAAHQwAACEMBAAlDAAAKQwEAC0MAAAxDAAANQwAADkMAAA9DAQAQQwAAEUMBABJDAAATQwAAFEMBABVDAAAWQwEAF0MAABhDAQAZQwAAGkMAABtDAQAcQwAAHUMBAB5DAAAfQwEAIEMBACFDAAAiQwEAI0MAACRDAQAlQwAAJkMAACdDAQAoQwAAKUMBACpDAAArQwEALEMBAC1DAAAuQwEAL0MAADBDAQAxQwAAMkMBADNDAQA0QwAANUMBADZDAAA3QwEAOEMAADlDAAA6QwEAO0MAADxDAQA9QwAAPkMBAD9DAQBAQwAAQUMBAEJDAABDQwEAREMAAEVDAQBGQwEAR0MAAEhDAQBJQwAASkMBAEtDAQBMQwAATUMBAE5DAABPQwEAUEMAAFFDAQBSQwEAU0MAAFRDAQBVQwAAVkMBAFdDAQBYQwEAWUMBAFpDAABbQwEAXEMAAF1DAQBeQwEAX0MAAGBDAQBhQwAAYkMBAGNDAABkQwEAZUMCAGZDAQBnQwEAaEMAAGlDAABqQwEAa0MBAGxDAQBtQwAAbkMAAG9DAQBwQwEAcUMBAHJDAABzQwAAdEMBAHVDAQB2QwEAd0MAAHhDAgB5QwEAekMBAHtDAAB8QwAAfUMBAH5DAQB\u002fQwAAgEMAgIBDAACBQwGAgUMBAIJDAICCQwAAg0MAgINDAQCEQwCAhEMAAIVDAICFQwEAhkMBgIZDAACHQwCAh0MAAIhDAYCIQwEAiUMAgIlDAACKQwCAikMBAItDAYCLQwAAjEMAgIxDAACNQwGAjUMAAI5DAICOQwAAj0MBgI9DAQCQQwCAkEMAAJFDAICRQwEAkkMBgJJDAACTQwCAk0MAAJRDAYCUQwEAlUMAgJVDAACWQwCAlkMBAJdDAYCXQwAAmEMAgJhDAQCZQwGAmUMAAJpDAICaQwAAm0MBgJtDAQCcQwCAnEMAAJ1DAICdQwEAnkMBgJ5DAACfQwCAn0MBAKBDAYCgQwEAoUMAgKFDAACiQwGAokMBAKNDAICjQwAApEMAgKRDAQClQwGApUMAAKZDAICmQwAAp0MBgKdDAQCoQwCAqEMAAKlDAYCpQwEAqkMBgKpDAACrQwCAq0MBAKxDAYCsQwEArUMAgK1DAACuQwGArkMBAK9DAICvQwAAsEMAgLBDAQCxQwGAsUMAALJDAICyQwEAs0MBgLND"},"y":{"dtype":"f4","bdata":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAODYAALY3AACZOAAANTkAYLA5APgXOgCQcDoA6LI6AKz9OgAuLTsAUmU7AAeUOwAPuzsAGeg7ALoNPAC1KjyAHEs8gAxvPIBOizzA76A8wHG4PIDY0TwAJ+08gC4FPUC8FD0AOiU9gKQ2PQD3SD2AK1w9YDtwPUCPgj3gZY09oJyYPQAupD0gFLA9oEi8PdDEyD2ggdU9sHfiPWCf7z3A8Pw94DEFPhD4Cz64xhI+oJkZPohsID44Oyc+YAEuPuC6ND6QYzs+aPdBPnBySD7Y0E4+8A5VPjApWz44HGE+8ORmPlCAbD6g63E+aCR3PlgofD7AeoA+EMWCPmDyhD4YAoc+zPOIPizHij4UfIw+hBKOPqCKjz645JA+OCGSPrhAkz70Q5Q+zCuVPjj5lT5grZY+gEmXPvTOlz5AP5g+8JuYPrTmmD5QIZk+nE2ZPoBtmT74gpk+CJCZPsSWmT5AmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPpiZmT6YmZk+mJmZPkCZmT7Elpk+CJCZPviCmT6AbZk+nE2ZPlAhmT605pg+8JuYPkA\u002fmD70zpc+fEmXPlytlj40+ZU+yCuVPvBDlD60QJM+NCGSPrDkkD6cio8+gBKOPhB8jD4ox4o+xPOIPhAChz5Y8oQ+CMWCPrh6gD5IKHw+UCR3PpDrcT44gGw+2ORmPigcYT4gKVs+0A5VPsjQTj5gckg+WPdBPoBjOz7QujQ+UAEuPiA7Jz54bCA+kJkZPqDGEj749ws+yDEFPpDw\u002fD0gn+89kHfiPYCB1T2wxMg9gEi8PfATsD3gLaQ9gJyYPcBljT0gj4I9ADtwPWArXD3A9kg9QKQ2PeA5JT3guxQ9YC4FPcAm7TxA2NE8QHG4PIDvoDxATos8gAxvPAAcSzyAtCo8ALoNPAAZ6DsAD7s7AAeUOwBSZTsALi07AKz9OgDksjoAkHA6APgXOgBgsDkAADU5AACZOAAAtjcAADg2"},"type":"scatter","xaxis":"x2","yaxis":"y2"},{"line":{"color":"steelblue","width":2},"mode":"lines","name":"Achieved","showlegend":false,"x":{"dtype":"f4","bdata":"AAAAAAAAgD8AAABAAQBAQAAAgEABAKBAAQDAQAAA4EAAAABBAQAQQQEAIEEAADBBAQBAQQEAUEEAAGBBAQBwQQAAgEEAAIhBAQCQQQAAmEEBAKBBAQCoQQAAsEEBALhBAQDAQQAAyEEBANBBAQDYQQAA4EEBAOhBAQDwQQAA+EEAAABCAQAEQgAACEIAAAxCAQAQQgAAFEIAABhCAQAcQgEAIEIAACRCAQAoQgEALEIAADBCAQA0QgEAOEIAADxCAQBAQgEAREIAAEhCAQBMQgEAUEIAAFRCAQBYQgEAXEIAAGBCAABkQgEAaEIBAGxCAQBwQgAAdEIAAHhCAAB8QgAAgEIBAIJCAQCEQgEAhkIAAIhCAACKQgAAjEIAAI5CAQCQQgEAkkIAAJRCAACWQgAAmEIAAJpCAQCcQgEAnkIBAKBCAACiQgAApEIAAKZCAQCoQgEAqkIBAKxCAACuQgAAsEIAALJCAQC0QgEAtkIBALhCAAC6QgAAvEIAAL5CAQDAQgEAwkIBAMRCAQDGQgAAyEIAAMpCAQDMQgEAzkIBANBCAQDSQgAA1EIAANZCAQDYQgEA2kIBANxCAQDeQgAA4EIAAOJCAADkQgIA5kIBAOhCAADqQgEA7EIAAO5CAQDwQgEA8kIAAPRCAQD2QgAA+EIBAPpCAAD8QgEA\u002fkIAAABDAAABQwEAAkMAAANDAQAEQwAABUMBAAZDAAAHQwAACEMBAAlDAAAKQwEAC0MAAAxDAAANQwAADkMAAA9DAQAQQwAAEUMBABJDAAATQwAAFEMBABVDAAAWQwEAF0MAABhDAQAZQwAAGkMAABtDAQAcQwAAHUMBAB5DAAAfQwEAIEMBACFDAAAiQwEAI0MAACRDAQAlQwAAJkMAACdDAQAoQwAAKUMBACpDAAArQwEALEMBAC1DAAAuQwEAL0MAADBDAQAxQwAAMkMBADNDAQA0QwAANUMBADZDAAA3QwEAOEMAADlDAAA6QwEAO0MAADxDAQA9QwAAPkMBAD9DAQBAQwAAQUMBAEJDAABDQwEAREMAAEVDAQBGQwEAR0MAAEhDAQBJQwAASkMBAEtDAQBMQwAATUMBAE5DAABPQwEAUEMAAFFDAQBSQwEAU0MAAFRDAQBVQwAAVkMBAFdDAQBYQwEAWUMBAFpDAABbQwEAXEMAAF1DAQBeQwEAX0MAAGBDAQBhQwAAYkMBAGNDAABkQwEAZUMCAGZDAQBnQwEAaEMAAGlDAABqQwEAa0MBAGxDAQBtQwAAbkMAAG9DAQBwQwEAcUMBAHJDAABzQwAAdEMBAHVDAQB2QwEAd0MAAHhDAgB5QwEAekMBAHtDAAB8QwAAfUMBAH5DAQB\u002fQwAAgEMAgIBDAACBQwGAgUMBAIJDAICCQwAAg0MAgINDAQCEQwCAhEMAAIVDAICFQwEAhkMBgIZDAACHQwCAh0MAAIhDAYCIQwEAiUMAgIlDAACKQwCAikMBAItDAYCLQwAAjEMAgIxDAACNQwGAjUMAAI5DAICOQwAAj0MBgI9DAQCQQwCAkEMAAJFDAICRQwEAkkMBgJJDAACTQwCAk0MAAJRDAYCUQwEAlUMAgJVDAACWQwCAlkMBAJdDAYCXQwAAmEMAgJhDAQCZQwGAmUMAAJpDAICaQwAAm0MBgJtDAQCcQwCAnEMAAJ1DAICdQwEAnkMBgJ5DAACfQwCAn0MBAKBDAYCgQwEAoUMAgKFDAACiQwGAokMBAKNDAICjQwAApEMAgKRDAQClQwGApUMAAKZDAICmQwAAp0MBgKdDAQCoQwCAqEMAAKlDAYCpQwEAqkMBgKpDAACrQwCAq0MBAKxDAYCsQwEArUMAgK1DAACuQwGArkMBAK9DAICvQwAAsEMAgLBDAQCxQwGAsUMAALJDAICyQwEAs0MBgLND"},"y":{"dtype":"f4","bdata":"AJCJuQDAorkASLW5AKDBuQBgyLkA6Mm5AMDGuQBwv7kASLS5APCluQDolLkAeIG5AMBYuQDAK7kAIPq4AMCbuACA9rcAAHA3AIBpOADAxTgA4AY5ACAmOQBAPzkAAFE5AOBbOQBgYDkAAF45AOBWOQBgSjkAIDo5AOAlOQDgDjkAQOs4AMCzOACAdTgAAAI4AAAoNgCAz7cAQFW4AECfuADAzbgAAPi4ALAMuQBwGbkAECK5AKAkuQAgIrkA0Bm5AKAMuQBg97gAAM64AICeuADAVrgAgM63AABANgAAATgAgHY4AIC0OABA6zgAIA85AGAmOQBgOjkAwEo5AOBWOQBAXjkAIGA5AABcOQAgUTkAID85AEAmOQAgBzkAwMU4AIBqOAAAcDcAgPa3AKCbuABA+rgAwCu5ALBYuQCIgbkA6JS5AAimuQBYtLkAcL+5ANjGuQAAyrkAcMi5ALjBuQBYtbkA2KK5ALCJuQDwULkAwOe4AACENwBASDkAEOA5ABhBOgAwlDoAgNQ6AIgROwCwQDsAhng7AOacOwCnwjsA5+07AIYPPAA8KzyAR0o8ANpsPACTiTyArp48QNi1PEApzzyAueo84EMEPeA9FD1gPSU9YDU3PcAYSj2g2l09wG1yPYDigz2g6Y494EWaPYDwpT0w47E9MBe+PRCGyj1AKdc9MPrjPXDy8D1QC\u002f49OJ8FPpBCDD547BI+mJkZPsBGID6g8CY++JMtPoAtND74uTo+EDZBPpCeRz4g8E0+mCdUPphBWj7oOmA+OBBmPlC+az7wQXE+wJd2Poi8ez58VoA+6LKCPujxhD7YEYc+GBGJPgDuij4Ap4w+DDyOPqyujz5gAJE+wDKSPlRHkz60P5Q+YB2VPvThlT7wjpY+9CWXPoColz4sGJg+gHaYPgzFmD5YBZk+\u002fDiZPohhmT6EgJk+fJeZPgComT6os5k++LuZPkDCmT7gxpk++MmZPqjLmT4MzJk+RMuZPmjJmT6oxpk+EMOZPsi+mT7suZk+qLSZPgivmT40qZk+TKOZPmydmT60l5k+QJKZPjiNmT60iJk+0ISZPqyBmT5wf5k+FH6ZPpB9mT7MfZk+uH6ZPjyAmT5Igpk+zISZPrCHmT7gipk+TI6ZPuCRmT6MlZk+OJmZPtScmT5EoJk+gKOZPnimmT4IqZk+LKuZPsismT7QrZk+LK6ZPtCtmT7IrJk+KKuZPgSpmT50ppk+gKOZPkSgmT7QnJk+NJmZPoyVmT7ckZk+SI6ZPuCKmT60h5k+zISZPkiCmT48gJk+tH6ZPsx9mT6MfZk+GH6ZPmx\u002fmT6sgZk+zISZPrCImT44jZk+RJKZPrSXmT5wnZk+UKOZPjypmT4Mr5k+rLSZPvi5mT7Qvpk+GMOZPqzGmT50yZk+SMuZPhjMmT6wy5k+CMqZPuzGmT5Qwpk+BLyZPrSzmT4QqJk+hJeZPpCAmT6QYZk+CDmZPmQFmT4UxZg+iHaYPjgYmD6IqJc+\u002fCWXPvyOlj784ZU+aB2VPrw\u002flD5cR5M+wDKSPmAAkT6sro8+FDyOPgCnjD787Yo+HBGJPtgRhz7w8YQ+6LKCPnxWgD6AvHs+uJd2PvBBcT5Yvms+QBBmPtg6YD6YQVo+iCdUPhjwTT6Inkc+CDZBPvi5Oj54LTQ+8JMtPqDwJj7ARiA+mJkZPmjsEj6AQgw+KJ8FPlAL\u002fj1g8vA9IPrjPUAp1z0Qhso9MBe+PTDjsT2Q8KU94EWaPaDpjj2A4oM9wG1yPaDaXT3gGEo9gDU3PWA9JT3APRQ9AEQEPYC56jzAKc88gNi1PMCunjyAk4k8ANtsPABISjwAPSs8AIcPPADq7TsAqMI7AOicOwCKeDsAtkA7AIoROwCM1DoAPJQ6ACBBOgAw4DkAgEg5AACGNwAg57gAoFC5"},"type":"scatter","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.44],"scaleanchor":"y","scaleratio":1,"title":{"text":"x"}},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"y"}},"xaxis2":{"anchor":"y2","domain":[0.56,1.0],"title":{"text":"Cam angle (°)"},"range":[0,360],"dtick":90},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"Displacement"}},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Cam Profile","x":0.22,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Follower Displacement","x":0.78,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"shapes":[{"fillcolor":"rgba(200,200,200,0.2)","line":{"width":0},"type":"rect","x0":0,"x1":90,"xref":"x2","y0":0,"y1":1,"yref":"y2 domain"},{"fillcolor":"rgba(100,149,237,0.2)","line":{"width":0},"type":"rect","x0":90,"x1":180,"xref":"x2","y0":0,"y1":1,"yref":"y2 domain"},{"fillcolor":"rgba(200,200,200,0.2)","line":{"width":0},"type":"rect","x0":180,"x1":270,"xref":"x2","y0":0,"y1":1,"yref":"y2 domain"},{"fillcolor":"rgba(100,149,237,0.2)","line":{"width":0},"type":"rect","x0":270,"x1":360,"xref":"x2","y0":0,"y1":1,"yref":"y2 domain"}],"margin":{"t":40,"b":40,"l":60,"r":40},"legend":{"x":0.02,"y":0.98},"height":400},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+</section>
+<section id="pressure-angle-analysis">
+<h2>Pressure angle analysis<a class="headerlink" href="#pressure-angle-analysis" title="Link to this heading">¶</a></h2>
+<p>The pressure angle affects force transmission efficiency. High angles cause side loads on the follower.</p>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">()</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">eval_thetas</span><span class="p">),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">pressure_angles</span><span class="p">),</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Pressure angle&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Limit line.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_hline</span><span class="p">(</span>
+    <span class="n">y</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">MAX_PRESSURE_ANGLE</span><span class="p">)),</span>
+    <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;crimson&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">dash</span><span class="o">=</span><span class="s2">&quot;dash&quot;</span><span class="p">),</span>
+    <span class="n">annotation_text</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Limit (</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">MAX_PRESSURE_ANGLE</span><span class="p">))</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">°)&quot;</span><span class="p">,</span>
+    <span class="n">annotation_position</span><span class="o">=</span><span class="s2">&quot;top right&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Shade motion phases.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_vrect</span><span class="p">(</span><span class="n">x0</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">x1</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">fillcolor</span><span class="o">=</span><span class="s2">&quot;rgba(100,149,237,0.15)&quot;</span><span class="p">,</span> <span class="n">line_width</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_vrect</span><span class="p">(</span><span class="n">x0</span><span class="o">=</span><span class="mi">270</span><span class="p">,</span> <span class="n">x1</span><span class="o">=</span><span class="mi">360</span><span class="p">,</span> <span class="n">fillcolor</span><span class="o">=</span><span class="s2">&quot;rgba(100,149,237,0.15)&quot;</span><span class="p">,</span> <span class="n">line_width</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_annotation</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">135</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Rise&quot;</span><span class="p">,</span> <span class="n">showarrow</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">font</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_annotation</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">315</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="s2">&quot;Return&quot;</span><span class="p">,</span> <span class="n">showarrow</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">font</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span>
+    <span class="n">xaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Cam angle (°)&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">360</span><span class="p">],</span> <span class="n">dtick</span><span class="o">=</span><span class="mi">90</span><span class="p">),</span>
+    <span class="n">yaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Pressure angle (°)&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">40</span><span class="p">]),</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+    <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">),</span>
+    <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.1.0.min.js" integrity="sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=" crossorigin="anonymous"></script>                <div id="b605b321-085f-44c5-9554-c044dc948706" class="plotly-graph-div" style="height:300px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("b605b321-085f-44c5-9554-c044dc948706")) {                    Plotly.newPlot(                        "b605b321-085f-44c5-9554-c044dc948706",                        [{"line":{"color":"steelblue","width":2},"mode":"lines","name":"Pressure angle","x":{"dtype":"f4","bdata":"AAAAAAAAgD8AAABAAQBAQAAAgEABAKBAAQDAQAAA4EAAAABBAQAQQQEAIEEAADBBAQBAQQEAUEEAAGBBAQBwQQAAgEEAAIhBAQCQQQAAmEEBAKBBAQCoQQAAsEEBALhBAQDAQQAAyEEBANBBAQDYQQAA4EEBAOhBAQDwQQAA+EEAAABCAQAEQgAACEIAAAxCAQAQQgAAFEIAABhCAQAcQgEAIEIAACRCAQAoQgEALEIAADBCAQA0QgEAOEIAADxCAQBAQgEAREIAAEhCAQBMQgEAUEIAAFRCAQBYQgEAXEIAAGBCAABkQgEAaEIBAGxCAQBwQgAAdEIAAHhCAAB8QgAAgEIBAIJCAQCEQgEAhkIAAIhCAACKQgAAjEIAAI5CAQCQQgEAkkIAAJRCAACWQgAAmEIAAJpCAQCcQgEAnkIBAKBCAACiQgAApEIAAKZCAQCoQgEAqkIBAKxCAACuQgAAsEIAALJCAQC0QgEAtkIBALhCAAC6QgAAvEIAAL5CAQDAQgEAwkIBAMRCAQDGQgAAyEIAAMpCAQDMQgEAzkIBANBCAQDSQgAA1EIAANZCAQDYQgEA2kIBANxCAQDeQgAA4EIAAOJCAADkQgIA5kIBAOhCAADqQgEA7EIAAO5CAQDwQgEA8kIAAPRCAQD2QgAA+EIBAPpCAAD8QgEA\u002fkIAAABDAAABQwEAAkMAAANDAQAEQwAABUMBAAZDAAAHQwAACEMBAAlDAAAKQwEAC0MAAAxDAAANQwAADkMAAA9DAQAQQwAAEUMBABJDAAATQwAAFEMBABVDAAAWQwEAF0MAABhDAQAZQwAAGkMAABtDAQAcQwAAHUMBAB5DAAAfQwEAIEMBACFDAAAiQwEAI0MAACRDAQAlQwAAJkMAACdDAQAoQwAAKUMBACpDAAArQwEALEMBAC1DAAAuQwEAL0MAADBDAQAxQwAAMkMBADNDAQA0QwAANUMBADZDAAA3QwEAOEMAADlDAAA6QwEAO0MAADxDAQA9QwAAPkMBAD9DAQBAQwAAQUMBAEJDAABDQwEAREMAAEVDAQBGQwEAR0MAAEhDAQBJQwAASkMBAEtDAQBMQwAATUMBAE5DAABPQwEAUEMAAFFDAQBSQwEAU0MAAFRDAQBVQwAAVkMBAFdDAQBYQwEAWUMBAFpDAABbQwEAXEMAAF1DAQBeQwEAX0MAAGBDAQBhQwAAYkMBAGNDAABkQwEAZUMCAGZDAQBnQwEAaEMAAGlDAABqQwEAa0MBAGxDAQBtQwAAbkMAAG9DAQBwQwEAcUMBAHJDAABzQwAAdEMBAHVDAQB2QwEAd0MAAHhDAgB5QwEAekMBAHtDAAB8QwAAfUMBAH5DAQB\u002fQwAAgEMAgIBDAACBQwGAgUMBAIJDAICCQwAAg0MAgINDAQCEQwCAhEMAAIVDAICFQwEAhkMBgIZDAACHQwCAh0MAAIhDAYCIQwEAiUMAgIlDAACKQwCAikMBAItDAYCLQwAAjEMAgIxDAACNQwGAjUMAAI5DAICOQwAAj0MBgI9DAQCQQwCAkEMAAJFDAICRQwEAkkMBgJJDAACTQwCAk0MAAJRDAYCUQwEAlUMAgJVDAACWQwCAlkMBAJdDAYCXQwAAmEMAgJhDAQCZQwGAmUMAAJpDAICaQwAAm0MBgJtDAQCcQwCAnEMAAJ1DAICdQwEAnkMBgJ5DAACfQwCAn0MBAKBDAYCgQwEAoUMAgKFDAACiQwGAokMBAKNDAICjQwAApEMAgKRDAQClQwGApUMAAKZDAICmQwAAp0MBgKdDAQCoQwCAqEMAAKlDAYCpQwEAqkMBgKpDAACrQwCAq0MBAKxDAYCsQwEArUMAgK1DAACuQwGArkMBAK9DAICvQwAAsEMAgLBDAQCxQwGAsUMAALJDAICyQwEAs0MBgLND"},"y":{"dtype":"f4","bdata":"BaM3PuWTCz4TQMU9cg1zPawF0DxBIbU7g\u002fcIPSG0bj1pFqQ9uaTKPUTc6j1UfwI++2QMPvFFEz4eDBc+jaYXPpMzFT7trw8+avQGPqB\u002f9j21m9g9wcy0PZnHij1LMjc9AQm9PHnRVjt\u002f4nE8UVv8PEefOD0zF2s9AAaLPciVnD0+Vqo9WEe0Pddfuj2hn7w9pwa7PUuZtT1wZ6w9lDyfPSVWjj1533I97shBPXv0CD3MJJA8BY6RN89BkTwiEgk9NctBPVRIcz22Wo49KzGfPZJwrD1oorU9hP26PcGovD3VX7o9AlW0PVxfqj0CqJw93vyKPUogaz0kljg9BpL8PK0HcTxi1FI7h+S8PDl7Nz2bx4o90uW0PR\u002fQ2D2\u002fiPY9xwcHPu2vDz5BQRU+N7gXPhkUFz6dVxM+xX8MPm+QAj5U\u002feo9\u002fLLKPVwupD2N+G49ayMJPTAAtzvkpc88juJyPbUoxT2Shws+6Zk3PmQpeT73TrE+XvX5PuBDKz9ne2M\u002ffs6SP7LOuD+mueM\u002fM8MJQJcVJEDnzUBA1uRfQKKogEA6hJJATH+lQMiSuUCgts5AsuHkQDUK\u002fECGEgpBwZIWQXl\u002fI0EtqzBBESw9QavdSEHAwlNBuN5dQRw1Z0H8yW9Br6F3QWPAfkFllYJBnnKFQR76h0EtLopB4RCMQXakjUHf6o5BE+aPQQ2YkEGNApFBPyeRQcQHkUGfpZBBPQKQQeEej0HA\u002fI1B+ZyMQYgAi0FVKIlBMxWHQc\u002fHhEHOQIJBZQF\u002fQeAPeUGirXJBXttrQTyZZEGL51xBWMZUQWs1TEGONENBV8M5QSnhL0FrjSVBOccaQe2ND0F+\u002fwNBp6\u002fxQIRq3ED7LchAIvi0QD7HokCMmZFAdG2BQF2CZED7JkhA28UtQJRcFUCx0P0\u002fJc\u002fUP2mxrz\u002f5c44\u002fjSZiP8UcLz9kxgM\u002f9EXAPpBZiD64kT8+lCoNPsCT1j0lmJc9EcA6PdDHnzyu64s7EIrSPMeZNz1YTnw9lL6bPaKdtD3escg9MPvXPQ2A4j1iQ+g9TVHpPYeI5T0O9tw90KPPPUWdvT0Kv6Y9eiOLPUFwVT1oFA09HU2RPO08Ijt0+Dk8AGLCPD\u002f4DT3U6DQ9qNhVPdj4cD1yEYM9M7SKPaBljz0hHJE9fN2PPTe4iz3SjIQ9PPp0PWfRWj3D8Do9XQ0VPYSB0jxOkV48MnBgN1V3Xjy7odI8NBkVPeX2Oj127Vo94QN1PQiWhD22tIs9seaPPQEdkT2CZo89VLOKPdQVgz3y8HA9qNhVPT3bND3\u002f+Q09dTDCPGCcOTzxICM7TleRPOo5DT3\u002fj1U9tDKLPbzNpj3nr709v8DPPWMO3T32mOU9pGDpPU5g6D0omOI92RLYPYPCyD1IrrQ9b9ibPSdzfD2Rtzc9l+LSPI3BjDtFb588trA6PZCHlz12itY90CgNPsOWPz5qWog+JEfAPsTIAz8oHy8\u002fHSliP1h0jj9jsq8\u002fx9DUP7HR\u002fT8zXRVAdMYtQOonSEA3g2RAzG2BQAKakUDCx6JAqfi0QEkuyEDUatxA5q\u002fxQL7\u002fA0ERjg9Be8caQZ6NJUFO4S9BfsM5QbU0Q0GJNUxBaMZUQbDnXEFgmWRBbdtrQc6tckHvD3lBdAF\u002fQdlAgkHQx4RBOhWHQV4oiUGLAItB9pyMQcD8jUHaHo9BOQKQQZ6lkEHGB5FBOCeRQYICkUEBmJBBDeaPQc7qjkFppI1B2hCMQR4uikEW+odBj3KFQVeVgkFKwH5BcqF3QeHJb0HuNGdBjN5dQZ3CU0Fy3UhB2Ss9Qf6qMEFbfyNBi5IWQUMSCkHoCfxAcOHkQGq2zkCFkrlAIX+lQBmEkkB0qIBAoeRfQKXNQEBQFSRA78IJQMS54z\u002fSzrg\u002fnc6SP+d7Yz8eRCs\u002f3\u002fj5PiFQsT6VM3k+"},"type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"shapes":[{"line":{"color":"crimson","dash":"dash","width":2},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":30.000001907348633,"y1":30.000001907348633,"yref":"y"},{"fillcolor":"rgba(100,149,237,0.15)","line":{"width":0},"type":"rect","x0":90,"x1":180,"xref":"x","y0":0,"y1":1,"yref":"y domain"},{"fillcolor":"rgba(100,149,237,0.15)","line":{"width":0},"type":"rect","x0":270,"x1":360,"xref":"x","y0":0,"y1":1,"yref":"y domain"}],"annotations":[{"showarrow":false,"text":"Limit (30°)","x":1,"xanchor":"right","xref":"x domain","y":30.000001907348633,"yanchor":"bottom","yref":"y"},{"font":{"size":12},"showarrow":false,"text":"Rise","x":135,"y":25},{"font":{"size":12},"showarrow":false,"text":"Return","x":315,"y":25}],"xaxis":{"title":{"text":"Cam angle (°)"},"range":[0,360],"dtick":90},"yaxis":{"title":{"text":"Pressure angle (°)"},"range":[0,40]},"margin":{"t":30,"b":40,"l":60,"r":40},"height":300,"showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+<p>The optimized cam profile closely tracks the desired dwell-rise-dwell-return motion while keeping the pressure angle within acceptable limits. The B-spline parameterization ensures a smooth, manufacturable profile.</p>
+<p>Key design tradeoffs:</p>
+<ul class="simple">
+<li><p><strong>Larger base circle</strong> → lower pressure angles but larger cam size</p></li>
+<li><p><strong>Slower rise/return</strong> → lower pressure angles but reduced machine speed</p></li>
+<li><p><strong>More control points</strong> → better motion tracking but more complex profile</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="imu_sensor_fusion.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">IMU fusion + calibration</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="cart_pole_shooting.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Cart-pole (shooting)</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/brentyi/jaxls" aria-label="GitHub">
+            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+        </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Cam profile optimization</a><ul>
+<li><a class="reference internal" href="#cam-geometry">Cam geometry</a></li>
+<li><a class="reference internal" href="#target-motion-profile">Target motion profile</a></li>
+<li><a class="reference internal" href="#optimization-variables-and-costs">Optimization variables and costs</a></li>
+<li><a class="reference internal" href="#solve-the-cam-design-problem">Solve the cam design problem</a></li>
+<li><a class="reference internal" href="#visualization">Visualization</a></li>
+<li><a class="reference internal" href="#pressure-angle-analysis">Pressure angle analysis</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=5fa4622c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=fd10adb8"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

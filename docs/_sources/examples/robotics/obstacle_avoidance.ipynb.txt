@@ -8,11 +8,9 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
-   "id": "cell-1",
+   "execution_count": null,
    "metadata": {
     "tags": [
-     "hide-cell",
      "hide-input"
     ]
    },

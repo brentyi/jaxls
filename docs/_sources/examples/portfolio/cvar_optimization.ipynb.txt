@@ -4,12 +4,11 @@
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
-   "source": "# CVaR allocation\n\nIn this notebook, we solve a CVaR portfolio optimization problem: minimizing\nexpected losses in the worst-case scenarios rather than overall variance.\n\nUnlike mean-variance optimization which penalizes all volatility equally, CVaR focuses on\nworst-case scenarios -- the expected loss in the worst \u03b1% of outcomes. This makes\nit useful for risk-averse investors concerned about extreme market downturns.\n\nThis example is based on the formulation from [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/en/latest/GeneralEfficientFrontier.html)\nand [Rockafellar & Uryasev (2000)](https://sites.math.washington.edu/~rtr/papers/rtr179-CVaR1.pdf).\n\nFeatures used:\n- {class}`~jaxls.Var` with vector-valued and scalar defaults\n- Inequality constraints (`constraint_geq_zero`): CVaR auxiliary constraints, budget, no short-selling\n- Equality constraints (`constraint_eq_zero`): budget constraint\n- Augmented Lagrangian solver for constrained optimization"
+   "source": "# CVaR allocation\n\nIn this notebook, we solve a CVaR portfolio optimization problem: minimizing\nexpected losses in the worst-case scenarios rather than overall variance.\n\nUnlike mean-variance optimization which penalizes all volatility equally, CVaR focuses on\nworst-case scenarios: the expected loss in the worst \u03b1% of outcomes. This makes\nit useful for risk-averse investors concerned about extreme market downturns.\n\nThis example is based on the formulation from [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/en/latest/GeneralEfficientFrontier.html)\nand [Rockafellar & Uryasev (2000)](https://sites.math.washington.edu/~rtr/papers/rtr179-CVaR1.pdf).\n\nFeatures used:\n- {class}`~jaxls.Var` with vector-valued and scalar defaults\n- Inequality constraints (`constraint_geq_zero`): CVaR auxiliary constraints, budget, no short-selling\n- Equality constraints (`constraint_eq_zero`): budget constraint\n- Augmented Lagrangian solver for constrained optimization"
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
-   "id": "cell-1",
+   "execution_count": null,
    "metadata": {
     "tags": [
      "hide-input"

@@ -1,0 +1,1085 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="Mechanics" href="../../examples/mechanics/index.html" /><link rel="prev" title="Robust costs" href="robust_costs.html" />
+
+    <!-- Generated with Sphinx 8.0.2 and Furo 2024.08.06 -->
+        <title>Covariance estimation - jaxls</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=302659d7" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-code-background: #f4f4f4;
+  --color-code-foreground: #000;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">jaxls</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a
+  class="sidebar-brand"
+  href="../../index.html"
+  style="margin-top: 0.75em"
+>
+  
+  <span class="sidebar-brand-text">jaxls</span>
+
+  
+</a>
+
+<div style="text-align: left; padding: 0 1em 1em 1em">
+  <a href="https://github.com/brentyi/jaxls">
+    <img src="https://img.shields.io/github/stars/brentyi/jaxls?style=social" alt="GitHub stars">
+  </a>
+</div><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../basics.html">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tips_and_gotchas.html">Tips and gotchas</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Advanced</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Advanced</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="non_euclidean.html">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_jacobians.html">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="constraints.html">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="robust_costs.html">Robust costs</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Covariance estimation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/mechanics/index.html">Mechanics</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Mechanics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium.html">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_draping.html">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis.html">Truss analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/index.html">Vision</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Vision</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/camera_calibration.html">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_2d.html">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_3d.html">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/bundle_adjustment.html">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/smplh_shape_fitting.html">SMPL-H shape fitting</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/robotics/index.html">Robotics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Robotics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics.html">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance.html">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation.html">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting.html">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cam_design.html">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/imu_sensor_fusion.html">IMU fusion + calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/portfolio/index.html">Portfolio optimization</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Portfolio optimization</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance.html">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation.html">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation.html">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization.html">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman.html">Black-Litterman allocation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/core.html">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/lie_group_variables.html">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/solver_config.html">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/covariance.html">Covariance Estimation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../design/typed_api.html">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices.html">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static.html">What’s traced?</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/guide/advanced/covariance.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="covariance-estimation">
+<h1>Covariance estimation<a class="headerlink" href="#covariance-estimation" title="Link to this heading">¶</a></h1>
+<p>Computing uncertainty estimates from nonlinear least squares solutions in jaxls.</p>
+<p>After solving a nonlinear least squares problem, we often want to quantify uncertainty in the estimated variables. The covariance matrix <span class="math notranslate nohighlight">\((J^T J)^{-1}\)</span> provides this information, representing the tangent-space uncertainty of each variable.</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../api/core.html#jaxls.AnalyzedLeastSquaresProblem.make_covariance_estimator" title="jaxls.AnalyzedLeastSquaresProblem.make_covariance_estimator"><code class="xref py py-meth docutils literal notranslate"><span class="pre">make_covariance_estimator()</span></code></a> for creating estimators</p></li>
+<li><p><a class="reference internal" href="../../api/covariance.html#jaxls.CovarianceEstimator" title="jaxls.CovarianceEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">CovarianceEstimator</span></code></a> for extracting covariance blocks</p></li>
+<li><p><a class="reference internal" href="../../api/covariance.html#jaxls.LinearSolverCovarianceEstimatorConfig" title="jaxls.LinearSolverCovarianceEstimatorConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearSolverCovarianceEstimatorConfig</span></code></a> for configuration</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">loguru</span> <span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jaxlie</span>
+<span class="kn">import</span> <span class="nn">jaxls</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="background">
+<h2>Background<a class="headerlink" href="#background" title="Link to this heading">¶</a></h2>
+<p>For a nonlinear least squares problem that minimizes <span class="math notranslate nohighlight">\(\sum_i \|r_i(x)\|^2\)</span>,
+the covariance of the solution at a local minimum is approximated by:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\Sigma = (J^T J)^{-1} \sigma^2\]</div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(J\)</span> is the Jacobian of residuals at the solution</p></li>
+<li><p><span class="math notranslate nohighlight">\(\sigma^2\)</span> is the residual variance, estimated as <span class="math notranslate nohighlight">\(\|r\|^2 / (m - n)\)</span> where <span class="math notranslate nohighlight">\(m\)</span> is the number of residuals and <span class="math notranslate nohighlight">\(n\)</span> is the number of parameters</p></li>
+</ul>
+<p>For manifold variables (like SE3 poses), this covariance lives in the tangent space.</p>
+</section>
+<section id="simple-example-2d-localization">
+<h2>Simple example: 2D localization<a class="headerlink" href="#simple-example-2d-localization" title="Link to this heading">¶</a></h2>
+<p>Let’s start with a simple problem: estimating a 2D pose from noisy measurements.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ground truth pose.</span>
+<span class="n">true_pose</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">from_xy_theta</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span>
+
+<span class="c1"># Generate noisy measurements.</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">n_measurements</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">measurement_noise_std</span> <span class="o">=</span> <span class="mf">0.1</span>
+
+<span class="c1"># Noisy position measurements (x, y).</span>
+<span class="n">measured_positions</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()</span>
+    <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n_measurements</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span> <span class="o">*</span> <span class="n">measurement_noise_std</span>
+<span class="p">)</span>
+
+<span class="c1"># Noisy orientation measurements (as unit vectors).</span>
+<span class="n">true_angle</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span>
+    <span class="n">true_pose</span><span class="o">.</span><span class="n">rotation</span><span class="p">()</span><span class="o">.</span><span class="n">as_matrix</span><span class="p">()[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">true_pose</span><span class="o">.</span><span class="n">rotation</span><span class="p">()</span><span class="o">.</span><span class="n">as_matrix</span><span class="p">()[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="p">)</span>
+<span class="n">measured_angles</span> <span class="o">=</span> <span class="n">true_angle</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n_measurements</span><span class="p">)</span> <span class="o">*</span> <span class="n">measurement_noise_std</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;True pose: x=</span><span class="si">{</span><span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, theta=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">true_angle</span><span class="p">)</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>True pose: x=1.000, y=2.000, theta=0.785
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define cost functions.</span>
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">position_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">,</span> <span class="n">measured_xy</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Residual: difference between pose position and measurement.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">vals</span><span class="p">[</span><span class="n">pose</span><span class="p">]</span><span class="o">.</span><span class="n">translation</span><span class="p">()</span> <span class="o">-</span> <span class="n">measured_xy</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">orientation_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">,</span> <span class="n">measured_theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Residual: difference in orientation (as log of rotation).&quot;&quot;&quot;</span>
+    <span class="n">R</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">pose</span><span class="p">]</span><span class="o">.</span><span class="n">rotation</span><span class="p">()</span>
+    <span class="n">R_measured</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SO2</span><span class="o">.</span><span class="n">from_radians</span><span class="p">(</span><span class="n">measured_theta</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">R</span> <span class="o">@</span> <span class="n">R_measured</span><span class="o">.</span><span class="n">inverse</span><span class="p">())</span><span class="o">.</span><span class="n">log</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Build and solve the problem.</span>
+<span class="n">pose_var</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="c1"># Batch costs.</span>
+<span class="n">costs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">position_cost</span><span class="p">(</span>
+        <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_measurements</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">)),</span>
+        <span class="n">measured_positions</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">orientation_cost</span><span class="p">(</span>
+        <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_measurements</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">)),</span>
+        <span class="n">measured_angles</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+
+<span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">pose_var</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">identity</span><span class="p">())])</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">pose_var</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+<span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">)</span>
+
+<span class="n">estimated_pose</span> <span class="o">=</span> <span class="n">solution</span><span class="p">[</span><span class="n">pose_var</span><span class="p">]</span>
+<span class="n">est_angle</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span>
+    <span class="n">estimated_pose</span><span class="o">.</span><span class="n">rotation</span><span class="p">()</span><span class="o">.</span><span class="n">as_matrix</span><span class="p">()[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="n">estimated_pose</span><span class="o">.</span><span class="n">rotation</span><span class="p">()</span><span class="o">.</span><span class="n">as_matrix</span><span class="p">()[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Estimated pose: x=</span><span class="si">{</span><span class="n">estimated_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">estimated_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, theta=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">est_angle</span><span class="p">)</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 20 terms and 1 variables: 20 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 10 costs, 1 variables each: orientation_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 10 costs, 1 variables each: position_cost
+<span class=" -Color -Color-Bold">INFO    </span> |  step #0: cost=55.0646 lambd=0.0005 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - orientation_cost(10): 5.88457 (avg 0.58846)
+<span class=" -Color -Color-Bold">INFO    </span> |      - position_cost(10): 49.18004 (avg 2.45900)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.90e+01 cost_prev=55.0646 cost_new=7.1428
+<span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=7.1428 lambd=0.0003 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - orientation_cost(10): 0.05962 (avg 0.00596)
+<span class=" -Color -Color-Bold">INFO    </span> |      - position_cost(10): 7.08317 (avg 0.35416)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.03e+01 cost_prev=7.1428 cost_new=0.2347
+<span class=" -Color -Color-Bold">INFO    </span> |  step #2: cost=0.2347 lambd=0.0001 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - orientation_cost(10): 0.05962 (avg 0.00596)
+<span class=" -Color -Color-Bold">INFO    </span> |      - position_cost(10): 0.17508 (avg 0.00875)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.75e-04 cost_prev=0.2347 cost_new=0.2347
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #3: cost=0.2347 criteria=[1 0 0], term_deltas=0.0e+00,1.7e-04,5.8e-06
+Estimated pose: x=0.982, y=1.984, theta=0.763
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="computing-covariance">
+<h2>Computing covariance<a class="headerlink" href="#computing-covariance" title="Link to this heading">¶</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">make_covariance_estimator()</span></code> to create a covariance estimator, then extract blocks with <code class="docutils literal notranslate"><span class="pre">covariance()</span></code>:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create covariance estimator (default: conjugate gradient solver).</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">make_covariance_estimator</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span>
+
+<span class="c1"># Get the 3x3 covariance matrix for the SE2 pose (in tangent space).</span>
+<span class="c1"># Tangent space is [vx, vy, omega] for SE2.</span>
+<span class="n">cov</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">pose_var</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Covariance matrix (tangent space):&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cov</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Standard deviations: x=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, theta=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">])</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Covariance matrix (tangent space):
+[[ 8.6924818e-04 -5.4531440e-12  0.0000000e+00]
+ [-5.4531418e-12  8.6924795e-04  0.0000000e+00]
+ [ 0.0000000e+00  0.0000000e+00  8.6924812e-04]]
+
+Standard deviations: x=0.0295, y=0.0295, theta=0.0295
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">plotly.graph_objects</span> <span class="k">as</span> <span class="nn">go</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">HTML</span>
+
+
+<span class="k">def</span> <span class="nf">make_ellipse_trace</span><span class="p">(</span>
+    <span class="n">center</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+    <span class="n">cov_2d</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">n_std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Uncertainty&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;#2196F3&quot;</span><span class="p">,</span>
+    <span class="n">dash</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;solid&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a 2D uncertainty ellipse trace.&quot;&quot;&quot;</span>
+    <span class="c1"># Eigendecomposition for ellipse axes.</span>
+    <span class="n">eigvals</span><span class="p">,</span> <span class="n">eigvecs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigh</span><span class="p">(</span><span class="n">cov_2d</span><span class="p">)</span>
+    <span class="c1"># Scale by number of standard deviations.</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">n_std</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">eigvals</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">height</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">n_std</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">eigvals</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">angle</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">eigvecs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">eigvecs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+
+    <span class="c1"># Generate ellipse points.</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+    <span class="n">x_ellipse</span> <span class="o">=</span> <span class="n">width</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+    <span class="n">y_ellipse</span> <span class="o">=</span> <span class="n">height</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+
+    <span class="c1"># Rotate.</span>
+    <span class="n">cos_a</span><span class="p">,</span> <span class="n">sin_a</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span>
+    <span class="n">x_rot</span> <span class="o">=</span> <span class="n">cos_a</span> <span class="o">*</span> <span class="n">x_ellipse</span> <span class="o">-</span> <span class="n">sin_a</span> <span class="o">*</span> <span class="n">y_ellipse</span> <span class="o">+</span> <span class="n">center</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">y_rot</span> <span class="o">=</span> <span class="n">sin_a</span> <span class="o">*</span> <span class="n">x_ellipse</span> <span class="o">+</span> <span class="n">cos_a</span> <span class="o">*</span> <span class="n">y_ellipse</span> <span class="o">+</span> <span class="n">center</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">x_rot</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">y_rot</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">dash</span><span class="o">=</span><span class="n">dash</span><span class="p">),</span>
+        <span class="n">fill</span><span class="o">=</span><span class="s2">&quot;toself&quot;</span><span class="p">,</span>
+        <span class="n">fillcolor</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;rgba(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">color</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">color</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">5</span><span class="p">],</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">color</span><span class="p">[</span><span class="mi">5</span><span class="p">:</span><span class="mi">7</span><span class="p">],</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="si">}</span><span class="s2">, 0.2)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="c1"># Extract 2D position covariance (first 2x2 block).</span>
+<span class="n">cov_xy</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[:</span><span class="mi">2</span><span class="p">,</span> <span class="p">:</span><span class="mi">2</span><span class="p">]</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">()</span>
+
+<span class="c1"># Measurements.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">measured_positions</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">measured_positions</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#9E9E9E&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Measurements&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># True pose.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">0</span><span class="p">]],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">1</span><span class="p">]],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#4CAF50&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;star&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;True pose&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Estimated pose.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">estimated_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">0</span><span class="p">]],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">estimated_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">1</span><span class="p">]],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#2196F3&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;circle&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Estimated pose&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># 2-sigma uncertainty ellipse.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">make_ellipse_trace</span><span class="p">(</span>
+        <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">estimated_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">estimated_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">1</span><span class="p">])),</span>
+        <span class="n">cov_xy</span><span class="p">,</span>
+        <span class="n">n_std</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;2σ uncertainty&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#2196F3&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;2D Pose Estimation with Uncertainty&quot;</span><span class="p">,</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+    <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">),</span>
+    <span class="n">legend</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">yanchor</span><span class="o">=</span><span class="s2">&quot;top&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">xanchor</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.1.0.min.js" integrity="sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=" crossorigin="anonymous"></script>                <div id="ec7124c2-62e7-4dc7-afb3-54e33d2a33a8" class="plotly-graph-div" style="height:500px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("ec7124c2-62e7-4dc7-afb3-54e33d2a33a8")) {                    Plotly.newPlot(                        "ec7124c2-62e7-4dc7-afb3-54e33d2a33a8",                        [{"marker":{"color":"#9E9E9E","size":8},"mode":"markers","name":"Measurements","x":{"dtype":"f4","bdata":"oluGP1lKiD90AXo\u002fxDaUP0H7cz\u002fyInQ\u002f3RiDP5TXUz9PEmY\u002fLMFoPw=="},"y":{"dtype":"f4","bdata":"8Dr+P1W\u002fCUDIAP0\u002fXekEQO54A0DmCfo\u002fkILnP3\u002fN+D\u002fdAgJAKuztPw=="},"type":"scatter"},{"marker":{"color":"#4CAF50","size":12,"symbol":"star"},"mode":"markers","name":"True pose","x":[1.0],"y":[2.0],"type":"scatter"},{"marker":{"color":"#2196F3","size":12,"symbol":"circle"},"mode":"markers","name":"Estimated pose","x":[0.9815137982368469],"y":[1.984215497970581],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(33, 150, 243, 0.2)","line":{"color":"#2196F3","dash":"solid","width":2},"mode":"lines","name":"2σ uncertainty","x":{"dtype":"f4","bdata":"fUR7P2VPej9JW3k\u002fJWl4P\u002fR5dz+rjnY\u002fPah1P5fHdD+h7XM\u002fPRtzP0JRcj+AkHE\u002fwNlwP7wtcD8mjW8\u002fpfhuP9Bwbj809m0\u002fT4ltP5IqbT9e2mw\u002fBplsP81mbD\u002fnQ2w\u002feDBsP5QsbD8\u002fOGw\u002fbVNsPwJ+bD\u002fSt2w\u002foQBtPyVYbT8Dvm0\u002f0jFuPxyzbj9ZQW8\u002f+dtvP1uCcD\u002fUM3E\u002fre9xPyW1cj9vg3M\u002fuFl0PyI3dT\u002fJGnY\u002fwwN3Px\u002fxdz\u002fp4Xg\u002fJ9V5P+HJej8Zv3s\u002f07N8PxKnfT\u002fbl34\u002fN4V\u002fPxg3gD\u002fsqIA\u002foReBP8WCgT\u002fr6YE\u002fpkyCP5Oqgj9QA4M\u002fgVaDP9Cjgz\u002fv6oM\u002flCuEP3xlhD9rmIQ\u002fLMSEP5TohD98BYU\u002fxxqFP14ohT8zLoU\u002fQSyFP4oihT8XEYU\u002f+veEP07XhD80r4Q\u002f1n+EP2NJhD8VDIQ\u002fK8iDP+p9gz+fLYM\u002fndeCPz18gj\u002fcG4I\u002f37aBP6xNgT+y4IA\u002fX3CAP0\u002f6fz8GD38\u002f1B9+P7EtfT+VOXw\u002ffUR7Pw=="},"y":{"dtype":"f4","bdata":"fMMCQIrBAkC3uwJAB7ICQIWkAkBAkwJASH4CQLRlAkCdSQJAHyoCQFwHAkB24QFAlrgBQOWMAUCQXgFAxy0BQL36AECmxQBAuI4AQC1WAEA+HABATsL\u002fP0xK\u002fz\u002fv0P4\u002ftlb+Px7c\u002fT+mYf0\u002fy+f8Pwxv\u002fD\u002fl9\u002fs\u002f0IL7P0cQ+z\u002fAoPo\u002frTT6P33M+T+daPk\u002fdAn5P2Kv+D\u002fGWvg\u002f9gv4P0TD9z\u002f7gPc\u002fXkX3P6wQ9z8a4\u002fY\u002f2Lz2Pw2e9j\u002fYhvY\u002fU3f2P4xv9j+Mb\u002fY\u002fU3f2P9iG9j8NnvY\u002f2Lz2Pxrj9j+sEPc\u002fXkX3P\u002fuA9z9Ew\u002fc\u002f9gv4P8Za+D9ir\u002fg\u002fdAn5P55o+T99zPk\u002frTT6P8Cg+j9HEPs\u002f0IL7P+X3+z8Mb\u002fw\u002fy+f8P6Zh\u002fT8e3P0\u002ftlb+P+\u002fQ\u002fj9MSv8\u002fTsL\u002fPz4cAEAtVgBAuI4AQKbFAEC9+gBAyC0BQJBeAUDljAFAlrgBQHbhAUBcBwJAHyoCQJ1JAkC0ZQJASH4CQECTAkCFpAJAB7ICQLe7AkCKwQJAfMMCQA=="},"type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"title":{"text":"x"},"scaleanchor":"y","scaleratio":1},"yaxis":{"title":{"text":"y"}},"margin":{"t":60,"b":40,"l":60,"r":40},"legend":{"yanchor":"top","y":0.99,"xanchor":"left","x":0.01},"title":{"text":"2D Pose Estimation with Uncertainty"},"height":500},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+</section>
+<section id="ekf-as-single-gauss-newton-iteration">
+<h2>EKF as single Gauss-Newton iteration<a class="headerlink" href="#ekf-as-single-gauss-newton-iteration" title="Link to this heading">¶</a></h2>
+<p>An Extended Kalman Filter (EKF) update can be viewed as:</p>
+<ol class="arabic simple">
+<li><p>One Gauss-Newton iteration on a nonlinear least squares problem</p></li>
+<li><p>Covariance propagation via <span class="math notranslate nohighlight">\((J^T J)^{-1}\)</span></p></li>
+</ol>
+<p>This perspective shows that EKF and batch optimization are fundamentally the same algorithm, just with different iteration counts.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Simulate EKF-style sequential updates.</span>
+<span class="c1"># Prior: initial pose estimate with uncertainty.</span>
+<span class="n">prior_pose</span> <span class="o">=</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">from_xy_theta</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">6</span><span class="p">)</span>
+<span class="n">prior_cov</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mf">0.5</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mf">0.3</span><span class="o">**</span><span class="mi">2</span><span class="p">]))</span>  <span class="c1"># Prior uncertainty.</span>
+
+
+<span class="c1"># For EKF equivalence, use Euclidean parameterization [x, y, theta].</span>
+<span class="k">class</span> <span class="nc">PoseVar</span><span class="p">(</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pose as [x, y, theta] vector.&quot;&quot;&quot;</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">euclidean_prior_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">pose</span><span class="p">:</span> <span class="n">PoseVar</span><span class="p">,</span>
+    <span class="n">prior_mean</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">info_sqrt</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prior cost in Euclidean coordinates.&quot;&quot;&quot;</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">pose</span><span class="p">]</span> <span class="o">-</span> <span class="n">prior_mean</span>
+    <span class="k">return</span> <span class="n">info_sqrt</span> <span class="o">@</span> <span class="n">error</span>
+
+
+<span class="c1"># Information matrix is inverse of covariance.</span>
+<span class="n">prior_info</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">prior_cov</span><span class="p">)</span>
+<span class="n">prior_info_sqrt</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">prior_info</span><span class="p">)</span>
+<span class="n">prior_mean</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">6</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Take a single measurement.</span>
+<span class="n">single_measurement_xy</span> <span class="o">=</span> <span class="n">measured_positions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">single_measurement_theta</span> <span class="o">=</span> <span class="n">measured_angles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c1"># Measurement noise covariance (must match the noise used to generate data).</span>
+<span class="n">meas_noise_std</span> <span class="o">=</span> <span class="n">measurement_noise_std</span>  <span class="c1"># 0.1</span>
+<span class="n">meas_info_sqrt</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">meas_noise_std</span>  <span class="c1"># Weight = 1/sigma for residuals.</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">euclidean_position_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">pose</span><span class="p">:</span> <span class="n">PoseVar</span><span class="p">,</span>
+    <span class="n">measured_xy</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">weight</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Weighted position residual (Euclidean).&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">weight</span> <span class="o">*</span> <span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">pose</span><span class="p">][:</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">measured_xy</span><span class="p">)</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">euclidean_orientation_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">pose</span><span class="p">:</span> <span class="n">PoseVar</span><span class="p">,</span>
+    <span class="n">measured_theta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">weight</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Weighted orientation residual (Euclidean angle difference).&quot;&quot;&quot;</span>
+    <span class="c1"># Simple angle difference (works for small angles).</span>
+    <span class="n">angle_diff</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">pose</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">measured_theta</span>
+    <span class="c1"># Wrap to [-pi, pi].</span>
+    <span class="n">angle_diff</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle_diff</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle_diff</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">weight</span> <span class="o">*</span> <span class="n">angle_diff</span>
+
+
+<span class="c1"># EKF update = single Gauss-Newton step + covariance.</span>
+<span class="n">ekf_pose_var</span> <span class="o">=</span> <span class="n">PoseVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="n">ekf_costs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">euclidean_prior_cost</span><span class="p">(</span><span class="n">ekf_pose_var</span><span class="p">,</span> <span class="n">prior_mean</span><span class="p">,</span> <span class="n">prior_info_sqrt</span><span class="p">),</span>
+    <span class="n">euclidean_position_cost</span><span class="p">(</span><span class="n">ekf_pose_var</span><span class="p">,</span> <span class="n">single_measurement_xy</span><span class="p">,</span> <span class="n">meas_info_sqrt</span><span class="p">),</span>
+    <span class="n">euclidean_orientation_cost</span><span class="p">(</span><span class="n">ekf_pose_var</span><span class="p">,</span> <span class="n">single_measurement_theta</span><span class="p">,</span> <span class="n">meas_info_sqrt</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="n">ekf_initial</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">ekf_pose_var</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">prior_mean</span><span class="p">)])</span>
+<span class="n">ekf_problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">ekf_costs</span><span class="p">,</span> <span class="p">[</span><span class="n">ekf_pose_var</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+
+<span class="c1"># Single iteration (like EKF).</span>
+<span class="n">ekf_solution</span> <span class="o">=</span> <span class="n">ekf_problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+    <span class="n">ekf_initial</span><span class="p">,</span>
+    <span class="n">trust_region</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># Pure Gauss-Newton (no trust region).</span>
+    <span class="n">termination</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">TerminationConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Get posterior covariance.</span>
+<span class="n">ekf_estimator</span> <span class="o">=</span> <span class="n">ekf_problem</span><span class="o">.</span><span class="n">make_covariance_estimator</span><span class="p">(</span>
+    <span class="n">ekf_solution</span><span class="p">,</span> <span class="n">scale_by_residual_variance</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+<span class="n">posterior_cov</span> <span class="o">=</span> <span class="n">ekf_estimator</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">ekf_pose_var</span><span class="p">)</span>
+
+<span class="n">ekf_pose_vec</span> <span class="o">=</span> <span class="n">ekf_solution</span><span class="p">[</span><span class="n">ekf_pose_var</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;EKF-style update (1 Gauss-Newton iteration):&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Prior:     x=</span><span class="si">{</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Measurement: x=</span><span class="si">{</span><span class="n">single_measurement_xy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">single_measurement_xy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Posterior: x=</span><span class="si">{</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Prior uncertainty (std): x=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">prior_cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">])</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">prior_cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">])</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Posterior uncertainty (std): x=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">posterior_cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">])</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, y=</span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">posterior_cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">])</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 3 terms and 1 variables: 3 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: euclidean_prior_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: euclidean_position_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: euclidean_orientation_cost
+EKF-style update (1 Gauss-Newton iteration):
+  Prior:     x=0.500, y=1.500
+  Measurement: x=1.050, y=1.986
+  Posterior: x=1.029, y=1.967
+
+Prior uncertainty (std): x=0.500, y=0.500
+Posterior uncertainty (std): x=0.098, y=0.098
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Visualize EKF update.</span>
+<span class="n">fig_ekf</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">()</span>
+
+<span class="c1"># Prior ellipse.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">make_ellipse_trace</span><span class="p">(</span>
+        <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">1</span><span class="p">])),</span>
+        <span class="n">prior_cov</span><span class="p">[:</span><span class="mi">2</span><span class="p">,</span> <span class="p">:</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">n_std</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Prior 2σ&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#FF9800&quot;</span><span class="p">,</span>
+        <span class="n">dash</span><span class="o">=</span><span class="s2">&quot;dash&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Prior mean.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#FF9800&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;diamond&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Prior&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Measurement.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">single_measurement_xy</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">single_measurement_xy</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#9E9E9E&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;cross&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Measurement&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Posterior ellipse.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">make_ellipse_trace</span><span class="p">(</span>
+        <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">float</span><span class="p">(</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">1</span><span class="p">])),</span>
+        <span class="n">posterior_cov</span><span class="p">[:</span><span class="mi">2</span><span class="p">,</span> <span class="p">:</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">n_std</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Posterior 2σ&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#2196F3&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Posterior mean.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#2196F3&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;circle&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Posterior&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># True pose.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">0</span><span class="p">]],</span>
+        <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">true_pose</span><span class="o">.</span><span class="n">translation</span><span class="p">()[</span><span class="mi">1</span><span class="p">]],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;#4CAF50&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;star&quot;</span><span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;True pose&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Arrow from prior to posterior.</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">add_annotation</span><span class="p">(</span>
+    <span class="n">x</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+    <span class="n">y</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">ekf_pose_vec</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+    <span class="n">ax</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+    <span class="n">ay</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">prior_mean</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+    <span class="n">xref</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span>
+    <span class="n">yref</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span>
+    <span class="n">axref</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span>
+    <span class="n">ayref</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span>
+    <span class="n">showarrow</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">arrowhead</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">arrowsize</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>
+    <span class="n">arrowwidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">arrowcolor</span><span class="o">=</span><span class="s2">&quot;#607D8B&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">)</span>
+<span class="n">fig_ekf</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;EKF Update: Prior + Measurement → Posterior&quot;</span><span class="p">,</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+    <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">),</span>
+    <span class="n">legend</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">yanchor</span><span class="o">=</span><span class="s2">&quot;top&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">xanchor</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig_ekf</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.1.0.min.js" integrity="sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=" crossorigin="anonymous"></script>                <div id="8413c8a1-3617-4807-aa4a-497b74f2b769" class="plotly-graph-div" style="height:500px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("8413c8a1-3617-4807-aa4a-497b74f2b769")) {                    Plotly.newPlot(                        "8413c8a1-3617-4807-aa4a-497b74f2b769",                        [{"fill":"toself","fillcolor":"rgba(255, 152, 0, 0.2)","line":{"color":"#FF9800","dash":"dash","width":2},"mode":"lines","name":"Prior 2σ","x":{"dtype":"f4","bdata":"AADAPwe+vz9g+L4\u002f16+9P77luz\u002fum7k\u002fwtS2PxmTsz9M2q8\u002fMq6rPxgTpz++DaI\u002fUaOcP2XZlj\u002fztZA\u002fTj+KPyB8gz\u002fB5ng\u002folhqP+ZcWz\u002f5Akw\u002fslo8PzZ0LD\u002flXxw\u002fVC4MP2ng9z6KbNc+giK3PpQjlz56IW8+GhUxPuTD6D1gGmU9AACAs2DbXL3wSdi92JMevmxPTr6YJnu+jnWSvvC4pb6cSbe+chXHviwM1b5kH+G+qkLrvohr876Ykfm+gK79vgK+\u002f74Cvv++fq79vpaR+b6Ia\u002fO+qkLrvmQf4b4qDNW+cBXHvphJt77uuKW+jnWSvpwme75wT06+0JMevuBJ2L0w21y9AADAM4gaZT34w+g9JhUxPowhbz6eI5c+jCK3Pohs1z5n4Pc+Uy4MP+RfHD80dCw\u002fs1o8P\u002foCTD\u002fmXFs\u002fpVhqP8TmeD8hfIM\u002fUD+KP\u002fS1kD9n2ZY\u002fU6OcP74Noj8YE6c\u002fMq6rP0zarz8Yk7M\u002fwtS2P+6buT++5bs\u002f16+9P2D4vj8Hvr8\u002fAADAPw=="},"y":{"dtype":"f4","bdata":"AADAP0YeyD8uNNA\u002fYjnYP54l4D+28Oc\u002fo5LvP4UD9z+yO\u002f4\u002f3JkCQDTyBUBuIwlAQSoMQI0DD0BirBFAAyIUQOdhFkC8aRhAaTcaQBTJG0AeHR1AKTIeQBcHH0ANmx9Ace0fQPD9H0B4zB9APFkfQLOkHkCXrx1A5XocQNoHG0D2VxlA9mwXQNNIFUDD7RJAM14QQMicDUBYrApA648HQLVKBEAX4ABAKqf6P7BR8z9Sx+s\u002f0A\u002fkPyMz3D9kOdQ\u002fzCrMP6kPxD9W8Ls\u002fM9WzP5vGqz\u002fezKM\u002fMPCbP684lD9Orow\u002f1ViFP6J\u002ffD8o1W4\u002fVsBhP6FOVT\u002fgjEk\u002fMoc+P\u002fNIND+z3Co\u002fKEwiPyagGj+W4BM\u002fbBQOP6NBCT8zbQU\u002fD5sCPyDOAD9ACAA\u002fO0oAP82TAT+k4wM\u002fWzcHP4eLCz+w2xA\u002fXCIXPxRZHj9meCY\u002f9XcvP3lOOT\u002fP8UM\u002f\u002f1ZPP0NyWz8uN2g\u002fj5h1P07EgT97\u002fIg\u002fXW2QP0oPmD9i2p8\u002fnsanP9LLrz+74bc\u002fAQDAPw=="},"type":"scatter"},{"marker":{"color":"#FF9800","size":10,"symbol":"diamond"},"mode":"markers","name":"Prior","x":[0.5],"y":[1.5],"type":"scatter"},{"marker":{"color":"#9E9E9E","size":10,"symbol":"cross"},"mode":"markers","name":"Measurement","x":[1.0496714115142822],"y":[1.9861736297607422],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(33, 150, 243, 0.2)","line":{"color":"#2196F3","dash":"solid","width":2},"mode":"lines","name":"Posterior 2σ","x":{"dtype":"f4","bdata":"NcGcP0W0nD+CjZw\u002fFE2cPzzzmz9ZgJs\u002f4PSaP2JRmj+Glpk\u002fDcWYP8\u002fdlz+74ZY\u002f1dGVPzSvlD8Ee5M\u002fhDaSPwDjkD\u002fZgY8\u002feBSOP1icjD\u002f8Gos\u002f8ZGJP8wCiD8pb4Y\u002fp9iEP+pAgz+WqYE\u002fUBSAP3AFfT\u002fa7Hk\u002fDuJ2Py\u002focz9PAnE\u002fajNuP2Z+az8N5mg\u002fC21mP+4VZD8d42E\u002f39ZfP0\u002fzXT9gOlw\u002f2K1aP1BPWT8yIFg\u002ftSFXP+BUVj+HulU\u002fSFNVP44fVT+OH1U\u002fSFNVP4e6VT\u002fgVFY\u002ftSFXPzIgWD9QT1k\u002f2K1aP2A6XD9P810\u002f39ZfPx3jYT\u002ftFWQ\u002fC21mPw3maD9nfms\u002fazNuP1ACcT8w6HM\u002fD+J2P9vseT9xBX0\u002fUBSAP5apgT\u002fqQIM\u002fp9iEPyhvhj\u002fMAog\u002f8ZGJP\u002fwaiz9YnIw\u002feRSOP9mBjz8B45A\u002fhDaSPwV7kz80r5Q\u002f1dGVP7vhlj\u002fP3Zc\u002fDcWYP4aWmT9iUZo\u002f4PSaP1mAmz8885s\u002fFE2cP4KNnD9FtJw\u002fNcGcPw=="},"y":{"dtype":"f4","bdata":"Ndb7P8pt\u002fT+7A\u002f8\u002fM0sAQBUSAUC41QFAUZUCQBtQA0BWBQRARrQEQDdcBUB9\u002fAVAcZQGQHgjB0D+qAdAeSQIQGqVCEBc+whA51UJQK2kCUBd5wlAsh0KQHRHCkB5ZApAonQKQN53CkAqbgpAkVcKQCk0CkAXBApAjMcJQMh+CUAVKglAyskIQEpeCEAF6AdAdGcHQBzdBkCLSQZAWq0FQCkJBUCiXQRAdqsDQFzzAkASNgJAXHQBQACvAECUzf8\u002fEjn+Pxqi\u002fD9QCvs\u002fWHP5P9be9z9rTvY\u002fs8P0P0ZA8z+yxfE\u002fflXwPyXx7j8Xmu0\u002ftlHsP1QZ6z8y8uk\u002fgt3oP2Dc5z\u002fW7+Y\u002f1xjmP0BY5T\u002faruQ\u002fUR3kPzyk4z8YROM\u002fSf3iPxbQ4j+vvOI\u002fJ8PiP3jj4j+BHeM\u002fBnHjP7Dd4z8QY+Q\u002fnADlP7K15T+XgeY\u002feWPnP25a6D96Zek\u002fiIPqP3Cz6z\u002f88+w\u002f3kPuP7+h7z80DPE\u002fyIHyP\u002foA9D8\u002fiPU\u002fBBb3P6+o+D+gPvo\u002fNdb7Pw=="},"type":"scatter"},{"marker":{"color":"#2196F3","size":10,"symbol":"circle"},"mode":"markers","name":"Posterior","x":[1.0285301208496094],"y":[1.9674745798110962],"type":"scatter"},{"marker":{"color":"#4CAF50","size":12,"symbol":"star"},"mode":"markers","name":"True pose","x":[1.0],"y":[2.0],"type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"annotations":[{"arrowcolor":"#607D8B","arrowhead":2,"arrowsize":1.5,"arrowwidth":2,"ax":0.5,"axref":"x","ay":1.5,"ayref":"y","showarrow":true,"x":1.0285301208496094,"xref":"x","y":1.9674745798110962,"yref":"y"}],"xaxis":{"title":{"text":"x"},"scaleanchor":"y","scaleratio":1},"yaxis":{"title":{"text":"y"}},"margin":{"t":60,"b":40,"l":60,"r":40},"legend":{"yanchor":"top","y":0.99,"xanchor":"left","x":0.01},"title":{"text":"EKF Update: Prior + Measurement → Posterior"},"height":500},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+</section>
+<section id="cross-covariance-between-variables">
+<h2>Cross-covariance between variables<a class="headerlink" href="#cross-covariance-between-variables" title="Link to this heading">¶</a></h2>
+<p>For problems with multiple variables, we can compute cross-covariance blocks:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Two-pose problem with relative constraint.</span>
+<span class="n">pose0</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">pose1</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">anchor_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Anchor pose to a target.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">pose</span><span class="p">]</span> <span class="o">@</span> <span class="n">target</span><span class="o">.</span><span class="n">inverse</span><span class="p">())</span><span class="o">.</span><span class="n">log</span><span class="p">()</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">relative_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">pose_a</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">,</span>
+    <span class="n">pose_b</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">SE2Var</span><span class="p">,</span>
+    <span class="n">delta</span><span class="p">:</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Relative pose constraint.&quot;&quot;&quot;</span>
+    <span class="n">T_a</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">pose_a</span><span class="p">]</span>
+    <span class="n">T_b</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">pose_b</span><span class="p">]</span>
+    <span class="n">measured</span> <span class="o">=</span> <span class="n">T_a</span><span class="o">.</span><span class="n">inverse</span><span class="p">()</span> <span class="o">@</span> <span class="n">T_b</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">measured</span> <span class="o">@</span> <span class="n">delta</span><span class="o">.</span><span class="n">inverse</span><span class="p">())</span><span class="o">.</span><span class="n">log</span><span class="p">()</span>
+
+
+<span class="n">two_pose_costs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">anchor_cost</span><span class="p">(</span><span class="n">pose0</span><span class="p">,</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">from_xy_theta</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+    <span class="n">anchor_cost</span><span class="p">(</span><span class="n">pose1</span><span class="p">,</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">from_xy_theta</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+    <span class="n">relative_cost</span><span class="p">(</span><span class="n">pose0</span><span class="p">,</span> <span class="n">pose1</span><span class="p">,</span> <span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">from_xy_theta</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+<span class="p">]</span>
+
+<span class="n">two_pose_initial</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">pose0</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">identity</span><span class="p">()),</span>
+        <span class="n">pose1</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jaxlie</span><span class="o">.</span><span class="n">SE2</span><span class="o">.</span><span class="n">from_xy_theta</span><span class="p">(</span><span class="mf">1.5</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">two_pose_problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">two_pose_costs</span><span class="p">,</span> <span class="p">[</span><span class="n">pose0</span><span class="p">,</span> <span class="n">pose1</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+<span class="n">two_pose_solution</span> <span class="o">=</span> <span class="n">two_pose_problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">two_pose_initial</span><span class="p">)</span>
+
+<span class="c1"># Get covariance estimator.</span>
+<span class="n">two_pose_estimator</span> <span class="o">=</span> <span class="n">two_pose_problem</span><span class="o">.</span><span class="n">make_covariance_estimator</span><span class="p">(</span>
+    <span class="n">two_pose_solution</span><span class="p">,</span> <span class="n">scale_by_residual_variance</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="c1"># Marginal covariances.</span>
+<span class="n">cov_00</span> <span class="o">=</span> <span class="n">two_pose_estimator</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">pose0</span><span class="p">)</span>
+<span class="n">cov_11</span> <span class="o">=</span> <span class="n">two_pose_estimator</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">pose1</span><span class="p">)</span>
+
+<span class="c1"># Cross-covariance.</span>
+<span class="n">cov_01</span> <span class="o">=</span> <span class="n">two_pose_estimator</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">pose0</span><span class="p">,</span> <span class="n">pose1</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Marginal covariance pose0 (diagonal):&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">cov_00</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Marginal covariance pose1 (diagonal):&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">cov_11</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Cross-covariance pose0-pose1:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cov_01</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 3 terms and 2 variables: 3 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 2 costs, 1 variables each: anchor_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 2 variables each: relative_cost
+<span class=" -Color -Color-Bold">INFO    </span> |  step #0: cost=0.5000 lambd=0.0005 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.25000 (avg 0.04167)
+<span class=" -Color -Color-Bold">INFO    </span> |      - relative_cost(1): 0.25000 (avg 0.08333)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=7.07e-01 cost_prev=0.5000 cost_new=0.3333
+<span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=0.3333 lambd=0.0003 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.22221 (avg 0.03704)
+<span class=" -Color -Color-Bold">INFO    </span> |      - relative_cost(1): 0.11112 (avg 0.03704)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.34e-04 cost_prev=0.3333 cost_new=0.3333
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #2: cost=0.3333 criteria=[1 0 0], term_deltas=1.8e-07,1.2e-04,3.7e-05
+Marginal covariance pose0 (diagonal):
+  [0.6666667 0.7081737 0.6666667]
+
+Marginal covariance pose1 (diagonal):
+  [0.6666667  2.4351852  0.63218397]
+
+Cross-covariance pose0-pose1:
+[[0.33333334 0.         0.        ]
+ [0.         0.6018518  0.15900384]
+ [0.         0.6111111  0.33333337]]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="estimator-options">
+<h2>Estimator options<a class="headerlink" href="#estimator-options" title="Link to this heading">¶</a></h2>
+<p>jaxls provides different methods for computing covariances:</p>
+<ul class="simple">
+<li><p><strong>Conjugate Gradient (default)</strong>: GPU-friendly iterative solver. Fast when variables are weakly correlated.</p></li>
+<li><p><strong>Dense Cholesky</strong>: Direct solver. Caches factorization for efficient repeated queries.</p></li>
+<li><p><strong>CHOLMOD</strong>: Sparse direct solver (requires <code class="docutils literal notranslate"><span class="pre">sksparse</span></code>). Efficient for large sparse problems on CPU.</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Default: Conjugate Gradient.</span>
+<span class="n">estimator_cg</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">make_covariance_estimator</span><span class="p">(</span><span class="n">solution</span><span class="p">)</span>
+
+<span class="c1"># Dense Cholesky.</span>
+<span class="n">estimator_dense</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">make_covariance_estimator</span><span class="p">(</span>
+    <span class="n">solution</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">LinearSolverCovarianceEstimatorConfig</span><span class="p">(</span><span class="n">linear_solver</span><span class="o">=</span><span class="s2">&quot;dense_cholesky&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Compare results.</span>
+<span class="n">cov_cg</span> <span class="o">=</span> <span class="n">estimator_cg</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">pose_var</span><span class="p">)</span>
+<span class="n">cov_dense</span> <span class="o">=</span> <span class="n">estimator_dense</span><span class="o">.</span><span class="n">covariance</span><span class="p">(</span><span class="n">pose_var</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;CG and Dense Cholesky give the same result:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Max difference: </span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">cov_cg</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">cov_dense</span><span class="p">))</span><span class="si">:</span><span class="s2">.2e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>CG and Dense Cholesky give the same result:
+  Max difference: 2.33e-10
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<p>Covariance estimation in jaxls:</p>
+<ol class="arabic simple">
+<li><p><strong>After solving</strong>, create a covariance estimator with <code class="docutils literal notranslate"><span class="pre">problem.make_covariance_estimator(solution)</span></code>.</p></li>
+<li><p><strong>Extract blocks</strong> using <code class="docutils literal notranslate"><span class="pre">estimator.covariance(var)</span></code> for marginal covariance or <code class="docutils literal notranslate"><span class="pre">estimator.covariance(var0,</span> <span class="pre">var1)</span></code> for cross-covariance.</p></li>
+<li><p><strong>EKF connection</strong>: An EKF update is equivalent to one Gauss-Newton iteration plus covariance computation.</p></li>
+<li><p><strong>Multiple methods</strong>: CG (default, GPU-friendly), dense Cholesky, or CHOLMOD for large sparse problems.</p></li>
+</ol>
+<p>For more details, see <a class="reference internal" href="../../api/covariance.html#jaxls.CovarianceEstimator" title="jaxls.CovarianceEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">CovarianceEstimator</span></code></a>, <a class="reference internal" href="../../api/covariance.html#jaxls.LinearSolverCovarianceEstimatorConfig" title="jaxls.LinearSolverCovarianceEstimatorConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">LinearSolverCovarianceEstimatorConfig</span></code></a>, and <a class="reference internal" href="../../api/core.html#jaxls.AnalyzedLeastSquaresProblem.make_covariance_estimator" title="jaxls.AnalyzedLeastSquaresProblem.make_covariance_estimator"><code class="xref py py-meth docutils literal notranslate"><span class="pre">make_covariance_estimator()</span></code></a>.</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../../examples/mechanics/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Mechanics</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="robust_costs.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Robust costs</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/brentyi/jaxls" aria-label="GitHub">
+            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+        </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Covariance estimation</a><ul>
+<li><a class="reference internal" href="#background">Background</a></li>
+<li><a class="reference internal" href="#simple-example-2d-localization">Simple example: 2D localization</a></li>
+<li><a class="reference internal" href="#computing-covariance">Computing covariance</a></li>
+<li><a class="reference internal" href="#ekf-as-single-gauss-newton-iteration">EKF as single Gauss-Newton iteration</a></li>
+<li><a class="reference internal" href="#cross-covariance-between-variables">Cross-covariance between variables</a></li>
+<li><a class="reference internal" href="#estimator-options">Estimator options</a></li>
+<li><a class="reference internal" href="#summary">Summary</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=5fa4622c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=fd10adb8"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

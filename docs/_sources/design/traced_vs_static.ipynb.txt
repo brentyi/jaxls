@@ -1,6 +1,23 @@
 {
  "cells": [
   {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "tags": [
+     "hide-input"
+    ]
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "from loguru import logger\n",
+    "\n",
+    "logger.remove()\n",
+    "logger.add(sys.stdout, format=\"<level>{level: <8}</level> | {message}\");"
+   ]
+  },
+  {
    "cell_type": "markdown",
    "id": "cell-0",
    "metadata": {},
@@ -15,24 +32,6 @@
     "- Why variable IDs are traced\n",
     "- What triggers recompilation\n",
     "- Examples: leveraging traced values"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "cell-1",
-   "metadata": {
-    "tags": [
-     "hide-input"
-    ]
-   },
-   "outputs": [],
-   "source": [
-    "import sys\n",
-    "from loguru import logger\n",
-    "\n",
-    "logger.remove()\n",
-    "logger.add(sys.stdout, format=\"<level>{level: <8}</level> | {message}\");"
    ]
   },
   {
@@ -174,7 +173,7 @@
     "- Adding/removing variables or costs\n",
     "- Changing variable types\n",
     "- Changing problem dimensions\n",
-    "- Switching linear solver (CG → Cholesky)\n",
+    "- Switching linear solver (CG \u2192 Cholesky)\n",
     "- Changing sparse matrix mode\n",
     "\n",
     "The first solve is slower (includes compilation), but subsequent solves with\n",

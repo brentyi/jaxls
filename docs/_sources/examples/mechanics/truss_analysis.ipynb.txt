@@ -21,8 +21,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 12,
-   "id": "cell-1",
+   "execution_count": null,
    "metadata": {
     "tags": [
      "hide-input"

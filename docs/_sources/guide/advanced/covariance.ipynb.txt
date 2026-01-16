@@ -1,0 +1,1105 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "cell-0",
+   "metadata": {},
+   "source": [
+    "# Covariance estimation\n",
+    "\n",
+    "Computing uncertainty estimates from nonlinear least squares solutions in jaxls.\n",
+    "\n",
+    "After solving a nonlinear least squares problem, we often want to quantify uncertainty in the estimated variables. The covariance matrix $(J^T J)^{-1}$ provides this information, representing the tangent-space uncertainty of each variable.\n",
+    "\n",
+    "Features used:\n",
+    "- {meth}`~jaxls.AnalyzedLeastSquaresProblem.make_covariance_estimator` for creating estimators\n",
+    "- {class}`~jaxls.CovarianceEstimator` for extracting covariance blocks\n",
+    "- {class}`~jaxls.LinearSolverCovarianceEstimatorConfig` for configuration"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "cell-1",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:24:59.372310Z",
+     "iopub.status.busy": "2026-01-08T04:24:59.371809Z",
+     "iopub.status.idle": "2026-01-08T04:24:59.396621Z",
+     "shell.execute_reply": "2026-01-08T04:24:59.396277Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "from loguru import logger\n",
+    "\n",
+    "logger.remove()\n",
+    "logger.add(sys.stdout, format=\"<level>{level: <8}</level> | {message}\");"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "cell-2",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:24:59.398514Z",
+     "iopub.status.busy": "2026-01-08T04:24:59.398359Z",
+     "iopub.status.idle": "2026-01-08T04:25:00.287192Z",
+     "shell.execute_reply": "2026-01-08T04:25:00.286750Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "import jax\n",
+    "import jax.numpy as jnp\n",
+    "import jaxlie\n",
+    "import jaxls\n",
+    "import numpy as np"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-3",
+   "metadata": {},
+   "source": [
+    "## Background\n",
+    "\n",
+    "For a nonlinear least squares problem that minimizes $\\sum_i \\|r_i(x)\\|^2$,\n",
+    "the covariance of the solution at a local minimum is approximated by:\n",
+    "\n",
+    "$$\\Sigma = (J^T J)^{-1} \\sigma^2$$\n",
+    "\n",
+    "where:\n",
+    "- $J$ is the Jacobian of residuals at the solution\n",
+    "- $\\sigma^2$ is the residual variance, estimated as $\\|r\\|^2 / (m - n)$ where $m$ is the number of residuals and $n$ is the number of parameters\n",
+    "\n",
+    "For manifold variables (like SE3 poses), this covariance lives in the tangent space."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-4",
+   "metadata": {},
+   "source": [
+    "## Simple example: 2D localization\n",
+    "\n",
+    "Let's start with a simple problem: estimating a 2D pose from noisy measurements."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "cell-5",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:00.289733Z",
+     "iopub.status.busy": "2026-01-08T04:25:00.289489Z",
+     "iopub.status.idle": "2026-01-08T04:25:00.802423Z",
+     "shell.execute_reply": "2026-01-08T04:25:00.802045Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "True pose: x=1.000, y=2.000, theta=0.785\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Ground truth pose.\n",
+    "true_pose = jaxlie.SE2.from_xy_theta(1.0, 2.0, jnp.pi / 4)\n",
+    "\n",
+    "# Generate noisy measurements.\n",
+    "np.random.seed(42)\n",
+    "n_measurements = 10\n",
+    "measurement_noise_std = 0.1\n",
+    "\n",
+    "# Noisy position measurements (x, y).\n",
+    "measured_positions = (\n",
+    "    true_pose.translation()\n",
+    "    + jnp.array(np.random.randn(n_measurements, 2)) * measurement_noise_std\n",
+    ")\n",
+    "\n",
+    "# Noisy orientation measurements (as unit vectors).\n",
+    "true_angle = jnp.arctan2(\n",
+    "    true_pose.rotation().as_matrix()[1, 0], true_pose.rotation().as_matrix()[0, 0]\n",
+    ")\n",
+    "measured_angles = true_angle + np.random.randn(n_measurements) * measurement_noise_std\n",
+    "\n",
+    "print(f\"True pose: x={true_pose.translation()[0]:.3f}, y={true_pose.translation()[1]:.3f}, theta={float(true_angle):.3f}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "cell-6",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:00.804427Z",
+     "iopub.status.busy": "2026-01-08T04:25:00.804268Z",
+     "iopub.status.idle": "2026-01-08T04:25:00.807037Z",
+     "shell.execute_reply": "2026-01-08T04:25:00.806744Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# Define cost functions.\n",
+    "@jaxls.Cost.factory\n",
+    "def position_cost(\n",
+    "    vals: jaxls.VarValues, pose: jaxls.SE2Var, measured_xy: jax.Array\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Residual: difference between pose position and measurement.\"\"\"\n",
+    "    return vals[pose].translation() - measured_xy\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def orientation_cost(\n",
+    "    vals: jaxls.VarValues, pose: jaxls.SE2Var, measured_theta: jax.Array\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Residual: difference in orientation (as log of rotation).\"\"\"\n",
+    "    R = vals[pose].rotation()\n",
+    "    R_measured = jaxlie.SO2.from_radians(measured_theta)\n",
+    "    return (R @ R_measured.inverse()).log()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "cell-7",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:00.808619Z",
+     "iopub.status.busy": "2026-01-08T04:25:00.808479Z",
+     "iopub.status.idle": "2026-01-08T04:25:02.682174Z",
+     "shell.execute_reply": "2026-01-08T04:25:02.681778Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Building optimization problem with 20 terms and 1 variables: 20 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 10 costs, 1 variables each: orientation_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 10 costs, 1 variables each: position_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |  step #0: cost=55.0646 lambd=0.0005 inexact_tol=1.0e-02\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - orientation_cost(10): 5.88457 (avg 0.58846)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - position_cost(10): 49.18004 (avg 2.45900)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      accepted=True ATb_norm=2.90e+01 cost_prev=55.0646 cost_new=7.1428\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |  step #1: cost=7.1428 lambd=0.0003 inexact_tol=1.0e-02\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - orientation_cost(10): 0.05962 (avg 0.00596)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - position_cost(10): 7.08317 (avg 0.35416)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      accepted=True ATb_norm=1.03e+01 cost_prev=7.1428 cost_new=0.2347\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |  step #2: cost=0.2347 lambd=0.0001 inexact_tol=1.0e-02\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - orientation_cost(10): 0.05962 (avg 0.00596)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - position_cost(10): 0.17508 (avg 0.00875)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      accepted=False ATb_norm=1.75e-04 cost_prev=0.2347 cost_new=0.2347\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Terminated @ iteration #3: cost=0.2347 criteria=[1 0 0], term_deltas=0.0e+00,1.7e-04,5.8e-06\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimated pose: x=0.982, y=1.984, theta=0.763\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Build and solve the problem.\n",
+    "pose_var = jaxls.SE2Var(id=0)\n",
+    "\n",
+    "# Batch costs.\n",
+    "costs = [\n",
+    "    position_cost(\n",
+    "        jaxls.SE2Var(id=jnp.zeros(n_measurements, dtype=jnp.int32)),\n",
+    "        measured_positions,\n",
+    "    ),\n",
+    "    orientation_cost(\n",
+    "        jaxls.SE2Var(id=jnp.zeros(n_measurements, dtype=jnp.int32)),\n",
+    "        measured_angles,\n",
+    "    ),\n",
+    "]\n",
+    "\n",
+    "initial_vals = jaxls.VarValues.make([pose_var.with_value(jaxlie.SE2.identity())])\n",
+    "\n",
+    "problem = jaxls.LeastSquaresProblem(costs, [pose_var]).analyze()\n",
+    "solution = problem.solve(initial_vals)\n",
+    "\n",
+    "estimated_pose = solution[pose_var]\n",
+    "est_angle = jnp.arctan2(\n",
+    "    estimated_pose.rotation().as_matrix()[1, 0],\n",
+    "    estimated_pose.rotation().as_matrix()[0, 0],\n",
+    ")\n",
+    "print(f\"Estimated pose: x={estimated_pose.translation()[0]:.3f}, y={estimated_pose.translation()[1]:.3f}, theta={float(est_angle):.3f}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-8",
+   "metadata": {},
+   "source": [
+    "## Computing covariance\n",
+    "\n",
+    "Use `make_covariance_estimator()` to create a covariance estimator, then extract blocks with `covariance()`:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "cell-9",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:02.684198Z",
+     "iopub.status.busy": "2026-01-08T04:25:02.684040Z",
+     "iopub.status.idle": "2026-01-08T04:25:05.946239Z",
+     "shell.execute_reply": "2026-01-08T04:25:05.945821Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Covariance matrix (tangent space):\n",
+      "[[ 8.6924818e-04 -5.4531440e-12  0.0000000e+00]\n",
+      " [-5.4531418e-12  8.6924795e-04  0.0000000e+00]\n",
+      " [ 0.0000000e+00  0.0000000e+00  8.6924812e-04]]\n",
+      "\n",
+      "Standard deviations: x=0.0295, y=0.0295, theta=0.0295\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Create covariance estimator (default: conjugate gradient solver).\n",
+    "estimator = problem.make_covariance_estimator(solution)\n",
+    "\n",
+    "# Get the 3x3 covariance matrix for the SE2 pose (in tangent space).\n",
+    "# Tangent space is [vx, vy, omega] for SE2.\n",
+    "cov = estimator.covariance(pose_var)\n",
+    "\n",
+    "print(\"Covariance matrix (tangent space):\")\n",
+    "print(cov)\n",
+    "print(f\"\\nStandard deviations: x={jnp.sqrt(cov[0, 0]):.4f}, y={jnp.sqrt(cov[1, 1]):.4f}, theta={jnp.sqrt(cov[2, 2]):.4f}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "cell-10",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:05.948164Z",
+     "iopub.status.busy": "2026-01-08T04:25:05.948008Z",
+     "iopub.status.idle": "2026-01-08T04:25:06.392187Z",
+     "shell.execute_reply": "2026-01-08T04:25:06.391770Z"
+    }
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>                        <script type=\"text/javascript\">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>\n",
+       "        <script charset=\"utf-8\" src=\"https://cdn.plot.ly/plotly-3.1.0.min.js\" integrity=\"sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=\" crossorigin=\"anonymous\"></script>                <div id=\"15d796e2-e350-403c-817e-c832812d2b15\" class=\"plotly-graph-div\" style=\"height:500px; width:100%;\"></div>            <script type=\"text/javascript\">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById(\"15d796e2-e350-403c-817e-c832812d2b15\")) {                    Plotly.newPlot(                        \"15d796e2-e350-403c-817e-c832812d2b15\",                        [{\"marker\":{\"color\":\"#9E9E9E\",\"size\":8},\"mode\":\"markers\",\"name\":\"Measurements\",\"x\":{\"dtype\":\"f4\",\"bdata\":\"oluGP1lKiD90AXo\\u002fxDaUP0H7cz\\u002fyInQ\\u002f3RiDP5TXUz9PEmY\\u002fLMFoPw==\"},\"y\":{\"dtype\":\"f4\",\"bdata\":\"8Dr+P1W\\u002fCUDIAP0\\u002fXekEQO54A0DmCfo\\u002fkILnP3\\u002fN+D\\u002fdAgJAKuztPw==\"},\"type\":\"scatter\"},{\"marker\":{\"color\":\"#4CAF50\",\"size\":12,\"symbol\":\"star\"},\"mode\":\"markers\",\"name\":\"True pose\",\"x\":[1.0],\"y\":[2.0],\"type\":\"scatter\"},{\"marker\":{\"color\":\"#2196F3\",\"size\":12,\"symbol\":\"circle\"},\"mode\":\"markers\",\"name\":\"Estimated pose\",\"x\":[0.9815137982368469],\"y\":[1.984215497970581],\"type\":\"scatter\"},{\"fill\":\"toself\",\"fillcolor\":\"rgba(33, 150, 243, 0.2)\",\"line\":{\"color\":\"#2196F3\",\"dash\":\"solid\",\"width\":2},\"mode\":\"lines\",\"name\":\"2σ uncertainty\",\"x\":{\"dtype\":\"f4\",\"bdata\":\"fUR7P2VPej9JW3k\\u002fJWl4P\\u002fR5dz+rjnY\\u002fPah1P5fHdD+h7XM\\u002fPRtzP0JRcj+AkHE\\u002fwNlwP7wtcD8mjW8\\u002fpfhuP9Bwbj809m0\\u002fT4ltP5IqbT9e2mw\\u002fBplsP81mbD\\u002fnQ2w\\u002feDBsP5QsbD8\\u002fOGw\\u002fbVNsPwJ+bD\\u002fSt2w\\u002foQBtPyVYbT8Dvm0\\u002f0jFuPxyzbj9ZQW8\\u002f+dtvP1uCcD\\u002fUM3E\\u002fre9xPyW1cj9vg3M\\u002fuFl0PyI3dT\\u002fJGnY\\u002fwwN3Px\\u002fxdz\\u002fp4Xg\\u002fJ9V5P+HJej8Zv3s\\u002f07N8PxKnfT\\u002fbl34\\u002fN4V\\u002fPxg3gD\\u002fsqIA\\u002foReBP8WCgT\\u002fr6YE\\u002fpkyCP5Oqgj9QA4M\\u002fgVaDP9Cjgz\\u002fv6oM\\u002flCuEP3xlhD9rmIQ\\u002fLMSEP5TohD98BYU\\u002fxxqFP14ohT8zLoU\\u002fQSyFP4oihT8XEYU\\u002f+veEP07XhD80r4Q\\u002f1n+EP2NJhD8VDIQ\\u002fK8iDP+p9gz+fLYM\\u002fndeCPz18gj\\u002fcG4I\\u002f37aBP6xNgT+y4IA\\u002fX3CAP0\\u002f6fz8GD38\\u002f1B9+P7EtfT+VOXw\\u002ffUR7Pw==\"},\"y\":{\"dtype\":\"f4\",\"bdata\":\"fMMCQIrBAkC3uwJAB7ICQIWkAkBAkwJASH4CQLRlAkCdSQJAHyoCQFwHAkB24QFAlrgBQOWMAUCQXgFAxy0BQL36AECmxQBAuI4AQC1WAEA+HABATsL\\u002fP0xK\\u002fz\\u002fv0P4\\u002ftlb+Px7c\\u002fT+mYf0\\u002fy+f8Pwxv\\u002fD\\u002fl9\\u002fs\\u002f0IL7P0cQ+z\\u002fAoPo\\u002frTT6P33M+T+daPk\\u002fdAn5P2Kv+D\\u002fGWvg\\u002f9gv4P0TD9z\\u002f7gPc\\u002fXkX3P6wQ9z8a4\\u002fY\\u002f2Lz2Pw2e9j\\u002fYhvY\\u002fU3f2P4xv9j+Mb\\u002fY\\u002fU3f2P9iG9j8NnvY\\u002f2Lz2Pxrj9j+sEPc\\u002fXkX3P\\u002fuA9z9Ew\\u002fc\\u002f9gv4P8Za+D9ir\\u002fg\\u002fdAn5P55o+T99zPk\\u002frTT6P8Cg+j9HEPs\\u002f0IL7P+X3+z8Mb\\u002fw\\u002fy+f8P6Zh\\u002fT8e3P0\\u002ftlb+P+\\u002fQ\\u002fj9MSv8\\u002fTsL\\u002fPz4cAEAtVgBAuI4AQKbFAEC9+gBAyC0BQJBeAUDljAFAlrgBQHbhAUBcBwJAHyoCQJ1JAkC0ZQJASH4CQECTAkCFpAJAB7ICQLe7AkCKwQJAfMMCQA==\"},\"type\":\"scatter\"}],                        {\"template\":{\"data\":{\"histogram2dcontour\":[{\"type\":\"histogram2dcontour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"choropleth\":[{\"type\":\"choropleth\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"histogram2d\":[{\"type\":\"histogram2d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"heatmap\":[{\"type\":\"heatmap\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"contourcarpet\":[{\"type\":\"contourcarpet\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"contour\":[{\"type\":\"contour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"surface\":[{\"type\":\"surface\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"mesh3d\":[{\"type\":\"mesh3d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"scatter\":[{\"fillpattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2},\"type\":\"scatter\"}],\"parcoords\":[{\"type\":\"parcoords\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolargl\":[{\"type\":\"scatterpolargl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"bar\":[{\"error_x\":{\"color\":\"#2a3f5f\"},\"error_y\":{\"color\":\"#2a3f5f\"},\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"bar\"}],\"scattergeo\":[{\"type\":\"scattergeo\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolar\":[{\"type\":\"scatterpolar\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"histogram\":[{\"marker\":{\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"histogram\"}],\"scattergl\":[{\"type\":\"scattergl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatter3d\":[{\"type\":\"scatter3d\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermap\":[{\"type\":\"scattermap\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermapbox\":[{\"type\":\"scattermapbox\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterternary\":[{\"type\":\"scatterternary\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattercarpet\":[{\"type\":\"scattercarpet\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"carpet\":[{\"aaxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"baxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"type\":\"carpet\"}],\"table\":[{\"cells\":{\"fill\":{\"color\":\"#EBF0F8\"},\"line\":{\"color\":\"white\"}},\"header\":{\"fill\":{\"color\":\"#C8D4E3\"},\"line\":{\"color\":\"white\"}},\"type\":\"table\"}],\"barpolar\":[{\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"barpolar\"}],\"pie\":[{\"automargin\":true,\"type\":\"pie\"}]},\"layout\":{\"autotypenumbers\":\"strict\",\"colorway\":[\"#636efa\",\"#EF553B\",\"#00cc96\",\"#ab63fa\",\"#FFA15A\",\"#19d3f3\",\"#FF6692\",\"#B6E880\",\"#FF97FF\",\"#FECB52\"],\"font\":{\"color\":\"#2a3f5f\"},\"hovermode\":\"closest\",\"hoverlabel\":{\"align\":\"left\"},\"paper_bgcolor\":\"white\",\"plot_bgcolor\":\"#E5ECF6\",\"polar\":{\"bgcolor\":\"#E5ECF6\",\"angularaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"radialaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"ternary\":{\"bgcolor\":\"#E5ECF6\",\"aaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"baxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"caxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"coloraxis\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"colorscale\":{\"sequential\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"sequentialminus\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"diverging\":[[0,\"#8e0152\"],[0.1,\"#c51b7d\"],[0.2,\"#de77ae\"],[0.3,\"#f1b6da\"],[0.4,\"#fde0ef\"],[0.5,\"#f7f7f7\"],[0.6,\"#e6f5d0\"],[0.7,\"#b8e186\"],[0.8,\"#7fbc41\"],[0.9,\"#4d9221\"],[1,\"#276419\"]]},\"xaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"yaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"scene\":{\"xaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"yaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"zaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2}},\"shapedefaults\":{\"line\":{\"color\":\"#2a3f5f\"}},\"annotationdefaults\":{\"arrowcolor\":\"#2a3f5f\",\"arrowhead\":0,\"arrowwidth\":1},\"geo\":{\"bgcolor\":\"white\",\"landcolor\":\"#E5ECF6\",\"subunitcolor\":\"white\",\"showland\":true,\"showlakes\":true,\"lakecolor\":\"white\"},\"title\":{\"x\":0.05},\"mapbox\":{\"style\":\"light\"}}},\"xaxis\":{\"title\":{\"text\":\"x\"},\"scaleanchor\":\"y\",\"scaleratio\":1},\"yaxis\":{\"title\":{\"text\":\"y\"}},\"margin\":{\"t\":60,\"b\":40,\"l\":60,\"r\":40},\"legend\":{\"yanchor\":\"top\",\"y\":0.99,\"xanchor\":\"left\",\"x\":0.01},\"title\":{\"text\":\"2D Pose Estimation with Uncertainty\"},\"height\":500},                        {\"responsive\": true}                    )                };            </script>        </div>"
+      ],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import plotly.graph_objects as go\n",
+    "from IPython.display import HTML\n",
+    "\n",
+    "\n",
+    "def make_ellipse_trace(\n",
+    "    center: tuple[float, float],\n",
+    "    cov_2d: jax.Array,\n",
+    "    n_std: float = 2.0,\n",
+    "    name: str = \"Uncertainty\",\n",
+    "    color: str = \"#2196F3\",\n",
+    "    dash: str = \"solid\",\n",
+    ") -> go.Scatter:\n",
+    "    \"\"\"Create a 2D uncertainty ellipse trace.\"\"\"\n",
+    "    # Eigendecomposition for ellipse axes.\n",
+    "    eigvals, eigvecs = jnp.linalg.eigh(cov_2d)\n",
+    "    # Scale by number of standard deviations.\n",
+    "    width = 2 * n_std * jnp.sqrt(eigvals[0])\n",
+    "    height = 2 * n_std * jnp.sqrt(eigvals[1])\n",
+    "    angle = jnp.arctan2(eigvecs[1, 0], eigvecs[0, 0])\n",
+    "\n",
+    "    # Generate ellipse points.\n",
+    "    t = jnp.linspace(0, 2 * jnp.pi, 100)\n",
+    "    x_ellipse = width / 2 * jnp.cos(t)\n",
+    "    y_ellipse = height / 2 * jnp.sin(t)\n",
+    "\n",
+    "    # Rotate.\n",
+    "    cos_a, sin_a = jnp.cos(angle), jnp.sin(angle)\n",
+    "    x_rot = cos_a * x_ellipse - sin_a * y_ellipse + center[0]\n",
+    "    y_rot = sin_a * x_ellipse + cos_a * y_ellipse + center[1]\n",
+    "\n",
+    "    return go.Scatter(\n",
+    "        x=x_rot,\n",
+    "        y=y_rot,\n",
+    "        mode=\"lines\",\n",
+    "        name=name,\n",
+    "        line=dict(color=color, width=2, dash=dash),\n",
+    "        fill=\"toself\",\n",
+    "        fillcolor=f\"rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.2)\",\n",
+    "    )\n",
+    "\n",
+    "\n",
+    "# Extract 2D position covariance (first 2x2 block).\n",
+    "cov_xy = cov[:2, :2]\n",
+    "\n",
+    "fig = go.Figure()\n",
+    "\n",
+    "# Measurements.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=measured_positions[:, 0],\n",
+    "        y=measured_positions[:, 1],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=8, color=\"#9E9E9E\"),\n",
+    "        name=\"Measurements\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# True pose.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=[true_pose.translation()[0]],\n",
+    "        y=[true_pose.translation()[1]],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=12, color=\"#4CAF50\", symbol=\"star\"),\n",
+    "        name=\"True pose\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# Estimated pose.\n",
+    "fig.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=[estimated_pose.translation()[0]],\n",
+    "        y=[estimated_pose.translation()[1]],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=12, color=\"#2196F3\", symbol=\"circle\"),\n",
+    "        name=\"Estimated pose\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# 2-sigma uncertainty ellipse.\n",
+    "fig.add_trace(\n",
+    "    make_ellipse_trace(\n",
+    "        (float(estimated_pose.translation()[0]), float(estimated_pose.translation()[1])),\n",
+    "        cov_xy,\n",
+    "        n_std=2.0,\n",
+    "        name=\"2σ uncertainty\",\n",
+    "        color=\"#2196F3\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "fig.update_xaxes(title_text=\"x\", scaleanchor=\"y\", scaleratio=1)\n",
+    "fig.update_yaxes(title_text=\"y\")\n",
+    "fig.update_layout(\n",
+    "    title=\"2D Pose Estimation with Uncertainty\",\n",
+    "    height=500,\n",
+    "    margin=dict(t=60, b=40, l=60, r=40),\n",
+    "    legend=dict(yanchor=\"top\", y=0.99, xanchor=\"left\", x=0.01),\n",
+    ")\n",
+    "HTML(fig.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-11",
+   "metadata": {},
+   "source": [
+    "## EKF as single Gauss-Newton iteration\n",
+    "\n",
+    "An Extended Kalman Filter (EKF) update can be viewed as:\n",
+    "1. One Gauss-Newton iteration on a nonlinear least squares problem\n",
+    "2. Covariance propagation via $(J^T J)^{-1}$\n",
+    "\n",
+    "This perspective shows that EKF and batch optimization are fundamentally the same algorithm, just with different iteration counts."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "cell-12",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:06.394475Z",
+     "iopub.status.busy": "2026-01-08T04:25:06.394301Z",
+     "iopub.status.idle": "2026-01-08T04:25:06.527243Z",
+     "shell.execute_reply": "2026-01-08T04:25:06.526826Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# Simulate EKF-style sequential updates.\n",
+    "# Prior: initial pose estimate with uncertainty.\n",
+    "prior_pose = jaxlie.SE2.from_xy_theta(0.5, 1.5, jnp.pi / 6)\n",
+    "prior_cov = jnp.diag(jnp.array([0.5**2, 0.5**2, 0.3**2]))  # Prior uncertainty.\n",
+    "\n",
+    "\n",
+    "# For EKF equivalence, use Euclidean parameterization [x, y, theta].\n",
+    "class PoseVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(3)):\n",
+    "    \"\"\"Pose as [x, y, theta] vector.\"\"\"\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def euclidean_prior_cost(\n",
+    "    vals: jaxls.VarValues,\n",
+    "    pose: PoseVar,\n",
+    "    prior_mean: jax.Array,\n",
+    "    info_sqrt: jax.Array,\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Prior cost in Euclidean coordinates.\"\"\"\n",
+    "    error = vals[pose] - prior_mean\n",
+    "    return info_sqrt @ error\n",
+    "\n",
+    "\n",
+    "# Information matrix is inverse of covariance.\n",
+    "prior_info = jnp.linalg.inv(prior_cov)\n",
+    "prior_info_sqrt = jnp.linalg.cholesky(prior_info)\n",
+    "prior_mean = jnp.array([0.5, 1.5, jnp.pi / 6])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "cell-13",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:06.529510Z",
+     "iopub.status.busy": "2026-01-08T04:25:06.529305Z",
+     "iopub.status.idle": "2026-01-08T04:25:10.055703Z",
+     "shell.execute_reply": "2026-01-08T04:25:10.055331Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Building optimization problem with 3 terms and 1 variables: 3 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 1 variables each: euclidean_position_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 1 variables each: euclidean_prior_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 1 variables each: euclidean_orientation_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "EKF-style update (1 Gauss-Newton iteration):\n",
+      "  Prior:     x=0.500, y=1.500\n",
+      "  Measurement: x=1.050, y=1.986\n",
+      "  Posterior: x=1.029, y=1.967\n",
+      "\n",
+      "Prior uncertainty (std): x=0.500, y=0.500\n",
+      "Posterior uncertainty (std): x=0.098, y=0.098\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Take a single measurement.\n",
+    "single_measurement_xy = measured_positions[0]\n",
+    "single_measurement_theta = measured_angles[0]\n",
+    "\n",
+    "# Measurement noise covariance (must match the noise used to generate data).\n",
+    "meas_noise_std = measurement_noise_std  # 0.1\n",
+    "meas_info_sqrt = 1.0 / meas_noise_std  # Weight = 1/sigma for residuals.\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def euclidean_position_cost(\n",
+    "    vals: jaxls.VarValues,\n",
+    "    pose: PoseVar,\n",
+    "    measured_xy: jax.Array,\n",
+    "    weight: float,\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Weighted position residual (Euclidean).\"\"\"\n",
+    "    return weight * (vals[pose][:2] - measured_xy)\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def euclidean_orientation_cost(\n",
+    "    vals: jaxls.VarValues,\n",
+    "    pose: PoseVar,\n",
+    "    measured_theta: jax.Array,\n",
+    "    weight: float,\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Weighted orientation residual (Euclidean angle difference).\"\"\"\n",
+    "    # Simple angle difference (works for small angles).\n",
+    "    angle_diff = vals[pose][2] - measured_theta\n",
+    "    # Wrap to [-pi, pi].\n",
+    "    angle_diff = jnp.arctan2(jnp.sin(angle_diff), jnp.cos(angle_diff))\n",
+    "    return weight * angle_diff\n",
+    "\n",
+    "\n",
+    "# EKF update = single Gauss-Newton step + covariance.\n",
+    "ekf_pose_var = PoseVar(id=0)\n",
+    "\n",
+    "ekf_costs = [\n",
+    "    euclidean_prior_cost(ekf_pose_var, prior_mean, prior_info_sqrt),\n",
+    "    euclidean_position_cost(ekf_pose_var, single_measurement_xy, meas_info_sqrt),\n",
+    "    euclidean_orientation_cost(ekf_pose_var, single_measurement_theta, meas_info_sqrt),\n",
+    "]\n",
+    "\n",
+    "ekf_initial = jaxls.VarValues.make([ekf_pose_var.with_value(prior_mean)])\n",
+    "ekf_problem = jaxls.LeastSquaresProblem(ekf_costs, [ekf_pose_var]).analyze()\n",
+    "\n",
+    "# Single iteration (like EKF).\n",
+    "ekf_solution = ekf_problem.solve(\n",
+    "    ekf_initial,\n",
+    "    trust_region=None,  # Pure Gauss-Newton (no trust region).\n",
+    "    termination=jaxls.TerminationConfig(max_iterations=1),\n",
+    "    verbose=False,\n",
+    ")\n",
+    "\n",
+    "# Get posterior covariance.\n",
+    "ekf_estimator = ekf_problem.make_covariance_estimator(\n",
+    "    ekf_solution, scale_by_residual_variance=False\n",
+    ")\n",
+    "posterior_cov = ekf_estimator.covariance(ekf_pose_var)\n",
+    "\n",
+    "ekf_pose_vec = ekf_solution[ekf_pose_var]\n",
+    "\n",
+    "print(\"EKF-style update (1 Gauss-Newton iteration):\")\n",
+    "print(f\"  Prior:     x={prior_mean[0]:.3f}, y={prior_mean[1]:.3f}\")\n",
+    "print(f\"  Measurement: x={single_measurement_xy[0]:.3f}, y={single_measurement_xy[1]:.3f}\")\n",
+    "print(f\"  Posterior: x={ekf_pose_vec[0]:.3f}, y={ekf_pose_vec[1]:.3f}\")\n",
+    "print(f\"\\nPrior uncertainty (std): x={jnp.sqrt(prior_cov[0, 0]):.3f}, y={jnp.sqrt(prior_cov[1, 1]):.3f}\")\n",
+    "print(f\"Posterior uncertainty (std): x={jnp.sqrt(posterior_cov[0, 0]):.3f}, y={jnp.sqrt(posterior_cov[1, 1]):.3f}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "cell-14",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:10.057764Z",
+     "iopub.status.busy": "2026-01-08T04:25:10.057498Z",
+     "iopub.status.idle": "2026-01-08T04:25:10.090168Z",
+     "shell.execute_reply": "2026-01-08T04:25:10.089803Z"
+    }
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>                        <script type=\"text/javascript\">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>\n",
+       "        <script charset=\"utf-8\" src=\"https://cdn.plot.ly/plotly-3.1.0.min.js\" integrity=\"sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=\" crossorigin=\"anonymous\"></script>                <div id=\"22ee003c-b65c-4e57-a951-1545c90a2a87\" class=\"plotly-graph-div\" style=\"height:500px; width:100%;\"></div>            <script type=\"text/javascript\">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById(\"22ee003c-b65c-4e57-a951-1545c90a2a87\")) {                    Plotly.newPlot(                        \"22ee003c-b65c-4e57-a951-1545c90a2a87\",                        [{\"fill\":\"toself\",\"fillcolor\":\"rgba(255, 152, 0, 0.2)\",\"line\":{\"color\":\"#FF9800\",\"dash\":\"dash\",\"width\":2},\"mode\":\"lines\",\"name\":\"Prior 2σ\",\"x\":{\"dtype\":\"f4\",\"bdata\":\"AADAPwe+vz9g+L4\\u002f16+9P77luz\\u002fum7k\\u002fwtS2PxmTsz9M2q8\\u002fMq6rPxgTpz++DaI\\u002fUaOcP2XZlj\\u002fztZA\\u002fTj+KPyB8gz\\u002fB5ng\\u002folhqP+ZcWz\\u002f5Akw\\u002fslo8PzZ0LD\\u002flXxw\\u002fVC4MP2ng9z6KbNc+giK3PpQjlz56IW8+GhUxPuTD6D1gGmU9AACAs2DbXL3wSdi92JMevmxPTr6YJnu+jnWSvvC4pb6cSbe+chXHviwM1b5kH+G+qkLrvohr876Ykfm+gK79vgK+\\u002f74Cvv++fq79vpaR+b6Ia\\u002fO+qkLrvmQf4b4qDNW+cBXHvphJt77uuKW+jnWSvpwme75wT06+0JMevuBJ2L0w21y9AADAM4gaZT34w+g9JhUxPowhbz6eI5c+jCK3Pohs1z5n4Pc+Uy4MP+RfHD80dCw\\u002fs1o8P\\u002foCTD\\u002fmXFs\\u002fpVhqP8TmeD8hfIM\\u002fUD+KP\\u002fS1kD9n2ZY\\u002fU6OcP74Noj8YE6c\\u002fMq6rP0zarz8Yk7M\\u002fwtS2P+6buT++5bs\\u002f16+9P2D4vj8Hvr8\\u002fAADAPw==\"},\"y\":{\"dtype\":\"f4\",\"bdata\":\"AADAP0YeyD8uNNA\\u002fYjnYP54l4D+28Oc\\u002fo5LvP4UD9z+yO\\u002f4\\u002f3JkCQDTyBUBuIwlAQSoMQI0DD0BirBFAAyIUQOdhFkC8aRhAaTcaQBTJG0AeHR1AKTIeQBcHH0ANmx9Ace0fQPD9H0B4zB9APFkfQLOkHkCXrx1A5XocQNoHG0D2VxlA9mwXQNNIFUDD7RJAM14QQMicDUBYrApA648HQLVKBEAX4ABAKqf6P7BR8z9Sx+s\\u002f0A\\u002fkPyMz3D9kOdQ\\u002fzCrMP6kPxD9W8Ls\\u002fM9WzP5vGqz\\u002fezKM\\u002fMPCbP684lD9Orow\\u002f1ViFP6J\\u002ffD8o1W4\\u002fVsBhP6FOVT\\u002fgjEk\\u002fMoc+P\\u002fNIND+z3Co\\u002fKEwiPyagGj+W4BM\\u002fbBQOP6NBCT8zbQU\\u002fD5sCPyDOAD9ACAA\\u002fO0oAP82TAT+k4wM\\u002fWzcHP4eLCz+w2xA\\u002fXCIXPxRZHj9meCY\\u002f9XcvP3lOOT\\u002fP8UM\\u002f\\u002f1ZPP0NyWz8uN2g\\u002fj5h1P07EgT97\\u002fIg\\u002fXW2QP0oPmD9i2p8\\u002fnsanP9LLrz+74bc\\u002fAQDAPw==\"},\"type\":\"scatter\"},{\"marker\":{\"color\":\"#FF9800\",\"size\":10,\"symbol\":\"diamond\"},\"mode\":\"markers\",\"name\":\"Prior\",\"x\":[0.5],\"y\":[1.5],\"type\":\"scatter\"},{\"marker\":{\"color\":\"#9E9E9E\",\"size\":10,\"symbol\":\"cross\"},\"mode\":\"markers\",\"name\":\"Measurement\",\"x\":[1.0496714115142822],\"y\":[1.9861736297607422],\"type\":\"scatter\"},{\"fill\":\"toself\",\"fillcolor\":\"rgba(33, 150, 243, 0.2)\",\"line\":{\"color\":\"#2196F3\",\"dash\":\"solid\",\"width\":2},\"mode\":\"lines\",\"name\":\"Posterior 2σ\",\"x\":{\"dtype\":\"f4\",\"bdata\":\"NcGcP0W0nD+CjZw\\u002fFE2cPzzzmz9ZgJs\\u002f4PSaP2JRmj+Glpk\\u002fDcWYP8\\u002fdlz+74ZY\\u002f1dGVPzSvlD8Ee5M\\u002fhDaSPwDjkD\\u002fZgY8\\u002feBSOP1icjD\\u002f8Gos\\u002f8ZGJP8wCiD8pb4Y\\u002fp9iEP+pAgz+WqYE\\u002fUBSAP3AFfT\\u002fa7Hk\\u002fDuJ2Py\\u002focz9PAnE\\u002fajNuP2Z+az8N5mg\\u002fC21mP+4VZD8d42E\\u002f39ZfP0\\u002fzXT9gOlw\\u002f2K1aP1BPWT8yIFg\\u002ftSFXP+BUVj+HulU\\u002fSFNVP44fVT+OH1U\\u002fSFNVP4e6VT\\u002fgVFY\\u002ftSFXPzIgWD9QT1k\\u002f2K1aP2A6XD9P810\\u002f39ZfPx3jYT\\u002ftFWQ\\u002fC21mPw3maD9nfms\\u002fazNuP1ACcT8w6HM\\u002fD+J2P9vseT9xBX0\\u002fUBSAP5apgT\\u002fqQIM\\u002fp9iEPyhvhj\\u002fMAog\\u002f8ZGJP\\u002fwaiz9YnIw\\u002feRSOP9mBjz8B45A\\u002fhDaSPwV7kz80r5Q\\u002f1dGVP7vhlj\\u002fP3Zc\\u002fDcWYP4aWmT9iUZo\\u002f4PSaP1mAmz8885s\\u002fFE2cP4KNnD9FtJw\\u002fNcGcPw==\"},\"y\":{\"dtype\":\"f4\",\"bdata\":\"Ndb7P8pt\\u002fT+7A\\u002f8\\u002fM0sAQBUSAUC41QFAUZUCQBtQA0BWBQRARrQEQDdcBUB9\\u002fAVAcZQGQHgjB0D+qAdAeSQIQGqVCEBc+whA51UJQK2kCUBd5wlAsh0KQHRHCkB5ZApAonQKQN53CkAqbgpAkVcKQCk0CkAXBApAjMcJQMh+CUAVKglAyskIQEpeCEAF6AdAdGcHQBzdBkCLSQZAWq0FQCkJBUCiXQRAdqsDQFzzAkASNgJAXHQBQACvAECUzf8\\u002fEjn+Pxqi\\u002fD9QCvs\\u002fWHP5P9be9z9rTvY\\u002fs8P0P0ZA8z+yxfE\\u002fflXwPyXx7j8Xmu0\\u002ftlHsP1QZ6z8y8uk\\u002fgt3oP2Dc5z\\u002fW7+Y\\u002f1xjmP0BY5T\\u002faruQ\\u002fUR3kPzyk4z8YROM\\u002fSf3iPxbQ4j+vvOI\\u002fJ8PiP3jj4j+BHeM\\u002fBnHjP7Dd4z8QY+Q\\u002fnADlP7K15T+XgeY\\u002feWPnP25a6D96Zek\\u002fiIPqP3Cz6z\\u002f88+w\\u002f3kPuP7+h7z80DPE\\u002fyIHyP\\u002foA9D8\\u002fiPU\\u002fBBb3P6+o+D+gPvo\\u002fNdb7Pw==\"},\"type\":\"scatter\"},{\"marker\":{\"color\":\"#2196F3\",\"size\":10,\"symbol\":\"circle\"},\"mode\":\"markers\",\"name\":\"Posterior\",\"x\":[1.0285301208496094],\"y\":[1.9674745798110962],\"type\":\"scatter\"},{\"marker\":{\"color\":\"#4CAF50\",\"size\":12,\"symbol\":\"star\"},\"mode\":\"markers\",\"name\":\"True pose\",\"x\":[1.0],\"y\":[2.0],\"type\":\"scatter\"}],                        {\"template\":{\"data\":{\"histogram2dcontour\":[{\"type\":\"histogram2dcontour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"choropleth\":[{\"type\":\"choropleth\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"histogram2d\":[{\"type\":\"histogram2d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"heatmap\":[{\"type\":\"heatmap\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"contourcarpet\":[{\"type\":\"contourcarpet\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"contour\":[{\"type\":\"contour\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"surface\":[{\"type\":\"surface\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"},\"colorscale\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]]}],\"mesh3d\":[{\"type\":\"mesh3d\",\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}],\"scatter\":[{\"fillpattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2},\"type\":\"scatter\"}],\"parcoords\":[{\"type\":\"parcoords\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolargl\":[{\"type\":\"scatterpolargl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"bar\":[{\"error_x\":{\"color\":\"#2a3f5f\"},\"error_y\":{\"color\":\"#2a3f5f\"},\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"bar\"}],\"scattergeo\":[{\"type\":\"scattergeo\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterpolar\":[{\"type\":\"scatterpolar\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"histogram\":[{\"marker\":{\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"histogram\"}],\"scattergl\":[{\"type\":\"scattergl\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatter3d\":[{\"type\":\"scatter3d\",\"line\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermap\":[{\"type\":\"scattermap\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattermapbox\":[{\"type\":\"scattermapbox\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scatterternary\":[{\"type\":\"scatterternary\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"scattercarpet\":[{\"type\":\"scattercarpet\",\"marker\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}}}],\"carpet\":[{\"aaxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"baxis\":{\"endlinecolor\":\"#2a3f5f\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"minorgridcolor\":\"white\",\"startlinecolor\":\"#2a3f5f\"},\"type\":\"carpet\"}],\"table\":[{\"cells\":{\"fill\":{\"color\":\"#EBF0F8\"},\"line\":{\"color\":\"white\"}},\"header\":{\"fill\":{\"color\":\"#C8D4E3\"},\"line\":{\"color\":\"white\"}},\"type\":\"table\"}],\"barpolar\":[{\"marker\":{\"line\":{\"color\":\"#E5ECF6\",\"width\":0.5},\"pattern\":{\"fillmode\":\"overlay\",\"size\":10,\"solidity\":0.2}},\"type\":\"barpolar\"}],\"pie\":[{\"automargin\":true,\"type\":\"pie\"}]},\"layout\":{\"autotypenumbers\":\"strict\",\"colorway\":[\"#636efa\",\"#EF553B\",\"#00cc96\",\"#ab63fa\",\"#FFA15A\",\"#19d3f3\",\"#FF6692\",\"#B6E880\",\"#FF97FF\",\"#FECB52\"],\"font\":{\"color\":\"#2a3f5f\"},\"hovermode\":\"closest\",\"hoverlabel\":{\"align\":\"left\"},\"paper_bgcolor\":\"white\",\"plot_bgcolor\":\"#E5ECF6\",\"polar\":{\"bgcolor\":\"#E5ECF6\",\"angularaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"radialaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"ternary\":{\"bgcolor\":\"#E5ECF6\",\"aaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"baxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"},\"caxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\"}},\"coloraxis\":{\"colorbar\":{\"outlinewidth\":0,\"ticks\":\"\"}},\"colorscale\":{\"sequential\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"sequentialminus\":[[0.0,\"#0d0887\"],[0.1111111111111111,\"#46039f\"],[0.2222222222222222,\"#7201a8\"],[0.3333333333333333,\"#9c179e\"],[0.4444444444444444,\"#bd3786\"],[0.5555555555555556,\"#d8576b\"],[0.6666666666666666,\"#ed7953\"],[0.7777777777777778,\"#fb9f3a\"],[0.8888888888888888,\"#fdca26\"],[1.0,\"#f0f921\"]],\"diverging\":[[0,\"#8e0152\"],[0.1,\"#c51b7d\"],[0.2,\"#de77ae\"],[0.3,\"#f1b6da\"],[0.4,\"#fde0ef\"],[0.5,\"#f7f7f7\"],[0.6,\"#e6f5d0\"],[0.7,\"#b8e186\"],[0.8,\"#7fbc41\"],[0.9,\"#4d9221\"],[1,\"#276419\"]]},\"xaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"yaxis\":{\"gridcolor\":\"white\",\"linecolor\":\"white\",\"ticks\":\"\",\"title\":{\"standoff\":15},\"zerolinecolor\":\"white\",\"automargin\":true,\"zerolinewidth\":2},\"scene\":{\"xaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"yaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2},\"zaxis\":{\"backgroundcolor\":\"#E5ECF6\",\"gridcolor\":\"white\",\"linecolor\":\"white\",\"showbackground\":true,\"ticks\":\"\",\"zerolinecolor\":\"white\",\"gridwidth\":2}},\"shapedefaults\":{\"line\":{\"color\":\"#2a3f5f\"}},\"annotationdefaults\":{\"arrowcolor\":\"#2a3f5f\",\"arrowhead\":0,\"arrowwidth\":1},\"geo\":{\"bgcolor\":\"white\",\"landcolor\":\"#E5ECF6\",\"subunitcolor\":\"white\",\"showland\":true,\"showlakes\":true,\"lakecolor\":\"white\"},\"title\":{\"x\":0.05},\"mapbox\":{\"style\":\"light\"}}},\"annotations\":[{\"arrowcolor\":\"#607D8B\",\"arrowhead\":2,\"arrowsize\":1.5,\"arrowwidth\":2,\"ax\":0.5,\"axref\":\"x\",\"ay\":1.5,\"ayref\":\"y\",\"showarrow\":true,\"x\":1.0285301208496094,\"xref\":\"x\",\"y\":1.9674745798110962,\"yref\":\"y\"}],\"xaxis\":{\"title\":{\"text\":\"x\"},\"scaleanchor\":\"y\",\"scaleratio\":1},\"yaxis\":{\"title\":{\"text\":\"y\"}},\"margin\":{\"t\":60,\"b\":40,\"l\":60,\"r\":40},\"legend\":{\"yanchor\":\"top\",\"y\":0.99,\"xanchor\":\"left\",\"x\":0.01},\"title\":{\"text\":\"EKF Update: Prior + Measurement → Posterior\"},\"height\":500},                        {\"responsive\": true}                    )                };            </script>        </div>"
+      ],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Visualize EKF update.\n",
+    "fig_ekf = go.Figure()\n",
+    "\n",
+    "# Prior ellipse.\n",
+    "fig_ekf.add_trace(\n",
+    "    make_ellipse_trace(\n",
+    "        (float(prior_mean[0]), float(prior_mean[1])),\n",
+    "        prior_cov[:2, :2],\n",
+    "        n_std=2.0,\n",
+    "        name=\"Prior 2σ\",\n",
+    "        color=\"#FF9800\",\n",
+    "        dash=\"dash\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# Prior mean.\n",
+    "fig_ekf.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=[prior_mean[0]],\n",
+    "        y=[prior_mean[1]],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=10, color=\"#FF9800\", symbol=\"diamond\"),\n",
+    "        name=\"Prior\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# Measurement.\n",
+    "fig_ekf.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=[single_measurement_xy[0]],\n",
+    "        y=[single_measurement_xy[1]],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=10, color=\"#9E9E9E\", symbol=\"cross\"),\n",
+    "        name=\"Measurement\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# Posterior ellipse.\n",
+    "fig_ekf.add_trace(\n",
+    "    make_ellipse_trace(\n",
+    "        (float(ekf_pose_vec[0]), float(ekf_pose_vec[1])),\n",
+    "        posterior_cov[:2, :2],\n",
+    "        n_std=2.0,\n",
+    "        name=\"Posterior 2σ\",\n",
+    "        color=\"#2196F3\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# Posterior mean.\n",
+    "fig_ekf.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=[ekf_pose_vec[0]],\n",
+    "        y=[ekf_pose_vec[1]],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=10, color=\"#2196F3\", symbol=\"circle\"),\n",
+    "        name=\"Posterior\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# True pose.\n",
+    "fig_ekf.add_trace(\n",
+    "    go.Scatter(\n",
+    "        x=[true_pose.translation()[0]],\n",
+    "        y=[true_pose.translation()[1]],\n",
+    "        mode=\"markers\",\n",
+    "        marker=dict(size=12, color=\"#4CAF50\", symbol=\"star\"),\n",
+    "        name=\"True pose\",\n",
+    "    )\n",
+    ")\n",
+    "\n",
+    "# Arrow from prior to posterior.\n",
+    "fig_ekf.add_annotation(\n",
+    "    x=float(ekf_pose_vec[0]),\n",
+    "    y=float(ekf_pose_vec[1]),\n",
+    "    ax=float(prior_mean[0]),\n",
+    "    ay=float(prior_mean[1]),\n",
+    "    xref=\"x\",\n",
+    "    yref=\"y\",\n",
+    "    axref=\"x\",\n",
+    "    ayref=\"y\",\n",
+    "    showarrow=True,\n",
+    "    arrowhead=2,\n",
+    "    arrowsize=1.5,\n",
+    "    arrowwidth=2,\n",
+    "    arrowcolor=\"#607D8B\",\n",
+    ")\n",
+    "\n",
+    "fig_ekf.update_xaxes(title_text=\"x\", scaleanchor=\"y\", scaleratio=1)\n",
+    "fig_ekf.update_yaxes(title_text=\"y\")\n",
+    "fig_ekf.update_layout(\n",
+    "    title=\"EKF Update: Prior + Measurement → Posterior\",\n",
+    "    height=500,\n",
+    "    margin=dict(t=60, b=40, l=60, r=40),\n",
+    "    legend=dict(yanchor=\"top\", y=0.99, xanchor=\"left\", x=0.01),\n",
+    ")\n",
+    "HTML(fig_ekf.to_html(full_html=False, include_plotlyjs=\"cdn\"))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-15",
+   "metadata": {},
+   "source": [
+    "## Cross-covariance between variables\n",
+    "\n",
+    "For problems with multiple variables, we can compute cross-covariance blocks:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "cell-16",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:10.091997Z",
+     "iopub.status.busy": "2026-01-08T04:25:10.091853Z",
+     "iopub.status.idle": "2026-01-08T04:25:16.407246Z",
+     "shell.execute_reply": "2026-01-08T04:25:16.406806Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Building optimization problem with 3 terms and 2 variables: 3 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 2 costs, 1 variables each: anchor_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Vectorizing group with 1 costs, 2 variables each: relative_cost\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |  step #0: cost=0.5000 lambd=0.0005 inexact_tol=1.0e-02\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - anchor_cost(2): 0.25000 (avg 0.04167)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - relative_cost(1): 0.25000 (avg 0.08333)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      accepted=True ATb_norm=7.07e-01 cost_prev=0.5000 cost_new=0.3333\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |  step #1: cost=0.3333 lambd=0.0003 inexact_tol=1.0e-02\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - anchor_cost(2): 0.22221 (avg 0.03704)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      - relative_cost(1): 0.11112 (avg 0.03704)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m |      accepted=True ATb_norm=1.34e-04 cost_prev=0.3333 cost_new=0.3333\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1mINFO    \u001b[0m | Terminated @ iteration #2: cost=0.3333 criteria=[1 0 0], term_deltas=1.8e-07,1.2e-04,3.7e-05\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Marginal covariance pose0 (diagonal):\n",
+      "  [0.6666667 0.7081737 0.6666667]\n",
+      "\n",
+      "Marginal covariance pose1 (diagonal):\n",
+      "  [0.6666667  2.4351852  0.63218397]\n",
+      "\n",
+      "Cross-covariance pose0-pose1:\n",
+      "[[0.33333334 0.         0.        ]\n",
+      " [0.         0.6018518  0.15900384]\n",
+      " [0.         0.6111111  0.33333337]]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Two-pose problem with relative constraint.\n",
+    "pose0 = jaxls.SE2Var(id=0)\n",
+    "pose1 = jaxls.SE2Var(id=1)\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def anchor_cost(\n",
+    "    vals: jaxls.VarValues, pose: jaxls.SE2Var, target: jaxlie.SE2\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Anchor pose to a target.\"\"\"\n",
+    "    return (vals[pose] @ target.inverse()).log()\n",
+    "\n",
+    "\n",
+    "@jaxls.Cost.factory\n",
+    "def relative_cost(\n",
+    "    vals: jaxls.VarValues,\n",
+    "    pose_a: jaxls.SE2Var,\n",
+    "    pose_b: jaxls.SE2Var,\n",
+    "    delta: jaxlie.SE2,\n",
+    ") -> jax.Array:\n",
+    "    \"\"\"Relative pose constraint.\"\"\"\n",
+    "    T_a = vals[pose_a]\n",
+    "    T_b = vals[pose_b]\n",
+    "    measured = T_a.inverse() @ T_b\n",
+    "    return (measured @ delta.inverse()).log()\n",
+    "\n",
+    "\n",
+    "two_pose_costs = [\n",
+    "    anchor_cost(pose0, jaxlie.SE2.from_xy_theta(0.0, 0.0, 0.0)),\n",
+    "    anchor_cost(pose1, jaxlie.SE2.from_xy_theta(2.0, 0.0, 0.0)),\n",
+    "    relative_cost(pose0, pose1, jaxlie.SE2.from_xy_theta(1.0, 0.0, 0.0)),\n",
+    "]\n",
+    "\n",
+    "two_pose_initial = jaxls.VarValues.make(\n",
+    "    [\n",
+    "        pose0.with_value(jaxlie.SE2.identity()),\n",
+    "        pose1.with_value(jaxlie.SE2.from_xy_theta(1.5, 0.0, 0.0)),\n",
+    "    ]\n",
+    ")\n",
+    "\n",
+    "two_pose_problem = jaxls.LeastSquaresProblem(two_pose_costs, [pose0, pose1]).analyze()\n",
+    "two_pose_solution = two_pose_problem.solve(two_pose_initial)\n",
+    "\n",
+    "# Get covariance estimator.\n",
+    "two_pose_estimator = two_pose_problem.make_covariance_estimator(\n",
+    "    two_pose_solution, scale_by_residual_variance=False\n",
+    ")\n",
+    "\n",
+    "# Marginal covariances.\n",
+    "cov_00 = two_pose_estimator.covariance(pose0)\n",
+    "cov_11 = two_pose_estimator.covariance(pose1)\n",
+    "\n",
+    "# Cross-covariance.\n",
+    "cov_01 = two_pose_estimator.covariance(pose0, pose1)\n",
+    "\n",
+    "print(\"Marginal covariance pose0 (diagonal):\")\n",
+    "print(f\"  {jnp.diag(cov_00)}\")\n",
+    "print(\"\\nMarginal covariance pose1 (diagonal):\")\n",
+    "print(f\"  {jnp.diag(cov_11)}\")\n",
+    "print(\"\\nCross-covariance pose0-pose1:\")\n",
+    "print(cov_01)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-17",
+   "metadata": {},
+   "source": [
+    "## Estimator options\n",
+    "\n",
+    "jaxls provides different methods for computing covariances:\n",
+    "\n",
+    "- **Conjugate Gradient (default)**: GPU-friendly iterative solver. Fast when variables are weakly correlated.\n",
+    "- **Dense Cholesky**: Direct solver. Caches factorization for efficient repeated queries.\n",
+    "- **CHOLMOD**: Sparse direct solver (requires `sksparse`). Efficient for large sparse problems on CPU."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "cell-18",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-08T04:25:16.409150Z",
+     "iopub.status.busy": "2026-01-08T04:25:16.408981Z",
+     "iopub.status.idle": "2026-01-08T04:25:17.031921Z",
+     "shell.execute_reply": "2026-01-08T04:25:17.031555Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "CG and Dense Cholesky give the same result:\n",
+      "  Max difference: 2.33e-10\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Default: Conjugate Gradient.\n",
+    "estimator_cg = problem.make_covariance_estimator(solution)\n",
+    "\n",
+    "# Dense Cholesky.\n",
+    "estimator_dense = problem.make_covariance_estimator(\n",
+    "    solution,\n",
+    "    method=jaxls.LinearSolverCovarianceEstimatorConfig(linear_solver=\"dense_cholesky\"),\n",
+    ")\n",
+    "\n",
+    "# Compare results.\n",
+    "cov_cg = estimator_cg.covariance(pose_var)\n",
+    "cov_dense = estimator_dense.covariance(pose_var)\n",
+    "\n",
+    "print(\"CG and Dense Cholesky give the same result:\")\n",
+    "print(f\"  Max difference: {jnp.max(jnp.abs(cov_cg - cov_dense)):.2e}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cell-19",
+   "metadata": {},
+   "source": [
+    "## Summary\n",
+    "\n",
+    "Covariance estimation in jaxls:\n",
+    "\n",
+    "1. **After solving**, create a covariance estimator with `problem.make_covariance_estimator(solution)`.\n",
+    "\n",
+    "2. **Extract blocks** using `estimator.covariance(var)` for marginal covariance or `estimator.covariance(var0, var1)` for cross-covariance.\n",
+    "\n",
+    "3. **EKF connection**: An EKF update is equivalent to one Gauss-Newton iteration plus covariance computation.\n",
+    "\n",
+    "4. **Multiple methods**: CG (default, GPU-friendly), dense Cholesky, or CHOLMOD for large sparse problems.\n",
+    "\n",
+    "For more details, see {class}`~jaxls.CovarianceEstimator`, {class}`~jaxls.LinearSolverCovarianceEstimatorConfig`, and {meth}`~jaxls.AnalyzedLeastSquaresProblem.make_covariance_estimator`."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

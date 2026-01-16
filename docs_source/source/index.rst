@@ -28,9 +28,9 @@ jaxls is designed to be:
 
 - Lightweight and hackable, but fast. It aims to be practical for common
   scientific computing problems.
-- Python-native. jaxls combines recent Python typing constructs with
-  a functional, `PyTree <https://docs.jax.dev/en/latest/pytrees.html>`_-first
-  implementation. Its API is type-safe, compatible with standard JAX
+- Python-native. jaxls combines a functional,
+  `PyTree <https://docs.jax.dev/en/latest/pytrees.html>`_-first implementation
+  with recent Python typing constructs. Its API is type-safe, compatible with standard JAX
   `function transforms <https://docs.jax.dev/en/latest/key-concepts.html#transformations>`_,
   and more concise than traditional optimization tools.
 
@@ -114,6 +114,7 @@ Algorithmic references:
    api/core
    api/lie_group_variables
    api/solver_config
+   api/covariance
 
 .. toctree::
    :caption: Design Notes

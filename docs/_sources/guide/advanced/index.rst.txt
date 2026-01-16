@@ -10,3 +10,4 @@ Documentation for advanced features.
    custom_jacobians
    constraints
    robust_costs
+   covariance

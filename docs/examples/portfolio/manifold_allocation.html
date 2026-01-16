@@ -1,0 +1,833 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="Reparameterized allocation" href="reparameterized_allocation.html" /><link rel="prev" title="Mean-variance allocation" href="mean_variance.html" />
+
+    <!-- Generated with Sphinx 8.0.2 and Furo 2024.08.06 -->
+        <title>Manifold allocation - jaxls</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=6517d2d4" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=302659d7" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-code-background: #f4f4f4;
+  --color-code-foreground: #000;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">jaxls</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a
+  class="sidebar-brand"
+  href="../../index.html"
+  style="margin-top: 0.75em"
+>
+  
+  <span class="sidebar-brand-text">jaxls</span>
+
+  
+</a>
+
+<div style="text-align: left; padding: 0 1em 1em 1em">
+  <a href="https://github.com/brentyi/jaxls">
+    <img src="https://img.shields.io/github/stars/brentyi/jaxls?style=social" alt="GitHub stars">
+  </a>
+</div><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/basics.html">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas.html">Tips and gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/index.html">Advanced</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Advanced</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean.html">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians.html">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/constraints.html">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/robust_costs.html">Robust costs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/covariance.html">Covariance estimation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../mechanics/index.html">Mechanics</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Mechanics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../mechanics/spring_equilibrium.html">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../mechanics/cloth_draping.html">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../mechanics/truss_analysis.html">Truss analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../vision/index.html">Vision</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Vision</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../vision/camera_calibration.html">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/pose_graph_2d.html">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/pose_graph_3d.html">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/bundle_adjustment.html">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../vision/smplh_shape_fitting.html">SMPL-H shape fitting</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../robotics/index.html">Robotics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Robotics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../robotics/inverse_kinematics.html">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robotics/obstacle_avoidance.html">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robotics/cart_pole_collocation.html">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robotics/cart_pole_shooting.html">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robotics/cam_design.html">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robotics/imu_sensor_fusion.html">IMU fusion + calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Portfolio optimization</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Portfolio optimization</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mean_variance.html">Mean-variance allocation</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reparameterized_allocation.html">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cvar_optimization.html">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="black_litterman.html">Black-Litterman allocation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/core.html">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/lie_group_variables.html">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/solver_config.html">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/covariance.html">Covariance Estimation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../design/typed_api.html">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices.html">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static.html">What’s traced?</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/examples/portfolio/manifold_allocation.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="manifold-allocation">
+<h1>Manifold allocation<a class="headerlink" href="#manifold-allocation" title="Link to this heading">¶</a></h1>
+<p>The <a class="reference internal" href="mean_variance.html"><span class="doc">mean-variance notebook</span></a> treats allocation as a classical constrained
+optimization problem: we minimize variance subject to budget constraints (weights sum to 1)
+and no short-selling (weights non-negative).</p>
+<p>An alternative perspective: the set of valid allocations forms a <em>manifold</em> called the
+probability simplex. By defining a custom <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code>, we can optimize directly on this manifold
+without explicit constraints.</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../api/core.html#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a> with custom <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code> and <code class="docutils literal notranslate"><span class="pre">tangent_dim</span></code> for manifold variables</p></li>
+<li><p>Multiplicative retraction for smooth simplex optimization</p></li>
+</ul>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">loguru</span> <span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">jaxls</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="the-probability-simplex">
+<h2>The probability simplex<a class="headerlink" href="#the-probability-simplex" title="Link to this heading">¶</a></h2>
+<p>The probability simplex <span class="math notranslate nohighlight">\(\Delta^{n-1}\)</span> is the set of valid portfolio allocations:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\Delta^{n-1} = \{w \in \mathbb{R}^n : w_i \geq 0, \sum_i w_i = 1\}\]</div>
+</div>
+<p>This is an <span class="math notranslate nohighlight">\((n-1)\)</span>-dimensional manifold embedded in <span class="math notranslate nohighlight">\(\mathbb{R}^n\)</span>. The sum-to-one constraint
+removes one degree of freedom.</p>
+<p>To optimize on this manifold, we need a <strong>retraction</strong>: a function <code class="docutils literal notranslate"><span class="pre">retract(x,</span> <span class="pre">delta)</span></code> that maps
+a point on the manifold plus a tangent update back to the manifold.
+See <a class="reference internal" href="../../guide/advanced/non_euclidean.html"><span class="doc">Non-Euclidean variables</span></a> for background on manifold optimization.</p>
+</section>
+<section id="simplex-retraction">
+<h2>Simplex retraction<a class="headerlink" href="#simplex-retraction" title="Link to this heading">¶</a></h2>
+<p>Our retraction uses multiplicative updates, which are additive in log-space:</p>
+<ol class="arabic simple">
+<li><p>Scale each weight: <code class="docutils literal notranslate"><span class="pre">weights</span> <span class="pre">*</span> <span class="pre">exp(delta)</span></code></p></li>
+<li><p>Normalize: divide by sum to ensure sum-to-one</p></li>
+</ol>
+<p>This satisfies the retraction requirements:</p>
+<ul class="simple">
+<li><p><strong>Identity at zero</strong>: <code class="docutils literal notranslate"><span class="pre">exp(0)</span> <span class="pre">=</span> <span class="pre">1</span></code>, so <code class="docutils literal notranslate"><span class="pre">retract(w,</span> <span class="pre">0)</span> <span class="pre">=</span> <span class="pre">w</span> <span class="pre">/</span> <span class="pre">sum(w)</span> <span class="pre">=</span> <span class="pre">w</span></code></p></li>
+<li><p><strong>Stays on manifold</strong>: normalization ensures sum-to-one; <code class="docutils literal notranslate"><span class="pre">exp()</span></code> ensures positivity</p></li>
+<li><p><strong>Smoothness</strong>: both <code class="docutils literal notranslate"><span class="pre">exp()</span></code> and division are smooth operations</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">simplex_retract</span><span class="p">(</span><span class="n">weights</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">delta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Multiplicative update that keeps weights positive and summing to 1.&quot;&quot;&quot;</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">weights</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">delta</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">v</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Verify the retraction works.</span>
+<span class="n">test_weights</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">])</span>
+<span class="n">test_delta</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>  <span class="c1"># Would make middle weight negative.</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">simplex_retract</span><span class="p">(</span><span class="n">test_weights</span><span class="p">,</span> <span class="n">test_delta</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Initial weights: </span><span class="si">{</span><span class="n">test_weights</span><span class="si">}</span><span class="s2"> (sum=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">test_weights</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After adding delta: </span><span class="si">{</span><span class="n">test_weights</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">test_delta</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After retraction: </span><span class="si">{</span><span class="n">result</span><span class="si">}</span><span class="s2"> (sum=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">result</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;All non-negative: </span><span class="si">{</span><span class="nb">bool</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">result</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Initial weights: [0.5 0.3 0.2] (sum=1.0000)
+After adding delta: [ 0.6        -0.09999999  0.3       ]
+After retraction: [0.5669196  0.20631248 0.22676787] (sum=1.0000)
+All non-negative: True
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="simplex-variable-type">
+<h2>Simplex variable type<a class="headerlink" href="#simplex-variable-type" title="Link to this heading">¶</a></h2>
+<p>Now we define a variable type that lives on the simplex. The <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code> ensures all updates
+produce valid allocations:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">n_assets</span> <span class="o">=</span> <span class="mi">3</span>
+
+
+<span class="k">class</span> <span class="nc">SimplexWeightsVar</span><span class="p">(</span>
+    <span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span>
+    <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n_assets</span><span class="p">)</span> <span class="o">/</span> <span class="n">n_assets</span><span class="p">,</span>
+    <span class="n">retract_fn</span><span class="o">=</span><span class="n">simplex_retract</span><span class="p">,</span>
+    <span class="n">tangent_dim</span><span class="o">=</span><span class="n">n_assets</span><span class="p">,</span>  <span class="c1"># One delta per weight; retraction enforces constraints.</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Portfolio weights on the probability simplex.&quot;&quot;&quot;</span>
+
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SimplexWeightsVar tangent_dim: </span><span class="si">{</span><span class="n">SimplexWeightsVar</span><span class="o">.</span><span class="n">tangent_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>SimplexWeightsVar tangent_dim: 3
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="asset-data">
+<h2>Asset data<a class="headerlink" href="#asset-data" title="Link to this heading">¶</a></h2>
+<p>We use the same historical stock data as the mean-variance notebook.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">stock_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;IBM&quot;</span><span class="p">,</span> <span class="s2">&quot;WMT&quot;</span><span class="p">,</span> <span class="s2">&quot;SEHI&quot;</span><span class="p">]</span>
+
+<span class="c1"># Monthly prices (13 months: Nov 2000 - Nov 2001).</span>
+<span class="n">prices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="p">[</span><span class="mf">93.043</span><span class="p">,</span> <span class="mf">51.826</span><span class="p">,</span> <span class="mf">1.063</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">84.585</span><span class="p">,</span> <span class="mf">52.823</span><span class="p">,</span> <span class="mf">0.938</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">111.453</span><span class="p">,</span> <span class="mf">56.477</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">99.525</span><span class="p">,</span> <span class="mf">49.805</span><span class="p">,</span> <span class="mf">0.938</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">95.819</span><span class="p">,</span> <span class="mf">50.287</span><span class="p">,</span> <span class="mf">1.438</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">114.708</span><span class="p">,</span> <span class="mf">51.521</span><span class="p">,</span> <span class="mf">1.7</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">111.515</span><span class="p">,</span> <span class="mf">51.531</span><span class="p">,</span> <span class="mf">2.54</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">113.211</span><span class="p">,</span> <span class="mf">48.664</span><span class="p">,</span> <span class="mf">2.39</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">104.942</span><span class="p">,</span> <span class="mf">55.744</span><span class="p">,</span> <span class="mf">3.12</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">99.827</span><span class="p">,</span> <span class="mf">47.916</span><span class="p">,</span> <span class="mf">2.98</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">91.607</span><span class="p">,</span> <span class="mf">49.438</span><span class="p">,</span> <span class="mf">1.9</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">107.937</span><span class="p">,</span> <span class="mf">51.336</span><span class="p">,</span> <span class="mf">1.75</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">115.59</span><span class="p">,</span> <span class="mf">55.081</span><span class="p">,</span> <span class="mf">1.8</span><span class="p">],</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+
+<span class="c1"># Compute returns and covariance.</span>
+<span class="n">returns</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">prices</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">prices</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">expected_returns</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">returns</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">returns_centered</span> <span class="o">=</span> <span class="n">returns</span> <span class="o">-</span> <span class="n">expected_returns</span>
+<span class="n">covariance</span> <span class="o">=</span> <span class="p">(</span><span class="n">returns_centered</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">returns_centered</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">returns</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">cov_chol</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">covariance</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Expected monthly returns:&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">stock_names</span><span class="p">,</span> <span class="n">expected_returns</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">+.2f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Expected monthly returns:
+  IBM: +2.60%
+  WMT: +0.81%
+  SEHI: +7.37%
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="problem-formulation">
+<h2>Problem formulation<a class="headerlink" href="#problem-formulation" title="Link to this heading">¶</a></h2>
+<p>With the simplex variable, we only need a variance cost and a return constraint.
+The budget and no short-selling constraints are handled implicitly by the manifold geometry.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">weights_var</span> <span class="o">=</span> <span class="n">SimplexWeightsVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span> <span class="nf">variance_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">SimplexWeightsVar</span><span class="p">,</span> <span class="n">cov_chol</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Minimize portfolio variance: ||L.T @ w||^2 = w.T @ cov @ w.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">cov_chol</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;constraint_geq_zero&quot;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">return_constraint</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">SimplexWeightsVar</span><span class="p">,</span> <span class="n">exp_ret</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Expected return must meet target: E[r] &gt;= target.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">exp_ret</span><span class="p">)</span> <span class="o">-</span> <span class="n">target</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="efficient-frontier">
+<h2>Efficient frontier<a class="headerlink" href="#efficient-frontier" title="Link to this heading">¶</a></h2>
+<p>We compute the efficient frontier by solving for different target returns.
+Note that we only have one constraint (return target) instead of three.</p>
+<p>Using <code class="docutils literal notranslate"><span class="pre">jax.lax.scan</span></code>, we solve sequentially while using each solution as the
+initial guess for the next (warm-starting).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">min_return</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">expected_returns</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+<span class="n">max_return</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">expected_returns</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+<span class="n">target_returns</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">min_return</span><span class="p">,</span> <span class="n">max_return</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">solve_for_target</span><span class="p">(</span>
+    <span class="n">current_vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve portfolio optimization for a given target return.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        current_vals: Solution from previous target (used as initial guess).</span>
+<span class="sd">        target: Target return for this solve.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of (solution values, optimal weights).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">costs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">variance_cost</span><span class="p">(</span><span class="n">weights_var</span><span class="p">,</span> <span class="n">cov_chol</span><span class="p">),</span>
+        <span class="n">return_constraint</span><span class="p">(</span><span class="n">weights_var</span><span class="p">,</span> <span class="n">expected_returns</span><span class="p">,</span> <span class="n">target</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">weights_var</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+    <span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+        <span class="n">current_vals</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">linear_solver</span><span class="o">=</span><span class="s2">&quot;dense_cholesky&quot;</span><span class="p">,</span>
+        <span class="n">termination</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">TerminationConfig</span><span class="p">(</span><span class="n">cost_tolerance</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">solution</span><span class="p">,</span> <span class="n">solution</span><span class="p">[</span><span class="n">weights_var</span><span class="p">]</span>
+
+
+<span class="c1"># Solve sequentially with warm-starting.</span>
+<span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">weights_var</span><span class="p">])</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">all_weights</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">solve_for_target</span><span class="p">,</span> <span class="n">initial_vals</span><span class="p">,</span> <span class="n">target_returns</span><span class="p">)</span>
+<span class="n">variances</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">w</span><span class="p">:</span> <span class="n">w</span> <span class="o">@</span> <span class="n">covariance</span> <span class="o">@</span> <span class="n">w</span><span class="p">)(</span><span class="n">all_weights</span><span class="p">)</span>
+<span class="n">returns_achieved</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">w</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">expected_returns</span><span class="p">))(</span><span class="n">all_weights</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Computed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">target_returns</span><span class="p">)</span><span class="si">}</span><span class="s2"> points on the efficient frontier&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 2 terms and 1 variables: 1 costs, 0 eq_zero, 0 leq_zero, 1 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 1 costs, 1 variables each: variance_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 1 constraints (constraint_geq_zero), 1 variables each: augmented_return_constraint
+Computed 50 points on the efficient frontier
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Verify all solutions satisfy simplex constraints.</span>
+<span class="n">weight_sums</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">all_weights</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">min_weights</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">all_weights</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Weight sums: min=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">weight_sums</span><span class="o">.</span><span class="n">min</span><span class="p">())</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">, max=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">weight_sums</span><span class="o">.</span><span class="n">max</span><span class="p">())</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Min weight across all solutions: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">min_weights</span><span class="o">.</span><span class="n">min</span><span class="p">())</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;All constraints satisfied by construction!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Weight sums: min=1.000000, max=1.000000
+Min weight across all solutions: 0.000000
+All constraints satisfied by construction!
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="results">
+<h2>Results<a class="headerlink" href="#results" title="Link to this heading">¶</a></h2>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">plotly.graph_objects</span> <span class="k">as</span> <span class="nn">go</span>
+<span class="kn">from</span> <span class="nn">plotly.subplots</span> <span class="kn">import</span> <span class="n">make_subplots</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">HTML</span>
+<span class="kn">import</span> <span class="nn">math</span>
+
+<span class="c1"># Annualize returns and risk.</span>
+<span class="n">annual_factor</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">risk_free_rate</span> <span class="o">=</span> <span class="mf">0.05</span>  <span class="c1"># 5% annual risk-free rate.</span>
+
+<span class="n">std_devs_annual</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">annual_factor</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">variances</span><span class="p">]</span>
+<span class="n">returns_annual</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">annual_factor</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">returns_achieved</span><span class="p">]</span>
+<span class="n">sharpe_ratios</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">risk_free_rate</span><span class="p">)</span> <span class="o">/</span> <span class="n">s</span> <span class="k">if</span> <span class="n">s</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">returns_annual</span><span class="p">,</span> <span class="n">std_devs_annual</span><span class="p">)</span>
+<span class="p">]</span>
+
+<span class="n">colors</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;#2196F3&quot;</span><span class="p">,</span> <span class="s2">&quot;#4CAF50&quot;</span><span class="p">,</span> <span class="s2">&quot;#FF9800&quot;</span><span class="p">]</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">make_subplots</span><span class="p">(</span>
+    <span class="n">rows</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">cols</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">subplot_titles</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;Efficient Frontier&quot;</span><span class="p">,</span> <span class="s2">&quot;Sharpe Ratio&quot;</span><span class="p">,</span> <span class="s2">&quot;Asset Allocation&quot;</span><span class="p">),</span>
+    <span class="n">column_widths</span><span class="o">=</span><span class="p">[</span><span class="mf">0.33</span><span class="p">,</span> <span class="mf">0.33</span><span class="p">,</span> <span class="mf">0.34</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="c1"># Scale to $1000 investment.</span>
+<span class="n">std_dev_dollars</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="o">*</span> <span class="mi">1000</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">std_devs_annual</span><span class="p">]</span>
+<span class="n">return_dollars</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="o">*</span> <span class="mi">1000</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">returns_annual</span><span class="p">]</span>
+<span class="n">target_dollars</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="n">annual_factor</span> <span class="o">*</span> <span class="mi">1000</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">target_returns</span><span class="p">]</span>
+
+<span class="c1"># Left plot: Efficient frontier.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">std_dev_dollars</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">return_dollars</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines+markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">sharpe_ratios</span><span class="p">,</span> <span class="n">colorscale</span><span class="o">=</span><span class="s2">&quot;Viridis&quot;</span><span class="p">,</span> <span class="n">showscale</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;Std Dev: $%</span><span class="si">{x:.0f}</span><span class="s2">&lt;br&gt;Return: $%</span><span class="si">{y:.0f}</span><span class="s2">&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Middle plot: Sharpe ratio vs return.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+    <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">return_dollars</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">sharpe_ratios</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines+markers&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">sharpe_ratios</span><span class="p">,</span> <span class="n">colorscale</span><span class="o">=</span><span class="s2">&quot;Viridis&quot;</span><span class="p">,</span> <span class="n">showscale</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;Return: $%</span><span class="si">{x:.0f}</span><span class="s2">&lt;br&gt;Sharpe: %</span><span class="si">{y:.2f}</span><span class="s2">&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Right plot: Asset allocation.</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">color</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">stock_names</span><span class="p">,</span> <span class="n">colors</span><span class="p">)):</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="n">target_dollars</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">w</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">all_weights</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]],</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">marker_color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: $%</span><span class="se">{{</span><span class="s2">y:.0f</span><span class="se">}}</span><span class="s2">&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">col</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;Std Dev ($)&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;Return ($)&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;Return ($)&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;Sharpe Ratio&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;Target Return ($)&quot;</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;Investment ($)&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1050</span><span class="p">],</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span>
+    <span class="n">barmode</span><span class="o">=</span><span class="s2">&quot;stack&quot;</span><span class="p">,</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+    <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">),</span>
+    <span class="n">legend</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">orientation</span><span class="o">=</span><span class="s2">&quot;h&quot;</span><span class="p">,</span> <span class="n">yanchor</span><span class="o">=</span><span class="s2">&quot;bottom&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=-</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">xanchor</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="mf">0.83</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.1.0.min.js" integrity="sha256-Ei4740bWZhaUTQuD6q9yQlgVCMPBz6CZWhevDYPv93A=" crossorigin="anonymous"></script>                <div id="325a6c64-e0e8-4890-b84b-bc2bef64511d" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("325a6c64-e0e8-4890-b84b-bc2bef64511d")) {                    Plotly.newPlot(                        "325a6c64-e0e8-4890-b84b-bc2bef64511d",                        [{"hovertemplate":"Std Dev: $%{x:.0f}\u003cbr\u003eReturn: $%{y:.0f}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":[0.3805649166820572,0.3805649166820572,0.3805649166820572,0.3805649166820572,0.4171856546268763,0.475446241869894,0.5314030949864398,0.5846158475682927,0.634688593904948,0.6813525043433676,0.7244701555216878,0.7640026500565782,0.799976871325907,0.8325461549265514,0.8618637359976752,0.8881422690177155,0.9115913755150858,0.9324578587434664,0.9509772165019238,0.9673783154224493,0.9818694334872404,0.9946581351641337,1.0059604643390236,1.0159177841492235,1.0246829328367064,1.0323335271582237,1.0391053857636876,1.0450326538820687,1.0502192244904636,1.0545638933985946,1.0564473576729558,1.055884962601748,1.0532713550831214,1.049013209364859,1.0434024356689453,1.036722543775924,1.0292448250850532,1.0212140539112387,1.0128150569530763,1.0041192739716727,0.9952514478788536,0.9863526770614076,0.9774510128904847,0.968639124477809,0.9599411956376386,0.951437652002289,0.9431103729433468,0.9349031490227598,0.9270067209888554,0.9193039227035017],"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"showscale":false,"size":6},"mode":"lines+markers","showlegend":false,"x":[267.0690502563281,267.0690502563281,267.0690502563281,267.0690502563281,267.2465426573863,268.29484989219554,270.2729984434109,273.1623796123029,276.93393182498886,281.5512893997629,286.97406036226755,293.1579296837669,300.0520267051821,307.6151593555388,315.7966376427363,324.55232720501647,333.83115090675426,343.593723346755,353.7998332176393,364.4122115028114,375.3900532748215,386.70383238755784,398.356929894465,410.30219171429627,422.5182991436528,434.8836891159381,447.56331058202653,460.4149786302662,473.4276983845701,486.7367119827228,500.9961887423371,516.4688700684983,533.0054734182779,550.4049422547783,568.7581262583434,587.9763953715014,607.9185712557634,628.4343389854693,649.4436372798162,671.0685453967662,693.2361771154978,715.7823835817534,738.7827352114555,762.1120555984481,785.791715065267,809.6617975268523,833.8123267573627,858.4478693949818,883.0080997123614,907.8507383258553],"y":[151.63711085915565,151.63711085915565,151.63711085915565,151.63711085915565,161.49142384529114,177.5597780942917,193.62390786409378,209.69505608081818,225.76680779457092,241.83567613363266,257.90414214134216,273.9734351634979,290.034681558609,306.10381811857224,322.17366993427277,338.2486402988434,354.3175980448723,370.38666754961014,386.45558059215546,402.524471282959,418.58401894569397,434.638112783432,450.7313221693039,466.83329343795776,482.94728994369507,498.9450126886368,515.0654464960098,531.148687005043,547.2028702497482,563.2949620485306,579.2760998010635,595.3317135572433,611.3993972539902,627.3820549249649,643.4436142444611,659.5683842897415,675.6970435380936,691.7659789323807,707.7662944793701,723.8328605890274,739.9443089962006,756.0138702392578,772.1239328384399,788.2115542888641,804.3138384819031,820.3427195549011,836.3770544528961,852.5656163692474,868.5544431209564,884.590744972229],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Return: $%{x:.0f}\u003cbr\u003eSharpe: %{y:.2f}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":[0.3805649166820572,0.3805649166820572,0.3805649166820572,0.3805649166820572,0.4171856546268763,0.475446241869894,0.5314030949864398,0.5846158475682927,0.634688593904948,0.6813525043433676,0.7244701555216878,0.7640026500565782,0.799976871325907,0.8325461549265514,0.8618637359976752,0.8881422690177155,0.9115913755150858,0.9324578587434664,0.9509772165019238,0.9673783154224493,0.9818694334872404,0.9946581351641337,1.0059604643390236,1.0159177841492235,1.0246829328367064,1.0323335271582237,1.0391053857636876,1.0450326538820687,1.0502192244904636,1.0545638933985946,1.0564473576729558,1.055884962601748,1.0532713550831214,1.049013209364859,1.0434024356689453,1.036722543775924,1.0292448250850532,1.0212140539112387,1.0128150569530763,1.0041192739716727,0.9952514478788536,0.9863526770614076,0.9774510128904847,0.968639124477809,0.9599411956376386,0.951437652002289,0.9431103729433468,0.9349031490227598,0.9270067209888554,0.9193039227035017],"colorscale":[[0.0,"#440154"],[0.1111111111111111,"#482878"],[0.2222222222222222,"#3e4989"],[0.3333333333333333,"#31688e"],[0.4444444444444444,"#26828e"],[0.5555555555555556,"#1f9e89"],[0.6666666666666666,"#35b779"],[0.7777777777777778,"#6ece58"],[0.8888888888888888,"#b5de2b"],[1.0,"#fde725"]],"showscale":false,"size":6},"mode":"lines+markers","showlegend":false,"x":[151.63711085915565,151.63711085915565,151.63711085915565,151.63711085915565,161.49142384529114,177.5597780942917,193.62390786409378,209.69505608081818,225.76680779457092,241.83567613363266,257.90414214134216,273.9734351634979,290.034681558609,306.10381811857224,322.17366993427277,338.2486402988434,354.3175980448723,370.38666754961014,386.45558059215546,402.524471282959,418.58401894569397,434.638112783432,450.7313221693039,466.83329343795776,482.94728994369507,498.9450126886368,515.0654464960098,531.148687005043,547.2028702497482,563.2949620485306,579.2760998010635,595.3317135572433,611.3993972539902,627.3820549249649,643.4436142444611,659.5683842897415,675.6970435380936,691.7659789323807,707.7662944793701,723.8328605890274,739.9443089962006,756.0138702392578,772.1239328384399,788.2115542888641,804.3138384819031,820.3427195549011,836.3770544528961,852.5656163692474,868.5544431209564,884.590744972229],"y":[0.3805649166820572,0.3805649166820572,0.3805649166820572,0.3805649166820572,0.4171856546268763,0.475446241869894,0.5314030949864398,0.5846158475682927,0.634688593904948,0.6813525043433676,0.7244701555216878,0.7640026500565782,0.799976871325907,0.8325461549265514,0.8618637359976752,0.8881422690177155,0.9115913755150858,0.9324578587434664,0.9509772165019238,0.9673783154224493,0.9818694334872404,0.9946581351641337,1.0059604643390236,1.0159177841492235,1.0246829328367064,1.0323335271582237,1.0391053857636876,1.0450326538820687,1.0502192244904636,1.0545638933985946,1.0564473576729558,1.055884962601748,1.0532713550831214,1.049013209364859,1.0434024356689453,1.036722543775924,1.0292448250850532,1.0212140539112387,1.0128150569530763,1.0041192739716727,0.9952514478788536,0.9863526770614076,0.9774510128904847,0.968639124477809,0.9599411956376386,0.951437652002289,0.9431103729433468,0.9349031490227598,0.9270067209888554,0.9193039227035017],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"IBM: $%{y:.0f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#2196F3"},"name":"IBM","x":[97.21581637859344,113.28469589352608,129.35356423258781,145.42244374752045,161.49131208658218,177.56019160151482,193.62907111644745,209.6979394555092,225.7668301463127,241.83569848537445,257.9045668244362,273.9734351634979,290.04232585430145,306.1111941933632,322.1800848841667,338.24895322322845,354.3178215622902,370.3867122530937,386.45558059215546,402.524471282959,418.59331727027893,434.66220796108246,450.7310539484024,466.79994463920593,482.86883533000946,498.937726020813,515.0065720081329,531.0754626989365,547.14435338974,563.2131993770599,579.2820900678635,595.350980758667,611.4198267459869,627.4887174367905,643.557608127594,659.6264541149139,675.6953448057175,691.7641907930374,707.8330814838409,723.9019721746445,739.970862865448,756.039708852768,772.1085548400879,788.177490234375,804.246336221695,820.3151822090149,836.384117603302,852.452963590622,868.5218095779419,884.590744972229],"y":[159.79421138763428,159.79421138763428,159.79421138763428,159.79421138763428,169.83261704444885,186.20115518569946,202.5657594203949,218.93703937530518,235.30858755111694,251.67757272720337,268.04617047309875,284.415602684021,300.77672004699707,317.1460032463074,333.516001701355,349.89133477211,366.26049876213074,382.6296627521515,398.99879693984985,415.3677821159363,431.7272901535034,448.08098673820496,464.4748866558075,480.87847232818604,497.29418754577637,513.5894417762756,530.0142765045166,546.4050769805908,562.847912311554,560.8298778533936,533.0981016159058,505.124032497406,477.0921766757965,449.1986334323883,421.1551547050476,392.9978013038635,364.83150720596313,336.7684781551361,308.82471799850464,280.76493740081787,252.62612104415894,224.56061840057373,196.4242160320282,168.32715272903442,140.2043253183365,112.20980435609818,84.20541137456894,55.93198910355568,28.007274493575096,2.477877928883099e-10],"type":"bar","xaxis":"x3","yaxis":"y3"},{"hovertemplate":"WMT: $%{y:.0f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#4CAF50"},"name":"WMT","x":[97.21581637859344,113.28469589352608,129.35356423258781,145.42244374752045,161.49131208658218,177.56019160151482,193.62907111644745,209.6979394555092,225.7668301463127,241.83569848537445,257.9045668244362,273.9734351634979,290.04232585430145,306.1111941933632,322.1800848841667,338.24895322322845,354.3178215622902,370.3867122530937,386.45558059215546,402.524471282959,418.59331727027893,434.66220796108246,450.7310539484024,466.79994463920593,482.86883533000946,498.937726020813,515.0065720081329,531.0754626989365,547.14435338974,563.2131993770599,579.2820900678635,595.350980758667,611.4198267459869,627.4887174367905,643.557608127594,659.6264541149139,675.6953448057175,691.7641907930374,707.8330814838409,723.9019721746445,739.970862865448,756.039708852768,772.1085548400879,788.177490234375,804.246336221695,820.3151822090149,836.384117603302,852.452963590622,868.5218095779419,884.590744972229],"y":[814.6831393241882,814.6831393241882,814.6831393241882,814.6831393241882,794.8679327964783,762.5575065612793,730.2553653717041,697.9395151138306,665.6224727630615,633.3110928535461,601.0004878044128,568.6882734298706,536.392331123352,504.08029556274414,471.7669188976288,439.4431710243225,407.131552696228,374.819815158844,342.50831604003906,310.1968467235565,277.9042422771454,245.62275409698486,213.26230466365814,180.8837205171585,148.48098158836365,116.3136288523674,83.89610052108765,51.5507236123085,19.204167649149895,0.2339867496630177,0.10329182987334207,0.05425940253189765,0.031836923881201074,0.01687000985839404,0.010635830221872311,0.007075932444422506,0.004965884272678522,0.0036781502785743214,0.00283604549622396,0.0022384008389053633,0.0018957008478537318,0.0016121565522553283,0.0014101506167207845,0.0012342653690211591,0.0010607651574900956,0.0009234078675035562,0.0007722261443632306,0.0006112341566222312,0.0004187346860362595,1.2560566736014023e-9],"type":"bar","xaxis":"x3","yaxis":"y3"},{"hovertemplate":"SEHI: $%{y:.0f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#FF9800"},"name":"SEHI","x":[97.21581637859344,113.28469589352608,129.35356423258781,145.42244374752045,161.49131208658218,177.56019160151482,193.62907111644745,209.6979394555092,225.7668301463127,241.83569848537445,257.9045668244362,273.9734351634979,290.04232585430145,306.1111941933632,322.1800848841667,338.24895322322845,354.3178215622902,370.3867122530937,386.45558059215546,402.524471282959,418.59331727027893,434.66220796108246,450.7310539484024,466.79994463920593,482.86883533000946,498.937726020813,515.0065720081329,531.0754626989365,547.14435338974,563.2131993770599,579.2820900678635,595.350980758667,611.4198267459869,627.4887174367905,643.557608127594,659.6264541149139,675.6953448057175,691.7641907930374,707.8330814838409,723.9019721746445,739.970862865448,756.039708852768,772.1085548400879,788.177490234375,804.246336221695,820.3151822090149,836.384117603302,852.452963590622,868.5218095779419,884.590744972229],"y":[25.52265115082264,25.52265115082264,25.52265115082264,25.52265115082264,35.29940918087959,51.24128982424736,67.17884540557861,83.12350511550903,99.06888753175735,115.0112897157669,130.95328211784363,146.896094083786,162.83094882965088,178.7736415863037,194.71701979637146,210.66543459892273,226.60790383815765,242.55050718784332,258.4929168224335,274.4353413581848,290.3684675693512,306.29628896713257,322.26279377937317,338.23779225349426,354.2247712612152,370.09695172309875,386.08962297439575,402.04426646232605,417.947918176651,438.93611431121826,466.7985737323761,494.8217272758484,522.875964641571,550.7844686508179,578.8341164588928,606.9951057434082,635.1634860038757,663.2277965545654,691.1724209785461,719.2328572273254,747.3719120025635,775.4377126693726,803.5743236541748,831.6716551780701,859.7946166992188,887.7893686294556,915.793776512146,944.0674185752869,971.9923138618469,1000.0],"type":"bar","xaxis":"x3","yaxis":"y3"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.28600000000000003],"title":{"text":"Std Dev ($)"}},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"Return ($)"}},"xaxis2":{"anchor":"y2","domain":[0.3526666666666667,0.6386666666666667],"title":{"text":"Return ($)"}},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"Sharpe Ratio"}},"xaxis3":{"anchor":"y3","domain":[0.7053333333333334,1.0],"title":{"text":"Target Return ($)"}},"yaxis3":{"anchor":"x3","domain":[0.0,1.0],"title":{"text":"Investment ($)"},"range":[0,1050]},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Efficient Frontier","x":0.14300000000000002,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Sharpe Ratio","x":0.4956666666666667,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Asset Allocation","x":0.8526666666666667,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"margin":{"t":40,"b":40,"l":60,"r":40},"legend":{"orientation":"h","yanchor":"bottom","y":-0.25,"xanchor":"center","x":0.83},"barmode":"stack","height":400},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+</section>
+<section id="comparison-with-constrained-approach">
+<h2>Comparison with constrained approach<a class="headerlink" href="#comparison-with-constrained-approach" title="Link to this heading">¶</a></h2>
+<p>The manifold and constrained approaches produce the same efficient frontier. The key difference
+is in how constraints are enforced:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Approach</p></th>
+<th class="head"><p>Budget constraint</p></th>
+<th class="head"><p>No short-selling</p></th>
+<th class="head"><p>Implementation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Constrained</p></td>
+<td><p>Explicit equality constraint</p></td>
+<td><p>Explicit inequality constraint</p></td>
+<td><p>Augmented Lagrangian</p></td>
+</tr>
+<tr class="row-odd"><td><p>Manifold</p></td>
+<td><p>Built into <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code></p></td>
+<td><p>Built into <code class="docutils literal notranslate"><span class="pre">retract_fn</span></code></p></td>
+<td><p>Multiplicative retraction</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The manifold approach can be advantageous when:</p>
+<ul class="simple">
+<li><p>Constraints define a smooth manifold with a simple retraction</p></li>
+<li><p>You want to avoid the overhead of the Augmented Lagrangian solver</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="reparameterized_allocation.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Reparameterized allocation</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="mean_variance.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Mean-variance allocation</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/brentyi/jaxls" aria-label="GitHub">
+            <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+            </svg>
+        </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Manifold allocation</a><ul>
+<li><a class="reference internal" href="#the-probability-simplex">The probability simplex</a></li>
+<li><a class="reference internal" href="#simplex-retraction">Simplex retraction</a></li>
+<li><a class="reference internal" href="#simplex-variable-type">Simplex variable type</a></li>
+<li><a class="reference internal" href="#asset-data">Asset data</a></li>
+<li><a class="reference internal" href="#problem-formulation">Problem formulation</a></li>
+<li><a class="reference internal" href="#efficient-frontier">Efficient frontier</a></li>
+<li><a class="reference internal" href="#results">Results</a></li>
+<li><a class="reference internal" href="#comparison-with-constrained-approach">Comparison with constrained approach</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=5fa4622c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=fd10adb8"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

@@ -9,7 +9,6 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "cell-1",
    "metadata": {
     "tags": [
      "hide-input"
@@ -112,7 +111,7 @@
    "cell_type": "markdown",
    "id": "cell-7",
    "metadata": {},
-   "source": "## Manifold optimization\n\nThe standard approach is to optimize on the manifold using:\n\n1. **Tangent space**: At each point on the manifold, there's a local linear approximation (the tangent space). For SO(3), tangent spaces are 3-dimensional; we can parameterize local updates using axis-angle vectors.\n\n2. **Retraction**: A function that maps from the tangent space back to the manifold. For SO(3), we use the exponential map: $R_{\\text{new}} = R_{\\text{current}} \\cdot \\exp(\\delta)$, where $\\delta \\in \\mathbb{R}^3$ is an axis-angle perturbation.\n\nThe solver optimizes in the tangent space (which is Euclidean), then uses retraction to update the manifold variable."
+   "source": "## Manifold optimization\n\nThe standard approach is to optimize on the manifold using:\n\n1. **Tangent space**: At each point on the manifold, there's a local linear approximation (the tangent space). For SO(3), tangent spaces are 3-dimensional; we can parameterize local updates using axis-angle vectors.\n\n2. **Retraction**: A function `retract(x, delta)` that maps a point on the manifold plus a tangent space update back to a valid point on the manifold. For SO(3), we use the exponential map: $R_{\\text{new}} = R_{\\text{current}} \\cdot \\exp(\\delta)$, where $\\delta \\in \\mathbb{R}^3$ is an axis-angle perturbation.\n\nA valid retraction must satisfy:\n\n- **Identity at zero**: `retract(x, 0) = x`\n- **Stays on manifold**: output always satisfies the manifold constraints\n- **Smoothness**: the function should be differentiable\n\nThe solver optimizes in the tangent space (which is Euclidean), then uses retraction to update the manifold variable."
   },
   {
    "cell_type": "markdown",

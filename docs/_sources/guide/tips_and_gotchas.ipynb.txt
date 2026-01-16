@@ -9,7 +9,6 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "cell-1",
    "metadata": {
     "tags": [
      "hide-input"
@@ -265,7 +264,7 @@
    "cell_type": "markdown",
    "id": "cell-11",
    "metadata": {},
-   "source": "## Residual vector dimension\n\nIn Gauss-Newton, the Hessian is approximated as $J^T J$ where $J$ is the Jacobian of residuals with respect to parameters. The rank of this approximation is limited by the number of residual dimensions. Higher-dimensional residuals produce higher-rank Jacobians and better Hessian approximations.\n\nFor circle fitting, consider two formulations:\n- 1D residual: `[dist - r]`, the signed distance error (shape `(1,)`)\n- 2D residual: `(dist - r) * direction`, the error vector pointing from circle to point (shape `(2,)`)\n\nBoth have the same cost when squared, but the 2D version has a 2×3 Jacobian (rank 2) vs 1×3 (rank 1)."
+   "source": "## Residual vector dimension\n\nIn Gauss-Newton, the Hessian is approximated as $J^T J$ where $J$ is the Jacobian of residuals with respect to parameters. The rank of this approximation is limited by the number of residual dimensions. Higher-dimensional residuals produce higher-rank Jacobians and better Hessian approximations.\n\nFor circle fitting, consider two formulations:\n- 1D residual: `[dist - r]`, the signed distance error (shape `(1,)`)\n- 2D residual: `(dist - r) * direction`, the error vector pointing from circle to point (shape `(2,)`)\n\nBoth have the same cost when squared, but the 2D version has a 2\u00d73 Jacobian (rank 2) vs 1\u00d73 (rank 1)."
   },
   {
    "cell_type": "code",

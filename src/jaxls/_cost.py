@@ -315,41 +315,41 @@ class Cost[*Args]:
             return decorator
         return decorator(compute_residual)
 
-    @staticmethod
-    @deprecated("Use Cost.factory instead of Cost.create_factory")
-    def create_factory[**Args_](
-        compute_residual: ResidualFunc[Args_] | None = None,
-        *,
-        kind: CostKind = "l2_squared",
-        jac_mode: Literal["auto", "forward", "reverse"] = "auto",
-        jac_batch_size: int | None = None,
-        jac_custom_fn: JacobianFunc[Args_] | None = None,
-        jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, Any] | None = None,
-        name: str | None = None,
-    ) -> (
-        Callable[[ResidualFunc[Args_]], CostFactory[Args_]]
-        | Callable[[ResidualFuncWithJacCache[Args_, Any]], CostFactory[Args_]]
-        | CostFactory[Args_]
-    ):
-        """Deprecated: Use Cost.factory instead."""
-        import warnings
-
-        warnings.warn(
-            "Cost.create_factory is deprecated, use Cost.factory instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return Cost.factory(  # type: ignore
-            compute_residual,
-            kind=kind,
-            jac_mode=jac_mode,
-            jac_batch_size=jac_batch_size,
-            jac_custom_fn=jac_custom_fn,
-            jac_custom_with_cache_fn=jac_custom_with_cache_fn,
-            name=name,
-        )
-
     if not TYPE_CHECKING:
+
+        @staticmethod
+        @deprecated("Use Cost.factory instead of Cost.create_factory")
+        def create_factory[**Args_](
+            compute_residual: ResidualFunc[Args_] | None = None,
+            *,
+            kind: CostKind = "l2_squared",
+            jac_mode: Literal["auto", "forward", "reverse"] = "auto",
+            jac_batch_size: int | None = None,
+            jac_custom_fn: JacobianFunc[Args_] | None = None,
+            jac_custom_with_cache_fn: JacobianFuncWithCache[Args_, Any] | None = None,
+            name: str | None = None,
+        ) -> (
+            Callable[[ResidualFunc[Args_]], CostFactory[Args_]]
+            | Callable[[ResidualFuncWithJacCache[Args_, Any]], CostFactory[Args_]]
+            | CostFactory[Args_]
+        ):
+            """Deprecated: Use Cost.factory instead."""
+            import warnings
+
+            warnings.warn(
+                "Cost.create_factory is deprecated, use Cost.factory instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return Cost.factory(  # type: ignore
+                compute_residual,
+                kind=kind,
+                jac_mode=jac_mode,
+                jac_batch_size=jac_batch_size,
+                jac_custom_fn=jac_custom_fn,
+                jac_custom_with_cache_fn=jac_custom_with_cache_fn,
+                name=name,
+            )
 
         @staticmethod
         def make[*Args_](

@@ -114,6 +114,7 @@ Algorithmic references:
    api/core
    api/lie_group_variables
    api/solver_config
+   api/covariance
 
 .. toctree::
    :caption: Design Notes
