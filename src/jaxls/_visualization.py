@@ -108,14 +108,16 @@ def _problem_to_graph_data(
                     node_idx = len(nodes)
                     var_nodes[key] = node_idx
                     vars_count_by_type[var_type_name] = current_count + 1
-                    nodes.append({
-                        "id": f"var_{node_idx}",
-                        "label": f"{var_type_name}({var_id})",
-                        "type": "variable",
-                        "var_type": var_type_name,
-                        "fill": fill_color,
-                        "stroke": border_color,
-                    })
+                    nodes.append(
+                        {
+                            "id": f"var_{node_idx}",
+                            "label": f"{var_type_name}({var_id})",
+                            "type": "variable",
+                            "var_type": var_type_name,
+                            "fill": fill_color,
+                            "stroke": border_color,
+                        }
+                    )
 
     # Count total cost nodes per cost type (by name) for proportional allocation.
     cost_counts_by_name: dict[str, int] = {}
@@ -201,21 +203,25 @@ def _problem_to_graph_data(
             cost_node_idx += 1
             costs_added_by_name[name] = current_type_count + 1
 
-            nodes.append({
-                "id": node_id,
-                "label": name,
-                "type": "cost",
-                "kind": cost.kind,
-                "fill": fill_color,
-                "stroke": border_color,
-            })
+            nodes.append(
+                {
+                    "id": node_id,
+                    "label": name,
+                    "type": "cost",
+                    "kind": cost.kind,
+                    "fill": fill_color,
+                    "stroke": border_color,
+                }
+            )
 
             for key in var_keys:
                 target_idx = var_nodes[key]
-                links.append({
-                    "source": node_id,
-                    "target": nodes[target_idx]["id"],
-                })
+                links.append(
+                    {
+                        "source": node_id,
+                        "target": nodes[target_idx]["id"],
+                    }
+                )
 
     return {
         "nodes": nodes,

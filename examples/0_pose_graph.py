@@ -48,7 +48,7 @@ costs = [
 # This goes through costs, and preprocesses them to enable vectorization of
 # computations. If we have 1000 prior costs, we will internally stack all of
 # the associated values and batch computations.
-problem = jaxls.LeastSquaresProblem(costs, vars) #.analyze()
+problem = jaxls.LeastSquaresProblem(costs, vars)  # .analyze()
 
 # Visualize the variables and costs.
 problem.visualize()

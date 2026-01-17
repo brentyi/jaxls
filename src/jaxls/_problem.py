@@ -748,7 +748,9 @@ class AnalyzedLeastSquaresProblem:
     def make_covariance_estimator(
         self,
         vals: VarValues,
-        method: Literal["cholmod_spinv"] | "LinearSolverCovarianceEstimatorConfig" | None = None,
+        method: Literal["cholmod_spinv"]
+        | "LinearSolverCovarianceEstimatorConfig"
+        | None = None,
         *,
         scale_by_residual_variance: bool = True,
     ) -> "CovarianceEstimator":
@@ -778,7 +780,6 @@ class AnalyzedLeastSquaresProblem:
             estimator.covariance(var0, var1).
         """
         from ._covariance import (
-            CovarianceEstimator,
             LinearSolveCovarianceEstimator,
             LinearSolverCovarianceEstimatorConfig,
             SpinvCovarianceEstimator,
@@ -871,7 +872,10 @@ class AnalyzedLeastSquaresProblem:
             # Build solve function based on linear solver config.
             linear_solver = method.linear_solver
 
-            if isinstance(linear_solver, ConjugateGradientConfig) or linear_solver == "conjugate_gradient":
+            if (
+                isinstance(linear_solver, ConjugateGradientConfig)
+                or linear_solver == "conjugate_gradient"
+            ):
                 cg_config = (
                     ConjugateGradientConfig()
                     if linear_solver == "conjugate_gradient"
@@ -880,7 +884,9 @@ class AnalyzedLeastSquaresProblem:
 
                 # Set up preconditioner.
                 if cg_config.preconditioner == "block_jacobi":
-                    preconditioner = make_block_jacobi_precoditioner(self, A_blocksparse)
+                    preconditioner = make_block_jacobi_precoditioner(
+                        self, A_blocksparse
+                    )
                 elif cg_config.preconditioner == "point_jacobi":
                     preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
                 else:
