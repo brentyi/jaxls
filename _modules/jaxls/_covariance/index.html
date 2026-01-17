@@ -474,9 +474,6 @@ document.write(`
         <span class="k">if</span> <span class="n">var1</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">var1</span> <span class="o">=</span> <span class="n">var0</span>
 
-        <span class="n">var0_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">var0</span><span class="p">)</span>
-        <span class="n">var1_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">var1</span><span class="p">)</span>
-
         <span class="c1"># Compute tangent indices.</span>
         <span class="k">def</span><span class="w"> </span><span class="nf">get_tangent_slice</span><span class="p">(</span><span class="n">var</span><span class="p">:</span> <span class="n">Var</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
             <span class="n">var_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
@@ -491,7 +488,7 @@ document.write(`
         <span class="n">start1</span><span class="p">,</span> <span class="n">end1</span> <span class="o">=</span> <span class="n">get_tangent_slice</span><span class="p">(</span><span class="n">var1</span><span class="p">)</span>
 
         <span class="c1"># Extract block from sparse matrix.</span>
-        <span class="n">cov_block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sparse_cov</span><span class="p">[</span><span class="n">start0</span><span class="p">:</span><span class="n">end0</span><span class="p">,</span> <span class="n">start1</span><span class="p">:</span><span class="n">end1</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+        <span class="n">cov_block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sparse_cov</span><span class="p">[</span><span class="n">start0</span><span class="p">:</span><span class="n">end0</span><span class="p">,</span> <span class="n">start1</span><span class="p">:</span><span class="n">end1</span><span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
         <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cov_block</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_residual_variance</span>
 
 
@@ -531,7 +528,7 @@ document.write(`
         <span class="n">d1</span> <span class="o">=</span> <span class="n">var1_type</span><span class="o">.</span><span class="n">tangent_dim</span>
 
         <span class="c1"># Compute tangent indices.</span>
-        <span class="k">def</span><span class="w"> </span><span class="nf">get_tangent_start</span><span class="p">(</span><span class="n">var</span><span class="p">:</span> <span class="n">Var</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">get_tangent_start</span><span class="p">(</span><span class="n">var</span><span class="p">:</span> <span class="n">Var</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
             <span class="n">var_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
             <span class="n">tangent_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tangent_start_from_var_type</span><span class="p">[</span><span class="n">var_type</span><span class="p">]</span>
             <span class="n">sorted_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sorted_ids_from_var_type</span><span class="p">[</span><span class="n">var_type</span><span class="p">]</span>
