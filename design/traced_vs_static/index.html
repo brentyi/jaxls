@@ -44,7 +44,7 @@
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=fd10adb8"></script>
-    <script src="../../_static/js/custom.js?v=58150dd0"></script>
+    <script src="../../_static/js/custom.js?v=b8ccbbc1"></script>
     <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'design/traced_vs_static';</script>
     <link rel="index" title="Index" href="../../genindex/" />
@@ -414,12 +414,6 @@ document.write(`
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-variable-ids-are-traced">Why variable IDs are traced</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#implementation-jdc-static">Implementation: <code class="docutils literal notranslate"><span class="pre">jdc.Static</span></code></a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-triggers-recompilation">What triggers recompilation?</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#does-not-trigger-recompilation">Does not trigger recompilation</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#triggers-recompilation">Triggers recompilation</a></li>
-</ul>
-</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#examples-leveraging-traced-values">Examples: leveraging traced values</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#different-variable-assignments">Different variable assignments</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#batched-solves-with-vmap">Batched solves with vmap</a></li>
@@ -439,24 +433,7 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <div class="cell tag_hide-input docutils container">
-<details class="admonition hide above-input">
-<summary aria-label="Toggle hidden content">
-<p class="collapsed admonition-title">Show code cell source</p>
-<p class="expanded admonition-title">Hide code cell source</p>
-</summary>
-<div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
-
-<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
-<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-</details>
-</div>
-<section class="tex2jax_ignore mathjax_ignore" id="what-s-traced">
+  <section class="tex2jax_ignore mathjax_ignore" id="what-s-traced">
 <h1>What’s traced?<a class="headerlink" href="#what-s-traced" title="Link to this heading">#</a></h1>
 <p>JAX’s JIT compilation requires distinguishing between traced values (that can
 change between calls) and static values (that trigger recompilation if changed).</p>
@@ -558,7 +535,7 @@ vectorization of costs. These two approaches produce equivalent results after an
 </pre></div>
 </div>
 <p>In approach A, the IDs are explicit arrays. In approach B, jaxls stacks the
-scalar IDs into arrays during <code class="docutils literal notranslate"><span class="pre">analyze()</span></code>. Either way, the analyzed problem
+scalar IDs into arrays during <code class="docutils literal notranslate"><span class="pre">analyze()</span></code>. In both cases, the analyzed problem
 vmaps over the ID arrays to compute residuals and Jacobians in parallel.</p>
 <p>This also works with inline lambda functions:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Approach C: Inline lambdas with list comprehension.</span>
@@ -573,49 +550,6 @@ vmaps over the ID arrays to compute residuals and Jacobians in parallel.</p>
 <p>Even though this creates 100 separate lambda objects, jaxls recognizes them as
 the same cost type using bytecode analysis: <code class="docutils literal notranslate"><span class="pre">dis.Bytecode</span></code> extracts the instruction
 sequence, which is identical across all 100 lambdas.</p>
-</section>
-<section id="implementation-jdc-static">
-<h2>Implementation: <code class="docutils literal notranslate"><span class="pre">jdc.Static</span></code><a class="headerlink" href="#implementation-jdc-static" title="Link to this heading">#</a></h2>
-<p>jaxls uses <code class="docutils literal notranslate"><span class="pre">jax_dataclasses</span></code> with the <code class="docutils literal notranslate"><span class="pre">jdc.Static[]</span></code> type annotation to mark static fields:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@jdc</span><span class="o">.</span><span class="n">pytree_dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">AnalyzedLeastSquaresProblem</span><span class="p">:</span>
-    <span class="c1"># Traced fields (part of pytree).</span>
-    <span class="n">_stacked_costs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">_AnalyzedCost</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
-    <span class="n">_sorted_ids_from_var_type</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">Var</span><span class="p">],</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">]</span>
-    
-    <span class="c1"># Static fields (not part of pytree, trigger recompile if changed).</span>
-    <span class="n">_cost_counts</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
-    <span class="n">_tangent_dim</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
-    <span class="n">_residual_dim</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
-</pre></div>
-</div>
-<p>Static fields are excluded from the pytree structure, so JAX treats them as
-compile-time constants.</p>
-</section>
-<section id="what-triggers-recompilation">
-<h2>What triggers recompilation?<a class="headerlink" href="#what-triggers-recompilation" title="Link to this heading">#</a></h2>
-<section id="does-not-trigger-recompilation">
-<h3>Does not trigger recompilation<a class="headerlink" href="#does-not-trigger-recompilation" title="Link to this heading">#</a></h3>
-<ul class="simple">
-<li><p>Different variable IDs (as long as count and types are the same)</p></li>
-<li><p>Different variable values</p></li>
-<li><p>Different initial guesses</p></li>
-<li><p>Different solver parameters (trust region damping, CG tolerance)</p></li>
-<li><p>Different AL penalty parameters</p></li>
-</ul>
-</section>
-<section id="triggers-recompilation">
-<h3>Triggers recompilation<a class="headerlink" href="#triggers-recompilation" title="Link to this heading">#</a></h3>
-<ul class="simple">
-<li><p>Adding/removing variables or costs</p></li>
-<li><p>Changing variable types</p></li>
-<li><p>Changing problem dimensions</p></li>
-<li><p>Switching linear solver (CG → Cholesky)</p></li>
-<li><p>Changing sparse matrix mode</p></li>
-</ul>
-<p>The first solve is slower (includes compilation), but subsequent solves with
-the same structure are fast.</p>
-</section>
 </section>
 <section id="examples-leveraging-traced-values">
 <h2>Examples: leveraging traced values<a class="headerlink" href="#examples-leveraging-traced-values" title="Link to this heading">#</a></h2>
@@ -733,12 +667,6 @@ previous solution as its initial guess:</p>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-variable-ids-are-traced">Why variable IDs are traced</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#implementation-jdc-static">Implementation: <code class="docutils literal notranslate"><span class="pre">jdc.Static</span></code></a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-triggers-recompilation">What triggers recompilation?</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#does-not-trigger-recompilation">Does not trigger recompilation</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#triggers-recompilation">Triggers recompilation</a></li>
-</ul>
-</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#examples-leveraging-traced-values">Examples: leveraging traced values</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#different-variable-assignments">Different variable assignments</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#batched-solves-with-vmap">Batched solves with vmap</a></li>
