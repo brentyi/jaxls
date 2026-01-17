@@ -1,0 +1,965 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Custom Jacobians &#8212; jaxls</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=2a1f1aab" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=55b5f74b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=fd10adb8"></script>
+    <script src="../../../_static/js/custom.js?v=58150dd0"></script>
+    <script src="../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'guide/advanced/custom_jacobians';</script>
+    <link rel="index" title="Index" href="../../../genindex/" />
+    <link rel="search" title="Search" href="../../../search/" />
+    <link rel="next" title="Constraints" href="../constraints/" />
+    <link rel="prev" title="Non-Euclidean variables" href="../non_euclidean/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search/"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">jaxls</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tips_and_gotchas/">Tips and gotchas</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../">Advanced</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../non_euclidean/">Non-Euclidean variables</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../robust_costs/">Robust costs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../covariance/">Covariance estimation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/mechanics/">Mechanics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/mechanics/truss_analysis/">Truss analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/vision/">Vision</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/robotics/">Robotics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../examples/portfolio/">Portfolio optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples/portfolio/black_litterman/">Black-Litterman allocation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../api/core/">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/covariance/">Covariance Estimation</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../design/typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/traced_vs_static/">What’s traced?</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls/issues/new?title=Issue%20on%20page%20%2Fguide/advanced/custom_jacobians.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../_sources/guide/advanced/custom_jacobians.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Custom Jacobians</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#when-to-use-custom-jacobians">When to use custom Jacobians</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#problem-setup-2d-point-fitting">Problem setup: 2D point fitting</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#basic-usage-jac-custom-fn">Basic usage: <code class="docutils literal notranslate"><span class="pre">jac_custom_fn</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#with-cache-jac-custom-with-cache-fn">With cache: <code class="docutils literal notranslate"><span class="pre">jac_custom_with_cache_fn</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jacobian-shape-requirements">Jacobian shape requirements</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#solving-the-optimization-problem">Solving the optimization problem</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#performance-comparison">Performance comparison</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multiple-variables">Multiple variables</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#important-notes">Important notes</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="custom-jacobians">
+<h1>Custom Jacobians<a class="headerlink" href="#custom-jacobians" title="Link to this heading">#</a></h1>
+<p>In nonlinear least squares, the Jacobian matrix <span class="math notranslate nohighlight">\(J\)</span> contains partial derivatives of residuals with respect to variables. It’s used to approximate the Hessian as <span class="math notranslate nohighlight">\(J^T J\)</span> for Gauss-Newton updates. By default, jaxls computes Jacobians automatically via JAX’s autodiff. This guide shows how to provide analytical Jacobians instead.</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-func docutils literal notranslate"><span class="pre">&#64;jaxls.Cost.factory</span></code></a> with <code class="docutils literal notranslate"><span class="pre">jac_custom_fn</span></code> for custom Jacobians</p></li>
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-func docutils literal notranslate"><span class="pre">&#64;jaxls.Cost.factory</span></code></a> with <code class="docutils literal notranslate"><span class="pre">jac_custom_with_cache_fn</span></code> for cached intermediates</p></li>
+</ul>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jaxls</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="when-to-use-custom-jacobians">
+<h2>When to use custom Jacobians<a class="headerlink" href="#when-to-use-custom-jacobians" title="Link to this heading">#</a></h2>
+<p>JAX’s automatic differentiation is powerful and efficient for most use cases. However, there are situations where providing analytical Jacobians can be beneficial:</p>
+<ol class="arabic simple">
+<li><p><strong>Known closed-form solutions.</strong> When the Jacobian has a simple analytical form that is faster to compute than autodiff.</p></li>
+<li><p><strong>Numerical stability.</strong> When the analytical form is more numerically stable than the autodiff computation.</p></li>
+<li><p><strong>Reusing intermediates.</strong> When the residual computation produces intermediate values that can be reused for the Jacobian.</p></li>
+</ol>
+</section>
+<section id="problem-setup-2d-point-fitting">
+<h2>Problem setup: 2D point fitting<a class="headerlink" href="#problem-setup-2d-point-fitting" title="Link to this heading">#</a></h2>
+<p>We’ll demonstrate custom Jacobians with a simple 2D point fitting problem. Given a set of target points, we want to find the optimal location that minimizes the sum of squared distances.</p>
+<p>For a point <span class="math notranslate nohighlight">\(p \in \mathbb{R}^2\)</span> and target <span class="math notranslate nohighlight">\(t_i \in \mathbb{R}^2\)</span>, the residual is the Euclidean distance:
+$<span class="math notranslate nohighlight">\(r_i(p) = \|p - t_i\|\)</span>$</p>
+<p>The Jacobian of the distance with respect to the point is:
+$<span class="math notranslate nohighlight">\(\frac{\partial r_i}{\partial p} = \frac{(p - t_i)^T}{\|p - t_i\|}\)</span>$</p>
+<p>This is a simple 1x2 row vector (residual dimension 1, tangent dimension 2).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define a 2D point variable.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Point2DVar</span><span class="p">(</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A 2D point variable.&quot;&quot;&quot;</span>
+
+
+<span class="c1"># Generate random target points.</span>
+<span class="n">num_targets</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">targets</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="n">num_targets</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target points: </span><span class="si">{</span><span class="n">targets</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Target points: (100, 2)
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="basic-usage-jac-custom-fn">
+<h2>Basic usage: <code class="docutils literal notranslate"><span class="pre">jac_custom_fn</span></code><a class="headerlink" href="#basic-usage-jac-custom-fn" title="Link to this heading">#</a></h2>
+<p>The simplest way to provide a custom Jacobian is via the <code class="docutils literal notranslate"><span class="pre">jac_custom_fn</span></code> parameter. This function takes the same arguments as the residual function and returns a 2D Jacobian matrix.</p>
+<p><strong>Important</strong>: The Jacobian shape must be <code class="docutils literal notranslate"><span class="pre">(residual_dim,</span> <span class="pre">sum_of_tangent_dims_of_variables)</span></code>. For a single <code class="docutils literal notranslate"><span class="pre">Point2DVar</span></code>, this is <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">2)</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">distance_jacobian</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Analytical Jacobian of distance residual.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Jacobian matrix of shape (1, 2).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">point</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">point</span> <span class="o">-</span> <span class="n">target</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span>
+    <span class="c1"># Jacobian is (p - t)^T / ||p - t||, reshaped to (1, 2).</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">diff</span> <span class="o">/</span> <span class="n">dist</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">jac_custom_fn</span><span class="o">=</span><span class="n">distance_jacobian</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">distance_cost_custom</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distance residual with custom Jacobian.&quot;&quot;&quot;</span>
+    <span class="n">point</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">point</span> <span class="o">-</span> <span class="n">target</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>For comparison, here’s the same cost using autodiff:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">distance_cost_autodiff</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distance residual with autodiff Jacobian.&quot;&quot;&quot;</span>
+    <span class="n">point</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">point</span> <span class="o">-</span> <span class="n">target</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="with-cache-jac-custom-with-cache-fn">
+<h2>With cache: <code class="docutils literal notranslate"><span class="pre">jac_custom_with_cache_fn</span></code><a class="headerlink" href="#with-cache-jac-custom-with-cache-fn" title="Link to this heading">#</a></h2>
+<p>When computing the residual produces intermediate values that can be reused for the Jacobian, use <code class="docutils literal notranslate"><span class="pre">jac_custom_with_cache_fn</span></code>. The residual function must return a tuple of <code class="docutils literal notranslate"><span class="pre">(residual,</span> <span class="pre">cache)</span></code>, and the Jacobian function receives this cache as its second argument.</p>
+<p>In our distance example, both the residual and Jacobian need <code class="docutils literal notranslate"><span class="pre">diff</span> <span class="pre">=</span> <span class="pre">point</span> <span class="pre">-</span> <span class="pre">target</span></code> and <code class="docutils literal notranslate"><span class="pre">dist</span> <span class="pre">=</span> <span class="pre">||diff||</span></code>. We can compute these once and cache them:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">NamedTuple</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DistanceCache</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Cache for distance computation.&quot;&quot;&quot;</span>
+
+    <span class="n">diff</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>  <span class="c1"># point - target.</span>
+    <span class="n">dist</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>  <span class="c1"># ||diff||.</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">distance_jacobian_with_cache</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="n">DistanceCache</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Jacobian using cached intermediate values.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vals: Variable values (not used since we have cache).</span>
+<span class="sd">        cache: Cached diff and dist from residual computation.</span>
+<span class="sd">        var: The point variable.</span>
+<span class="sd">        target: Target point.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Jacobian matrix of shape (1, 2).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Reuse cached values instead of recomputing.</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">cache</span><span class="o">.</span><span class="n">diff</span> <span class="o">/</span> <span class="n">cache</span><span class="o">.</span><span class="n">dist</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">jac_custom_with_cache_fn</span><span class="o">=</span><span class="n">distance_jacobian_with_cache</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">distance_cost_cached</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">DistanceCache</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distance residual that caches intermediates for Jacobian.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of (residual, cache) - the cache is passed to the Jacobian function.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">point</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">point</span> <span class="o">-</span> <span class="n">target</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span>
+    <span class="n">cache</span> <span class="o">=</span> <span class="n">DistanceCache</span><span class="p">(</span><span class="n">diff</span><span class="o">=</span><span class="n">diff</span><span class="p">,</span> <span class="n">dist</span><span class="o">=</span><span class="n">dist</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dist</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">cache</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="jacobian-shape-requirements">
+<h2>Jacobian shape requirements<a class="headerlink" href="#jacobian-shape-requirements" title="Link to this heading">#</a></h2>
+<p>The Jacobian must have shape <code class="docutils literal notranslate"><span class="pre">(residual_dim,</span> <span class="pre">sum_of_tangent_dims_of_variables)</span></code>. Let’s verify our Jacobians have the correct shape:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a test point and target.</span>
+<span class="n">test_var</span> <span class="o">=</span> <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">test_point</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">])</span>
+<span class="n">test_target</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">test_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">test_var</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">test_point</span><span class="p">)])</span>
+
+<span class="c1"># Check Jacobian shape from custom function.</span>
+<span class="n">jac</span> <span class="o">=</span> <span class="n">distance_jacobian</span><span class="p">(</span><span class="n">test_vals</span><span class="p">,</span> <span class="n">test_var</span><span class="p">,</span> <span class="n">test_target</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Jacobian shape: </span><span class="si">{</span><span class="n">jac</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Expected: (residual_dim=1, tangent_dim=2)&quot;</span><span class="p">)</span>
+
+<span class="c1"># Verify against autodiff.</span>
+<span class="n">jac_autodiff</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jacrev</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">p</span> <span class="o">-</span> <span class="n">test_target</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">))(</span>
+    <span class="n">test_point</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Custom Jacobian:</span><span class="se">\n</span><span class="si">{</span><span class="n">jac</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Autodiff Jacobian:</span><span class="se">\n</span><span class="si">{</span><span class="n">jac_autodiff</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Match: </span><span class="si">{</span><span class="n">jnp</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">jac</span><span class="p">,</span><span class="w"> </span><span class="n">jac_autodiff</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Jacobian shape: (1, 2)
+Expected: (residual_dim=1, tangent_dim=2)
+
+Custom Jacobian:
+[[0.4472136 0.8944272]]
+Autodiff Jacobian:
+[[0.4472136 0.8944272]]
+Match: True
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="solving-the-optimization-problem">
+<h2>Solving the optimization problem<a class="headerlink" href="#solving-the-optimization-problem" title="Link to this heading">#</a></h2>
+<p>Let’s verify all three approaches produce the same result:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">solve_with_cost_factory</span><span class="p">(</span><span class="n">cost_factory</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve the point fitting problem with a given cost factory.&quot;&quot;&quot;</span>
+    <span class="n">var</span> <span class="o">=</span> <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Create batched costs for all targets.</span>
+    <span class="n">costs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">cost_factory</span><span class="p">(</span>
+            <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_targets</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">)),</span>
+            <span class="n">targets</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Initial guess away from the solution.</span>
+    <span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">var</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">]))])</span>
+
+    <span class="c1"># Solve.</span>
+    <span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">var</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+    <span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">solution</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: point = [</span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="n">result_autodiff</span> <span class="o">=</span> <span class="n">solve_with_cost_factory</span><span class="p">(</span><span class="n">distance_cost_autodiff</span><span class="p">,</span> <span class="s2">&quot;Autodiff&quot;</span><span class="p">)</span>
+<span class="n">result_custom</span> <span class="o">=</span> <span class="n">solve_with_cost_factory</span><span class="p">(</span><span class="n">distance_cost_custom</span><span class="p">,</span> <span class="s2">&quot;Custom &quot;</span><span class="p">)</span>
+<span class="n">result_cached</span> <span class="o">=</span> <span class="n">solve_with_cost_factory</span><span class="p">(</span><span class="n">distance_cost_cached</span><span class="p">,</span> <span class="s2">&quot;Cached &quot;</span><span class="p">)</span>
+
+<span class="c1"># The optimal point should be close to the mean of targets.</span>
+<span class="c1"># (for sum of squared distances, the minimum is at the geometric median,.</span>
+<span class="c1"># which is close to the mean for normally distributed points)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Target mean: [</span><span class="si">{</span><span class="n">targets</span><span class="p">[:,</span><span class="w"> </span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">targets</span><span class="p">[:,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_autodiff
+Autodiff: point = [-0.016823, 0.043048]
+<span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_custom
+Custom : point = [-0.016822, 0.043048]
+<span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_cached
+Cached : point = [-0.016822, 0.043048]
+
+Target mean: [-0.024155, 0.041008]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="performance-comparison">
+<h2>Performance comparison<a class="headerlink" href="#performance-comparison" title="Link to this heading">#</a></h2>
+<p>Let’s compare the timing of autodiff vs custom Jacobians. Note that for this simple example, the difference may be small or even favor autodiff due to JAX’s optimizations. Custom Jacobians are most beneficial for:</p>
+<ul class="simple">
+<li><p>Complex functions where the analytical Jacobian is simpler</p></li>
+<li><p>Cases where intermediate values can be heavily reused</p></li>
+<li><p>Very high-dimensional problems where autodiff has significant overhead</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">benchmark_solver</span><span class="p">(</span><span class="n">cost_factory</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">num_runs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Benchmark a solver configuration.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Minimum time per solve in milliseconds.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">var</span> <span class="o">=</span> <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">costs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">cost_factory</span><span class="p">(</span>
+            <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_targets</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">)),</span>
+            <span class="n">targets</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">var</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">]))])</span>
+    <span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">var</span><span class="p">])</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+
+    <span class="c1"># Warmup (JIT compilation).</span>
+    <span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">jax</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">(</span><span class="n">solution</span><span class="p">[</span><span class="n">var</span><span class="p">])</span>
+
+    <span class="c1"># Timed runs.</span>
+    <span class="n">times</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_runs</span><span class="p">):</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+        <span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">jax</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">(</span><span class="n">solution</span><span class="p">[</span><span class="n">var</span><span class="p">])</span>  <span class="c1"># Important: wait for async execution!</span>
+        <span class="n">times</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>
+
+    <span class="n">min_time</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">times</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span>  <span class="c1"># Convert to ms.</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">min_time</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ms (min of </span><span class="si">{</span><span class="n">num_runs</span><span class="si">}</span><span class="s2"> runs)&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">min_time</span>
+
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Benchmarking solve times...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">t_autodiff</span> <span class="o">=</span> <span class="n">benchmark_solver</span><span class="p">(</span><span class="n">distance_cost_autodiff</span><span class="p">,</span> <span class="s2">&quot;Autodiff      &quot;</span><span class="p">)</span>
+<span class="n">t_custom</span> <span class="o">=</span> <span class="n">benchmark_solver</span><span class="p">(</span><span class="n">distance_cost_custom</span><span class="p">,</span> <span class="s2">&quot;Custom Jacobian&quot;</span><span class="p">)</span>
+<span class="n">t_cached</span> <span class="o">=</span> <span class="n">benchmark_solver</span><span class="p">(</span><span class="n">distance_cost_cached</span><span class="p">,</span> <span class="s2">&quot;With Cache     &quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Benchmarking solve times...
+
+<span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_autodiff
+Autodiff      : 0.890 ms (min of 20 runs)
+<span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_custom
+Custom Jacobian: 0.856 ms (min of 20 runs)
+<span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 100 terms and 1 variables: 100 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 100 costs, 1 variables each: distance_cost_cached
+With Cache     : 1.054 ms (min of 20 runs)
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="multiple-variables">
+<h2>Multiple variables<a class="headerlink" href="#multiple-variables" title="Link to this heading">#</a></h2>
+<p>When a cost involves multiple variables, the Jacobian concatenates their tangent dimensions in the order they appear as arguments. For example, a cost with two <code class="docutils literal notranslate"><span class="pre">Point2DVar</span></code> variables would have a Jacobian of shape <code class="docutils literal notranslate"><span class="pre">(residual_dim,</span> <span class="pre">4)</span></code> (2 + 2 tangent dims).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">two_point_jacobian</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var_a</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">var_b</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Jacobian for distance between two points.</span>
+
+<span class="sd">    The residual is ||p_a - p_b||, and the Jacobian has shape (1, 4)</span>
+<span class="sd">    with columns [d/dp_a, d/dp_b].</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">p_a</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_a</span><span class="p">]</span>
+    <span class="n">p_b</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_b</span><span class="p">]</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">p_a</span> <span class="o">-</span> <span class="n">p_b</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span>
+    <span class="c1"># d/dp_a = (p_a - p_b) / ||p_a - p_b||.</span>
+    <span class="c1"># d/dp_b = -(p_a - p_b) / ||p_a - p_b||.</span>
+    <span class="n">jac_a</span> <span class="o">=</span> <span class="n">diff</span> <span class="o">/</span> <span class="n">dist</span>
+    <span class="n">jac_b</span> <span class="o">=</span> <span class="o">-</span><span class="n">diff</span> <span class="o">/</span> <span class="n">dist</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jac_a</span><span class="p">,</span> <span class="n">jac_b</span><span class="p">])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">jac_custom_fn</span><span class="o">=</span><span class="n">two_point_jacobian</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">two_point_distance</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var_a</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+    <span class="n">var_b</span><span class="p">:</span> <span class="n">Point2DVar</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Distance between two points.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">var_a</span><span class="p">]</span> <span class="o">-</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_b</span><span class="p">])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="c1"># Verify the multi-variable Jacobian shape.</span>
+<span class="n">var_a</span> <span class="o">=</span> <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">var_b</span> <span class="o">=</span> <span class="n">Point2DVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">test_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">var_a</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])),</span>
+        <span class="n">var_b</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">jac</span> <span class="o">=</span> <span class="n">two_point_jacobian</span><span class="p">(</span><span class="n">test_vals</span><span class="p">,</span> <span class="n">var_a</span><span class="p">,</span> <span class="n">var_b</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Two-variable Jacobian shape: </span><span class="si">{</span><span class="n">jac</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Jacobian:</span><span class="se">\n</span><span class="si">{</span><span class="n">jac</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Two-variable Jacobian shape: (1, 4)
+Jacobian:
+[[ 0.70710677 -0.70710677 -0.70710677  0.70710677]]
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="important-notes">
+<h2>Important notes<a class="headerlink" href="#important-notes" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>Correctness: Custom Jacobians bypass autodiff entirely. If your Jacobian is incorrect, the solver may converge to the wrong solution or fail to converge. Always verify against autodiff during development.</p></li>
+<li><p>Shape requirements: The Jacobian must be a 2D array with shape <code class="docutils literal notranslate"><span class="pre">(residual_dim,</span> <span class="pre">total_tangent_dim)</span></code>. The tangent dimensions are concatenated in the order variables appear as arguments.</p></li>
+<li><p>Caching: Use <code class="docutils literal notranslate"><span class="pre">jac_custom_with_cache_fn</span></code> when the residual computation produces expensive intermediate values that the Jacobian can reuse. This avoids duplicate computation.</p></li>
+</ol>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../non_euclidean/"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Non-Euclidean variables</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../constraints/"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Constraints</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#when-to-use-custom-jacobians">When to use custom Jacobians</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#problem-setup-2d-point-fitting">Problem setup: 2D point fitting</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#basic-usage-jac-custom-fn">Basic usage: <code class="docutils literal notranslate"><span class="pre">jac_custom_fn</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#with-cache-jac-custom-with-cache-fn">With cache: <code class="docutils literal notranslate"><span class="pre">jac_custom_with_cache_fn</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jacobian-shape-requirements">Jacobian shape requirements</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#solving-the-optimization-problem">Solving the optimization problem</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#performance-comparison">Performance comparison</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multiple-variables">Multiple variables</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#important-notes">Important notes</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By brentyi
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

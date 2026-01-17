@@ -1,0 +1,808 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Solver configuration &#8212; jaxls</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=2a1f1aab" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=55b5f74b"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=fd10adb8"></script>
+    <script src="../../_static/js/custom.js?v=58150dd0"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/solver_config';</script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Covariance Estimation" href="../covariance/" />
+    <link rel="prev" title="Lie group variables" href="../lie_group_variables/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search/"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">jaxls</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../guide/basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/">Advanced</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/robust_costs/">Robust costs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/covariance/">Covariance estimation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/mechanics/">Mechanics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Vision</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/robotics/">Robotics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/portfolio/">Portfolio optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman allocation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../core/">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../covariance/">Covariance Estimation</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../design/typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static/">What’s traced?</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls/issues/new?title=Issue%20on%20page%20%2Fapi/solver_config.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/api/solver_config.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Solver configuration</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_initial"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_initial</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_factor"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_factor</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_min"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_max"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.step_quality_min"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.step_quality_min</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig"><code class="docutils literal notranslate"><span class="pre">TerminationConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.max_iterations"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.max_iterations</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.early_termination"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.early_termination</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.cost_tolerance"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.cost_tolerance</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.gradient_tolerance"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.gradient_tolerance</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.gradient_tolerance_start_step"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.gradient_tolerance_start_step</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.parameter_tolerance"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.parameter_tolerance</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.tolerance_min"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.tolerance_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.tolerance_max"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.tolerance_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.eisenstat_walker_gamma"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.eisenstat_walker_gamma</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.eisenstat_walker_alpha"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.eisenstat_walker_alpha</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.preconditioner"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.preconditioner</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_factor"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_factor</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_max"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_min"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_initial"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_initial</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.tolerance_absolute"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.tolerance_absolute</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.tolerance_relative"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.tolerance_relative</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.violation_reduction_threshold"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.violation_reduction_threshold</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.lambda_min"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.lambda_max"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.inner_solve_tolerance</span></code></a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="solver-configuration">
+<h1>Solver configuration<a class="headerlink" href="#solver-configuration" title="Link to this heading">#</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.TrustRegionConfig">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">TrustRegionConfig</span></span><a class="reference internal" href="../../_modules/jaxls/_solvers/#TrustRegionConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.TrustRegionConfig" title="Link to this definition">#</a></dt>
+<dd><p>TrustRegionConfig(lambda_initial: ‘float | jax.Array’ = 0.0005, lambda_factor: ‘float | jax.Array’ = 2.0, lambda_min: ‘float | jax.Array’ = 1e-05, lambda_max: ‘float | jax.Array’ = 1000000.0, step_quality_min: ‘float | jax.Array’ = 0.001)</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TrustRegionConfig.lambda_initial">
+<span class="sig-name descname"><span class="pre">lambda_initial</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0005</span></em><a class="headerlink" href="#jaxls.TrustRegionConfig.lambda_initial" title="Link to this definition">#</a></dt>
+<dd><p>Initial damping factor. Only used for Levenberg-Marquardt.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TrustRegionConfig.lambda_factor">
+<span class="sig-name descname"><span class="pre">lambda_factor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2.0</span></em><a class="headerlink" href="#jaxls.TrustRegionConfig.lambda_factor" title="Link to this definition">#</a></dt>
+<dd><p>Factor to increase or decrease damping. Only used for Levenberg-Marquardt.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TrustRegionConfig.lambda_min">
+<span class="sig-name descname"><span class="pre">lambda_min</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-05</span></em><a class="headerlink" href="#jaxls.TrustRegionConfig.lambda_min" title="Link to this definition">#</a></dt>
+<dd><p>Minimum damping factor. Only used for Levenberg-Marquardt.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TrustRegionConfig.lambda_max">
+<span class="sig-name descname"><span class="pre">lambda_max</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1000000.0</span></em><a class="headerlink" href="#jaxls.TrustRegionConfig.lambda_max" title="Link to this definition">#</a></dt>
+<dd><p>Maximum damping factor. Only used for Levenberg-Marquardt.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TrustRegionConfig.step_quality_min">
+<span class="sig-name descname"><span class="pre">step_quality_min</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.001</span></em><a class="headerlink" href="#jaxls.TrustRegionConfig.step_quality_min" title="Link to this definition">#</a></dt>
+<dd><p>Minimum step quality for Levenberg-Marquardt. Only used for Levenberg-Marquardt.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">TerminationConfig</span></span><a class="reference internal" href="../../_modules/jaxls/_solvers/#TerminationConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.TerminationConfig" title="Link to this definition">#</a></dt>
+<dd><p>TerminationConfig(max_iterations: ‘jdc.Static[int]’ = 100, early_termination: ‘jdc.Static[bool]’ = True, cost_tolerance: ‘float | jax.Array’ = 1e-05, gradient_tolerance: ‘float | jax.Array’ = 0.0001, gradient_tolerance_start_step: ‘int | jax.Array’ = 10, parameter_tolerance: ‘float | jax.Array’ = 1e-06)</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig.max_iterations">
+<span class="sig-name descname"><span class="pre">max_iterations</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'__jax_dataclasses_static_field__'</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100</span></em><a class="headerlink" href="#jaxls.TerminationConfig.max_iterations" title="Link to this definition">#</a></dt>
+<dd><p>Maximum number of optimization steps. For constrained problems, this is
+the maximum iterations per inner solve (not total iterations).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig.early_termination">
+<span class="sig-name descname"><span class="pre">early_termination</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'__jax_dataclasses_static_field__'</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#jaxls.TerminationConfig.early_termination" title="Link to this definition">#</a></dt>
+<dd><p>If set to <cite>True</cite>, terminate when any of the tolerances are met. If
+<cite>False</cite>, always run <cite>max_iterations</cite> steps.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig.cost_tolerance">
+<span class="sig-name descname"><span class="pre">cost_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-05</span></em><a class="headerlink" href="#jaxls.TerminationConfig.cost_tolerance" title="Link to this definition">#</a></dt>
+<dd><p>We terminate if <cite>|cost change| / cost &lt; cost_tolerance</cite>. For constrained
+problems, this acts as a floor for the adaptive inner solver tolerance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig.gradient_tolerance">
+<span class="sig-name descname"><span class="pre">gradient_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0001</span></em><a class="headerlink" href="#jaxls.TerminationConfig.gradient_tolerance" title="Link to this definition">#</a></dt>
+<dd><p>We terminate if <cite>norm_inf(x - rplus(x, linear delta)) &lt; gradient_tolerance</cite>.
+For constrained problems, this acts as a floor for the adaptive inner solver
+tolerance.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig.gradient_tolerance_start_step">
+<span class="sig-name descname"><span class="pre">gradient_tolerance_start_step</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></em><a class="headerlink" href="#jaxls.TerminationConfig.gradient_tolerance_start_step" title="Link to this definition">#</a></dt>
+<dd><p>When to start checking the gradient tolerance condition. Helps solve precision
+issues caused by inexact Newton steps.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.TerminationConfig.parameter_tolerance">
+<span class="sig-name descname"><span class="pre">parameter_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-06</span></em><a class="headerlink" href="#jaxls.TerminationConfig.parameter_tolerance" title="Link to this definition">#</a></dt>
+<dd><p>We terminate if <cite>norm_2(linear delta) &lt; (norm2(x) + parameter_tolerance) * parameter_tolerance</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.ConjugateGradientConfig">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">ConjugateGradientConfig</span></span><a class="reference internal" href="../../_modules/jaxls/_solvers/#ConjugateGradientConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.ConjugateGradientConfig" title="Link to this definition">#</a></dt>
+<dd><p>Iterative solver for sparse linear systems. Can run on CPU or GPU.</p>
+<p>For inexact steps, we use the Eisenstat-Walker criterion. For reference,
+see “Choosing the Forcing Terms in an Inexact Newton Method”, Eisenstat &amp;
+Walker, 1996.”</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.ConjugateGradientConfig.tolerance_min">
+<span class="sig-name descname"><span class="pre">tolerance_min</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-07</span></em><a class="headerlink" href="#jaxls.ConjugateGradientConfig.tolerance_min" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.ConjugateGradientConfig.tolerance_max">
+<span class="sig-name descname"><span class="pre">tolerance_max</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.01</span></em><a class="headerlink" href="#jaxls.ConjugateGradientConfig.tolerance_max" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.ConjugateGradientConfig.eisenstat_walker_gamma">
+<span class="sig-name descname"><span class="pre">eisenstat_walker_gamma</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.9</span></em><a class="headerlink" href="#jaxls.ConjugateGradientConfig.eisenstat_walker_gamma" title="Link to this definition">#</a></dt>
+<dd><p>Eisenstat-Walker criterion gamma term. Controls how quickly the tolerance
+decreases. Typical values range from 0.5 to 0.9. Higher values lead to more
+aggressive tolerance reduction.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.ConjugateGradientConfig.eisenstat_walker_alpha">
+<span class="sig-name descname"><span class="pre">eisenstat_walker_alpha</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2.0</span></em><a class="headerlink" href="#jaxls.ConjugateGradientConfig.eisenstat_walker_alpha" title="Link to this definition">#</a></dt>
+<dd><p>Eisenstat-Walker criterion alpha term. Determines rate at which the
+tolerance changes based on residual reduction. Typical values are 1.5 or
+2.0. Higher values make the tolerance more sensitive to residual changes.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.ConjugateGradientConfig.preconditioner">
+<span class="sig-name descname"><span class="pre">preconditioner</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'block_jacobi'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'point_jacobi'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'__jax_dataclasses_static_field__'</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'block_jacobi'</span></em><a class="headerlink" href="#jaxls.ConjugateGradientConfig.preconditioner" title="Link to this definition">#</a></dt>
+<dd><p>Preconditioner to use for linear solves.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">AugmentedLagrangianConfig</span></span><a class="reference internal" href="../../_modules/jaxls/_augmented_lagrangian/#AugmentedLagrangianConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig" title="Link to this definition">#</a></dt>
+<dd><p>Configuration for Augmented Lagrangian solver (ALGENCAN-style).</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.penalty_factor">
+<span class="sig-name descname"><span class="pre">penalty_factor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4.0</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.penalty_factor" title="Link to this definition">#</a></dt>
+<dd><p>Penalty multiplier when constraint progress stagnates.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.penalty_max">
+<span class="sig-name descname"><span class="pre">penalty_max</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10000000.0</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.penalty_max" title="Link to this definition">#</a></dt>
+<dd><p>Maximum penalty parameter.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.penalty_min">
+<span class="sig-name descname"><span class="pre">penalty_min</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-06</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.penalty_min" title="Link to this definition">#</a></dt>
+<dd><p>Minimum penalty parameter.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.penalty_initial">
+<span class="sig-name descname"><span class="pre">penalty_initial</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.penalty_initial" title="Link to this definition">#</a></dt>
+<dd><p>Initial penalty parameter. If None, uses ALGENCAN-style heuristic:
+<code class="docutils literal notranslate"><span class="pre">rho</span> <span class="pre">=</span> <span class="pre">10</span> <span class="pre">*</span> <span class="pre">max(1,</span> <span class="pre">|f|)</span> <span class="pre">/</span> <span class="pre">max(1,</span> <span class="pre">0.5</span> <span class="pre">*</span> <span class="pre">c^2)</span></code>. Set to a fixed value (e.g., 1.0) to
+override the automatic initialization.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.tolerance_absolute">
+<span class="sig-name descname"><span class="pre">tolerance_absolute</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-05</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.tolerance_absolute" title="Link to this definition">#</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">max(snorm,</span> <span class="pre">csupn)</span> <span class="pre">&lt;</span> <span class="pre">tol</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Absolute convergence tolerance</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.tolerance_relative">
+<span class="sig-name descname"><span class="pre">tolerance_relative</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0001</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.tolerance_relative" title="Link to this definition">#</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">snorm</span> <span class="pre">/</span> <span class="pre">snorm_initial</span> <span class="pre">&lt;</span> <span class="pre">tol</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Relative convergence tolerance</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.violation_reduction_threshold">
+<span class="sig-name descname"><span class="pre">violation_reduction_threshold</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.5</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.violation_reduction_threshold" title="Link to this definition">#</a></dt>
+<dd><p>Increase penalty if violation &gt; threshold * previous_violation.
+E.g., 0.9 requires ~10% reduction per update to avoid penalty growth.
+Use higher values (e.g., 0.99) for more lenient penalty updates.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.lambda_min">
+<span class="sig-name descname"><span class="pre">lambda_min</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-10000000.0</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.lambda_min" title="Link to this definition">#</a></dt>
+<dd><p>Minimum Lagrange multiplier (safeguard).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.lambda_max">
+<span class="sig-name descname"><span class="pre">lambda_max</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10000000.0</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.lambda_max" title="Link to this definition">#</a></dt>
+<dd><p>Maximum Lagrange multiplier (safeguard).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="jaxls.AugmentedLagrangianConfig.inner_solve_tolerance">
+<span class="sig-name descname"><span class="pre">inner_solve_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.jax.dev/en/latest/_autosummary/jax.Array.html#jax.Array" title="(in JAX)"><span class="pre">Array</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.01</span></em><a class="headerlink" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance" title="Link to this definition">#</a></dt>
+<dd><p>Only update AL parameters when inner problem has converged.
+Update when <code class="docutils literal notranslate"><span class="pre">||gradient||</span> <span class="pre">&lt;</span> <span class="pre">tolerance</span></code>, meaning the LM solver
+has approximately solved the current augmented subproblem.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../lie_group_variables/"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Lie group variables</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../covariance/"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Covariance Estimation</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_initial"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_initial</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_factor"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_factor</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_min"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.lambda_max"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.lambda_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TrustRegionConfig.step_quality_min"><code class="docutils literal notranslate"><span class="pre">TrustRegionConfig.step_quality_min</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig"><code class="docutils literal notranslate"><span class="pre">TerminationConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.max_iterations"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.max_iterations</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.early_termination"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.early_termination</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.cost_tolerance"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.cost_tolerance</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.gradient_tolerance"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.gradient_tolerance</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.gradient_tolerance_start_step"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.gradient_tolerance_start_step</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.TerminationConfig.parameter_tolerance"><code class="docutils literal notranslate"><span class="pre">TerminationConfig.parameter_tolerance</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.tolerance_min"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.tolerance_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.tolerance_max"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.tolerance_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.eisenstat_walker_gamma"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.eisenstat_walker_gamma</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.eisenstat_walker_alpha"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.eisenstat_walker_alpha</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.ConjugateGradientConfig.preconditioner"><code class="docutils literal notranslate"><span class="pre">ConjugateGradientConfig.preconditioner</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_factor"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_factor</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_max"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_min"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.penalty_initial"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.penalty_initial</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.tolerance_absolute"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.tolerance_absolute</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.tolerance_relative"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.tolerance_relative</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.violation_reduction_threshold"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.violation_reduction_threshold</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.lambda_min"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_min</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.lambda_max"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_max</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.inner_solve_tolerance</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By brentyi
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

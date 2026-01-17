@@ -1,0 +1,1352 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Obstacle avoidance &#8212; jaxls</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=2a1f1aab" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=55b5f74b"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=fd10adb8"></script>
+    <script src="../../../_static/js/custom.js?v=58150dd0"></script>
+    <script src="../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'examples/robotics/obstacle_avoidance';</script>
+    <link rel="index" title="Index" href="../../../genindex/" />
+    <link rel="search" title="Search" href="../../../search/" />
+    <link rel="next" title="Cart-pole (collocation)" href="../cart_pole_collocation/" />
+    <link rel="prev" title="Inverse kinematics" href="../inverse_kinematics/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search/"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">jaxls</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../guide/basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../guide/advanced/">Advanced</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/robust_costs/">Robust costs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../guide/advanced/covariance/">Covariance estimation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../mechanics/">Mechanics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../mechanics/truss_analysis/">Truss analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../vision/">Vision</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../">Robotics</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cart_pole_shooting/">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../portfolio/">Portfolio optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../portfolio/black_litterman/">Black-Litterman allocation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../api/core/">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/solver_config/">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/covariance/">Covariance Estimation</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../design/typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/traced_vs_static/">What’s traced?</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls/issues/new?title=Issue%20on%20page%20%2Fexamples/robotics/obstacle_avoidance.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../_sources/examples/robotics/obstacle_avoidance.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Obstacle avoidance</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#problem-setup">Problem setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variables-and-costs">Variables and costs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#problem-construction">Problem construction</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#solving">Solving</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visualization">Visualization</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="obstacle-avoidance">
+<h1>Obstacle avoidance<a class="headerlink" href="#obstacle-avoidance" title="Link to this heading">#</a></h1>
+<p>In this notebook, we solve an obstacle avoidance problem: finding a smooth path from
+start to goal while avoiding circular obstacles.</p>
+<p>Features used:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Var" title="jaxls.Var"><code class="xref py py-class docutils literal notranslate"><span class="pre">Var</span></code></a> for 2D waypoint positions</p></li>
+<li><p><a class="reference internal" href="../../../api/core/#jaxls.Cost.factory" title="jaxls.Cost.factory"><code class="xref py py-func docutils literal notranslate"><span class="pre">&#64;jaxls.Cost.factory</span></code></a> for smoothness and anchor costs</p></li>
+<li><p>Inequality constraints (<code class="docutils literal notranslate"><span class="pre">constraint_leq_zero</span></code>): obstacle avoidance</p></li>
+<li><p>Augmented Lagrangian solver for constrained optimization</p></li>
+</ul>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+
+<span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;&lt;level&gt;</span><span class="si">{level: &lt;8}</span><span class="s2">&lt;/level&gt; | </span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jaxls</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="problem-setup">
+<h2>Problem setup<a class="headerlink" href="#problem-setup" title="Link to this heading">#</a></h2>
+<p>Plan a trajectory with 20 waypoints from start to goal, avoiding two obstacles:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Trajectory parameters.</span>
+<span class="n">n_waypoints</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">goal</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+
+<span class="c1"># Obstacles: (center_x, center_y, radius)</span>
+<span class="n">obstacles</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="mf">3.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">),</span>
+    <span class="p">(</span><span class="mf">6.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">),</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="variables-and-costs">
+<h2>Variables and costs<a class="headerlink" href="#variables-and-costs" title="Link to this heading">#</a></h2>
+<p>Variable instances are <a class="reference external" href="https://docs.jax.dev/en/latest/pytrees.html">PyTrees</a>. We define waypoints and cost functions:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">WaypointVar</span><span class="p">(</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;2D waypoint position.&quot;&quot;&quot;</span>
+
+
+<span class="c1"># Batched variable creation.</span>
+<span class="n">waypoint_vars</span> <span class="o">=</span> <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_waypoints</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">smoothness_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var_prev</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">var_curr</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">var_next</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Penalize acceleration (second derivative).&quot;&quot;&quot;</span>
+    <span class="n">accel</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_prev</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_curr</span><span class="p">]</span> <span class="o">+</span> <span class="n">vals</span><span class="p">[</span><span class="n">var_next</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">accel</span> <span class="o">*</span> <span class="mf">5.0</span>  <span class="c1"># Weight for smoothness</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">anchor_cost</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pin waypoint to target position.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">-</span> <span class="n">target</span><span class="p">)</span> <span class="o">*</span> <span class="mf">10.0</span>  <span class="c1"># Strong weight</span>
+
+
+<span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;constraint_leq_zero&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">obstacle_constraint</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">WaypointVar</span><span class="p">,</span>
+    <span class="n">center</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">radius</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stay outside obstacle: ||p - center|| &gt;= radius.&quot;&quot;&quot;</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">-</span> <span class="n">center</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">diff</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1e-6</span><span class="p">)</span>
+    <span class="c1"># Constraint: radius - dist &lt;= 0 (i.e., dist &gt;= radius)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">radius</span> <span class="o">-</span> <span class="n">dist</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="problem-construction">
+<h2>Problem construction<a class="headerlink" href="#problem-construction" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Indices for smoothness costs (interior waypoints)</span>
+<span class="n">smooth_prev</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_waypoints</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># 0, 1, ..., n-3</span>
+<span class="n">smooth_curr</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_waypoints</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># 1, 2, ..., n-2</span>
+<span class="n">smooth_next</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">)</span>  <span class="c1"># 2, 3, ..., n-1</span>
+
+<span class="c1"># Obstacle constraint: each waypoint x each obstacle.</span>
+<span class="n">n_obstacles</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">obstacles</span><span class="p">)</span>
+<span class="n">waypoint_ids_for_obs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_waypoints</span><span class="p">),</span> <span class="n">n_obstacles</span><span class="p">)</span>
+<span class="n">obstacle_centers</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">]</span> <span class="k">for</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">obstacles</span><span class="p">])</span>
+<span class="n">obstacle_radii</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">obstacles</span><span class="p">])</span>
+<span class="c1"># Repeat each obstacle for all waypoints.</span>
+<span class="n">centers_repeated</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">obstacle_centers</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">radii_repeated</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">obstacle_radii</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">)</span>
+
+<span class="c1"># Build costs using batched construction.</span>
+<span class="n">costs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># Anchor start and goal.</span>
+    <span class="n">anchor_cost</span><span class="p">(</span><span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">start</span><span class="p">),</span>
+    <span class="n">anchor_cost</span><span class="p">(</span><span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">n_waypoints</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="n">goal</span><span class="p">),</span>
+    <span class="c1"># Smoothness costs (batched)</span>
+    <span class="n">smoothness_cost</span><span class="p">(</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">smooth_prev</span><span class="p">),</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">smooth_curr</span><span class="p">),</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">smooth_next</span><span class="p">),</span>
+    <span class="p">),</span>
+    <span class="c1"># Obstacle avoidance constraints (batched)</span>
+    <span class="n">obstacle_constraint</span><span class="p">(</span>
+        <span class="n">WaypointVar</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">waypoint_ids_for_obs</span><span class="p">),</span>
+        <span class="n">centers_repeated</span><span class="p">,</span>
+        <span class="n">radii_repeated</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">costs</span><span class="p">)</span><span class="si">}</span><span class="s2"> batched cost objects&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Created 4 batched cost objects
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize with straight line (will collide with obstacles)</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_waypoints</span><span class="p">)</span>
+<span class="n">initial_positions</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">t</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">goal</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>  <span class="c1"># (n_waypoints, 2)</span>
+
+<span class="n">initial_vals</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">([</span><span class="n">waypoint_vars</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span><span class="n">initial_positions</span><span class="p">)])</span>
+
+<span class="c1"># Create the problem.</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="p">[</span><span class="n">waypoint_vars</span><span class="p">])</span>
+
+<span class="c1"># Visualize the problem structure structure.</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html">
+        <iframe
+            width="100%"
+            height="500"
+            src="data:text/html;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KICAgIDxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KICAgIDxzdHlsZT4KICAgICAgICBib2R5IHsgbWFyZ2luOiAwOyBvdmVyZmxvdzogaGlkZGVuOyB9CiAgICAgICAgI2NvbnRhaW5lciB7IHdpZHRoOiAxMDAlOyBoZWlnaHQ6IDEwMHZoOyBwb3NpdGlvbjogcmVsYXRpdmU7IH0KICAgICAgICBjYW52YXMgeyBkaXNwbGF5OiBibG9jazsgd2lkdGg6IDEwMCU7IGhlaWdodDogMTAwJTsgfQogICAgICAgIC5zdGF0dXMgeyBwb3NpdGlvbjogYWJzb2x1dGU7IGJvdHRvbTogNXB4OyByaWdodDogMTBweDsgZm9udC1zaXplOiAxMHB4OyBjb2xvcjogIzY2NjsgZm9udC1mYW1pbHk6IEhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWY7IGJhY2tncm91bmQ6IHJnYmEoMjU1LDI1NSwyNTUsMC44KTsgcGFkZGluZzogMnB4IDVweDsgYm9yZGVyLXJhZGl1czogM3B4OyB9CiAgICA8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgogICAgPGRpdiBpZD0iY29udGFpbmVyIj4KICAgICAgICA8Y2FudmFzPjwvY2FudmFzPgogICAgICAgIDxkaXYgY2xhc3M9InN0YXR1cyI+NjAgY29zdHMsIDIwIHZhcmlhYmxlczwvZGl2PgogICAgPC9kaXY+CiAgICA8c2NyaXB0IHNyYz0iaHR0cHM6Ly9kM2pzLm9yZy9kMy52Ny5taW4uanMiPjwvc2NyaXB0PgogICAgPHNjcmlwdD4KICAgIChmdW5jdGlvbigpIHsKICAgICAgICBjb25zdCBkYXRhID0geyJub2RlcyI6IFt7ImlkIjogInZhcl8wIiwgImxhYmVsIjogIldheXBvaW50VmFyKDApIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzEiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoMTkpIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzIiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoMSkiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJXYXlwb2ludFZhciIsICJmaWxsIjogIiNmZmNjY2MiLCAic3Ryb2tlIjogIiNjYzY2NjYifSwgeyJpZCI6ICJ2YXJfMyIsICJsYWJlbCI6ICJXYXlwb2ludFZhcigyKSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogInZhcl80IiwgImxhYmVsIjogIldheXBvaW50VmFyKDMpIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzUiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoNCkiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJXYXlwb2ludFZhciIsICJmaWxsIjogIiNmZmNjY2MiLCAic3Ryb2tlIjogIiNjYzY2NjYifSwgeyJpZCI6ICJ2YXJfNiIsICJsYWJlbCI6ICJXYXlwb2ludFZhcig1KSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogInZhcl83IiwgImxhYmVsIjogIldheXBvaW50VmFyKDYpIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzgiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoNykiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJXYXlwb2ludFZhciIsICJmaWxsIjogIiNmZmNjY2MiLCAic3Ryb2tlIjogIiNjYzY2NjYifSwgeyJpZCI6ICJ2YXJfOSIsICJsYWJlbCI6ICJXYXlwb2ludFZhcig4KSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogInZhcl8xMCIsICJsYWJlbCI6ICJXYXlwb2ludFZhcig5KSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogInZhcl8xMSIsICJsYWJlbCI6ICJXYXlwb2ludFZhcigxMCkiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJXYXlwb2ludFZhciIsICJmaWxsIjogIiNmZmNjY2MiLCAic3Ryb2tlIjogIiNjYzY2NjYifSwgeyJpZCI6ICJ2YXJfMTIiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoMTEpIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzEzIiwgImxhYmVsIjogIldheXBvaW50VmFyKDEyKSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogInZhcl8xNCIsICJsYWJlbCI6ICJXYXlwb2ludFZhcigxMykiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJXYXlwb2ludFZhciIsICJmaWxsIjogIiNmZmNjY2MiLCAic3Ryb2tlIjogIiNjYzY2NjYifSwgeyJpZCI6ICJ2YXJfMTUiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoMTQpIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzE2IiwgImxhYmVsIjogIldheXBvaW50VmFyKDE1KSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogInZhcl8xNyIsICJsYWJlbCI6ICJXYXlwb2ludFZhcigxNikiLCAidHlwZSI6ICJ2YXJpYWJsZSIsICJ2YXJfdHlwZSI6ICJXYXlwb2ludFZhciIsICJmaWxsIjogIiNmZmNjY2MiLCAic3Ryb2tlIjogIiNjYzY2NjYifSwgeyJpZCI6ICJ2YXJfMTgiLCAibGFiZWwiOiAiV2F5cG9pbnRWYXIoMTcpIiwgInR5cGUiOiAidmFyaWFibGUiLCAidmFyX3R5cGUiOiAiV2F5cG9pbnRWYXIiLCAiZmlsbCI6ICIjZmZjY2NjIiwgInN0cm9rZSI6ICIjY2M2NjY2In0sIHsiaWQiOiAidmFyXzE5IiwgImxhYmVsIjogIldheXBvaW50VmFyKDE4KSIsICJ0eXBlIjogInZhcmlhYmxlIiwgInZhcl90eXBlIjogIldheXBvaW50VmFyIiwgImZpbGwiOiAiI2ZmY2NjYyIsICJzdHJva2UiOiAiI2NjNjY2NiJ9LCB7ImlkIjogImNvc3RfMCIsICJsYWJlbCI6ICJhbmNob3JfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMSIsICJsYWJlbCI6ICJhbmNob3JfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMiIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzMiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF80IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfNSIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzYiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF83IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfOCIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzkiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMCIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzExIiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTIiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xMyIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzE0IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTUiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xNiIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzE3IiwgImxhYmVsIjogInNtb290aG5lc3NfY29zdCIsICJ0eXBlIjogImNvc3QiLCAia2luZCI6ICJsMl9zcXVhcmVkIiwgImZpbGwiOiAiI2E4ZDVmZiIsICJzdHJva2UiOiAiIzRhOTBkOSJ9LCB7ImlkIjogImNvc3RfMTgiLCAibGFiZWwiOiAic21vb3RobmVzc19jb3N0IiwgInR5cGUiOiAiY29zdCIsICJraW5kIjogImwyX3NxdWFyZWQiLCAiZmlsbCI6ICIjYThkNWZmIiwgInN0cm9rZSI6ICIjNGE5MGQ5In0sIHsiaWQiOiAiY29zdF8xOSIsICJsYWJlbCI6ICJzbW9vdGhuZXNzX2Nvc3QiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAibDJfc3F1YXJlZCIsICJmaWxsIjogIiNhOGQ1ZmYiLCAic3Ryb2tlIjogIiM0YTkwZDkifSwgeyJpZCI6ICJjb3N0XzIwIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzIxIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzIyIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzIzIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzI0IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzI1IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzI2IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzI3IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzI4IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzI5IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzMwIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzMxIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzMyIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzMzIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzM0IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzM1IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzM2IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzM3IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzM4IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzM5IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQwIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQxIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQyIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQzIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQ0IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQ1IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQ2IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQ3IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQ4IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzQ5IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzUwIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzUxIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzUyIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzUzIiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzU0IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzU1IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzU2IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzU3IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzU4IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifSwgeyJpZCI6ICJjb3N0XzU5IiwgImxhYmVsIjogIm9ic3RhY2xlX2NvbnN0cmFpbnQiLCAidHlwZSI6ICJjb3N0IiwgImtpbmQiOiAiY29uc3RyYWludF9sZXFfemVybyIsICJmaWxsIjogIiNmZmU0YTgiLCAic3Ryb2tlIjogIiNkOWE4NGEifV0sICJsaW5rcyI6IFt7InNvdXJjZSI6ICJjb3N0XzAiLCAidGFyZ2V0IjogInZhcl8wIn0sIHsic291cmNlIjogImNvc3RfMSIsICJ0YXJnZXQiOiAidmFyXzEifSwgeyJzb3VyY2UiOiAiY29zdF8yIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzIiLCAidGFyZ2V0IjogInZhcl8yIn0sIHsic291cmNlIjogImNvc3RfMiIsICJ0YXJnZXQiOiAidmFyXzMifSwgeyJzb3VyY2UiOiAiY29zdF8zIiwgInRhcmdldCI6ICJ2YXJfMiJ9LCB7InNvdXJjZSI6ICJjb3N0XzMiLCAidGFyZ2V0IjogInZhcl8zIn0sIHsic291cmNlIjogImNvc3RfMyIsICJ0YXJnZXQiOiAidmFyXzQifSwgeyJzb3VyY2UiOiAiY29zdF80IiwgInRhcmdldCI6ICJ2YXJfMyJ9LCB7InNvdXJjZSI6ICJjb3N0XzQiLCAidGFyZ2V0IjogInZhcl80In0sIHsic291cmNlIjogImNvc3RfNCIsICJ0YXJnZXQiOiAidmFyXzUifSwgeyJzb3VyY2UiOiAiY29zdF81IiwgInRhcmdldCI6ICJ2YXJfNCJ9LCB7InNvdXJjZSI6ICJjb3N0XzUiLCAidGFyZ2V0IjogInZhcl81In0sIHsic291cmNlIjogImNvc3RfNSIsICJ0YXJnZXQiOiAidmFyXzYifSwgeyJzb3VyY2UiOiAiY29zdF82IiwgInRhcmdldCI6ICJ2YXJfNSJ9LCB7InNvdXJjZSI6ICJjb3N0XzYiLCAidGFyZ2V0IjogInZhcl82In0sIHsic291cmNlIjogImNvc3RfNiIsICJ0YXJnZXQiOiAidmFyXzcifSwgeyJzb3VyY2UiOiAiY29zdF83IiwgInRhcmdldCI6ICJ2YXJfNiJ9LCB7InNvdXJjZSI6ICJjb3N0XzciLCAidGFyZ2V0IjogInZhcl83In0sIHsic291cmNlIjogImNvc3RfNyIsICJ0YXJnZXQiOiAidmFyXzgifSwgeyJzb3VyY2UiOiAiY29zdF84IiwgInRhcmdldCI6ICJ2YXJfNyJ9LCB7InNvdXJjZSI6ICJjb3N0XzgiLCAidGFyZ2V0IjogInZhcl84In0sIHsic291cmNlIjogImNvc3RfOCIsICJ0YXJnZXQiOiAidmFyXzkifSwgeyJzb3VyY2UiOiAiY29zdF85IiwgInRhcmdldCI6ICJ2YXJfOCJ9LCB7InNvdXJjZSI6ICJjb3N0XzkiLCAidGFyZ2V0IjogInZhcl85In0sIHsic291cmNlIjogImNvc3RfOSIsICJ0YXJnZXQiOiAidmFyXzEwIn0sIHsic291cmNlIjogImNvc3RfMTAiLCAidGFyZ2V0IjogInZhcl85In0sIHsic291cmNlIjogImNvc3RfMTAiLCAidGFyZ2V0IjogInZhcl8xMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzEwIiwgInRhcmdldCI6ICJ2YXJfMTEifSwgeyJzb3VyY2UiOiAiY29zdF8xMSIsICJ0YXJnZXQiOiAidmFyXzEwIn0sIHsic291cmNlIjogImNvc3RfMTEiLCAidGFyZ2V0IjogInZhcl8xMSJ9LCB7InNvdXJjZSI6ICJjb3N0XzExIiwgInRhcmdldCI6ICJ2YXJfMTIifSwgeyJzb3VyY2UiOiAiY29zdF8xMiIsICJ0YXJnZXQiOiAidmFyXzExIn0sIHsic291cmNlIjogImNvc3RfMTIiLCAidGFyZ2V0IjogInZhcl8xMiJ9LCB7InNvdXJjZSI6ICJjb3N0XzEyIiwgInRhcmdldCI6ICJ2YXJfMTMifSwgeyJzb3VyY2UiOiAiY29zdF8xMyIsICJ0YXJnZXQiOiAidmFyXzEyIn0sIHsic291cmNlIjogImNvc3RfMTMiLCAidGFyZ2V0IjogInZhcl8xMyJ9LCB7InNvdXJjZSI6ICJjb3N0XzEzIiwgInRhcmdldCI6ICJ2YXJfMTQifSwgeyJzb3VyY2UiOiAiY29zdF8xNCIsICJ0YXJnZXQiOiAidmFyXzEzIn0sIHsic291cmNlIjogImNvc3RfMTQiLCAidGFyZ2V0IjogInZhcl8xNCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE0IiwgInRhcmdldCI6ICJ2YXJfMTUifSwgeyJzb3VyY2UiOiAiY29zdF8xNSIsICJ0YXJnZXQiOiAidmFyXzE0In0sIHsic291cmNlIjogImNvc3RfMTUiLCAidGFyZ2V0IjogInZhcl8xNSJ9LCB7InNvdXJjZSI6ICJjb3N0XzE1IiwgInRhcmdldCI6ICJ2YXJfMTYifSwgeyJzb3VyY2UiOiAiY29zdF8xNiIsICJ0YXJnZXQiOiAidmFyXzE1In0sIHsic291cmNlIjogImNvc3RfMTYiLCAidGFyZ2V0IjogInZhcl8xNiJ9LCB7InNvdXJjZSI6ICJjb3N0XzE2IiwgInRhcmdldCI6ICJ2YXJfMTcifSwgeyJzb3VyY2UiOiAiY29zdF8xNyIsICJ0YXJnZXQiOiAidmFyXzE2In0sIHsic291cmNlIjogImNvc3RfMTciLCAidGFyZ2V0IjogInZhcl8xNyJ9LCB7InNvdXJjZSI6ICJjb3N0XzE3IiwgInRhcmdldCI6ICJ2YXJfMTgifSwgeyJzb3VyY2UiOiAiY29zdF8xOCIsICJ0YXJnZXQiOiAidmFyXzE3In0sIHsic291cmNlIjogImNvc3RfMTgiLCAidGFyZ2V0IjogInZhcl8xOCJ9LCB7InNvdXJjZSI6ICJjb3N0XzE4IiwgInRhcmdldCI6ICJ2YXJfMTkifSwgeyJzb3VyY2UiOiAiY29zdF8xOSIsICJ0YXJnZXQiOiAidmFyXzE4In0sIHsic291cmNlIjogImNvc3RfMTkiLCAidGFyZ2V0IjogInZhcl8xOSJ9LCB7InNvdXJjZSI6ICJjb3N0XzE5IiwgInRhcmdldCI6ICJ2YXJfMSJ9LCB7InNvdXJjZSI6ICJjb3N0XzIwIiwgInRhcmdldCI6ICJ2YXJfMCJ9LCB7InNvdXJjZSI6ICJjb3N0XzIxIiwgInRhcmdldCI6ICJ2YXJfMiJ9LCB7InNvdXJjZSI6ICJjb3N0XzIyIiwgInRhcmdldCI6ICJ2YXJfMyJ9LCB7InNvdXJjZSI6ICJjb3N0XzIzIiwgInRhcmdldCI6ICJ2YXJfNCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI0IiwgInRhcmdldCI6ICJ2YXJfNSJ9LCB7InNvdXJjZSI6ICJjb3N0XzI1IiwgInRhcmdldCI6ICJ2YXJfNiJ9LCB7InNvdXJjZSI6ICJjb3N0XzI2IiwgInRhcmdldCI6ICJ2YXJfNyJ9LCB7InNvdXJjZSI6ICJjb3N0XzI3IiwgInRhcmdldCI6ICJ2YXJfOCJ9LCB7InNvdXJjZSI6ICJjb3N0XzI4IiwgInRhcmdldCI6ICJ2YXJfOSJ9LCB7InNvdXJjZSI6ICJjb3N0XzI5IiwgInRhcmdldCI6ICJ2YXJfMTAifSwgeyJzb3VyY2UiOiAiY29zdF8zMCIsICJ0YXJnZXQiOiAidmFyXzExIn0sIHsic291cmNlIjogImNvc3RfMzEiLCAidGFyZ2V0IjogInZhcl8xMiJ9LCB7InNvdXJjZSI6ICJjb3N0XzMyIiwgInRhcmdldCI6ICJ2YXJfMTMifSwgeyJzb3VyY2UiOiAiY29zdF8zMyIsICJ0YXJnZXQiOiAidmFyXzE0In0sIHsic291cmNlIjogImNvc3RfMzQiLCAidGFyZ2V0IjogInZhcl8xNSJ9LCB7InNvdXJjZSI6ICJjb3N0XzM1IiwgInRhcmdldCI6ICJ2YXJfMTYifSwgeyJzb3VyY2UiOiAiY29zdF8zNiIsICJ0YXJnZXQiOiAidmFyXzE3In0sIHsic291cmNlIjogImNvc3RfMzciLCAidGFyZ2V0IjogInZhcl8xOCJ9LCB7InNvdXJjZSI6ICJjb3N0XzM4IiwgInRhcmdldCI6ICJ2YXJfMTkifSwgeyJzb3VyY2UiOiAiY29zdF8zOSIsICJ0YXJnZXQiOiAidmFyXzEifSwgeyJzb3VyY2UiOiAiY29zdF80MCIsICJ0YXJnZXQiOiAidmFyXzAifSwgeyJzb3VyY2UiOiAiY29zdF80MSIsICJ0YXJnZXQiOiAidmFyXzIifSwgeyJzb3VyY2UiOiAiY29zdF80MiIsICJ0YXJnZXQiOiAidmFyXzMifSwgeyJzb3VyY2UiOiAiY29zdF80MyIsICJ0YXJnZXQiOiAidmFyXzQifSwgeyJzb3VyY2UiOiAiY29zdF80NCIsICJ0YXJnZXQiOiAidmFyXzUifSwgeyJzb3VyY2UiOiAiY29zdF80NSIsICJ0YXJnZXQiOiAidmFyXzYifSwgeyJzb3VyY2UiOiAiY29zdF80NiIsICJ0YXJnZXQiOiAidmFyXzcifSwgeyJzb3VyY2UiOiAiY29zdF80NyIsICJ0YXJnZXQiOiAidmFyXzgifSwgeyJzb3VyY2UiOiAiY29zdF80OCIsICJ0YXJnZXQiOiAidmFyXzkifSwgeyJzb3VyY2UiOiAiY29zdF80OSIsICJ0YXJnZXQiOiAidmFyXzEwIn0sIHsic291cmNlIjogImNvc3RfNTAiLCAidGFyZ2V0IjogInZhcl8xMSJ9LCB7InNvdXJjZSI6ICJjb3N0XzUxIiwgInRhcmdldCI6ICJ2YXJfMTIifSwgeyJzb3VyY2UiOiAiY29zdF81MiIsICJ0YXJnZXQiOiAidmFyXzEzIn0sIHsic291cmNlIjogImNvc3RfNTMiLCAidGFyZ2V0IjogInZhcl8xNCJ9LCB7InNvdXJjZSI6ICJjb3N0XzU0IiwgInRhcmdldCI6ICJ2YXJfMTUifSwgeyJzb3VyY2UiOiAiY29zdF81NSIsICJ0YXJnZXQiOiAidmFyXzE2In0sIHsic291cmNlIjogImNvc3RfNTYiLCAidGFyZ2V0IjogInZhcl8xNyJ9LCB7InNvdXJjZSI6ICJjb3N0XzU3IiwgInRhcmdldCI6ICJ2YXJfMTgifSwgeyJzb3VyY2UiOiAiY29zdF81OCIsICJ0YXJnZXQiOiAidmFyXzE5In0sIHsic291cmNlIjogImNvc3RfNTkiLCAidGFyZ2V0IjogInZhcl8xIn1dLCAidHJ1bmNhdGVkIjogZmFsc2V9OwogICAgICAgIGNvbnN0IGNvbnRhaW5lciA9IGQzLnNlbGVjdCgiI2NvbnRhaW5lciIpOwogICAgICAgIGNvbnN0IGNhbnZhcyA9IGNvbnRhaW5lci5zZWxlY3QoImNhbnZhcyIpLm5vZGUoKTsKICAgICAgICBjb25zdCBjdHggPSBjYW52YXMuZ2V0Q29udGV4dCgiMmQiKTsKCiAgICAvLyBHZXQgYWN0dWFsIGNvbnRhaW5lciBkaW1lbnNpb25zLgogICAgY29uc3QgcmVjdCA9IGNvbnRhaW5lci5ub2RlKCkuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCk7CiAgICBjb25zdCB3aWR0aCA9IHJlY3Qud2lkdGg7CiAgICBjb25zdCBoZWlnaHQgPSByZWN0LmhlaWdodDsKCiAgICAvLyBOb2RlIHNpemluZy4KICAgIGNvbnN0IHZhclJ4ID0gNDUsIHZhclJ5ID0gMTQ7ICAvLyBFbGxpcHNlIHJhZGlpIGZvciB2YXJpYWJsZXMuCiAgICBjb25zdCBjb3N0VyA9IDkwLCBjb3N0SCA9IDIyOyAgIC8vIFJlY3Qgc2l6ZSBmb3IgY29zdHMuCgogICAgLy8gU2V0IHVwIGhpZ2gtRFBJIGNhbnZhcy4KICAgIGNvbnN0IGRwciA9IHdpbmRvdy5kZXZpY2VQaXhlbFJhdGlvIHx8IDE7CiAgICBjYW52YXMud2lkdGggPSB3aWR0aCAqIGRwcjsKICAgIGNhbnZhcy5oZWlnaHQgPSBoZWlnaHQgKiBkcHI7CiAgICBjdHguc2NhbGUoZHByLCBkcHIpOwoKICAgIC8vIFRyYWNrIHRyYW5zZm9ybSBmb3Igem9vbS9wYW4uCiAgICBsZXQgdHJhbnNmb3JtID0gZDMuem9vbUlkZW50aXR5OwoKICAgIC8vIENyZWF0ZSBmb3JjZSBzaW11bGF0aW9uLgogICAgY29uc3Qgc2ltdWxhdGlvbiA9IGQzLmZvcmNlU2ltdWxhdGlvbihkYXRhLm5vZGVzKQogICAgICAgIC5mb3JjZSgibGluayIsIGQzLmZvcmNlTGluayhkYXRhLmxpbmtzKS5pZChkID0+IGQuaWQpLmRpc3RhbmNlKDYwKSkKICAgICAgICAuZm9yY2UoImNoYXJnZSIsIGQzLmZvcmNlTWFueUJvZHkoKS5zdHJlbmd0aCgtMTUwKS5kaXN0YW5jZU1heCgyNTApKQogICAgICAgIC5mb3JjZSgiY2VudGVyIiwgZDMuZm9yY2VDZW50ZXIod2lkdGggLyAyLCBoZWlnaHQgLyAyKSkKICAgICAgICAuZm9yY2UoImNvbGxpc2lvbiIsIGQzLmZvcmNlQ29sbGlkZSgpLnJhZGl1cygzNSkpOwoKICAgIC8vIERyYWcgc3RhdGUuCiAgICBsZXQgZHJhZ05vZGUgPSBudWxsOwoKICAgIC8vIEZpbmQgbm9kZSBhdCBwb3NpdGlvbi4KICAgIGZ1bmN0aW9uIG5vZGVBdCh4LCB5KSB7CiAgICAgICAgY29uc3QgdHggPSAoeCAtIHRyYW5zZm9ybS54KSAvIHRyYW5zZm9ybS5rOwogICAgICAgIGNvbnN0IHR5ID0gKHkgLSB0cmFuc2Zvcm0ueSkgLyB0cmFuc2Zvcm0uazsKICAgICAgICBmb3IgKGxldCBpID0gZGF0YS5ub2Rlcy5sZW5ndGggLSAxOyBpID49IDA7IGktLSkgewogICAgICAgICAgICBjb25zdCBkID0gZGF0YS5ub2Rlc1tpXTsKICAgICAgICAgICAgY29uc3QgZHggPSB0eCAtIGQueDsKICAgICAgICAgICAgY29uc3QgZHkgPSB0eSAtIGQueTsKICAgICAgICAgICAgaWYgKGQudHlwZSA9PT0gInZhcmlhYmxlIikgewogICAgICAgICAgICAgICAgaWYgKChkeCpkeCkvKHZhclJ4KnZhclJ4KSArIChkeSpkeSkvKHZhclJ5KnZhclJ5KSA8IDEpIHJldHVybiBkOwogICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgaWYgKE1hdGguYWJzKGR4KSA8IGNvc3RXLzIgJiYgTWF0aC5hYnMoZHkpIDwgY29zdEgvMikgcmV0dXJuIGQ7CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICAgICAgcmV0dXJuIG51bGw7CiAgICB9CgogICAgZnVuY3Rpb24gZHJhdygpIHsKICAgICAgICBjdHguc2F2ZSgpOwogICAgICAgIGN0eC5jbGVhclJlY3QoMCwgMCwgd2lkdGgsIGhlaWdodCk7CiAgICAgICAgY3R4LnRyYW5zbGF0ZSh0cmFuc2Zvcm0ueCwgdHJhbnNmb3JtLnkpOwogICAgICAgIGN0eC5zY2FsZSh0cmFuc2Zvcm0uaywgdHJhbnNmb3JtLmspOwoKICAgICAgICAvLyBEcmF3IGxpbmtzLgogICAgICAgIGN0eC5zdHJva2VTdHlsZSA9ICIjOTk5IjsKICAgICAgICBjdHguZ2xvYmFsQWxwaGEgPSAwLjY7CiAgICAgICAgY3R4LmxpbmVXaWR0aCA9IDEuNSAvIHRyYW5zZm9ybS5rOwogICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICBkYXRhLmxpbmtzLmZvckVhY2goZCA9PiB7CiAgICAgICAgICAgIGN0eC5tb3ZlVG8oZC5zb3VyY2UueCwgZC5zb3VyY2UueSk7CiAgICAgICAgICAgIGN0eC5saW5lVG8oZC50YXJnZXQueCwgZC50YXJnZXQueSk7CiAgICAgICAgfSk7CiAgICAgICAgY3R4LnN0cm9rZSgpOwogICAgICAgIGN0eC5nbG9iYWxBbHBoYSA9IDEuMDsKCiAgICAgICAgLy8gRHJhdyBub2Rlcy4KICAgICAgICBkYXRhLm5vZGVzLmZvckVhY2goZCA9PiB7CiAgICAgICAgICAgIGN0eC5zYXZlKCk7CiAgICAgICAgICAgIGN0eC50cmFuc2xhdGUoZC54LCBkLnkpOwoKICAgICAgICAgICAgaWYgKGQudHlwZSA9PT0gInZhcmlhYmxlIikgewogICAgICAgICAgICAgICAgLy8gRWxsaXBzZSBmb3IgdmFyaWFibGVzLgogICAgICAgICAgICAgICAgY3R4LmJlZ2luUGF0aCgpOwogICAgICAgICAgICAgICAgY3R4LmVsbGlwc2UoMCwgMCwgdmFyUngsIHZhclJ5LCAwLCAwLCAyICogTWF0aC5QSSk7CiAgICAgICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gZC5maWxsOwogICAgICAgICAgICAgICAgY3R4LmZpbGwoKTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2VTdHlsZSA9IGQuc3Ryb2tlOwogICAgICAgICAgICAgICAgY3R4LmxpbmVXaWR0aCA9IDEuNSAvIHRyYW5zZm9ybS5rOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZSgpOwogICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgLy8gUm91bmRlZCByZWN0IGZvciBjb3N0cy4KICAgICAgICAgICAgICAgIGNvbnN0IHcgPSBjb3N0VywgaCA9IGNvc3RILCByID0gNDsKICAgICAgICAgICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICAgICAgICAgIGN0eC5tb3ZlVG8oLXcvMiArIHIsIC1oLzIpOwogICAgICAgICAgICAgICAgY3R4LmxpbmVUbyh3LzIgLSByLCAtaC8yKTsKICAgICAgICAgICAgICAgIGN0eC5xdWFkcmF0aWNDdXJ2ZVRvKHcvMiwgLWgvMiwgdy8yLCAtaC8yICsgcik7CiAgICAgICAgICAgICAgICBjdHgubGluZVRvKHcvMiwgaC8yIC0gcik7CiAgICAgICAgICAgICAgICBjdHgucXVhZHJhdGljQ3VydmVUbyh3LzIsIGgvMiwgdy8yIC0gciwgaC8yKTsKICAgICAgICAgICAgICAgIGN0eC5saW5lVG8oLXcvMiArIHIsIGgvMik7CiAgICAgICAgICAgICAgICBjdHgucXVhZHJhdGljQ3VydmVUbygtdy8yLCBoLzIsIC13LzIsIGgvMiAtIHIpOwogICAgICAgICAgICAgICAgY3R4LmxpbmVUbygtdy8yLCAtaC8yICsgcik7CiAgICAgICAgICAgICAgICBjdHgucXVhZHJhdGljQ3VydmVUbygtdy8yLCAtaC8yLCAtdy8yICsgciwgLWgvMik7CiAgICAgICAgICAgICAgICBjdHguY2xvc2VQYXRoKCk7CiAgICAgICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gZC5maWxsOwogICAgICAgICAgICAgICAgY3R4LmZpbGwoKTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2VTdHlsZSA9IGQuc3Ryb2tlOwogICAgICAgICAgICAgICAgY3R4LmxpbmVXaWR0aCA9IDEuNSAvIHRyYW5zZm9ybS5rOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZSgpOwogICAgICAgICAgICB9CgogICAgICAgICAgICAvLyBEcmF3IGxhYmVsLgogICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gIiMwMDAiOwogICAgICAgICAgICBjdHguZm9udCA9ICI5cHggSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI7CiAgICAgICAgICAgIGN0eC50ZXh0QWxpZ24gPSAiY2VudGVyIjsKICAgICAgICAgICAgY3R4LnRleHRCYXNlbGluZSA9ICJtaWRkbGUiOwogICAgICAgICAgICBjdHguZmlsbFRleHQoZC5sYWJlbCwgMCwgMCk7CgogICAgICAgICAgICBjdHgucmVzdG9yZSgpOwogICAgICAgIH0pOwoKICAgICAgICAvLyBEcmF3IGxlZ2VuZC4KICAgICAgICBjdHgucmVzdG9yZSgpOwogICAgICAgIGRyYXdMZWdlbmQoKTsKICAgIH0KCiAgICBmdW5jdGlvbiBkcmF3TGVnZW5kKCkgewogICAgICAgIC8vIEJ1aWxkIGxlZ2VuZCBkeW5hbWljYWxseSBmcm9tIGFjdHVhbCBub2Rlcy4KICAgICAgICBjb25zdCBsZWdlbmREYXRhID0gW107CgogICAgICAgIC8vIENvbGxlY3QgdW5pcXVlIGNvc3Qga2luZHMuCiAgICAgICAgY29uc3QgY29zdEtpbmRMYWJlbHMgPSB7CiAgICAgICAgICAgICJsMl9zcXVhcmVkIjogIkNvc3QgKEwyKSIsCiAgICAgICAgICAgICJjb25zdHJhaW50X2VxX3plcm8iOiAiRXF1YWxpdHkiLAogICAgICAgICAgICAiY29uc3RyYWludF9sZXFfemVybyI6ICJJbmVxdWFsaXR5ICjiiaQpIiwKICAgICAgICAgICAgImNvbnN0cmFpbnRfZ2VxX3plcm8iOiAiSW5lcXVhbGl0eSAo4omlKSIKICAgICAgICB9OwogICAgICAgIGNvbnN0IHNlZW5Db3N0S2luZHMgPSBuZXcgU2V0KCk7CiAgICAgICAgZGF0YS5ub2Rlcy5maWx0ZXIobiA9PiBuLnR5cGUgPT09ICJjb3N0IikuZm9yRWFjaChuID0+IHNlZW5Db3N0S2luZHMuYWRkKG4ua2luZCkpOwogICAgICAgIGZvciAoY29uc3Qga2luZCBvZiBbImwyX3NxdWFyZWQiLCAiY29uc3RyYWludF9lcV96ZXJvIiwgImNvbnN0cmFpbnRfbGVxX3plcm8iLCAiY29uc3RyYWludF9nZXFfemVybyJdKSB7CiAgICAgICAgICAgIGlmIChzZWVuQ29zdEtpbmRzLmhhcyhraW5kKSkgewogICAgICAgICAgICAgICAgY29uc3Qgbm9kZSA9IGRhdGEubm9kZXMuZmluZChuID0+IG4udHlwZSA9PT0gImNvc3QiICYmIG4ua2luZCA9PT0ga2luZCk7CiAgICAgICAgICAgICAgICBsZWdlbmREYXRhLnB1c2goewogICAgICAgICAgICAgICAgICAgIGxhYmVsOiBjb3N0S2luZExhYmVsc1traW5kXSwKICAgICAgICAgICAgICAgICAgICBmaWxsOiBub2RlLmZpbGwsCiAgICAgICAgICAgICAgICAgICAgc3Ryb2tlOiBub2RlLnN0cm9rZSwKICAgICAgICAgICAgICAgICAgICB0eXBlOiAiY29zdCIKICAgICAgICAgICAgICAgIH0pOwogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICAvLyBDb2xsZWN0IHVuaXF1ZSB2YXJpYWJsZSB0eXBlcy4KICAgICAgICBjb25zdCBzZWVuVmFyVHlwZXMgPSBuZXcgTWFwKCk7ICAvLyB2YXJfdHlwZSAtPiB7ZmlsbCwgc3Ryb2tlfQogICAgICAgIGRhdGEubm9kZXMuZmlsdGVyKG4gPT4gbi50eXBlID09PSAidmFyaWFibGUiKS5mb3JFYWNoKG4gPT4gewogICAgICAgICAgICBpZiAoIXNlZW5WYXJUeXBlcy5oYXMobi52YXJfdHlwZSkpIHsKICAgICAgICAgICAgICAgIHNlZW5WYXJUeXBlcy5zZXQobi52YXJfdHlwZSwgeyBmaWxsOiBuLmZpbGwsIHN0cm9rZTogbi5zdHJva2UgfSk7CiAgICAgICAgICAgIH0KICAgICAgICB9KTsKICAgICAgICBmb3IgKGNvbnN0IFt2YXJUeXBlLCBjb2xvcnNdIG9mIHNlZW5WYXJUeXBlcykgewogICAgICAgICAgICBsZWdlbmREYXRhLnB1c2goewogICAgICAgICAgICAgICAgbGFiZWw6IHZhclR5cGUsCiAgICAgICAgICAgICAgICBmaWxsOiBjb2xvcnMuZmlsbCwKICAgICAgICAgICAgICAgIHN0cm9rZTogY29sb3JzLnN0cm9rZSwKICAgICAgICAgICAgICAgIHR5cGU6ICJ2YXJpYWJsZSIKICAgICAgICAgICAgfSk7CiAgICAgICAgfQoKICAgICAgICBjdHguc2F2ZSgpOwogICAgICAgIGN0eC50cmFuc2xhdGUoMTAsIDEwKTsKCiAgICAgICAgbGVnZW5kRGF0YS5mb3JFYWNoKChkLCBpKSA9PiB7CiAgICAgICAgICAgIGNvbnN0IHkgPSBpICogMTg7CiAgICAgICAgICAgIGlmIChkLnR5cGUgPT09ICJ2YXJpYWJsZSIpIHsKICAgICAgICAgICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICAgICAgICAgIGN0eC5lbGxpcHNlKDEyLCB5ICsgNiwgMTIsIDYsIDAsIDAsIDIgKiBNYXRoLlBJKTsKICAgICAgICAgICAgICAgIGN0eC5maWxsU3R5bGUgPSBkLmZpbGw7CiAgICAgICAgICAgICAgICBjdHguZmlsbCgpOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZVN0eWxlID0gZC5zdHJva2U7CiAgICAgICAgICAgICAgICBjdHgubGluZVdpZHRoID0gMTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2UoKTsKICAgICAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgIGN0eC5iZWdpblBhdGgoKTsKICAgICAgICAgICAgICAgIGN0eC5yb3VuZFJlY3QoMCwgeSwgMjQsIDEyLCAyKTsKICAgICAgICAgICAgICAgIGN0eC5maWxsU3R5bGUgPSBkLmZpbGw7CiAgICAgICAgICAgICAgICBjdHguZmlsbCgpOwogICAgICAgICAgICAgICAgY3R4LnN0cm9rZVN0eWxlID0gZC5zdHJva2U7CiAgICAgICAgICAgICAgICBjdHgubGluZVdpZHRoID0gMTsKICAgICAgICAgICAgICAgIGN0eC5zdHJva2UoKTsKICAgICAgICAgICAgfQogICAgICAgICAgICBjdHguZmlsbFN0eWxlID0gIiMwMDAiOwogICAgICAgICAgICBjdHguZm9udCA9ICI5cHggSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI7CiAgICAgICAgICAgIGN0eC50ZXh0QWxpZ24gPSAibGVmdCI7CiAgICAgICAgICAgIGN0eC50ZXh0QmFzZWxpbmUgPSAibWlkZGxlIjsKICAgICAgICAgICAgY3R4LmZpbGxUZXh0KGQubGFiZWwsIDMwLCB5ICsgNik7CiAgICAgICAgfSk7CgogICAgICAgIGN0eC5yZXN0b3JlKCk7CiAgICB9CgogICAgc2ltdWxhdGlvbi5vbigidGljayIsIGRyYXcpOwoKICAgIC8vIFpvb20gYmVoYXZpb3Igd2l0aCBmaWx0ZXIgdG8gYWxsb3cgbm9kZSBkcmFnZ2luZy4KICAgIGNvbnN0IHpvb20gPSBkMy56b29tKCkKICAgICAgICAuc2NhbGVFeHRlbnQoWzAuMSwgNF0pCiAgICAgICAgLmZpbHRlcigoZXZlbnQpID0+IHsKICAgICAgICAgICAgLy8gQmxvY2sgem9vbSBpZiBjbGlja2luZyBvbiBhIG5vZGUgKGFsbG93IG5vZGUgZHJhZyBpbnN0ZWFkKS4KICAgICAgICAgICAgaWYgKGV2ZW50LnR5cGUgPT09ICJtb3VzZWRvd24iKSB7CiAgICAgICAgICAgICAgICBjb25zdCBbeCwgeV0gPSBkMy5wb2ludGVyKGV2ZW50KTsKICAgICAgICAgICAgICAgIGlmIChub2RlQXQoeCwgeSkpIHJldHVybiBmYWxzZTsKICAgICAgICAgICAgfQogICAgICAgICAgICByZXR1cm4gdHJ1ZTsKICAgICAgICB9KQogICAgICAgIC5vbigiem9vbSIsIChldmVudCkgPT4gewogICAgICAgICAgICB0cmFuc2Zvcm0gPSBldmVudC50cmFuc2Zvcm07CiAgICAgICAgICAgIGRyYXcoKTsKICAgICAgICB9KTsKCiAgICBkMy5zZWxlY3QoY2FudmFzKQogICAgICAgIC5jYWxsKHpvb20pCiAgICAgICAgLm9uKCJtb3VzZWRvd24uZHJhZyIsIChldmVudCkgPT4gewogICAgICAgICAgICBjb25zdCBbeCwgeV0gPSBkMy5wb2ludGVyKGV2ZW50KTsKICAgICAgICAgICAgY29uc3Qgbm9kZSA9IG5vZGVBdCh4LCB5KTsKICAgICAgICAgICAgaWYgKG5vZGUpIHsKICAgICAgICAgICAgICAgIGRyYWdOb2RlID0gbm9kZTsKICAgICAgICAgICAgICAgIHNpbXVsYXRpb24uYWxwaGFUYXJnZXQoMC4zKS5yZXN0YXJ0KCk7CiAgICAgICAgICAgICAgICBkcmFnTm9kZS5meCA9IGRyYWdOb2RlLng7CiAgICAgICAgICAgICAgICBkcmFnTm9kZS5meSA9IGRyYWdOb2RlLnk7CiAgICAgICAgICAgIH0KICAgICAgICB9KQogICAgICAgIC5vbigibW91c2Vtb3ZlLmRyYWciLCAoZXZlbnQpID0+IHsKICAgICAgICAgICAgaWYgKGRyYWdOb2RlKSB7CiAgICAgICAgICAgICAgICBjb25zdCBbeCwgeV0gPSBkMy5wb2ludGVyKGV2ZW50KTsKICAgICAgICAgICAgICAgIGRyYWdOb2RlLmZ4ID0gdHJhbnNmb3JtLmludmVydFgoeCk7CiAgICAgICAgICAgICAgICBkcmFnTm9kZS5meSA9IHRyYW5zZm9ybS5pbnZlcnRZKHkpOwogICAgICAgICAgICAgICAgZHJhdygpOwogICAgICAgICAgICB9CiAgICAgICAgfSkKICAgICAgICAub24oIm1vdXNldXAuZHJhZyBtb3VzZWxlYXZlLmRyYWciLCAoKSA9PiB7CiAgICAgICAgICAgIGlmIChkcmFnTm9kZSkgewogICAgICAgICAgICAgICAgc2ltdWxhdGlvbi5hbHBoYVRhcmdldCgwKTsKICAgICAgICAgICAgICAgIGRyYWdOb2RlLmZ4ID0gbnVsbDsKICAgICAgICAgICAgICAgIGRyYWdOb2RlLmZ5ID0gbnVsbDsKICAgICAgICAgICAgICAgIGRyYWdOb2RlID0gbnVsbDsKICAgICAgICAgICAgfQogICAgICAgIH0pOwoKICAgICAgICAvLyBJbml0aWFsIGRyYXcuCiAgICAgICAgZHJhdygpOwogICAgfSkoKTsKICAgIDwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4="
+            frameborder="0"
+            allowfullscreen
+            
+        ></iframe>
+        </div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Analyze the problem.</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Building optimization problem with 60 terms and 20 variables: 20 costs, 0 eq_zero, 40 leq_zero, 0 geq_zero
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 2 costs, 1 variables each: anchor_cost
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing constraint group with 40 constraints (constraint_leq_zero), 1 variables each: augmented_obstacle_constraint
+<span class=" -Color -Color-Bold">INFO    </span> | Vectorizing group with 18 costs, 3 variables each: smoothness_cost
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="solving">
+<h2>Solving<a class="headerlink" href="#solving" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">solution</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">INFO    </span> | Augmented Lagrangian: initial snorm=4.8317e-01, csupn=4.8317e-01, max_rho=1.0706e+01, constraint_dim=40
+<span class=" -Color -Color-Bold">INFO    </span> |  step #0: cost=0.0000 lambd=0.0005 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 11.46163 (avg 0.28654)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.00000 (avg 0.00000)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.19e+01 cost_prev=11.4616 cost_new=0.9302
+<span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=0.8331 lambd=0.0003 inexact_tol=1.0e-02
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00119 (avg 0.00030)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.09714 (avg 0.00243)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.83190 (avg 0.02311)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.96e-01 cost_prev=0.9302 cost_new=0.8834
+<span class=" -Color -Color-Bold">INFO    </span> |  step #2: cost=0.7775 lambd=0.0001 inexact_tol=6.3e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00125 (avg 0.00031)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.10585 (avg 0.00265)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.77627 (avg 0.02156)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.80e-02 cost_prev=0.8834 cost_new=0.8828
+<span class=" -Color -Color-Bold">INFO    </span> |  step #3: cost=0.7712 lambd=0.0001 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00122 (avg 0.00030)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.11158 (avg 0.00279)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.76997 (avg 0.02139)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.31e-03 cost_prev=0.8828 cost_new=0.8828
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.0361e-02, csupn=7.0361e-02, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #4: cost=0.7707 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00122 (avg 0.00030)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.44837 (avg 0.01121)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.76945 (avg 0.02137)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.18e+00 cost_prev=1.2190 cost_new=1.1491
+<span class=" -Color -Color-Bold">INFO    </span> |  step #5: cost=0.9132 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00134 (avg 0.00034)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.23599 (avg 0.00590)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91181 (avg 0.02533)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.96e-01 cost_prev=1.1491 cost_new=1.1436
+<span class=" -Color -Color-Bold">INFO    </span> |  step #6: cost=0.9509 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00148 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.19274 (avg 0.00482)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.94939 (avg 0.02637)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.86e-02 cost_prev=1.1436 cost_new=1.1435
+<span class=" -Color -Color-Bold">INFO    </span> |  step #7: cost=0.9518 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00148 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.19162 (avg 0.00479)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95036 (avg 0.02640)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.88e-03 cost_prev=1.1435 cost_new=1.1435
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.4076e-02, csupn=2.4076e-02, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #8: cost=0.9522 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00148 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.30073 (avg 0.00752)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95070 (avg 0.02641)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.96e-01 cost_prev=1.2529 cost_new=1.2444
+<span class=" -Color -Color-Bold">INFO    </span> |  step #9: cost=1.0277 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00161 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.21676 (avg 0.00542)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.02608 (avg 0.02850)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.07e-03 cost_prev=1.2444 cost_new=1.2444
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.1835e-03, csupn=6.1835e-03, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #10: cost=1.0277 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00161 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.24424 (avg 0.00611)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.02605 (avg 0.02850)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.00e-01 cost_prev=1.2719 cost_new=1.2712
+<span class=" -Color -Color-Bold">INFO    </span> |  step #11: cost=1.0498 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00164 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22144 (avg 0.00554)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04813 (avg 0.02911)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=5.79e-04 cost_prev=1.2712 cost_new=1.2712
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.0778e-03, csupn=1.0778e-03, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #12: cost=1.0498 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00164 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22616 (avg 0.00565)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04813 (avg 0.02911)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.75e-02 cost_prev=1.2759 cost_new=1.2759
+<span class=" -Color -Color-Bold">INFO    </span> |  step #13: cost=1.0536 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22226 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05200 (avg 0.02922)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.70e-04 cost_prev=1.2759 cost_new=1.2759
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.8895e-04, csupn=1.8895e-04, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #14: cost=1.0536 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22308 (avg 0.00558)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05200 (avg 0.02922)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.07e-03 cost_prev=1.2767 cost_new=1.2767
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.4213e-05, csupn=3.4213e-05, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #15: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #16: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #17: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #18: cost=1.0543 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #19: cost=1.0543 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #20: cost=1.0543 lambd=0.0003 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.45e-04 cost_prev=1.2769 cost_new=1.2769
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.9870e-06, csupn=7.9870e-06, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #21: cost=1.0544 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22246 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05279 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.60e-04 cost_prev=1.2769 cost_new=1.2769
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.8678e-06, csupn=7.8678e-06, max_rho=4.2824e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #22: cost=1.0544 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.13904 (avg 0.00348)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05280 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.80e-04 cost_prev=1.1935 cost_new=1.1935
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.9870e-06, csupn=7.9870e-06, max_rho=4.2824e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #23: cost=1.0544 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05563 (avg 0.00139)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05277 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.92e-03 cost_prev=1.1100 cost_new=1.1085
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.7730e-04, csupn=0.0000e+00, max_rho=4.2824e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #24: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05282 (avg 0.00132)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05268 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.30e-02 cost_prev=1.1071 cost_new=1.0764
+<span class=" -Color -Color-Bold">INFO    </span> |  step #25: cost=1.0434 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00163 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.03300 (avg 0.00082)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04181 (avg 0.02894)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.07e+00 cost_prev=1.0764 cost_new=1.0461
+<span class=" -Color -Color-Bold">INFO    </span> |  step #26: cost=0.9435 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00147 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.10259 (avg 0.00256)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.94204 (avg 0.02617)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.47e+00 cost_prev=1.0461 cost_new=1.0058
+<span class=" -Color -Color-Bold">INFO    </span> |  step #27: cost=0.9217 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00149 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08418 (avg 0.00210)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.92017 (avg 0.02556)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.79e-02 cost_prev=1.0058 cost_new=1.0050
+<span class=" -Color -Color-Bold">INFO    </span> |  step #28: cost=0.9221 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08283 (avg 0.00207)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.92059 (avg 0.02557)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.17e-02 cost_prev=1.0050 cost_new=1.0049
+<span class=" -Color -Color-Bold">INFO    </span> |  step #29: cost=0.9211 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08382 (avg 0.00210)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91957 (avg 0.02554)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.53e-03 cost_prev=1.0049 cost_new=1.0049
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=5.8322e-02, csupn=5.8322e-02, max_rho=4.2824e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #30: cost=0.9206 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.47436 (avg 0.01186)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91904 (avg 0.02553)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.92e+00 cost_prev=1.3949 cost_new=1.1356
+<span class=" -Color -Color-Bold">INFO    </span> |  step #31: cost=1.0855 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00191 (avg 0.00048)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05005 (avg 0.00125)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.08361 (avg 0.03010)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.99e-01 cost_prev=1.1356 cost_new=1.0921
+<span class=" -Color -Color-Bold">INFO    </span> |  step #32: cost=1.0651 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #33: cost=1.0651 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #34: cost=1.0651 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #35: cost=1.0651 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #36: cost=1.0651 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #37: cost=1.0651 lambd=0.0003 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #38: cost=1.0651 lambd=0.0006 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #39: cost=1.0651 lambd=0.0013 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #40: cost=1.0651 lambd=0.0026 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #41: cost=1.0651 lambd=0.0051 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #42: cost=1.0651 lambd=0.0102 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #43: cost=1.0651 lambd=0.0205 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #44: cost=1.0651 lambd=0.0410 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.05e-01 cost_prev=1.0921 cost_new=1.0892
+<span class=" -Color -Color-Bold">INFO    </span> |  step #45: cost=1.0003 lambd=0.0205 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00126 (avg 0.00031)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08890 (avg 0.00222)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99903 (avg 0.02775)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.76e+00 cost_prev=1.0892 cost_new=1.0462
+<span class=" -Color -Color-Bold">INFO    </span> |  step #46: cost=1.0062 lambd=0.0102 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00158 (avg 0.00039)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04001 (avg 0.00100)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00464 (avg 0.02791)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.79e-02 cost_prev=1.0462 cost_new=1.0443
+<span class=" -Color -Color-Bold">INFO    </span> |  step #47: cost=1.0014 lambd=0.0051 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04295 (avg 0.00107)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99985 (avg 0.02777)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.50e-02 cost_prev=1.0443 cost_new=1.0437
+<span class=" -Color -Color-Bold">INFO    </span> |  step #48: cost=0.9985 lambd=0.0026 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00152 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04516 (avg 0.00113)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99699 (avg 0.02769)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.30e-02 cost_prev=1.0437 cost_new=1.0434
+<span class=" -Color -Color-Bold">INFO    </span> |  step #49: cost=0.9969 lambd=0.0013 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00151 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04650 (avg 0.00116)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99543 (avg 0.02765)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.22e-02 cost_prev=1.0434 cost_new=1.0431
+<span class=" -Color -Color-Bold">INFO    </span> |  step #50: cost=0.9972 lambd=0.0006 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04593 (avg 0.00115)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99568 (avg 0.02766)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.23e-02 cost_prev=1.0431 cost_new=1.0428
+<span class=" -Color -Color-Bold">INFO    </span> |  step #51: cost=0.9968 lambd=0.0003 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00152 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04598 (avg 0.00115)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99526 (avg 0.02765)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.28e-02 cost_prev=1.0428 cost_new=1.0423
+<span class=" -Color -Color-Bold">INFO    </span> |  step #52: cost=0.9961 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04618 (avg 0.00115)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99462 (avg 0.02763)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.37e-02 cost_prev=1.0423 cost_new=1.0419
+<span class=" -Color -Color-Bold">INFO    </span> |  step #53: cost=0.9953 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04655 (avg 0.00116)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99378 (avg 0.02760)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.43e-02 cost_prev=1.0419 cost_new=1.0414
+<span class=" -Color -Color-Bold">INFO    </span> |  step #54: cost=0.9943 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04709 (avg 0.00118)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99275 (avg 0.02758)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.45e-02 cost_prev=1.0414 cost_new=1.0409
+<span class=" -Color -Color-Bold">INFO    </span> |  step #55: cost=0.9931 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04778 (avg 0.00119)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99160 (avg 0.02754)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.41e-02 cost_prev=1.0409 cost_new=1.0405
+<span class=" -Color -Color-Bold">INFO    </span> |  step #56: cost=0.9919 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04859 (avg 0.00121)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99037 (avg 0.02751)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.29e-02 cost_prev=1.0405 cost_new=1.0402
+<span class=" -Color -Color-Bold">INFO    </span> |  step #57: cost=0.9907 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04946 (avg 0.00124)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98916 (avg 0.02748)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.18e-02 cost_prev=1.0402 cost_new=1.0399
+<span class=" -Color -Color-Bold">INFO    </span> |  step #58: cost=0.9895 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05034 (avg 0.00126)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98801 (avg 0.02744)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.03e-02 cost_prev=1.0399 cost_new=1.0397
+<span class=" -Color -Color-Bold">INFO    </span> |  step #59: cost=0.9885 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05118 (avg 0.00128)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98697 (avg 0.02742)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=8.80e-03 cost_prev=1.0397 cost_new=1.0396
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.9573e-02, csupn=1.9573e-02, max_rho=1.7129e+02
+<span class=" -Color -Color-Bold">INFO    </span> |  step #60: cost=0.9876 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.16703 (avg 0.00418)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98607 (avg 0.02739)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.18e+00 cost_prev=1.1546 cost_new=1.0663
+<span class=" -Color -Color-Bold">INFO    </span> |  step #61: cost=1.0532 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00169 (avg 0.00042)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01316 (avg 0.00033)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05146 (avg 0.02921)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.24e-02 cost_prev=1.0663 cost_new=1.0615
+<span class=" -Color -Color-Bold">INFO    </span> |  step #62: cost=1.0455 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #63: cost=1.0455 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #64: cost=1.0455 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #65: cost=1.0455 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #66: cost=1.0455 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #67: cost=1.0455 lambd=0.0003 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #68: cost=1.0455 lambd=0.0006 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #69: cost=1.0455 lambd=0.0013 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #70: cost=1.0455 lambd=0.0026 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #71: cost=1.0455 lambd=0.0051 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #72: cost=1.0455 lambd=0.0102 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #73: cost=1.0455 lambd=0.0205 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #74: cost=1.0455 lambd=0.0410 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #75: cost=1.0455 lambd=0.0819 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #76: cost=1.0455 lambd=0.1638 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #77: cost=1.0455 lambd=0.3277 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #78: cost=1.0455 lambd=0.6554 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #79: cost=1.0455 lambd=1.3107 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #80: cost=1.0455 lambd=2.6214 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #81: cost=1.0455 lambd=5.2429 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #82: cost=1.0455 lambd=10.4858 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #83: cost=1.0455 lambd=20.9715 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #84: cost=1.0455 lambd=41.9430 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.73e+00 cost_prev=1.0615 cost_new=1.0396
+<span class=" -Color -Color-Bold">INFO    </span> |  step #85: cost=1.0023 lambd=20.9715 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00163 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.03732 (avg 0.00093)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00065 (avg 0.02780)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.42e+00 cost_prev=1.0396 cost_new=1.0322
+<span class=" -Color -Color-Bold">INFO    </span> |  step #86: cost=1.0073 lambd=10.4858 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00166 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02494 (avg 0.00062)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00562 (avg 0.02793)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.63e-01 cost_prev=1.0322 cost_new=1.0302
+<span class=" -Color -Color-Bold">INFO    </span> |  step #87: cost=1.0068 lambd=5.2429 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00173 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02337 (avg 0.00058)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00507 (avg 0.02792)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.38e-02 cost_prev=1.0302 cost_new=1.0282
+<span class=" -Color -Color-Bold">INFO    </span> |  step #88: cost=1.0053 lambd=2.6214 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00173 (avg 0.00043)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02288 (avg 0.00057)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00359 (avg 0.02788)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.84e-02 cost_prev=1.0282 cost_new=1.0255
+<span class=" -Color -Color-Bold">INFO    </span> |  step #89: cost=1.0026 lambd=1.3107 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00166 (avg 0.00042)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02297 (avg 0.00057)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00092 (avg 0.02780)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.94e-02 cost_prev=1.0255 cost_new=1.0212
+<span class=" -Color -Color-Bold">INFO    </span> |  step #90: cost=0.9973 lambd=0.6554 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00159 (avg 0.00040)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02389 (avg 0.00060)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99572 (avg 0.02766)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=7.04e-02 cost_prev=1.0212 cost_new=1.0151
+<span class=" -Color -Color-Bold">INFO    </span> |  step #91: cost=0.9901 lambd=0.3277 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02497 (avg 0.00062)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98859 (avg 0.02746)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.03e-02 cost_prev=1.0151 cost_new=1.0066
+<span class=" -Color -Color-Bold">INFO    </span> |  step #92: cost=0.9777 lambd=0.1638 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02891 (avg 0.00072)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.97620 (avg 0.02712)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=8.89e-02 cost_prev=1.0066 cost_new=0.9964
+<span class=" -Color -Color-Bold">INFO    </span> |  step #93: cost=0.9591 lambd=0.0819 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.03738 (avg 0.00093)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95755 (avg 0.02660)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.43e-01 cost_prev=0.9964 cost_new=0.9867
+<span class=" -Color -Color-Bold">INFO    </span> |  step #94: cost=0.9352 lambd=0.0410 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00152 (avg 0.00038)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05151 (avg 0.00129)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.93370 (avg 0.02594)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.93e-01 cost_prev=0.9867 cost_new=0.9828
+<span class=" -Color -Color-Bold">INFO    </span> |  step #95: cost=0.9235 lambd=0.0205 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05931 (avg 0.00148)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.92202 (avg 0.02561)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.50e-02 cost_prev=0.9828 cost_new=0.9815
+<span class=" -Color -Color-Bold">INFO    </span> |  step #96: cost=0.9162 lambd=0.0102 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.06536 (avg 0.00163)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91469 (avg 0.02541)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.81e-02 cost_prev=0.9815 cost_new=0.9811
+<span class=" -Color -Color-Bold">INFO    </span> |  step #97: cost=0.9121 lambd=0.0051 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.06906 (avg 0.00173)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91059 (avg 0.02529)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.16e-02 cost_prev=0.9811 cost_new=0.9810
+<span class=" -Color -Color-Bold">INFO    </span> |  step #98: cost=0.9099 lambd=0.0026 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.07110 (avg 0.00178)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.90843 (avg 0.02523)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.14e-03 cost_prev=0.9810 cost_new=0.9810
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.0159e-02, csupn=6.0159e-02, max_rho=1.7129e+02
+<span class=" -Color -Color-Bold">INFO    </span> |  step #99: cost=0.9088 lambd=0.0013 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00149 (avg 0.00037)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.43579 (avg 0.01089)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.90728 (avg 0.02520)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.75e+00 cost_prev=1.3446 cost_new=1.1252
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #100: cost=1.0642 criteria=[0 0 0], term_deltas=1.7e-01,2.7e+00,3.7e-03
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="visualization">
+<h2>Visualization<a class="headerlink" href="#visualization" title="Link to this heading">#</a></h2>
+<div class="cell tag_hide-input docutils container">
+<details class="admonition hide above-input">
+<summary aria-label="Toggle hidden content">
+<p class="collapsed admonition-title">Show code cell source</p>
+<p class="expanded admonition-title">Hide code cell source</p>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_trajectory_traces</span><span class="p">(</span>
+    <span class="n">vals</span><span class="p">:</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="p">,</span> <span class="n">name_prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Plotly traces for trajectory visualization.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vals: Variable values containing waypoint positions</span>
+<span class="sd">        name_prefix: Prefix for trace names</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of Plotly Scatter traces for path, start, and goal markers</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">traj</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">waypoint_vars</span><span class="p">]</span>  <span class="c1"># (n_waypoints, 2)</span>
+    <span class="n">traj_x</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">traj</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]]</span>
+    <span class="n">traj_y</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">traj</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]]</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="c1"># Trajectory line and points.</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="n">traj_x</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">traj_y</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines+markers&quot;</span><span class="p">,</span>
+            <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+            <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">),</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}</span><span class="s2">Path&quot;</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;(%</span><span class="si">{x:.2f}</span><span class="s2">, %</span><span class="si">{y:.2f}</span><span class="s2">)&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="c1"># Start marker.</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">traj_x</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+            <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">traj_y</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+            <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;circle&quot;</span><span class="p">),</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}</span><span class="s2">Start&quot;</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;Start (%</span><span class="si">{x:.2f}</span><span class="s2">, %</span><span class="si">{y:.2f}</span><span class="s2">)&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="c1"># Goal marker.</span>
+        <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="n">traj_x</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span>
+            <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">traj_y</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+            <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;square&quot;</span><span class="p">),</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name_prefix</span><span class="si">}</span><span class="s2">Goal&quot;</span><span class="p">,</span>
+            <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">&quot;Goal (%</span><span class="si">{x:.2f}</span><span class="s2">, %</span><span class="si">{y:.2f}</span><span class="s2">)&lt;extra&gt;&lt;/extra&gt;&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_obstacle_shapes</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Plotly shapes for obstacles.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of Plotly shape dictionaries for circular obstacles</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="nb">dict</span><span class="p">(</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;circle&quot;</span><span class="p">,</span>
+            <span class="n">xref</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span>
+            <span class="n">yref</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span>
+            <span class="n">x0</span><span class="o">=</span><span class="n">cx</span> <span class="o">-</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">y0</span><span class="o">=</span><span class="n">cy</span> <span class="o">-</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">x1</span><span class="o">=</span><span class="n">cx</span> <span class="o">+</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">y1</span><span class="o">=</span><span class="n">cy</span> <span class="o">+</span> <span class="n">r</span><span class="p">,</span>
+            <span class="n">fillcolor</span><span class="o">=</span><span class="s2">&quot;rgba(255, 99, 71, 0.3)&quot;</span><span class="p">,</span>
+            <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;tomato&quot;</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">obstacles</span>
+    <span class="p">]</span>
+
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">make_subplots</span><span class="p">(</span>
+    <span class="n">rows</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">cols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">subplot_titles</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;Initial (straight line)&quot;</span><span class="p">,</span> <span class="s2">&quot;Optimized (avoids obstacles)&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Add trajectory traces.</span>
+<span class="k">for</span> <span class="n">trace</span> <span class="ow">in</span> <span class="n">get_trajectory_traces</span><span class="p">(</span><span class="n">initial_vals</span><span class="p">):</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span><span class="n">trace</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">trace</span> <span class="ow">in</span> <span class="n">get_trajectory_traces</span><span class="p">(</span><span class="n">solution</span><span class="p">):</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span><span class="n">trace</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># Add obstacle shapes to both subplots.</span>
+<span class="n">obstacle_shapes</span> <span class="o">=</span> <span class="n">get_obstacle_shapes</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">shape</span> <span class="ow">in</span> <span class="n">obstacle_shapes</span><span class="p">:</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_shape</span><span class="p">({</span><span class="o">**</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;yref&quot;</span><span class="p">:</span> <span class="s2">&quot;y&quot;</span><span class="p">},</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_shape</span><span class="p">({</span><span class="o">**</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="s2">&quot;x2&quot;</span><span class="p">,</span> <span class="s2">&quot;yref&quot;</span><span class="p">:</span> <span class="s2">&quot;y2&quot;</span><span class="p">},</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># Consistent axis ranges for both subplots.</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">11</span><span class="p">],</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">11</span><span class="p">],</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span>
+    <span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span>
+    <span class="n">title_text</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">scaleanchor</span><span class="o">=</span><span class="s2">&quot;x2&quot;</span><span class="p">,</span> <span class="n">scaleratio</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">2</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">margin</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">t</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">l</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">40</span><span class="p">))</span>
+<span class="n">HTML</span><span class="p">(</span><span class="n">fig</span><span class="o">.</span><span class="n">to_html</span><span class="p">(</span><span class="n">full_html</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">include_plotlyjs</span><span class="o">=</span><span class="s2">&quot;cdn&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="07844804-5ea3-4bb5-a45b-babcdc4aae80" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("07844804-5ea3-4bb5-a45b-babcdc4aae80")) {                    Plotly.newPlot(                        "07844804-5ea3-4bb5-a45b-babcdc4aae80",                        [{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.0,0.5263158082962036,1.0526316165924072,1.5789473056793213,2.1052632331848145,2.6315789222717285,3.1578946113586426,3.6842105388641357,4.210526466369629,4.736842155456543,5.263157844543457,5.789473533630371,6.315789222717285,6.842105388641357,7.3684210777282715,7.894737243652344,8.421052932739258,8.947368621826172,9.473684310913086,10.0],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[10.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.001096092164516449,0.6224334836006165,1.2399812936782837,1.8495848178863525,2.4480464458465576,3.0316696166992188,3.5967390537261963,4.139975070953369,4.661486625671387,5.165163516998291,5.654297828674316,6.132838249206543,6.613283634185791,7.095311164855957,7.57834005355835,8.061881065368652,8.54587459564209,9.030303001403809,9.5149564743042,9.999974250793457],"y":[-0.00351781421341002,-0.16470424830913544,-0.3117147386074066,-0.4315578043460846,-0.5102421045303345,-0.5341255068778992,-0.48900407552719116,-0.3608531355857849,-0.17426882684230804,0.04066850244998932,0.2546529173851013,0.4373777210712433,0.5467910766601562,0.5907868146896362,0.5789273381233215,0.5202503204345703,0.4238448143005371,0.2992614507675171,0.1555843949317932,0.0023503643460571766],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.001096092164516449],"y":[-0.00351781421341002],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[9.999974250793457],"y":[0.0023503643460571766],"type":"scatter","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.45],"title":{"text":"x"},"range":[-1,11]},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x","scaleratio":1},"xaxis2":{"anchor":"y2","domain":[0.55,1.0],"title":{"text":"x"},"range":[-1,11]},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x2","scaleratio":1},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Initial (straight line)","x":0.225,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Optimized (avoids obstacles)","x":0.775,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"shapes":[{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x","y0":-0.5,"y1":2.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x2","y0":-0.5,"y1":2.5,"yref":"y2"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x","y0":-2.5,"y1":0.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x2","y0":-2.5,"y1":0.5,"yref":"y2"}],"margin":{"t":40,"b":40,"l":40,"r":40},"height":400,"showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+</div>
+<p>The optimizer found a smooth trajectory that avoids both obstacles while connecting start to goal. The inequality constraints keep waypoints outside the obstacle regions.</p>
+<p>For solver configuration options, see <a class="reference internal" href="../../../api/solver_config/#jaxls.TrustRegionConfig" title="jaxls.TrustRegionConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.TrustRegionConfig</span></code></a> and <a class="reference internal" href="../../../api/solver_config/#jaxls.AugmentedLagrangianConfig" title="jaxls.AugmentedLagrangianConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.AugmentedLagrangianConfig</span></code></a>.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../inverse_kinematics/"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Inverse kinematics</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../cart_pole_collocation/"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Cart-pole (collocation)</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#problem-setup">Problem setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variables-and-costs">Variables and costs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#problem-construction">Problem construction</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#solving">Solving</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visualization">Visualization</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By brentyi
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
