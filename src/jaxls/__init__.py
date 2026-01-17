@@ -7,6 +7,10 @@ if TYPE_CHECKING or sys.version_info >= (3, 12):
         AugmentedLagrangianConfig as AugmentedLagrangianConfig,
     )
     from ._cost import Cost as Cost
+    from ._covariance import CovarianceEstimator as CovarianceEstimator
+    from ._covariance import (
+        LinearSolverCovarianceEstimatorConfig as LinearSolverCovarianceEstimatorConfig,
+    )
     from ._lie_group_variables import SE2Var as SE2Var
     from ._lie_group_variables import SE3Var as SE3Var
     from ._lie_group_variables import SO2Var as SO2Var
@@ -25,6 +29,10 @@ elif sys.version_info >= (3, 10):
         AugmentedLagrangianConfig as AugmentedLagrangianConfig,
     )
     from ._py310._cost import Cost as Cost
+    from ._py310._covariance import CovarianceEstimator as CovarianceEstimator
+    from ._py310._covariance import (
+        LinearSolverCovarianceEstimatorConfig as LinearSolverCovarianceEstimatorConfig,
+    )
     from ._py310._lie_group_variables import SE2Var as SE2Var
     from ._py310._lie_group_variables import SE3Var as SE3Var
     from ._py310._lie_group_variables import SO2Var as SO2Var

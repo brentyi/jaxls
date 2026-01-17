@@ -132,36 +132,36 @@ class Cost:
             return decorator
         return decorator(compute_residual)
 
-    @staticmethod
-    @deprecated("Use Cost.factory instead of Cost.create_factory")
-    def create_factory(
-        compute_residual: Any = None,
-        *,
-        kind: Any = "l2_squared",
-        jac_mode: Any = "auto",
-        jac_batch_size: Any = None,
-        jac_custom_fn: Any = None,
-        jac_custom_with_cache_fn: Any = None,
-        name: Any = None,
-    ) -> Any:
-        import warnings
-
-        warnings.warn(
-            "Cost.create_factory is deprecated, use Cost.factory instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return Cost.factory(
-            compute_residual,
-            kind=kind,
-            jac_mode=jac_mode,
-            jac_batch_size=jac_batch_size,
-            jac_custom_fn=jac_custom_fn,
-            jac_custom_with_cache_fn=jac_custom_with_cache_fn,
-            name=name,
-        )
-
     if True:
+
+        @staticmethod
+        @deprecated("Use Cost.factory instead of Cost.create_factory")
+        def create_factory(
+            compute_residual: Any = None,
+            *,
+            kind: Any = "l2_squared",
+            jac_mode: Any = "auto",
+            jac_batch_size: Any = None,
+            jac_custom_fn: Any = None,
+            jac_custom_with_cache_fn: Any = None,
+            name: Any = None,
+        ) -> Any:
+            import warnings
+
+            warnings.warn(
+                "Cost.create_factory is deprecated, use Cost.factory instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return Cost.factory(
+                compute_residual,
+                kind=kind,
+                jac_mode=jac_mode,
+                jac_batch_size=jac_batch_size,
+                jac_custom_fn=jac_custom_fn,
+                jac_custom_with_cache_fn=jac_custom_with_cache_fn,
+                name=name,
+            )
 
         @staticmethod
         def make(
