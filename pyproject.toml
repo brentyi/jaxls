@@ -64,7 +64,7 @@ docs = [
     "fast_simplification",
     "jupyterlab",
     "graphviz",
-    "viser>=1.0.18",
+    "viser>=1.0.19",
 ]
 cholmod = ["scikit-sparse"]
 
