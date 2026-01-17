@@ -749,10 +749,10 @@ class AnalyzedLeastSquaresProblem:
         self,
         vals: VarValues,
         method: Literal["cholmod_spinv"]
-        | "LinearSolverCovarianceEstimatorConfig"
+        | LinearSolverCovarianceEstimatorConfig
         | None = None,
         *,
-        scale_by_residual_variance: bool = True,
+        scale_by_residual_variance: bool = False,
     ) -> "CovarianceEstimator":
         """Create a covariance estimator for uncertainty quantification.
 

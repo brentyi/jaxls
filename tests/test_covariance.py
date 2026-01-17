@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 import jaxlie
 import jaxls
-import pytest
 
 
 class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(1)):
@@ -180,18 +179,17 @@ def test_pose_graph_covariance():
     assert jnp.allclose(cov_cg_01, cov_dense_01, atol=1e-4)
 
     # Test CHOLMOD estimator if available.
-    if _has_sksparse():
-        estimator_cholmod = problem.make_covariance_estimator(
-            solution, method="cholmod_spinv", scale_by_residual_variance=False
-        )
-        cov_cholmod_00 = estimator_cholmod.covariance(var0)
-        cov_cholmod_11 = estimator_cholmod.covariance(var1)
-        cov_cholmod_01 = estimator_cholmod.covariance(var0, var1)
+    estimator_cholmod = problem.make_covariance_estimator(
+        solution, method="cholmod_spinv", scale_by_residual_variance=False
+    )
+    cov_cholmod_00 = estimator_cholmod.covariance(var0)
+    cov_cholmod_11 = estimator_cholmod.covariance(var1)
+    cov_cholmod_01 = estimator_cholmod.covariance(var0, var1)
 
-        # CHOLMOD should match CG.
-        assert jnp.allclose(cov_cg_00, cov_cholmod_00, atol=1e-4)
-        assert jnp.allclose(cov_cg_11, cov_cholmod_11, atol=1e-4)
-        assert jnp.allclose(cov_cg_01, cov_cholmod_01, atol=1e-4)
+    # CHOLMOD should match CG.
+    assert jnp.allclose(cov_cg_00, cov_cholmod_00, atol=1e-4)
+    assert jnp.allclose(cov_cg_11, cov_cholmod_11, atol=1e-4)
+    assert jnp.allclose(cov_cg_01, cov_cholmod_01, atol=1e-4)
 
 
 def test_cg_and_dense_consistency():
