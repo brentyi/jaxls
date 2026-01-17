@@ -523,7 +523,7 @@ class AnalyzedLeastSquaresProblem:
         vals: Any,
         method: Any = None,
         *,
-        scale_by_residual_variance: Any = True,
+        scale_by_residual_variance: Any = False,
     ) -> Any:
         from ._covariance import (
             LinearSolveCovarianceEstimator,
