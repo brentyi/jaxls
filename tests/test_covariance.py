@@ -7,16 +7,6 @@ import jaxls
 import pytest
 
 
-def _has_sksparse() -> bool:
-    """Check if sksparse is available."""
-    try:
-        import sksparse.cholmod
-
-        return True
-    except ImportError:
-        return False
-
-
 class ScalarVar(jaxls.Var[jax.Array], default_factory=lambda: jnp.zeros(1)):
     """Simple scalar variable for testing."""
 
@@ -285,9 +275,6 @@ def test_residual_variance_scaling():
     assert jnp.allclose(cov_scaled, cov_unscaled * residual_variance, atol=1e-6)
 
 
-@pytest.mark.skipif(
-    not _has_sksparse(), reason="sksparse not available for cholmod test"
-)
 def test_cholmod_consistency():
     """Test that cholmod_spinv gives same results as CG."""
     var0 = jaxls.SE2Var(0)
