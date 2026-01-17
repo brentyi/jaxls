@@ -7,7 +7,7 @@ jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares
 problems in JAX.
 
 We provide an API for declaring and solving least squares problems. We analyze
-and exploit problem structure: we automatically vectorize repeated cost and
+and exploit problem structure: jaxls automatically vectorizes repeated cost and
 variable operations, while translating sparse cost/variable relationships into
 sparse matrix operations.
 
