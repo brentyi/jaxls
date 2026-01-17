@@ -19,7 +19,7 @@ To install (Python >=3.10 minimum, >=3.12 recommended):
 Goals
 -----
 
-jaxls is designed to be:
+jaxls is a research artifact and intentionally minimal. It's designed to be:
 
 - Lightweight and hackable, but fast. Performance is enabled by analyzing and
   exploiting problem structure: jaxls automatically vectorizes repeated cost
