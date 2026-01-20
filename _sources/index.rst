@@ -6,7 +6,7 @@ jaxls
 jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares
 problems in JAX.
 
-To install (Python >=3.10 minimum, >=3.12 recommended):
+Please install from source:
 
 .. code-block:: bash
 
@@ -16,15 +16,19 @@ To install (Python >=3.10 minimum, >=3.12 recommended):
    # Or, with dev dependencies
    pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[dev,docs]"
 
+We recommend Python >=3.12. The test matrix also coverse Python 3.10 and 3.11,
+but this uses a transpiled version of the source code that may be deprecated in
+the future.
+
 Goals
 -----
 
-jaxls is a research artifact and intentionally minimal. It's designed to be:
+jaxls is a research artifact and intentionally lightweight. It's designed to be:
 
-- Lightweight and hackable, but fast. Performance is enabled by analyzing and
-  exploiting problem structure: jaxls automatically vectorizes repeated cost
-  and variable operations, while translating sparse cost/variable relationships
-  into sparse matrix operations.
+- Hackable but fast. Performance is enabled by analyzing and exploiting problem
+  structure: jaxls automatically vectorizes repeated cost and variable
+  operations, while translating sparse cost/variable relationships into sparse
+  matrix operations.
 - Python-native. jaxls combines a functional,
   `PyTree <https://docs.jax.dev/en/latest/pytrees.html>`_-first implementation
   with recent Python typing constructs. Its API is type-safe, compatible with standard JAX

@@ -433,7 +433,7 @@ document.write(`
 <p><a class="reference external" href="https://github.com/brentyi/jaxls/actions/workflows/pyright.yml"><img alt="Pyright status" src="https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg" /></a></p>
 <p>jaxls is a solver for sparse, constrained, and/or non-Euclidean least squares
 problems in JAX.</p>
-<p>To install (Python &gt;=3.10 minimum, &gt;=3.12 recommended):</p>
+<p>Please install from source:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Core package only</span>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/brentyi/jaxls.git&quot;</span>
 
@@ -441,14 +441,17 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/brentyi/jaxls.git#egg=jaxls[dev,docs]&quot;</span>
 </pre></div>
 </div>
+<p>We recommend Python &gt;=3.12. The test matrix also coverse Python 3.10 and 3.11,
+but this uses a transpiled version of the source code that may be deprecated in
+the future.</p>
 <section id="goals">
 <h2>Goals<a class="headerlink" href="#goals" title="Link to this heading">#</a></h2>
-<p>jaxls is a research artifact and intentionally minimal. It’s designed to be:</p>
+<p>jaxls is a research artifact and intentionally lightweight. It’s designed to be:</p>
 <ul class="simple">
-<li><p>Lightweight and hackable, but fast. Performance is enabled by analyzing and
-exploiting problem structure: jaxls automatically vectorizes repeated cost
-and variable operations, while translating sparse cost/variable relationships
-into sparse matrix operations.</p></li>
+<li><p>Hackable but fast. Performance is enabled by analyzing and exploiting problem
+structure: jaxls automatically vectorizes repeated cost and variable
+operations, while translating sparse cost/variable relationships into sparse
+matrix operations.</p></li>
 <li><p>Python-native. jaxls combines a functional,
 <a class="reference external" href="https://docs.jax.dev/en/latest/pytrees.html">PyTree</a>-first implementation
 with recent Python typing constructs. Its API is type-safe, compatible with standard JAX
