@@ -51,7 +51,7 @@ costs = [
 problem = jaxls.LeastSquaresProblem(costs, vars)  # .analyze()
 
 # Visualize the variables and costs.
-problem.visualize()
+problem.show()
 
 # Solve the optimization problem.
 solution = problem.analyze().solve()

@@ -506,7 +506,7 @@ def problem_show(
 </html>"""
 
     try:
-        from IPython import get_ipython
+        from IPython.core.getipython import get_ipython
 
         ipython = get_ipython()
 

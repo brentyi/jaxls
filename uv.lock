@@ -1230,6 +1230,8 @@ cholmod = [
     { name = "scikit-sparse" },
 ]
 dev = [
+    { name = "ipython", version = "8.37.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "ipython", version = "9.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "libcst" },
     { name = "nbconvert" },
     { name = "pyright" },
@@ -1264,6 +1266,7 @@ requires-dist = [
     { name = "fast-simplification", marker = "extra == 'docs'" },
     { name = "graphviz", marker = "extra == 'docs'" },
     { name = "ipykernel", marker = "extra == 'docs'" },
+    { name = "ipython", marker = "extra == 'dev'" },
     { name = "jax", specifier = ">=0.4.0" },
     { name = "jax-dataclasses", specifier = ">=1.6.2" },
     { name = "jaxlib" },

@@ -45,6 +45,7 @@ dev = [
     "libcst",
     "viser",
     "nbconvert",
+    "ipython",
 ]
 docs = [
     "sphinx>=7.0.0",

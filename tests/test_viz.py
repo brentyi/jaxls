@@ -22,7 +22,7 @@ def test_show_jupyter():
     mock_ipython.__class__.__name__ = "ZMQInteractiveShell"
 
     with (
-        patch("IPython.get_ipython", return_value=mock_ipython),
+        patch("IPython.core.getipython.get_ipython", return_value=mock_ipython),
         patch("IPython.display.display") as mock_display,
     ):
         result = problem.show()
@@ -52,7 +52,7 @@ def test_show_browser_fallback():
 
     # Mock non-Jupyter environment (get_ipython returns None).
     with (
-        patch("IPython.get_ipython", return_value=None),
+        patch("IPython.core.getipython.get_ipython", return_value=None),
         patch("webbrowser.open") as mock_browser,
     ):
         result = problem.show()
