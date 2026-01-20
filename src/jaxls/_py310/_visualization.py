@@ -96,6 +96,7 @@ def _problem_to_graph_data(
             batch_size = max(batch_sizes)
         cost_counts_by_name[name] = cost_counts_by_name.get(name, 0) + batch_size
 
+    max_per_cost_type: Any = {}
     if max_costs is not None and cost_counts_by_name:
         num_cost_types = len(cost_counts_by_name)
         per_type_limit = max_costs // num_cost_types
@@ -106,7 +107,6 @@ def _problem_to_graph_data(
             key=lambda n: cost_counts_by_name[n],
             reverse=True,
         )
-        max_per_cost_type: Any = {}
         for i, name in enumerate(sorted_names):
             max_per_cost_type[name] = per_type_limit + (1 if i < remainder else 0)
     else:
