@@ -32,7 +32,7 @@ def test_cost_create_factory_deprecated():
         warnings.simplefilter("always")
 
         # DEPRECATED: Use @jaxls.Cost.factory instead
-        @jaxls.Cost.create_factory
+        @jaxls.Cost.create_factory  # type: ignore[attr-defined]
         def cost_fn(vals: jaxls.VarValues, var: ScalarVar, target: float) -> jax.Array:
             return jnp.array([vals[var] - target])
 

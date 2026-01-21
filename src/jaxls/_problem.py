@@ -38,6 +38,7 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 
 if TYPE_CHECKING:
     from ._augmented_lagrangian import AugmentedLagrangianConfig
+    from ._covariance import CovarianceEstimator, LinearSolverCovarianceEstimatorConfig
 
 
 @jdc.pytree_dataclass
@@ -110,6 +111,37 @@ class LeastSquaresProblem:
 
     costs: Iterable[Cost]
     variables: Iterable[Var]
+
+    def show(
+        self,
+        *,
+        width: int = 800,
+        height: int = 500,
+        max_costs: int = 1000,
+        max_variables: int = 500,
+    ) -> None:
+        """Display an interactive graph showing costs and variables.
+
+        In Jupyter/JupyterLab/VS Code notebooks, displays inline. Otherwise,
+        opens in the default web browser.
+
+        Args:
+            width: Maximum width of the visualization in pixels.
+            height: Height of the visualization in pixels.
+            max_costs: Maximum number of cost nodes to show. When multiple cost
+                types exist, the limit is distributed proportionally across types.
+            max_variables: Maximum number of variables per type to show.
+                Only costs where all variables are visible are shown.
+        """
+        from ._visualization import problem_show
+
+        problem_show(
+            self,
+            width=width,
+            height=height,
+            max_costs=max_costs,
+            max_variables=max_variables,
+        )
 
     def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving.
@@ -712,3 +744,185 @@ class AnalyzedLeastSquaresProblem:
             shape=(self._residual_dim, self._tangent_dim),
         )
         return bsparse_jacobian
+
+    def make_covariance_estimator(
+        self,
+        vals: VarValues,
+        method: Literal["cholmod_spinv"]
+        | LinearSolverCovarianceEstimatorConfig
+        | None = None,
+        *,
+        scale_by_residual_variance: bool = False,
+    ) -> "CovarianceEstimator":
+        """Create a covariance estimator for uncertainty quantification.
+
+        This computes blocks of the covariance matrix (J^T J)^{-1}, which
+        represents the uncertainty of estimated variables at the solution.
+        The covariance is computed in the tangent space, appropriate for
+        manifold variables like SE3, SO3, etc.
+
+        Args:
+            vals: Variable values at which to compute covariance (typically
+                the solution from solve()).
+            method: Covariance computation method. Options:
+                - None (default): Use CG with block-Jacobi preconditioning.
+                  GPU-friendly and adapts to problem structure.
+                - LinearSolverCovarianceEstimatorConfig: Custom linear solver config.
+                - "cholmod_spinv": Use CHOLMOD's sparse inverse. Fast extraction
+                  but requires sksparse and only includes entries in the
+                  sparsity pattern.
+            scale_by_residual_variance: If True, scale by the estimated residual
+                variance sigma^2 = ||r||^2 / (m - n), where m is the number of
+                residuals and n is the tangent dimension.
+
+        Returns:
+            A CovarianceEstimator that can compute covariance blocks via
+            estimator.covariance(var0, var1).
+        """
+        from ._covariance import (
+            LinearSolveCovarianceEstimator,
+            LinearSolverCovarianceEstimatorConfig,
+            SpinvCovarianceEstimator,
+        )
+        from ._preconditioning import (
+            make_block_jacobi_precoditioner,
+            make_point_jacobi_precoditioner,
+        )
+
+        # Default to CG-based estimator.
+        if method is None:
+            method = LinearSolverCovarianceEstimatorConfig()
+
+        # Compute residual variance if needed.
+        if scale_by_residual_variance:
+            residual = self.compute_residual_vector(vals)
+            m = self._residual_dim
+            n = self._tangent_dim
+            residual_variance = jnp.sum(residual**2) / jnp.maximum(m - n, 1)
+        else:
+            residual_variance = jnp.array(1.0)
+
+        if method == "cholmod_spinv":
+            # Use CHOLMOD spinv for sparse inverse.
+            import sksparse.cholmod
+
+            # Compute the Jacobian.
+            cost_info = self._compute_cost_info(vals)
+            A_blocksparse = self._compute_jac_values(vals, cost_info.jac_cache)
+
+            # Build CSR matrix for CHOLMOD.
+            jac_values = jnp.concatenate(
+                [
+                    block_row.blocks_concat.flatten()
+                    for block_row in A_blocksparse.block_rows
+                ],
+                axis=0,
+            )
+            import scipy.sparse
+
+            # Convert to numpy arrays for scipy/CHOLMOD.
+            # CHOLMOD requires float64.
+            A_csr = scipy.sparse.csr_matrix(
+                (
+                    onp.asarray(jac_values, dtype=onp.float64),
+                    onp.asarray(self._jac_coords_csr.indices),
+                    onp.asarray(self._jac_coords_csr.indptr),
+                ),
+                shape=self._jac_coords_csr.shape,
+            )
+            # Compute J^T @ J explicitly (the Hessian).
+            JTJ = (A_csr.T @ A_csr).tocsc()
+            # Add regularization to ensure positive definiteness.
+            n = JTJ.shape[0]
+            JTJ = JTJ + 1e-8 * scipy.sparse.eye(n, format="csc", dtype=onp.float64)
+
+            # Compute Cholesky factorization.
+            factor = sksparse.cholmod.cholesky(JTJ)
+
+            # Compute inverse by solving (J^T J) X = I column by column.
+            cov_dense = onp.zeros((n, n), dtype=onp.float64)
+            for i in range(n):
+                e_i = onp.zeros(n, dtype=onp.float64)
+                e_i[i] = 1.0
+                cov_dense[:, i] = factor(e_i)
+            sparse_cov = scipy.sparse.csr_matrix(cov_dense)
+
+            return SpinvCovarianceEstimator(
+                _sparse_cov=sparse_cov,
+                _residual_variance=residual_variance,
+                _tangent_start_from_var_type=self._tangent_start_from_var_type,
+                _sorted_ids_from_var_type=self._sorted_ids_from_var_type,
+            )
+
+        elif isinstance(method, LinearSolverCovarianceEstimatorConfig):
+            # Use linear solve-based estimator.
+            cost_info = self._compute_cost_info(vals)
+            A_blocksparse = self._compute_jac_values(vals, cost_info.jac_cache)
+
+            # Build J @ v and J^T @ v functions.
+            A_multiply = A_blocksparse.multiply
+            AT_multiply_ = jax.linear_transpose(
+                A_multiply, jnp.zeros((A_blocksparse.shape[1],))
+            )
+            AT_multiply = lambda vec: AT_multiply_(vec)[0]
+
+            def ATA_multiply(vec: jax.Array) -> jax.Array:
+                return AT_multiply(A_multiply(vec))
+
+            # Build solve function based on linear solver config.
+            linear_solver = method.linear_solver
+
+            if (
+                isinstance(linear_solver, ConjugateGradientConfig)
+                or linear_solver == "conjugate_gradient"
+            ):
+                cg_config = (
+                    ConjugateGradientConfig()
+                    if linear_solver == "conjugate_gradient"
+                    else linear_solver
+                )
+
+                # Set up preconditioner.
+                if cg_config.preconditioner == "block_jacobi":
+                    preconditioner = make_block_jacobi_precoditioner(
+                        self, A_blocksparse
+                    )
+                elif cg_config.preconditioner == "point_jacobi":
+                    preconditioner = make_point_jacobi_precoditioner(A_blocksparse)
+                else:
+                    preconditioner = lambda x: x
+
+                def solve_fn(b: jax.Array) -> jax.Array:
+                    x, _ = jax.scipy.sparse.linalg.cg(
+                        A=ATA_multiply,
+                        b=b,
+                        x0=jnp.zeros(self._tangent_dim),
+                        maxiter=self._tangent_dim,
+                        tol=cast(float, cg_config.tolerance_min),
+                        M=preconditioner,
+                    )
+                    return x
+
+            elif linear_solver == "dense_cholesky":
+                # Dense Cholesky with cached factorization.
+                A_dense = A_blocksparse.to_dense()
+                ATA = A_dense.T @ A_dense
+                ATA = ATA + 1e-8 * jnp.eye(self._tangent_dim)
+                cho_factor = jax.scipy.linalg.cho_factor(ATA)
+
+                def solve_fn(b: jax.Array) -> jax.Array:
+                    return jax.scipy.linalg.cho_solve(cho_factor, b)
+
+            else:
+                raise ValueError(f"Unknown linear solver: {linear_solver}")
+
+            return LinearSolveCovarianceEstimator(
+                _solve_fn=solve_fn,
+                _tangent_dim=self._tangent_dim,
+                _residual_variance=residual_variance,
+                _tangent_start_from_var_type=self._tangent_start_from_var_type,
+                _sorted_ids_from_var_type=self._sorted_ids_from_var_type,
+            )
+
+        else:
+            raise ValueError(f"Unknown covariance method: {method}")

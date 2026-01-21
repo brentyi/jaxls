@@ -6,3 +6,4 @@ __pycache__
 .jupyter_ystore.db
 .doctrees/
 jupyter_execute/
+docs/build/
