@@ -35,6 +35,7 @@ dependencies = [
     "tqdm",
     "rich>=13.0.0",
     "typing_extensions>=4.5.0",
+    "optax[examples]>=0.2.6",
 ]
 
 [project.optional-dependencies]
