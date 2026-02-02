@@ -12,7 +12,7 @@ Problem setup:
 
 The bilevel optimization structure:
 - Inner problem: Weighted PnP - estimate SE3 pose minimizing weighted reprojection error
-- Outer problem: Minimize geodesic distance between estimated and ground truth pose
+- Outer problem: Minimize reprojection error (or geodesic pose error) of the estimated pose
 
 This is a fundamental pattern in learning-based robust estimation, where we want
 to learn which measurements to trust without ground truth outlier labels.
@@ -164,6 +164,39 @@ def weighted_reprojection_cost(
 
 
 # =============================================================================
+# Reprojection Error Utilities
+# =============================================================================
+
+
+def compute_reprojection_errors(
+    pose: jaxlie.SE3,
+    points_3d: jax.Array,
+    points_2d: jax.Array,
+    focal: float,
+) -> jax.Array:
+    """Compute per-point reprojection errors in pixels."""
+    points_cam = jax.vmap(lambda p: pose @ p)(points_3d)
+    projected = focal * points_cam[:, :2] / points_cam[:, 2:3]
+    return jnp.linalg.norm(projected - points_2d, axis=1)
+
+
+def print_error_histogram(
+    label: str, errors: jax.Array, bins: int = 10, width: int = 24
+) -> None:
+    """Print a simple ASCII histogram of reprojection errors."""
+    errors_np = onp.asarray(errors)
+    hist, edges = onp.histogram(errors_np, bins=bins)
+    max_count = int(hist.max()) if hist.size > 0 else 1
+    print(f"  {label}:")
+    for i, count in enumerate(hist):
+        bar_len = int(width * (count / max_count)) if max_count > 0 else 0
+        bar = "#" * bar_len
+        left = edges[i]
+        right = edges[i + 1]
+        print(f"    {left:6.1f}-{right:6.1f}px | {bar} ({count})")
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -181,12 +214,14 @@ def main():
     num_correspondences = num_inliers + num_outliers
     num_iterations = 50
     learning_rate = 0.02
+    outer_loss = "reprojection"  # "reprojection" or "pose"
 
     print("Problem setup:")
     print(f"  Correspondences: {num_inliers} inliers + {num_outliers} outliers")
     print(f"  Focal length: {focal}")
     print(f"  Training iterations: {num_iterations}")
     print(f"  Learning rate: {learning_rate}")
+    print(f"  Outer loss: {outer_loss}")
     print()
 
     # Initialize
@@ -244,7 +279,12 @@ def main():
         weights = apply_mlp(params, features)
         weights = jnp.clip(weights, 0.01, 1.0)
         estimated = build_and_solve(weights)
-        return jnp.sum((estimated @ train_gt.inverse()).log() ** 2)
+        if outer_loss == "pose":
+            return jnp.sum((estimated @ train_gt.inverse()).log() ** 2)
+        if outer_loss == "reprojection":
+            errors = compute_reprojection_errors(estimated, train_3d, train_2d, focal)
+            return jnp.mean(errors**2)
+        raise ValueError(f"Unknown outer loss: {outer_loss}")
 
     # JIT compile
     loss_and_grad_fn = jax.jit(jax.value_and_grad(loss_fn))
@@ -262,7 +302,8 @@ def main():
     print("=" * 70)
     print()
 
-    print(f"{'Iter':>5} | {'Loss':>12}")
+    loss_label = "Pose Loss" if outer_loss == "pose" else "Reproj MSE"
+    print(f"{'Iter':>5} | {loss_label:>12}")
     print("-" * 25)
 
     for i in range(num_iterations):
@@ -288,24 +329,50 @@ def main():
     features = build_features(train_3d, train_2d, focal)
     learned_weights = apply_mlp(params, features)
 
+    def pose_geodesic_loss(pose: jaxlie.SE3, gt: jaxlie.SE3) -> jax.Array:
+        return jnp.sum((pose @ gt.inverse()).log() ** 2)
+
+    def reprojection_rmse(
+        pose: jaxlie.SE3, points_3d: jax.Array, points_2d: jax.Array, focal_len: float
+    ) -> jax.Array:
+        errors = compute_reprojection_errors(pose, points_3d, points_2d, focal_len)
+        return jnp.sqrt(jnp.mean(errors**2))
+
     # Learned weights
     learned_pose = build_and_solve(jnp.clip(learned_weights, 0.01, 1.0))
-    learned_loss = float(jnp.sum((learned_pose @ train_gt.inverse()).log() ** 2))
+    learned_pose_loss = float(pose_geodesic_loss(learned_pose, train_gt))
+    learned_reproj_rmse = float(
+        reprojection_rmse(learned_pose, train_3d, train_2d, focal)
+    )
 
     # Uniform weights
     uniform_pose = build_and_solve(jnp.ones(num_correspondences))
-    uniform_loss = float(jnp.sum((uniform_pose @ train_gt.inverse()).log() ** 2))
+    uniform_pose_loss = float(pose_geodesic_loss(uniform_pose, train_gt))
+    uniform_reproj_rmse = float(
+        reprojection_rmse(uniform_pose, train_3d, train_2d, focal)
+    )
 
     # Oracle weights
     oracle_pose = build_and_solve(train_mask.astype(jnp.float32))
-    oracle_loss = float(jnp.sum((oracle_pose @ train_gt.inverse()).log() ** 2))
+    oracle_pose_loss = float(pose_geodesic_loss(oracle_pose, train_gt))
+    oracle_reproj_rmse = float(
+        reprojection_rmse(oracle_pose, train_3d, train_2d, focal)
+    )
 
     print("Pose loss (geodesic SE3 distance, lower is better):")
     print(f"  {'Method':<20} | {'Loss':>10}")
     print(f"  {'-' * 20}-+-{'-' * 10}")
-    print(f"  {'Learned weights':<20} | {learned_loss:>10.4f}")
-    print(f"  {'Uniform weights':<20} | {uniform_loss:>10.4f}")
-    print(f"  {'Oracle weights':<20} | {oracle_loss:>10.4f}")
+    print(f"  {'Learned weights':<20} | {learned_pose_loss:>10.4f}")
+    print(f"  {'Uniform weights':<20} | {uniform_pose_loss:>10.4f}")
+    print(f"  {'Oracle weights':<20} | {oracle_pose_loss:>10.4f}")
+    print()
+
+    print("Reprojection error (RMSE in px, lower is better):")
+    print(f"  {'Method':<20} | {'RMSE':>10}")
+    print(f"  {'-' * 20}-+-{'-' * 10}")
+    print(f"  {'Learned weights':<20} | {learned_reproj_rmse:>10.3f}")
+    print(f"  {'Uniform weights':<20} | {uniform_reproj_rmse:>10.3f}")
+    print(f"  {'Oracle weights':<20} | {oracle_reproj_rmse:>10.3f}")
     print()
 
     # Evaluate on test problems
@@ -333,7 +400,9 @@ def main():
         )
         test_problem = jaxls.LeastSquaresProblem([test_cost], [pose_var]).analyze()
         test_learned_pose = test_problem.solve(verbose=False)[pose_var]
-        learned_losses.append(float(jnp.sum((test_learned_pose @ test_gt.inverse()).log() ** 2)))
+        learned_losses.append(
+            float(reprojection_rmse(test_learned_pose, test_3d, test_2d, focal))
+        )
 
         # Solve with uniform weights
         uniform_cost = weighted_reprojection_cost(
@@ -342,12 +411,19 @@ def main():
         )
         uniform_problem = jaxls.LeastSquaresProblem([uniform_cost], [pose_var]).analyze()
         test_uniform_pose = uniform_problem.solve(verbose=False)[pose_var]
-        uniform_losses.append(float(jnp.sum((test_uniform_pose @ test_gt.inverse()).log() ** 2)))
+        uniform_losses.append(
+            float(reprojection_rmse(test_uniform_pose, test_3d, test_2d, focal))
+        )
 
+    print("Generalization reprojection error (RMSE in px):")
     print(f"  {'Method':<20} | {'Mean':>10} | {'Std':>10}")
     print(f"  {'-' * 20}-+-{'-' * 10}-+-{'-' * 10}")
-    print(f"  {'Learned weights':<20} | {onp.mean(learned_losses):>10.4f} | {onp.std(learned_losses):>10.4f}")
-    print(f"  {'Uniform weights':<20} | {onp.mean(uniform_losses):>10.4f} | {onp.std(uniform_losses):>10.4f}")
+    print(
+        f"  {'Learned weights':<20} | {onp.mean(learned_losses):>10.3f} | {onp.std(learned_losses):>10.3f}"
+    )
+    print(
+        f"  {'Uniform weights':<20} | {onp.mean(uniform_losses):>10.3f} | {onp.std(uniform_losses):>10.3f}"
+    )
     print()
 
     # Weight analysis
@@ -356,6 +432,16 @@ def main():
     outlier_w = learned_weights[~train_mask]
     print(f"  Inlier weights:  mean={float(inlier_w.mean()):.3f}, std={float(inlier_w.std()):.3f}")
     print(f"  Outlier weights: mean={float(outlier_w.mean()):.3f}, std={float(outlier_w.std()):.3f}")
+    print()
+    print("Reprojection error histograms (training problem):")
+    print_error_histogram(
+        "Learned weights",
+        compute_reprojection_errors(learned_pose, train_3d, train_2d, focal),
+    )
+    print_error_histogram(
+        "Uniform weights",
+        compute_reprojection_errors(uniform_pose, train_3d, train_2d, focal),
+    )
     print()
 
     # =========================================================================
@@ -372,12 +458,19 @@ def main():
     print("     - Minimize weighted reprojection error")
     print("     - SE3 pose solved via jaxls Levenberg-Marquardt")
     print()
-    print("  2. Outer problem: Learn correspondence weights from pose supervision")
-    print("     - Loss: Geodesic SE3 distance to ground truth pose")
+    print("  2. Outer problem: Learn correspondence weights from supervision")
+    if outer_loss == "pose":
+        print("     - Loss: Geodesic SE3 distance to ground truth pose")
+    else:
+        print("     - Loss: Reprojection error of the estimated pose")
     print("     - Gradients flow through solver via adjoint method")
     print()
-    print("Key insight: The network learns to downweight outliers without explicit")
-    print("outlier labels - only pose supervision is needed.")
+    if outer_loss == "pose":
+        print("Key insight: The network learns to downweight outliers without explicit")
+        print("outlier labels - only pose supervision is needed.")
+    else:
+        print("Key insight: Reprojection supervision can replace pose supervision,")
+        print("but it may be more sensitive to outliers.")
     print()
 
     # =========================================================================
@@ -529,9 +622,8 @@ def main():
                 line_width=2.0,
             )
 
-    # Exaggerate pose differences for better visibility
-    # Use high scale since learned pose is very accurate (close to GT)
-    exaggeration_scale = 10.0
+    # Exaggerate pose differences for visibility (set > 1.0 to amplify).
+    exaggeration_scale = 1.0
     learned_pose_vis = exaggerate_pose_error(learned_pose, train_gt, exaggeration_scale)
     uniform_pose_vis = exaggerate_pose_error(uniform_pose, train_gt, exaggeration_scale)
 
@@ -548,7 +640,7 @@ def main():
     )
     draw_image_plane(
         "learned",
-        learned_pose_vis,
+        learned_pose,
         train_3d,
         train_2d,
         learned_weights,
@@ -557,7 +649,7 @@ def main():
     )
     draw_image_plane(
         "uniform",
-        uniform_pose_vis,
+        uniform_pose,
         train_3d,
         train_2d,
         jnp.ones(num_correspondences),
