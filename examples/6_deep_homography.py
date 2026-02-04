@@ -30,9 +30,9 @@ except ImportError:
 
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as onp
 import optax
-import viser
 
 import jaxls
 
@@ -503,6 +503,223 @@ def build_and_solve_homography(
 
 
 # =============================================================================
+# Visualization Helpers
+# =============================================================================
+
+
+def create_checkerboard_blend(
+    img1: onp.ndarray, img2: onp.ndarray, tile_size: int = 8
+) -> onp.ndarray:
+    """Create a checkerboard blend of two images.
+
+    Args:
+        img1: First image (H, W)
+        img2: Second image (H, W)
+        tile_size: Size of checkerboard tiles
+
+    Returns:
+        Blended image (H, W)
+    """
+    h, w = img1.shape
+    result = onp.zeros_like(img1)
+
+    for i in range(0, h, tile_size):
+        for j in range(0, w, tile_size):
+            # Determine which image to use based on checkerboard pattern
+            use_first = ((i // tile_size) + (j // tile_size)) % 2 == 0
+            i_end = min(i + tile_size, h)
+            j_end = min(j + tile_size, w)
+            if use_first:
+                result[i:i_end, j:j_end] = img1[i:i_end, j:j_end]
+            else:
+                result[i:i_end, j:j_end] = img2[i:i_end, j:j_end]
+
+    return result
+
+
+def visualize_results(
+    source_img: jax.Array,
+    target_img: jax.Array,
+    H_gt: jax.Array,
+    H_est_learned: jax.Array,
+    H_est_raw: jax.Array,
+    feat1_learned: jax.Array,
+    feat2_learned: jax.Array,
+    losses: list[float],
+    grad_norms: list[float],
+    image_size: tuple[int, int],
+    error_learned: float,
+    error_raw: float,
+) -> None:
+    """Create comprehensive matplotlib visualization.
+
+    Args:
+        source_img: Source image
+        target_img: Target image (GT warped)
+        H_gt: Ground truth homography
+        H_est_learned: Estimated homography from learned CNN
+        H_est_raw: Estimated homography from raw pixels
+        feat1_learned: Source feature map from learned CNN
+        feat2_learned: Target feature map from learned CNN
+        losses: Training loss history
+        grad_norms: Gradient norm history
+        image_size: (height, width)
+        error_learned: Final MACE for learned CNN
+        error_raw: Final MACE for raw pixels
+    """
+    h, w = image_size
+
+    # Convert to numpy
+    source_np = onp.array(source_img)
+    target_np = onp.array(target_img)
+
+    # Warp source with estimated homographies
+    warped_learned = onp.array(warp_perspective(source_img, H_est_learned))
+    warped_raw = onp.array(warp_perspective(source_img, H_est_raw))
+
+    # Get corners
+    corners = get_four_corners(h, w)
+    corners_gt = onp.array(apply_homography_to_points(H_gt, corners))
+    corners_est_learned = onp.array(apply_homography_to_points(H_est_learned, corners))
+
+    # Corner colors: TL=red, TR=green, BR=blue, BL=yellow
+    corner_colors = ["red", "green", "blue", "gold"]
+    corner_labels = ["TL", "TR", "BR", "BL"]
+
+    # Create figure
+    fig = plt.figure(figsize=(16, 12))
+
+    # =========================================================================
+    # Row 1: Training Progress
+    # =========================================================================
+
+    # Loss curve
+    ax1 = fig.add_subplot(3, 4, 1)
+    ax1.plot(losses, "b-", linewidth=2)
+    ax1.set_xlabel("Iteration")
+    ax1.set_ylabel("MACE (px)")
+    ax1.set_title("Training Loss (MACE)")
+    ax1.grid(True, alpha=0.3)
+    ax1.set_xlim(0, len(losses) - 1)
+
+    # Gradient norm
+    ax2 = fig.add_subplot(3, 4, 2)
+    ax2.plot(grad_norms, "r-", linewidth=2)
+    ax2.set_xlabel("Iteration")
+    ax2.set_ylabel("Gradient Norm")
+    ax2.set_title("Gradient Norm")
+    ax2.grid(True, alpha=0.3)
+    ax2.set_xlim(0, len(grad_norms) - 1)
+
+    # Feature maps
+    feat1_vis = onp.array(feat1_learned)
+    feat1_vis = (feat1_vis - feat1_vis.min()) / (feat1_vis.max() - feat1_vis.min() + 1e-8)
+    ax3 = fig.add_subplot(3, 4, 3)
+    ax3.imshow(feat1_vis, cmap="viridis")
+    ax3.set_title("Source Features (Learned CNN)")
+    ax3.axis("off")
+
+    feat2_vis = onp.array(feat2_learned)
+    feat2_vis = (feat2_vis - feat2_vis.min()) / (feat2_vis.max() - feat2_vis.min() + 1e-8)
+    ax4 = fig.add_subplot(3, 4, 4)
+    ax4.imshow(feat2_vis, cmap="viridis")
+    ax4.set_title("Target Features (Learned CNN)")
+    ax4.axis("off")
+
+    # =========================================================================
+    # Row 2: Image Comparisons
+    # =========================================================================
+
+    ax5 = fig.add_subplot(3, 4, 5)
+    ax5.imshow(source_np, cmap="gray", vmin=0, vmax=1)
+    ax5.set_title("Source Image")
+    ax5.axis("off")
+
+    ax6 = fig.add_subplot(3, 4, 6)
+    ax6.imshow(target_np, cmap="gray", vmin=0, vmax=1)
+    ax6.set_title("Target (GT Warp)")
+    ax6.axis("off")
+
+    ax7 = fig.add_subplot(3, 4, 7)
+    ax7.imshow(warped_learned, cmap="gray", vmin=0, vmax=1)
+    ax7.set_title(f"Est. Warp (Learned CNN)\nMACE: {error_learned:.2f} px")
+    ax7.axis("off")
+
+    ax8 = fig.add_subplot(3, 4, 8)
+    ax8.imshow(warped_raw, cmap="gray", vmin=0, vmax=1)
+    ax8.set_title(f"Est. Warp (Raw Pixels)\nMACE: {error_raw:.2f} px")
+    ax8.axis("off")
+
+    # =========================================================================
+    # Row 3: Quality Assessment
+    # =========================================================================
+
+    # Overlay blend
+    blend = 0.5 * target_np + 0.5 * warped_learned
+    ax9 = fig.add_subplot(3, 4, 9)
+    ax9.imshow(blend, cmap="gray", vmin=0, vmax=1)
+    ax9.set_title("Overlay (Target + Est. Learned)")
+    ax9.axis("off")
+
+    # Difference image
+    diff = onp.abs(target_np - warped_learned)
+    diff_normalized = diff / (diff.max() + 1e-8)
+    ax10 = fig.add_subplot(3, 4, 10)
+    ax10.imshow(diff_normalized, cmap="hot")
+    ax10.set_title("Difference |Target - Est.|")
+    ax10.axis("off")
+
+    # Checkerboard blend
+    checkerboard = create_checkerboard_blend(target_np, warped_learned, tile_size=8)
+    ax11 = fig.add_subplot(3, 4, 11)
+    ax11.imshow(checkerboard, cmap="gray", vmin=0, vmax=1)
+    ax11.set_title("Checkerboard Blend")
+    ax11.axis("off")
+
+    # Corner error visualization
+    ax12 = fig.add_subplot(3, 4, 12)
+    ax12.imshow(target_np, cmap="gray", vmin=0, vmax=1)
+    ax12.set_title("Corner Errors on Target")
+
+    for i, (c_gt, c_est, color, label) in enumerate(
+        zip(corners_gt, corners_est_learned, corner_colors, corner_labels)
+    ):
+        # GT corners as circles
+        ax12.scatter(c_gt[0], c_gt[1], s=100, c=color, marker="o", edgecolors="white", linewidths=1.5, label=f"{label} GT" if i == 0 else None, zorder=5)
+        # Estimated corners as X
+        ax12.scatter(c_est[0], c_est[1], s=100, c=color, marker="x", linewidths=2, zorder=5)
+        # Error arrow from estimated to GT
+        ax12.annotate(
+            "",
+            xy=(c_gt[0], c_gt[1]),
+            xytext=(c_est[0], c_est[1]),
+            arrowprops=dict(arrowstyle="->", color=color, lw=1.5),
+            zorder=4,
+        )
+
+    ax12.set_xlim(0, w)
+    ax12.set_ylim(h, 0)  # Flip y-axis for image coordinates
+    ax12.axis("off")
+
+    # Add legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="gray", markersize=8, label="GT corners"),
+        Line2D([0], [0], marker="x", color="gray", markersize=8, label="Est. corners", linestyle="None"),
+    ]
+    ax12.legend(handles=legend_elements, loc="lower right", fontsize=8)
+
+    plt.tight_layout()
+
+    # Save figure
+    output_path = "/tmp/claude/deep_homography_results.png"
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    print(f"Saved visualization to: {output_path}")
+
+    plt.show()
+
+
+# =============================================================================
 # Training Loop
 # =============================================================================
 
@@ -626,6 +843,7 @@ def main():
     print("-" * 45)
 
     losses = []
+    grad_norms = []
     for i in range(num_training_iters):
         loss, grads = loss_and_grad_fn(cnn_params)
         updates, opt_state = optimizer.update(grads, opt_state, cnn_params)
@@ -637,6 +855,7 @@ def main():
         grad_norm = jnp.sqrt(
             sum(jnp.sum(g**2) for g in jax.tree.leaves(grads))
         )
+        grad_norms.append(float(grad_norm))
 
         if i % 10 == 0 or i == num_training_iters - 1:
             print(f"{i:>5} | {float(loss):>18.4f} | {float(grad_norm):>12.6f}")
@@ -735,160 +954,25 @@ def main():
     print("Visualization")
     print("=" * 70)
     print()
-    print("Starting Viser visualization server...")
 
-    server = viser.ViserServer()
-
-    # Create image planes
-    plane_size = 2.0
-    plane_spacing = 2.5
-
-    # Source image
-    source_rgb = onp.stack([onp.array(source_img)] * 3, axis=-1)
-    server.scene.add_image(
-        "/images/source",
-        image=source_rgb,
-        render_width=plane_size,
-        render_height=plane_size,
-        position=(-plane_spacing, 0.0, 0.0),
+    visualize_results(
+        source_img=source_img,
+        target_img=target_img,
+        H_gt=H_gt,
+        H_est_learned=H_est_learned,
+        H_est_raw=H_est_raw,
+        feat1_learned=feat1_learned,
+        feat2_learned=feat2_learned,
+        losses=losses,
+        grad_norms=grad_norms,
+        image_size=image_size,
+        error_learned=error_learned,
+        error_raw=error_raw,
     )
-    server.scene.add_label(
-        "/labels/source",
-        "Source",
-        position=(-plane_spacing, -1.3, 0.0),
-    )
-
-    # Target image (GT warped)
-    target_rgb = onp.stack([onp.array(target_img)] * 3, axis=-1)
-    server.scene.add_image(
-        "/images/target",
-        image=target_rgb,
-        render_width=plane_size,
-        render_height=plane_size,
-        position=(0.0, 0.0, 0.0),
-    )
-    server.scene.add_label(
-        "/labels/target",
-        "Target (GT Warp)",
-        position=(0.0, -1.3, 0.0),
-    )
-
-    # Estimated warp result
-    warped_est = warp_perspective(source_img, H_est_learned)
-    warped_rgb = onp.stack([onp.array(warped_est)] * 3, axis=-1)
-    server.scene.add_image(
-        "/images/warped_est",
-        image=warped_rgb,
-        render_width=plane_size,
-        render_height=plane_size,
-        position=(plane_spacing, 0.0, 0.0),
-    )
-    server.scene.add_label(
-        "/labels/warped_est",
-        "Estimated Warp",
-        position=(plane_spacing, -1.3, 0.0),
-    )
-
-    # Feature maps
-    feat1_vis = (feat1_learned - feat1_learned.min()) / (feat1_learned.max() - feat1_learned.min() + 1e-8)
-    feat1_rgb = onp.stack([onp.array(feat1_vis)] * 3, axis=-1)
-    server.scene.add_image(
-        "/images/feat1",
-        image=feat1_rgb,
-        render_width=plane_size,
-        render_height=plane_size,
-        position=(-plane_spacing, 2.5, 0.0),
-    )
-    server.scene.add_label(
-        "/labels/feat1",
-        "Source Features",
-        position=(-plane_spacing, 1.2, 0.0),
-    )
-
-    feat2_vis = (feat2_learned - feat2_learned.min()) / (feat2_learned.max() - feat2_learned.min() + 1e-8)
-    feat2_rgb = onp.stack([onp.array(feat2_vis)] * 3, axis=-1)
-    server.scene.add_image(
-        "/images/feat2",
-        image=feat2_rgb,
-        render_width=plane_size,
-        render_height=plane_size,
-        position=(0.0, 2.5, 0.0),
-    )
-    server.scene.add_label(
-        "/labels/feat2",
-        "Target Features",
-        position=(0.0, 1.2, 0.0),
-    )
-
-    # Draw corner correspondences
-    h, w = image_size
-    corners = get_four_corners(h, w)
-    corners_gt = apply_homography_to_points(H_gt, corners)
-    corners_est = apply_homography_to_points(H_est_learned, corners)
-
-    # Scale corners to visualization space
-    def corner_to_3d(corner: jax.Array, x_offset: float) -> onp.ndarray:
-        """Convert corner coordinates to 3D visualization position."""
-        x = float(corner[0]) / w * plane_size - plane_size / 2 + x_offset
-        y = float(corner[1]) / h * plane_size - plane_size / 2
-        return onp.array([x, -y, 0.1])
-
-    corner_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
-
-    for i, (c_src, c_gt, c_est) in enumerate(zip(corners, corners_gt, corners_est)):
-        color = corner_colors[i]
-
-        # Source corner
-        pos_src = corner_to_3d(c_src, -plane_spacing)
-        server.scene.add_icosphere(
-            f"/corners/source_{i}",
-            radius=0.05,
-            position=tuple(pos_src),
-            color=color,
-        )
-
-        # GT target corner
-        pos_gt = corner_to_3d(c_gt, 0.0)
-        server.scene.add_icosphere(
-            f"/corners/target_gt_{i}",
-            radius=0.05,
-            position=tuple(pos_gt),
-            color=color,
-        )
-
-        # Estimated target corner
-        pos_est = corner_to_3d(c_est, plane_spacing)
-        server.scene.add_icosphere(
-            f"/corners/target_est_{i}",
-            radius=0.05,
-            position=tuple(pos_est),
-            color=color,
-        )
-
-        # Draw error line between GT and estimated corners on middle image
-        pos_gt_middle = corner_to_3d(c_gt, 0.0)
-        pos_est_middle = corner_to_3d(c_est, 0.0)
-        server.scene.add_line_segments(
-            f"/corners/error_{i}",
-            points=onp.array([[pos_gt_middle, pos_est_middle]]),
-            colors=(255, 100, 100),
-            line_width=2.0,
-        )
-
-    # Add grid
-    server.scene.add_grid("/grid", width=10.0, height=6.0, cell_size=0.5)
 
     print()
-    print("Legend:")
-    print("  Top row:    Source features | Target features")
-    print("  Bottom row: Source image    | Target (GT)     | Estimated warp")
-    print("  Colored spheres: 4 corner correspondences")
-    print("  Red lines: Corner estimation errors")
-    print()
-    print(f"Final MACE: {error_learned:.4f} px")
-    print()
-    print(f"Visualization: http://{server.get_host()}:{server.get_port()}")
-    server.sleep_forever()
+    print(f"Final MACE (Learned CNN): {error_learned:.4f} px")
+    print(f"Final MACE (Raw Pixels):  {error_raw:.4f} px")
 
 
 if __name__ == "__main__":
