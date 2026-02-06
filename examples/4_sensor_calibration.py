@@ -17,8 +17,15 @@ import jax.numpy as jnp
 import jaxlie
 import jaxls
 import numpy as onp
-import optax
 import viser
+
+try:
+    import optax
+except ImportError as e:
+    raise ImportError(
+        "This example requires optax. Install example dependencies with "
+        '`pip install "jaxls[examples]"`.'
+    ) from e
 
 logging.getLogger("jaxls").setLevel(logging.ERROR)
 try:
