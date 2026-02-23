@@ -68,15 +68,13 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
                 # Passing in arrays like sqrt_precision_matrix as input makes
                 # it possible vectorize costs.
                 (
-                    lambda values,
-                    T_world_a,
-                    T_world_b,
-                    between,
-                    sqrt_precision_matrix: sqrt_precision_matrix
-                    @ (
-                        (values[T_world_a].inverse() @ values[T_world_b]).inverse()
-                        @ between
-                    ).log()
+                    lambda values, T_world_a, T_world_b, between, sqrt_precision_matrix: (
+                        sqrt_precision_matrix
+                        @ (
+                            (values[T_world_a].inverse() @ values[T_world_b]).inverse()
+                            @ between
+                        ).log()
+                    )
                 ),
                 args=(
                     pose_variables[before_index],
@@ -128,17 +126,15 @@ def parse_g2o(path: pathlib.Path, pose_count_limit: int = 100000) -> G2OData:
 
             cost = jaxls.Cost(
                 # Passing in arrays like sqrt_precision_matrix as input makes
-                # it possible for jaxfg vectorize costs.
+                # it possible for jaxls to vectorize costs.
                 (
-                    lambda values,
-                    T_world_a,
-                    T_world_b,
-                    between,
-                    sqrt_precision_matrix: sqrt_precision_matrix
-                    @ (
-                        (values[T_world_a].inverse() @ values[T_world_b]).inverse()
-                        @ between
-                    ).log()
+                    lambda values, T_world_a, T_world_b, between, sqrt_precision_matrix: (
+                        sqrt_precision_matrix
+                        @ (
+                            (values[T_world_a].inverse() @ values[T_world_b]).inverse()
+                            @ between
+                        ).log()
+                    )
                 ),
                 args=(
                     pose_variables[before_index],

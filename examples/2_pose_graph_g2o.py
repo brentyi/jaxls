@@ -2,7 +2,7 @@
 
 For a summary of options:
 
-    python pose_graph_g2o.py --help
+    python 2_pose_graph_g2o.py --help
 
 """
 

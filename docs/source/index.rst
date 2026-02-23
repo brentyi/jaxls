@@ -16,7 +16,7 @@ Please install from source:
    # Or, with dev dependencies
    pip install "git+https://github.com/brentyi/jaxls.git#egg=jaxls[dev,docs]"
 
-We recommend Python >=3.12. The test matrix also coverse Python 3.10 and 3.11,
+We recommend Python >=3.12. The test matrix also covers Python 3.10 and 3.11,
 but this uses a transpiled version of the source code that may be deprecated in
 the future.
 
