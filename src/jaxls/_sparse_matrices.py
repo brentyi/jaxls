@@ -60,7 +60,9 @@ class SparseBlockRow:
             out = jax.lax.dynamic_update_slice(
                 out,
                 update=self.blocks_concat[:, start_concat_col:end_concat_col],
-                start_indices=(0, start_col),
+                # Match index dtypes; `0` and `start_col` can otherwise
+                # disagree (int64 vs int32) when x64 is enabled.
+                start_indices=(jnp.zeros((), dtype=start_col.dtype), start_col),
             )
             start_concat_col = end_concat_col
 

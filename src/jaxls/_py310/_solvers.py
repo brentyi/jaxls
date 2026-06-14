@@ -1,6 +1,10 @@
 from __future__ import annotations
 from typing import Any
 
+import dataclasses
+from typing import (
+    Callable,
+    Hashable)
 from typing_extensions import assert_never
 
 import jax
@@ -16,22 +20,34 @@ from jaxls._preconditioning import (
 )
 
 from ._augmented_lagrangian import (
+    AugmentedLagrangianConfig,
+    AugmentedLagrangianState,
     check_al_convergence,
     initialize_al_state,
     update_al_state,
     update_problem_al_params,
 )
-from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
+from ._schur import (
+    EliminationPlan,
+    SchurFactors,
+    prepare_schur,
+    solve_schur_cg,
+    solve_schur_dense,
+)
+from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
+from ._variables import VarTypeOrdering, VarValues
 from .utils import jax_log
 
 
 _cholmod_analyze_cache: Any = {}
 
 
-def _cholmod_solve(A: Any, ATb: Any, lambd: Any) -> Any:
+def _cholmod_solve(
+    A: Any, ATb: Any, lambd: Any
+) -> Any:
     return jax.pure_callback(
         _cholmod_solve_on_host,
-        ATb,
+        ATb,  
         A,
         ATb,
         lambd,
@@ -46,10 +62,12 @@ def _cholmod_solve_on_host(
 ) -> Any:
     import sksparse.cholmod
 
+    
     A_T_scipy = scipy.sparse.csc_matrix(
         (A.values, A.coords.indices, A.coords.indptr), shape=A.coords.shape[::-1]
     )
 
+    
     cache_key = (
         A.coords.indices.tobytes(),
         A.coords.indptr.tobytes(),
@@ -64,28 +82,38 @@ def _cholmod_solve_on_host(
         if len(_cholmod_analyze_cache) > max_cache_size:
             _cholmod_analyze_cache.pop(next(iter(_cholmod_analyze_cache)))
 
+    
     cost = cost.cholesky_AAt(
         A_T_scipy,
+        
         beta=lambd + 1e-5,
     )
     return cost.solve_A(ATb)
 
 
+def _compute_jacobian_scaler(column_norms: Any) -> Any:
+    return 1.0 / (1.0 + column_norms) + 1.0
+
+
 @jdc.pytree_dataclass
 class _ConjugateGradientState:
+
     ATb_norm_prev: Any
     eta: Any
 
 
 @jdc.pytree_dataclass
 class ConjugateGradientConfig:
+
     tolerance_min: Any = 1e-7
     tolerance_max: Any = 1e-2
 
     eisenstat_walker_gamma: Any = 0.9
     eisenstat_walker_alpha: Any = 2.0
 
-    preconditioner: jdc.Static[Any] = "block_jacobi"
+    preconditioner: jdc.Static[Any] = (
+        "block_jacobi"
+    )
 
     def _solve(
         self,
@@ -97,6 +125,7 @@ class ConjugateGradientConfig:
     ) -> Any:
         assert len(ATb.shape) == 1, "ATb should be 1D!"
 
+        
         if self.preconditioner == "block_jacobi":
             preconditioner = make_block_jacobi_precoditioner(problem, A_blocksparse)
         elif self.preconditioner == "point_jacobi":
@@ -106,6 +135,7 @@ class ConjugateGradientConfig:
         else:
             assert_never(self.preconditioner)
 
+        
         ATb_norm = jnp.linalg.norm(ATb)
         current_eta = jnp.minimum(
             self.eisenstat_walker_gamma
@@ -117,11 +147,13 @@ class ConjugateGradientConfig:
             self.tolerance_min, jnp.minimum(current_eta, prev_linear_state.eta)
         )
 
+        
         initial_x = jnp.zeros(ATb.shape)
         solution_values, _ = jax.scipy.sparse.linalg.cg(
             A=ATA_multiply,
             b=ATb,
             x0=initial_x,
+            
             maxiter=len(initial_x),
             tol=current_eta,
             M=preconditioner,
@@ -129,6 +161,9 @@ class ConjugateGradientConfig:
         return solution_values, _ConjugateGradientState(
             ATb_norm_prev=ATb_norm, eta=current_eta
         )
+
+
+
 
 
 @jdc.pytree_dataclass
@@ -142,6 +177,7 @@ class SolveSummary:
 
 @jdc.pytree_dataclass
 class _SolutionState:
+
     vals: Any
     cost_info: Any
     cg_state: Any
@@ -149,31 +185,48 @@ class _SolutionState:
 
 @jdc.pytree_dataclass
 class _LmInnerState:
+
     lambd: Any
     accepted: Any
     sol_proposed: Any
     local_delta: Any
     summary: Any
+    lambda_growth: Any = dataclasses.field(default_factory=lambda: jnp.array(2.0))
 
 
 @jdc.pytree_dataclass
 class _LmOuterState:
+
     solution: Any
     summary: Any
     lambd: Any
     jacobian_scaler: Any
-    al_state: Any
+    al_state: Any  
+    last_step_accepted: Any = dataclasses.field(
+        default_factory=lambda: jnp.array(True)
+    )
 
 
 @jdc.pytree_dataclass
 class NonlinearSolver:
-    linear_solver: jdc.Static[Any]
+
+    linear_solver: jdc.Static[
+        Any
+    ]
     trust_region: Any
     termination: Any
     conjugate_gradient_config: Any
     sparse_mode: jdc.Static[Any]
     verbose: jdc.Static[Any]
     augmented_lagrangian: Any = None
+    elimination: Any = None
+
+    def _resolve_cg_config(self) -> Any:
+        if isinstance(self.linear_solver, ConjugateGradientConfig):
+            return self.linear_solver
+        if self.conjugate_gradient_config is not None:
+            return self.conjugate_gradient_config
+        return ConjugateGradientConfig()
 
     @jdc.jit
     def solve(
@@ -191,6 +244,7 @@ class NonlinearSolver:
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
 
+        
         al_state: Any = None
         if self.augmented_lagrangian is not None:
             al_state = initialize_al_state(
@@ -199,11 +253,19 @@ class NonlinearSolver:
                 self.augmented_lagrangian,
                 verbose=self.verbose,
             )
-
+            
             problem = update_problem_al_params(problem, al_state)
-
+            
             cost_info = problem._compute_cost_info(vals)
             cost_history = cost_history.at[0].set(cost_info.cost_nonconstraint)
+
+        
+        
+        
+        
+        jacobian_scaler = _compute_jacobian_scaler(
+            problem._compute_jac_values(vals, cost_info.jac_cache).compute_column_norms()
+        )
 
         state = _LmOuterState(
             solution=_SolutionState(
@@ -213,11 +275,7 @@ class NonlinearSolver:
                 if self.linear_solver != "conjugate_gradient"
                 else _ConjugateGradientState(
                     ATb_norm_prev=0.0,
-                    eta=(
-                        ConjugateGradientConfig()
-                        if self.conjugate_gradient_config is None
-                        else self.conjugate_gradient_config
-                    ).tolerance_max,
+                    eta=self._resolve_cg_config().tolerance_max,
                 ),
             ),
             summary=SolveSummary(
@@ -230,28 +288,51 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
-            jacobian_scaler=jnp.ones(problem._tangent_dim),
+            jacobian_scaler=jacobian_scaler,
             al_state=al_state,
         )
 
+        
         if self.termination.early_termination:
 
             def should_continue(state: Any) -> Any:
+                
                 basic_checks = ~jnp.isnan(state.solution.cost_info.cost_total) & (
                     state.summary.iterations < self.termination.max_iterations
                 )
+                
+                
+                
+                
+                
+                
+                if self.trust_region is not None and self.augmented_lagrangian is None:
+                    basic_checks = basic_checks & ~(
+                        ~state.last_step_accepted
+                        & (state.lambd >= self.trust_region.lambda_max)
+                    )
 
+                
                 if self.augmented_lagrangian is None:
                     return basic_checks & ~jnp.any(state.summary.termination_criteria)
 
+                
                 assert state.al_state is not None
                 al_abs, al_rel = check_al_convergence(
                     state.al_state, self.augmented_lagrangian
                 )
                 al_converged = al_abs & al_rel
 
+                
+                
+                
+                
+                
                 lm_terminated = jnp.any(state.summary.termination_criteria)
 
+                
+                
+                
                 should_stop = lm_terminated & al_converged
                 return basic_checks & ~should_stop
 
@@ -293,37 +374,57 @@ class NonlinearSolver:
         A_multiply: Any,
         AT_multiply: Any,
         ATb: Any,
+        schur_factors: Any = None,
     ) -> Any:
+        
+        
+        
         if self.trust_region is not None:
             lambd = jnp.minimum(
-                inner_state.lambd * self.trust_region.lambda_factor,
+                inner_state.lambd * inner_state.lambda_growth,
                 self.trust_region.lambda_max,
             )
         else:
-            lambd = inner_state.lambd
+            lambd = inner_state.lambd  
 
+        
         if self.verbose:
             self._log_state(problem, sol_prev, inner_state.summary.iterations, lambd)
 
+        
         cg_state: Any = None
-        if (
+        if schur_factors is not None:
+            
+            
+            if self.linear_solver == "conjugate_gradient":
+                assert isinstance(sol_prev.cg_state, _ConjugateGradientState)
+                local_delta, cg_state = solve_schur_cg(
+                    schur_factors, lambd, self._resolve_cg_config(), sol_prev.cg_state
+                )
+            elif self.linear_solver == "dense_cholesky":
+                local_delta = solve_schur_dense(schur_factors, lambd)
+            else:
+                raise AssertionError(
+                    f"Unexpected elimination plan for {self.linear_solver}."
+                )
+        elif (
             isinstance(self.linear_solver, ConjugateGradientConfig)
             or self.linear_solver == "conjugate_gradient"
         ):
-            cg_config = (
-                ConjugateGradientConfig()
-                if self.linear_solver == "conjugate_gradient"
-                else self.linear_solver
-            )
+            cg_config = self._resolve_cg_config()
             assert isinstance(sol_prev.cg_state, _ConjugateGradientState)
             local_delta, cg_state = cg_config._solve(
                 problem,
                 A_blocksparse,
+                
+                
+                
                 lambda vec: AT_multiply(A_multiply(vec)) + (lambd + 1e-5) * vec,
                 ATb=ATb,
                 prev_linear_state=sol_prev.cg_state,
             )
         elif self.linear_solver == "cholmod":
+            
             A_csr = SparseCsrMatrix(
                 jnp.concatenate(
                     [
@@ -351,17 +452,28 @@ class NonlinearSolver:
         )
         proposed_cost_info = problem._compute_cost_info(proposed_vals)
 
+        
+        
+        
         if self.trust_region is None:
             accepted = jnp.array(True)
         else:
-            cost_predicted = jnp.sum(
-                (
-                    A_blocksparse.multiply(scaled_local_delta)
-                    + sol_prev.cost_info.residual_vector
-                )
-                ** 2
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            predicted_reduction = 2.0 * jnp.dot(local_delta, ATb) - jnp.sum(
+                A_blocksparse.multiply(local_delta) ** 2
             )
-            predicted_reduction = sol_prev.cost_info.cost_total - cost_predicted
             actual_reduction = (
                 sol_prev.cost_info.cost_total - proposed_cost_info.cost_total
             )
@@ -378,9 +490,12 @@ class NonlinearSolver:
             tangent_ordering=problem._tangent_ordering,
             ATb=ATb,
             iterations=iterations,
+            accepted=accepted,
         )
         with jdc.copy_and_mutate(inner_state) as next:
             next.lambd = lambd
+            
+            next.lambda_growth = inner_state.lambda_growth * 2.0
             next.accepted = accepted
             next.sol_proposed = _SolutionState(
                 vals=proposed_vals,
@@ -407,21 +522,21 @@ class NonlinearSolver:
     ) -> Any:
         sol_prev = state.solution
 
+        
         if self.augmented_lagrangian is not None and state.al_state is not None:
             problem = update_problem_al_params(problem, state.al_state)
 
+        
         A_blocksparse = problem._compute_jac_values(
             sol_prev.vals, sol_prev.cost_info.jac_cache
         )
 
-        with jdc.copy_and_mutate(state, validate=False) as state:
-            state.jacobian_scaler = jnp.where(
-                state.summary.iterations == 0,
-                1.0 / (1.0 + A_blocksparse.compute_column_norms()) + 1.0,
-                state.jacobian_scaler,
-            )
+        
+        
+        
         A_blocksparse = A_blocksparse.scale_columns(state.jacobian_scaler)
 
+        
         jac_values = jnp.concatenate(
             [
                 block_row.blocks_concat.flatten()
@@ -430,6 +545,7 @@ class NonlinearSolver:
             axis=0,
         )
 
+        
         if self.sparse_mode == "blockrow":
             A_multiply = A_blocksparse.multiply
             AT_multiply_ = jax.linear_transpose(
@@ -455,8 +571,28 @@ class NonlinearSolver:
         else:
             assert_never(self.sparse_mode)
 
+        
         ATb = -AT_multiply(sol_prev.cost_info.residual_vector)
 
+        
+        
+        
+        schur_factors: Any = None
+        if self.elimination is not None:
+            schur_factors = prepare_schur(
+                self.elimination, A_blocksparse, ATb, linear_solver=self.linear_solver
+            )
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         if self.trust_region is not None:
             init_lambd = state.lambd / self.trust_region.lambda_factor
             lambda_max = self.trust_region.lambda_max
@@ -464,18 +600,27 @@ class NonlinearSolver:
             init_lambd = jnp.zeros(())
             lambda_max = jnp.inf
 
+        
+        
         with jdc.copy_and_mutate(state.summary, validate=False) as init_summary:
             init_summary.termination_criteria = jnp.array([False, False, False])
 
         init_inner_state = _LmInnerState(
             lambd=init_lambd,
+            lambda_growth=jnp.asarray(
+                self.trust_region.lambda_factor
+                if self.trust_region is not None
+                else 2.0
+            ),
             accepted=jnp.array(False),
+            
             sol_proposed=sol_prev,
             local_delta=jnp.zeros_like(ATb),
             summary=init_summary,
         )
         inner_state_final = jax.lax.while_loop(
             cond_fun=lambda s: (
+                
                 ~s.accepted
                 & ~jnp.any(s.summary.termination_criteria)
                 & (s.lambd < lambda_max)
@@ -490,10 +635,12 @@ class NonlinearSolver:
                 A_multiply,
                 AT_multiply,
                 ATb,
+                schur_factors,
             ),
             init_val=init_inner_state,
         )
 
+        
         if self.trust_region is not None:
             lambd_next = jnp.maximum(
                 self.trust_region.lambda_min,
@@ -504,8 +651,9 @@ class NonlinearSolver:
                 ),
             )
         else:
-            lambd_next = inner_state_final.lambd
+            lambd_next = inner_state_final.lambd  
 
+        
         with jdc.copy_and_mutate(state) as state_next:
             state_next.solution = jax.tree.map(
                 lambda new, old: jnp.where(inner_state_final.accepted, new, old),
@@ -513,7 +661,9 @@ class NonlinearSolver:
                 sol_prev,
             )
             state_next.lambd = lambd_next
+            state_next.last_step_accepted = inner_state_final.accepted
 
+        
         if self.verbose:
             jax_log(
                 "     accepted={accepted} ATb_norm={atb_norm:.2e} cost_prev={cost_prev:.4f} cost_new={cost_new:.4f}",
@@ -524,6 +674,8 @@ class NonlinearSolver:
                 ordered=True,
             )
 
+        
+        
         if self.augmented_lagrangian is not None and state_next.al_state is not None:
             should_update_al = (
                 jnp.linalg.norm(ATb) < self.augmented_lagrangian.inner_solve_tolerance
@@ -535,6 +687,7 @@ class NonlinearSolver:
                 state_next,
             )
 
+        
         with jdc.copy_and_mutate(state_next) as state_next:
             state_next.summary = inner_state_final.summary
         return state_next
@@ -609,6 +762,7 @@ class NonlinearSolver:
 
 @jdc.pytree_dataclass
 class TrustRegionConfig:
+    
     lambda_initial: Any = 5e-4
     lambda_factor: Any = 2.0
     lambda_min: Any = 1e-5
@@ -618,6 +772,7 @@ class TrustRegionConfig:
 
 @jdc.pytree_dataclass
 class TerminationConfig:
+    
     max_iterations: jdc.Static[Any] = 100
     early_termination: jdc.Static[Any] = True
     cost_tolerance: Any = 1e-5
@@ -633,13 +788,21 @@ class TerminationConfig:
         tangent_ordering: Any,
         ATb: Any,
         iterations: Any,
+        accepted: Any,
     ) -> Any:
+
+        
+        
+        
+        
+        
         cost_reldelta = (
             jnp.abs(cost_nonconstraint_updated - sol_prev.cost_info.cost_nonconstraint)
             / sol_prev.cost_info.cost_nonconstraint
         )
-        converged_cost = cost_reldelta < self.cost_tolerance
+        converged_cost = (cost_reldelta < self.cost_tolerance) & accepted
 
+        
         flat_vals = jax.flatten_util.ravel_pytree(sol_prev.vals)[0]
         gradient_mag = jnp.max(
             jnp.abs(
@@ -655,11 +818,19 @@ class TerminationConfig:
             False,
         )
 
+        
+        
+        
+        
+        
+        
+        
         param_delta = jnp.linalg.norm(jnp.abs(tangent)) / (
             jnp.linalg.norm(flat_vals) + self.parameter_tolerance
         )
-        converged_parameters = param_delta < self.parameter_tolerance
+        converged_parameters = (param_delta < self.parameter_tolerance) & accepted
 
+        
         term_flags = jnp.array(
             [converged_cost, converged_gradient, converged_parameters]
         )

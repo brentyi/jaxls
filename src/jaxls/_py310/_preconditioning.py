@@ -1,8 +1,12 @@
 from __future__ import annotations
 from typing import Any
 
+from typing import Callable
 
+import jax
 from jax import numpy as jnp
+
+from .utils import _batched_gram
 
 
 def make_point_jacobi_precoditioner(
@@ -14,7 +18,7 @@ def make_point_jacobi_precoditioner(
         (n_blocks, rows, cols_concat) = block_row.blocks_concat.shape
         del rows
         del cols_concat
-        assert block_row.blocks_concat.ndim == 3
+        assert block_row.blocks_concat.ndim == 3  
         assert block_row.start_cols[0].shape == (n_blocks,)
         block_l2_cols = jnp.sum(block_row.blocks_concat**2, axis=1).flatten()
         indices = jnp.concatenate(
@@ -31,7 +35,12 @@ def make_point_jacobi_precoditioner(
     return lambda vec: vec / ATA_diagonals
 
 
-def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
+def make_block_jacobi_precoditioner(
+    graph: Any, A_blocksparse: Any
+) -> Any:
+
+    
+    
     gram_diagonal_blocks = list()
     for var_type, ids in graph._tangent_ordering.ordered_dict_items(
         graph._sorted_ids_from_var_type
@@ -44,8 +53,9 @@ def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
 
     assert len(graph._stacked_costs) == len(A_blocksparse.block_rows)
     for cost, block_row in zip(graph._stacked_costs, A_blocksparse.block_rows):
-        assert block_row.blocks_concat.ndim == 3
+        assert block_row.blocks_concat.ndim == 3  
 
+        
         start_concat_col = 0
 
         for var_type, ids in graph._tangent_ordering.ordered_dict_items(
@@ -54,6 +64,7 @@ def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
             (num_costs, num_vars) = ids.shape
             var_type_idx = graph._tangent_ordering.order_from_type[var_type]
 
+            
             end_concat_col = start_concat_col + num_vars * var_type.tangent_dim
             A_blocks = block_row.blocks_concat[
                 :, :, start_concat_col:end_concat_col
@@ -66,7 +77,11 @@ def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
                 )
             )
 
-            gram_blocks = jnp.einsum("frvt,frva->fvta", A_blocks, A_blocks)
+            
+            
+            
+            A_fvrt = jnp.swapaxes(A_blocks, 1, 2)
+            gram_blocks = _batched_gram(A_fvrt, A_fvrt)
             assert gram_blocks.shape == (
                 num_costs,
                 num_vars,

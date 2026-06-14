@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any
 
+from typing import Hashable
 
 import jax
 import jax.experimental.sparse
@@ -10,6 +11,7 @@ from jax import numpy as jnp
 
 @jdc.pytree_dataclass
 class SparseBlockRow:
+
     num_cols: jdc.Static[Any]
     start_cols: Any
     block_num_cols: jdc.Static[Any]
@@ -20,6 +22,7 @@ class SparseBlockRow:
 
     def to_dense(self) -> Any:
         if self.blocks_concat.ndim == 3:
+            
             (num_block_rows, num_rows, _) = self.blocks_concat.shape
             return jax.vmap(SparseBlockRow.to_dense)(self).reshape(
                 (num_block_rows * num_rows, self.num_cols)
@@ -35,7 +38,9 @@ class SparseBlockRow:
             out = jax.lax.dynamic_update_slice(
                 out,
                 update=self.blocks_concat[:, start_concat_col:end_concat_col],
-                start_indices=(0, start_col),
+                
+                
+                start_indices=(jnp.zeros((), dtype=start_col.dtype), start_col),
             )
             start_concat_col = end_concat_col
 
@@ -53,9 +58,11 @@ class BlockRowSparseMatrix:
 
         out_slices = []
         for block_row in self.block_rows:
+            
             (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
             del block_rows
 
+            
             assert len(block_row.start_cols) == len(block_row.block_num_cols)
             target_slice_parts = list()
             for start_cols, width in zip(
@@ -71,9 +78,11 @@ class BlockRowSparseMatrix:
                 assert slice_part.shape == (n_block, width)
                 target_slice_parts.append(slice_part)
 
+            
             target_slice = jnp.concatenate(target_slice_parts, axis=1)
             assert target_slice.shape == (n_block, block_nz_cols)
 
+            
             out_slices.append(
                 jnp.einsum(
                     "bij,bj->bi", block_row.blocks_concat, target_slice
@@ -86,6 +95,7 @@ class BlockRowSparseMatrix:
     def compute_column_norms(self) -> Any:
         squared_sum = jnp.zeros(self.shape[1])
         for block_row in self.block_rows:
+            
             (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
             del block_rows
 
@@ -96,6 +106,7 @@ class BlockRowSparseMatrix:
             for start_cols, width in zip(
                 block_row.start_cols, block_row.block_num_cols
             ):
+                
                 assert start_cols.shape == (block_row.blocks_concat.shape[0],)
                 assert isinstance(width, int)
                 assert squared_sum.shape == (self.shape[1],)
@@ -115,9 +126,11 @@ class BlockRowSparseMatrix:
         assert scales.shape[0] == self.shape[1]
         scaled_block_rows = list()
         for block_row in self.block_rows:
+            
             (n_block, block_rows, block_nz_cols) = block_row.blocks_concat.shape
             del block_rows
 
+            
             assert len(block_row.start_cols) == len(block_row.block_num_cols)
             scale_slice_parts = list()
             for start_cols, width in zip(
@@ -133,15 +146,18 @@ class BlockRowSparseMatrix:
                 assert slice_part.shape == (n_block, width)
                 scale_slice_parts.append(slice_part)
 
+            
             scale_slice = jnp.concatenate(scale_slice_parts, axis=1)
             assert scale_slice.shape == (n_block, block_nz_cols)
 
+            
             with jdc.copy_and_mutate(block_row) as scaled_block_row:
                 scaled_block_row.blocks_concat = (
                     block_row.blocks_concat * scale_slice[:, None, :]
                 )
             scaled_block_rows.append(scaled_block_row)
 
+        
         return BlockRowSparseMatrix(tuple(scaled_block_rows), shape=self.shape)
 
     def to_dense(self) -> Any:
@@ -162,6 +178,7 @@ class SparseCsrCoordinates:
 
 @jdc.pytree_dataclass
 class SparseCsrMatrix:
+
     values: Any
     coords: Any
 
@@ -183,6 +200,7 @@ class SparseCooCoordinates:
 
 @jdc.pytree_dataclass
 class SparseCooMatrix:
+
     values: Any
     coords: Any
 

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Callable
 import jax
 from jax import numpy as jnp
 
+from .utils import _batched_gram
+
 if TYPE_CHECKING:
     from ._problem import AnalyzedLeastSquaresProblem
     from ._sparse_matrices import BlockRowSparseMatrix
@@ -80,8 +82,11 @@ def make_block_jacobi_precoditioner(
                 )
             )
 
-            # f: factor, r: residual, v: variable, t/a: tangent
-            gram_blocks = jnp.einsum("frvt,frva->fvta", A_blocks, A_blocks)
+            # f: factor, r: residual, v: variable, t/a: tangent. The
+            # broadcast helper avoids einsum's slow batched-GEMM lowering
+            # for the tiny residual contraction; see `utils._batched_gram`.
+            A_fvrt = jnp.swapaxes(A_blocks, 1, 2)
+            gram_blocks = _batched_gram(A_fvrt, A_fvrt)
             assert gram_blocks.shape == (
                 num_costs,
                 num_vars,

@@ -3,10 +3,33 @@ import contextlib
 import inspect
 import time
 from functools import partial
+from typing import Generator
 
 import jax
 import termcolor
+from jax import numpy as jnp
 from loguru import logger
+
+
+
+
+
+
+
+
+
+
+
+def _batched_gram(a: Any, b: Any) -> Any:
+    return jnp.sum(a[..., :, :, None] * b[..., :, None, :], axis=-3)
+
+
+def _batched_outer_last(a: Any, b: Any) -> Any:
+    return jnp.sum(a[..., :, None, :] * b[..., None, :, :], axis=-1)
+
+
+def _batched_matmul(a: Any, b: Any) -> Any:
+    return jnp.sum(a[..., :, :, None] * b[..., None, :, :], axis=-2)
 
 
 @contextlib.contextmanager
@@ -30,6 +53,7 @@ def jax_log(fmt: Any, *args, **kwargs) -> Any:
 def print_deprecation_warning(
     message0: Any, message1: Any = None, stack_level: Any = 2
 ) -> Any:
+    
     frame = inspect.currentframe()
     for _ in range(stack_level):
         if not frame:
@@ -39,6 +63,7 @@ def print_deprecation_warning(
     if frame is None:
         return
 
+    
     frame_info = inspect.getframeinfo(frame, context=2)
     filename = frame_info.filename
     lineno = frame_info.lineno
@@ -57,7 +82,9 @@ def print_deprecation_warning(
         Syntax("# " + filename + ":" + str(lineno), "python"),
     ]
 
+    
     if frame_info.code_context:
+        
         code_lines = frame_info.code_context
         start_line = lineno - (len(code_lines) // 2)
 
@@ -67,22 +94,27 @@ def print_deprecation_warning(
 
         code = "".join(code_lines)
 
+        
         highlight_line = start_line + (lineno - start_line)
 
+        
         syntax = Syntax(
             code,
             "python",
             line_numbers=True,
-            start_line=start_line,
-            highlight_lines={highlight_line},
+            start_line=start_line,  
+            highlight_lines={highlight_line},  
         )
         panel_content.append(syntax)
 
+    
     if message1 is not None:
         panel_content.append(Text.from_markup(message1))
 
+    
     content_group = Group(*panel_content)
 
+    
     console.print(
         Panel(
             content_group,
