@@ -14,6 +14,7 @@ from typing import (
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
+import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -100,6 +101,35 @@ def _cholmod_solve_on_host(
         beta=lambd + 1e-5,
     )
     return cost.solve_A(ATb)
+
+
+def _host_perf_counter(anchor: jax.Array) -> jax.Array:
+    """Wall-clock seconds (`time.perf_counter`) read on the host from inside
+    a jitted solve, via `jax.pure_callback`, for `SolveSummary.time_history`.
+
+    `anchor` is a value that depends on the just-computed iterate (its cost):
+    the callback consumes it so XLA cannot common-subexpression-eliminate the
+    (otherwise argument-free) callbacks together, hoist them out of the loop,
+    or fire one before that iteration's work completes. We ignore its value
+    and just return the host clock at call time.
+
+    Timestamps include asynchronous-dispatch latency, so use differences from
+    `time_history[0]`, not absolute values, and treat the largest gap as a
+    loose upper bound; for precise totals wrap the whole solve in
+    `block_until_ready`. Recording is opt-in
+    (`TerminationConfig.record_time_history`) because the per-iteration host
+    callback adds a synchronization point that is unwanted on the default
+    solve path (and awkward under vmap/pmap)."""
+    import time
+
+    # Match the active float width: a float64 callback result errors when
+    # jax_enable_x64 is off.
+    dtype = jnp.zeros(()).dtype
+
+    def _now(_anchor: object) -> onp.ndarray:
+        return onp.asarray(time.perf_counter(), dtype=dtype)
+
+    return jax.pure_callback(_now, jax.ShapeDtypeStruct((), dtype), anchor)
 
 
 def _compute_jacobian_scaler(column_norms: jax.Array) -> jax.Array:
@@ -213,6 +243,12 @@ class SolveSummary:
     cost_history: jax.Array
     """History of non-augmented costs (l2_squared terms only, excludes constraint penalties)."""
     lambda_history: jax.Array
+    time_history: jax.Array
+    """Per-outer-iteration host wall-clock timestamps (`time.perf_counter`
+    seconds). `time_history[i] - time_history[0]` is the elapsed time to
+    reach iteration `i`. All zeros unless
+    `TerminationConfig.record_time_history=True`; see `_host_perf_counter`
+    for accuracy caveats. Entries past `iterations` are zero."""
 
 
 @jdc.pytree_dataclass
@@ -334,6 +370,11 @@ class NonlinearSolver:
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
+        time_history = jnp.zeros(self.termination.max_iterations)
+        if self.termination.record_time_history:
+            time_history = time_history.at[0].set(
+                _host_perf_counter(cost_info.cost_total)
+            )
 
         # Initialize AL state if constraints are present.
         al_state: AugmentedLagrangianState | None = None
@@ -373,6 +414,7 @@ class NonlinearSolver:
                 iterations=jnp.array(0),
                 cost_history=cost_history,
                 lambda_history=lambda_history,
+                time_history=time_history,
                 termination_criteria=jnp.array([False, False, False]),
                 termination_deltas=jnp.zeros(3),
             ),
@@ -595,6 +637,13 @@ class NonlinearSolver:
                 cg_state=cg_state,
             )
             next.local_delta = local_delta
+            time_history = next.summary.time_history
+            if self.termination.record_time_history:
+                # Anchor the timestamp on this iterate's cost so the callback
+                # can't be reordered/hoisted ahead of the step's work.
+                time_history = time_history.at[iterations].set(
+                    _host_perf_counter(proposed_cost_info.cost_total)
+                )
             next.summary = SolveSummary(
                 iterations=iterations,
                 termination_criteria=term_criteria,
@@ -603,6 +652,7 @@ class NonlinearSolver:
                     proposed_cost_info.cost_nonconstraint
                 ),
                 lambda_history=next.summary.lambda_history.at[iterations].set(lambd),
+                time_history=time_history,
             )
 
         return next
@@ -886,6 +936,11 @@ class TerminationConfig:
     early_termination: jdc.Static[bool] = True
     """If set to `True`, terminate when any of the tolerances are met. If
     `False`, always run `max_iterations` steps."""
+    record_time_history: jdc.Static[bool] = False
+    """If `True`, record a host wall-clock timestamp per outer iteration into
+    `SolveSummary.time_history` (one `jax.pure_callback` per step). Off by
+    default: the callback adds a host synchronization point that is unwanted
+    on the normal solve path. Mainly for benchmarking convergence-vs-time."""
     cost_tolerance: float | jax.Array = 1e-5
     """We terminate if `|cost change| / cost < cost_tolerance`. For constrained
     problems, this acts as a floor for the adaptive inner solver tolerance."""
