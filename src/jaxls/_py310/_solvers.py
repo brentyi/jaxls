@@ -10,6 +10,7 @@ from typing_extensions import assert_never
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
+import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -89,6 +90,19 @@ def _cholmod_solve_on_host(
         beta=lambd + 1e-5,
     )
     return cost.solve_A(ATb)
+
+
+def _host_perf_counter(anchor: Any) -> Any:
+    import time
+
+    
+    
+    dtype = jnp.zeros(()).dtype
+
+    def _now(_anchor: Any) -> Any:
+        return onp.asarray(time.perf_counter(), dtype=dtype)
+
+    return jax.pure_callback(_now, jax.ShapeDtypeStruct((), dtype), anchor)
 
 
 def _compute_jacobian_scaler(column_norms: Any) -> Any:
@@ -173,6 +187,7 @@ class SolveSummary:
     termination_deltas: Any
     cost_history: Any
     lambda_history: Any
+    time_history: Any
 
 
 @jdc.pytree_dataclass
@@ -243,6 +258,11 @@ class NonlinearSolver:
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
+        time_history = jnp.zeros(self.termination.max_iterations)
+        if self.termination.record_time_history:
+            time_history = time_history.at[0].set(
+                _host_perf_counter(cost_info.cost_total)
+            )
 
         
         al_state: Any = None
@@ -282,6 +302,7 @@ class NonlinearSolver:
                 iterations=jnp.array(0),
                 cost_history=cost_history,
                 lambda_history=lambda_history,
+                time_history=time_history,
                 termination_criteria=jnp.array([False, False, False]),
                 termination_deltas=jnp.zeros(3),
             ),
@@ -503,6 +524,13 @@ class NonlinearSolver:
                 cg_state=cg_state,
             )
             next.local_delta = local_delta
+            time_history = next.summary.time_history
+            if self.termination.record_time_history:
+                
+                
+                time_history = time_history.at[iterations].set(
+                    _host_perf_counter(proposed_cost_info.cost_total)
+                )
             next.summary = SolveSummary(
                 iterations=iterations,
                 termination_criteria=term_criteria,
@@ -511,6 +539,7 @@ class NonlinearSolver:
                     proposed_cost_info.cost_nonconstraint
                 ),
                 lambda_history=next.summary.lambda_history.at[iterations].set(lambd),
+                time_history=time_history,
             )
 
         return next
@@ -775,6 +804,7 @@ class TerminationConfig:
     
     max_iterations: jdc.Static[Any] = 100
     early_termination: jdc.Static[Any] = True
+    record_time_history: jdc.Static[Any] = False
     cost_tolerance: Any = 1e-5
     gradient_tolerance: Any = 1e-4
     gradient_tolerance_start_step: Any = 10

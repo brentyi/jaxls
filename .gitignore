@@ -7,3 +7,8 @@ __pycache__
 .doctrees/
 jupyter_execute/
 docs/build/
+
+# Suite run outputs (regenerated each run; baseline.json is the committed reference)
+benchmarks/results/suite_report.md
+benchmarks/results/suite_results.json
+benchmarks/results/tuned_frag/
