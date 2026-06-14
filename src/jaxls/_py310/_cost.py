@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import (
+    Any,
+    Callable)
 
 import jax
 import jax_dataclasses as jdc
@@ -15,7 +17,9 @@ class Cost:
     def __class_getitem__(cls, params):
         return cls
 
-    compute_residual: jdc.Static[Any]
+    compute_residual: jdc.Static[
+        Any
+    ]
 
     args: Any
 
@@ -27,7 +31,9 @@ class Cost:
 
     jac_custom_fn: jdc.Static[Any] = None
 
-    jac_custom_with_cache_fn: jdc.Static[Any] = None
+    jac_custom_with_cache_fn: jdc.Static[
+        Any
+    ] = None
 
     name: jdc.Static[Any] = None
 
@@ -75,6 +81,7 @@ class Cost:
                     leaf, batch_axes + leaf.shape[len(batch_axes) :]
                 )
             except ValueError as e:
+                
                 error_msg = (
                     f"{str(e)}\n"
                     f"{type(self).__name__} name: '{self._get_name()}'\n"
@@ -97,10 +104,13 @@ class Cost:
         jac_custom_with_cache_fn: Any = None,
         name: Any = None,
     ) -> Any:
+
         def decorator(
             compute_residual: Any,
         ) -> Any:
-            def inner(*args: Any, **kwargs: Any) -> Any:
+            def inner(
+                *args: Any, **kwargs: Any
+            ) -> Any:
                 return Cost(
                     compute_residual=lambda values, args, kwargs: compute_residual(
                         values, *args, **kwargs
@@ -110,16 +120,12 @@ class Cost:
                     jac_mode=jac_mode,
                     jac_batch_size=jac_batch_size,
                     jac_custom_fn=(
-                        lambda values, args, kwargs: jac_custom_fn(
-                            values, *args, **kwargs
-                        )
+                        lambda values, args, kwargs: jac_custom_fn(values, *args, **kwargs)
                     )
                     if jac_custom_fn is not None
                     else None,
                     jac_custom_with_cache_fn=(
-                        lambda values, cache, args, kwargs: jac_custom_with_cache_fn(
-                            values, cache, *args, **kwargs
-                        )
+                        lambda values, cache, args, kwargs: jac_custom_with_cache_fn(values, cache, *args, **kwargs)
                     )
                     if jac_custom_with_cache_fn is not None
                     else None,
@@ -153,7 +159,7 @@ class Cost:
                 DeprecationWarning,
                 stacklevel=2,
             )
-            return Cost.factory(
+            return Cost.factory(  
                 compute_residual,
                 kind=kind,
                 jac_mode=jac_mode,
@@ -168,7 +174,9 @@ class Cost:
             compute_residual: jdc.Static[Any],
             args: Any,
             jac_mode: jdc.Static[Any] = "auto",
-            jac_custom_fn: jdc.Static[Any] = None,
+            jac_custom_fn: jdc.Static[
+                Any
+            ] = None,
         ) -> Any:
             import warnings
 

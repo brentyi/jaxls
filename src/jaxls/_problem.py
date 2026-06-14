@@ -21,6 +21,7 @@ from loguru import logger
 
 from ._analyzed_cost import _AnalyzedCost, _augment_constraint_cost
 from ._cost import Cost, CostKind, CustomJacobianCache
+from ._schur import EliminationPlan
 from ._solvers import (
     ConjugateGradientConfig,
     NonlinearSolver,
@@ -143,7 +144,9 @@ class LeastSquaresProblem:
             max_variables=max_variables,
         )
 
-    def analyze(self, use_onp: bool = False) -> AnalyzedLeastSquaresProblem:
+    def analyze(
+        self, use_onp: bool = False, schur_elimination: bool = True
+    ) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving.
 
         Processes all costs and variables to compute the sparse Jacobian structure,
@@ -152,6 +155,14 @@ class LeastSquaresProblem:
         Args:
             use_onp: If True, use numpy instead of jax.numpy for index computations.
                 Can be faster for problem setup on CPU.
+            schur_elimination: If True and a dominant block-diagonal variable
+                type exists (for example, landmarks in bundle adjustment),
+                precompute a Schur-complement elimination plan; solves then
+                run on the much smaller, better-conditioned reduced system.
+                Set to False to skip elimination and solve the full system
+                — useful for debugging, benchmarking against the
+                non-eliminated solve, or when the reduced system would be too
+                large to form densely.
 
         Returns:
             An AnalyzedLeastSquaresProblem ready for solving.
@@ -372,7 +383,7 @@ class LeastSquaresProblem:
             shape=(residual_dim_sum, tangent_dim_sum),
         )
 
-        return AnalyzedLeastSquaresProblem(
+        analyzed = AnalyzedLeastSquaresProblem(
             _stacked_costs=tuple(stacked_costs),
             _cost_counts=tuple(cost_counts),
             _sorted_ids_from_var_type=sorted_ids_from_var_type,
@@ -383,6 +394,41 @@ class LeastSquaresProblem:
             _tangent_dim=tangent_dim_sum,
             _residual_dim=residual_dim_sum,
         )
+
+        # Precompute the Schur-complement elimination plan when a dominant
+        # block-diagonal variable type exists (for example, landmarks in
+        # bundle adjustment). This is host-side index structure that depends
+        # only on the problem's sparsity, so it belongs with the rest of the
+        # analysis; `solve()` decides whether to use it.
+        from ._schur import (
+            _TracedVariableIdsError,
+            build_elimination_plan,
+            infer_eliminate,
+        )
+
+        eliminate = infer_eliminate(analyzed) if schur_elimination else ()
+        if len(eliminate) > 0:
+            try:
+                elimination = build_elimination_plan(analyzed, eliminate)
+            except _TracedVariableIdsError:
+                # Variable IDs are tracers (analyze() itself is being
+                # traced); solves will run without elimination.
+                logger.info(
+                    "Variable elimination: variable IDs are traced; solves "
+                    "will not use elimination"
+                )
+            else:
+                logger.info(
+                    "Variable elimination: eliminating {} ({} of {} tangent "
+                    "dims); reduced system is {}-dimensional",
+                    ", ".join(var_type.__name__ for var_type in eliminate),
+                    analyzed._tangent_dim - elimination.reduced_dim,
+                    analyzed._tangent_dim,
+                    elimination.reduced_dim,
+                )
+                with jdc.copy_and_mutate(analyzed, validate=False) as analyzed:
+                    analyzed._elimination = elimination
+        return analyzed
 
 
 @jdc.pytree_dataclass
@@ -398,6 +444,10 @@ class AnalyzedLeastSquaresProblem:
     _tangent_start_from_var_type: jdc.Static[dict[type[Var[Any]], int]]
     _tangent_dim: jdc.Static[int]
     _residual_dim: jdc.Static[int]
+    _elimination: EliminationPlan | None = None
+    """Schur-complement elimination plan, precomputed by `analyze()` when a
+    dominant block-diagonal variable type exists. Used by `solve()` unless
+    `schur_elimination=False` or the linear solver is cholmod."""
 
     @overload
     def solve(
@@ -450,7 +500,13 @@ class AnalyzedLeastSquaresProblem:
 
         Args:
             initial_vals: Initial values for the variables. If None, default values will be used.
-            linear_solver: The linear solver to use.
+            linear_solver: The linear solver to use. When a dominant
+                block-diagonal variable type exists (for example, landmarks
+                in bundle adjustment), "conjugate_gradient" and
+                "dense_cholesky" automatically eliminate it via the Schur
+                complement and solve the much smaller, better-conditioned
+                reduced system instead; the decision is logged. "cholmod"
+                always factors the full system.
             trust_region: Configuration for Levenberg-Marquardt trust region.
             termination: Configuration for termination criteria.
             sparse_mode: The representation to use for sparse matrix
@@ -488,6 +544,15 @@ class AnalyzedLeastSquaresProblem:
             conjugate_gradient_config = linear_solver
             linear_solver = "conjugate_gradient"
 
+        # Schur-complement variable elimination: the plan was precomputed by
+        # `analyze()` when a dominant block-diagonal variable type exists
+        # (for example, landmarks in bundle adjustment); the linear solves
+        # then run on the much smaller, better-conditioned reduced system and
+        # back-substitute the eliminated variables. Never used for cholmod,
+        # whose sparse factorization of the full system would be replaced by
+        # a dense reduced factorization that scales worse.
+        elimination = self._elimination if linear_solver != "cholmod" else None
+
         # Create unified solver (handles both constrained and unconstrained).
         solver = NonlinearSolver(
             linear_solver,
@@ -497,6 +562,7 @@ class AnalyzedLeastSquaresProblem:
             sparse_mode,
             verbose,
             augmented_lagrangian if has_constraints else None,
+            elimination,
         )
         return solver.solve(
             problem=self, initial_vals=initial_vals, return_summary=return_summary

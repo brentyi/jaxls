@@ -1,15 +1,18 @@
 from __future__ import annotations
 from typing import Any
 
+import jax
 import jax_dataclasses as jdc
 from jax import numpy as jnp
 from jax.nn import relu
 
+from ._variables import VarValues
 from .utils import jax_log
 
 
 @jdc.pytree_dataclass
 class AugmentedLagrangianConfig:
+
     penalty_factor: Any = 4.0
 
     penalty_max: Any = 1e7
@@ -33,6 +36,7 @@ class AugmentedLagrangianConfig:
 
 @jdc.pytree_dataclass
 class AugmentedLagrangianState:
+
     lagrange_multipliers: Any
 
     penalty_params: Any
@@ -60,10 +64,12 @@ def _compute_snorm_csupn(
         h_vals, lagrange_multipliers, is_inequality
     ):
         if is_ineq:
+            
             comp = jnp.minimum(-h_group, lambda_group)
             snorm_parts.append(jnp.max(jnp.abs(comp)))
             csupn_parts.append(jnp.max(relu(h_group)))
         else:
+            
             max_abs_h = jnp.max(jnp.abs(h_group))
             snorm_parts.append(max_abs_h)
             csupn_parts.append(max_abs_h)
@@ -82,6 +88,7 @@ def initialize_al_state(
     config: Any,
     verbose: Any = False,
 ) -> Any:
+    
     is_inequality = tuple(
         cost.kind in ("constraint_leq_zero", "constraint_geq_zero")
         for cost in problem._stacked_costs
@@ -91,27 +98,39 @@ def initialize_al_state(
         "initialize_al_state requires constraints (kind != 'l2_squared')."
     )
 
+    
     h_vals = problem._compute_constraint_values(initial_vals)
     lagrange_multipliers = tuple(jnp.zeros_like(h) for h in h_vals)
     initial_snorm, initial_csupn = _compute_snorm_csupn(
         h_vals, lagrange_multipliers, is_inequality
     )
 
+    
     residual_vector = problem.compute_residual_vector(initial_vals)
     initial_cost = jnp.sum(residual_vector**2)
 
+    
+    
+    
     if config.penalty_initial is not None:
+        
         penalty_params = tuple(
             jnp.full(h.shape[0], config.penalty_initial) for h in h_vals
         )
     else:
+        
+        
+        
         cost_scale = 10.0 * jnp.maximum(1.0, jnp.abs(initial_cost))
 
         penalty_params_list = []
         for h_group, is_ineq in zip(h_vals, is_inequality):
+            
             if is_ineq:
+                
                 max_violation = jnp.max(relu(h_group), axis=1)
             else:
+                
                 max_violation = jnp.max(jnp.abs(h_group), axis=1)
             c_squared = 0.5 * max_violation**2
             penalty_group = jnp.clip(
@@ -162,12 +181,14 @@ def update_al_state(
         al_state.constraint_values_prev,
         al_state.is_inequality,
     ):
+        
         lambda_new = lambda_group + penalty_group[:, None] * h_group
         if is_ineq:
             lambda_new = relu(lambda_new)
         lambda_new = jnp.clip(lambda_new, config.lambda_min, config.lambda_max)
         lagrange_multipliers_updated.append(lambda_new)
 
+        
         if is_ineq:
             violation = jnp.max(relu(h_group), axis=1)
             violation_prev = jnp.max(relu(h_prev), axis=1)
@@ -217,6 +238,7 @@ def update_problem_al_params(
     problem: Any,
     al_state: Any,
 ) -> Any:
+    
     from ._analyzed_cost import AugmentedLagrangianParams
 
     updated_costs = []
@@ -224,11 +246,15 @@ def update_problem_al_params(
 
     for cost in problem._stacked_costs:
         if cost.kind == "l2_squared":
+            
             updated_costs.append(cost)
         else:
+            
             assert len(cost.args) == 1
             current_al_params: Any = cost.args[0]
 
+            
+            
             with jdc.copy_and_mutate(cost) as cost_copy:
                 cost_copy.args = (
                     AugmentedLagrangianParams(
@@ -253,11 +279,13 @@ def check_al_convergence(
     al_state: Any,
     config: Any,
 ) -> Any:
+    
     converged_absolute = (
         jnp.maximum(al_state.snorm, al_state.constraint_violation)
         < config.tolerance_absolute
     )
-
+    
+    
     converged_relative = (
         al_state.snorm / jnp.maximum(al_state.snorm_initial, 1.0)
         < config.tolerance_relative

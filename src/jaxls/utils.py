@@ -6,7 +6,35 @@ from typing import Generator
 
 import jax
 import termcolor
+from jax import numpy as jnp
 from loguru import logger
+
+# Batched products over a tiny contraction axis, written as explicit
+# broadcast-multiply-sums rather than `einsum` / `dot_general`. When the
+# contraction dimension is tiny (a residual dim of 2, a landmark dim of 3),
+# XLA lowers the batched-GEMM form to a kernel that is ~5-30x slower than
+# the elementwise form on GPU (and modestly slower on CPU). These products
+# dominate Schur-complement assembly and block-Jacobi preconditioner
+# construction, so the form matters. Measurements: benchmarks/results.md,
+# "Where the GPU time went: batched einsum vs broadcast".
+
+
+def _batched_gram(a: jax.Array, b: jax.Array) -> jax.Array:
+    """Per-row blocks summed over the *middle* (contraction) axis:
+    ``a[...,r,i], b[...,r,j] -> out[...,i,j] = sum_r a[...,r,i] b[...,r,j]``."""
+    return jnp.sum(a[..., :, :, None] * b[..., :, None, :], axis=-3)
+
+
+def _batched_outer_last(a: jax.Array, b: jax.Array) -> jax.Array:
+    """Per-row blocks summed over the *last* axis:
+    ``a[...,t,f], b[...,s,f] -> out[...,t,s] = sum_f a[...,t,f] b[...,s,f]``."""
+    return jnp.sum(a[..., :, None, :] * b[..., None, :, :], axis=-1)
+
+
+def _batched_matmul(a: jax.Array, b: jax.Array) -> jax.Array:
+    """Per-row matrix products ``a[n] @ b[n]``:
+    ``a[...,t,e], b[...,e,f] -> out[...,t,f] = sum_e a[...,t,e] b[...,e,f]``."""
+    return jnp.sum(a[..., :, :, None] * b[..., None, :, :], axis=-2)
 
 
 @contextlib.contextmanager
