@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import base64
@@ -17,14 +16,14 @@ def _get_cost_color(kind: Any) -> Any:
 
 
 VAR_COLORS = [
-    ("#ffcccc", "#cc6666"),  
-    ("#ccccff", "#6666cc"),  
-    ("#ccffcc", "#66cc66"),  
-    ("#ffd9b3", "#cc8033"),  
-    ("#ffccff", "#cc66cc"),  
-    ("#ccffff", "#66cccc"),  
-    ("#ffffcc", "#cccc66"),  
-    ("#d9b3ff", "#8033cc"),  
+    ("#ffcccc", "#cc6666"),
+    ("#ccccff", "#6666cc"),
+    ("#ccffcc", "#66cc66"),
+    ("#ffd9b3", "#cc8033"),
+    ("#ffccff", "#cc66cc"),
+    ("#ccffff", "#66cccc"),
+    ("#ffffcc", "#cccc66"),
+    ("#d9b3ff", "#8033cc"),
 ]
 
 
@@ -44,7 +43,6 @@ def _problem_to_graph_data(
 
     costs = list(problem.costs)
 
-    
     all_var_types: Any = set()
     for cost in costs:
         for var in cost._get_variables():
@@ -52,9 +50,8 @@ def _problem_to_graph_data(
     sorted_var_types = sorted(all_var_types)
     var_type_to_index = {name: i for i, name in enumerate(sorted_var_types)}
 
-    
-    var_nodes: Any = {}  
-    vars_count_by_type: Any = {}  
+    var_nodes: Any = {}
+    vars_count_by_type: Any = {}
     truncated_vars = False
 
     for cost in costs:
@@ -64,7 +61,6 @@ def _problem_to_graph_data(
             for var_id in ids:
                 key = (var_type_name, int(var_id))
                 if key not in var_nodes:
-                    
                     current_count = vars_count_by_type.get(var_type_name, 0)
                     if max_variables is not None and current_count >= max_variables:
                         truncated_vars = True
@@ -86,7 +82,6 @@ def _problem_to_graph_data(
                         }
                     )
 
-    
     cost_counts_by_name: Any = {}
     for cost in costs:
         name = cost._get_name()
@@ -101,12 +96,11 @@ def _problem_to_graph_data(
             batch_size = max(batch_sizes)
         cost_counts_by_name[name] = cost_counts_by_name.get(name, 0) + batch_size
 
-    
     max_per_cost_type: Any = {}
     if max_costs is not None and cost_counts_by_name:
         num_cost_types = len(cost_counts_by_name)
         per_type_limit = max_costs // num_cost_types
-        
+
         remainder = max_costs % num_cost_types
         sorted_names = sorted(
             cost_counts_by_name.keys(),
@@ -118,8 +112,6 @@ def _problem_to_graph_data(
     else:
         max_per_cost_type = None
 
-    
-    
     cost_node_idx = 0
     costs_added_by_name: Any = {}
     truncated_costs = False
@@ -145,14 +137,12 @@ def _problem_to_graph_data(
                 expanded_ids.append((var_type_name, ids))
 
         for batch_idx in range(max_batch):
-            
             current_type_count = costs_added_by_name.get(name, 0)
             if max_per_cost_type is not None:
                 if current_type_count >= max_per_cost_type[name]:
                     truncated_costs = True
                     continue
 
-            
             all_vars_visible = True
             var_keys = []
             for var_type_name, ids in expanded_ids:
@@ -236,7 +226,6 @@ def problem_show(
     max_costs: Any = 1000,
     max_variables: Any = 500,
 ) -> Any:
-    
     total_costs = _count_total_costs(problem)
     total_vars_by_type = _count_total_variables(problem)
     total_vars = sum(total_vars_by_type.values())
@@ -244,17 +233,14 @@ def problem_show(
     graph_data = _problem_to_graph_data(problem, max_costs, max_variables)
     graph_json = json.dumps(graph_data)
 
-    
     displayed_costs = sum(1 for n in graph_data["nodes"] if n["type"] == "cost")
     displayed_vars = sum(1 for n in graph_data["nodes"] if n["type"] == "variable")
 
-    
     if graph_data["truncated"]:
         status_msg = f"Showing {displayed_costs}/{total_costs} costs, {displayed_vars}/{total_vars} variables"
     else:
         status_msg = f"{displayed_costs} costs, {displayed_vars} variables"
 
-    
     inner_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -519,12 +505,11 @@ def problem_show(
 </body>
 </html>"""
 
-    
     try:
         from IPython.core.getipython import get_ipython
 
         ipython = get_ipython()
-        
+
         if ipython is not None and "ZMQInteractiveShell" in type(ipython).__name__:
             data_uri = "data:text/html;base64," + base64.b64encode(
                 inner_html.encode("utf-8")
@@ -537,7 +522,6 @@ def problem_show(
     except ImportError:
         pass
 
-    
     import tempfile
     import webbrowser
 

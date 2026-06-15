@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +9,6 @@ import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
 
-from ._variables import Var
 from .utils import _batched_gram, _batched_matmul, _batched_outer_last
 
 
@@ -20,7 +18,6 @@ class _TracedVariableIdsError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class _TypeInfo:
-
     count: Any
     dim: Any
     orig_start: Any
@@ -29,7 +26,6 @@ class _TypeInfo:
 
 @jdc.pytree_dataclass
 class _Slot:
-
     type_index: jdc.Static[Any]
     is_kept: jdc.Static[Any]
     col_start: jdc.Static[Any]
@@ -38,7 +34,6 @@ class _Slot:
 
 @jdc.pytree_dataclass
 class _Combo:
-
     kept_type_index: jdc.Static[Any]
     elim_type_index: jdc.Static[Any]
     entries: jdc.Static[Any]
@@ -48,7 +43,6 @@ class _Combo:
 
 @jdc.pytree_dataclass
 class _CrossPairs:
-
     combo_a: jdc.Static[Any]
     combo_b: jdc.Static[Any]
     obs_a: Any
@@ -61,7 +55,6 @@ class _CrossPairs:
 
 @jdc.pytree_dataclass
 class EliminationPlan:
-
     kept_types: jdc.Static[Any]
     elim_types: jdc.Static[Any]
     group_slots: Any
@@ -74,7 +67,6 @@ class EliminationPlan:
 def infer_eliminate(
     problem: Any,
 ) -> Any:
-    
     slots_per_group = [
         {
             var_type: ids.shape[-1]
@@ -93,14 +85,13 @@ def infer_eliminate(
         var_type: (int(ids.shape[0]) * var_type.tangent_dim, int(ids.shape[0]))
         for var_type, ids in problem._sorted_ids_from_var_type.items()
     }
-    
-    
+
     candidates = sorted(sizes, key=lambda t: sizes[t], reverse=True)
 
     chosen = list()
     for var_type in candidates:
         if len(chosen) + 1 == len(candidates):
-            break  
+            break
         if total_elim_slots_ok(chosen + [var_type]):
             chosen.append(var_type)
 
@@ -114,7 +105,6 @@ def build_elimination_plan(
     problem: Any,
     eliminate: Any,
 ) -> Any:
-    
     elim_set = list()
     for var_type in eliminate:
         if var_type not in elim_set:
@@ -136,7 +126,6 @@ def build_elimination_plan(
                 "problem appears to be traced inside jax.jit."
             ) from e
 
-    
     kept_types = list()
     elim_types = list()
     kept_pos = dict()
@@ -174,11 +163,8 @@ def build_elimination_plan(
             "type must be kept to form the reduced system."
         )
 
-    
-    
-    
     group_slots = list()
-    slot_indices_onp = list()  
+    slot_indices_onp = list()
     for cost in problem._stacked_costs:
         slots = list()
         indices_onp = list()
@@ -221,8 +207,6 @@ def build_elimination_plan(
         group_slots.append(tuple(slots))
         slot_indices_onp.append(indices_onp)
 
-    
-    
     combo_entries = dict()
     for g, slots in enumerate(group_slots):
         elim_positions = [p for p, s in enumerate(slots) if not s.is_kept]
@@ -256,8 +240,6 @@ def build_elimination_plan(
         combo_kept_onp.append(kept_idx)
         combo_elim_onp.append(elim_idx)
 
-    
-    
     pairs = list()
     for ci_a in range(len(combos)):
         for ci_b in range(ci_a, len(combos)):
@@ -268,8 +250,6 @@ def build_elimination_plan(
                 combo_elim_onp[ci_a], combo_elim_onp[ci_b], num_elim
             )
             if ci_a == ci_b:
-                
-                
                 keep = pair_a < pair_b
                 pair_a, pair_b = pair_a[keep], pair_b[keep]
             if pair_a.shape[0] == 0:
@@ -279,8 +259,7 @@ def build_elimination_plan(
             num_cols_type = kept_types[combos[ci_b].kept_type_index].count
             keys = block_rows_all.astype(onp.int64) * num_cols_type + block_cols_all
             unique_keys, block_id = onp.unique(keys, return_inverse=True)
-            
-            
+
             order = onp.argsort(block_id, kind="stable")
             pair_a, pair_b, block_id = pair_a[order], pair_b[order], block_id[order]
             pairs.append(
@@ -311,9 +290,7 @@ def build_elimination_plan(
     )
 
 
-def _matching_pairs(
-    elim_a: Any, elim_b: Any, num_elim: Any
-) -> Any:
+def _matching_pairs(elim_a: Any, elim_b: Any, num_elim: Any) -> Any:
     order_a = onp.argsort(elim_a, kind="stable")
     order_b = onp.argsort(elim_b, kind="stable")
     counts_a = onp.bincount(elim_a, minlength=num_elim)
@@ -336,7 +313,6 @@ def _matching_pairs(
 
 @jdc.pytree_dataclass
 class SchurFactors:
-
     plan: Any
     v_blocks: Any
     cross_blocks: Any
@@ -364,9 +340,6 @@ def prepare_schur(
         info = (plan.kept_types if slot.is_kept else plan.elim_types)[slot.type_index]
         return blocks_by_group[g][:, :, slot.col_start : slot.col_start + info.dim]
 
-    
-    
-    
     v_blocks = [
         jnp.zeros((info.count, info.dim, info.dim), dtype=dtype)
         for info in plan.elim_types
@@ -384,7 +357,6 @@ def prepare_schur(
                 gram, slot.index, num_segments=target[slot.type_index].shape[0]
             )
 
-    
     cross_blocks = list()
     for combo in plan.combos:
         parts = [
@@ -398,7 +370,6 @@ def prepare_schur(
             parts[0] if len(parts) == 1 else jnp.concatenate(parts, axis=0)
         )
 
-    
     b_keep = jnp.concatenate(
         [
             ATb[info.orig_start : info.orig_start + info.count * info.dim]
@@ -412,8 +383,6 @@ def prepare_schur(
         for info in plan.elim_types
     )
 
-    
-    
     hcc_dense = None
     if need_dense:
         hcc_dense = jnp.zeros((plan.reduced_dim, plan.reduced_dim), dtype=dtype)
@@ -441,7 +410,6 @@ def prepare_schur(
                         jnp.swapaxes(blk, 1, 2)
                     )
 
-    
     keep_jacs = list()
     if linear_solver == "conjugate_gradient":
         for g, slots in enumerate(plan.group_slots):
@@ -545,9 +513,7 @@ def _reduced_rhs(factors: Any, vinv: Any) -> Any:
     return b_red
 
 
-def _wvwt_terms(
-    factors: Any, vinv: Any
-) -> Any:
+def _wvwt_terms(factors: Any, vinv: Any) -> Any:
     plan = factors.plan
     y_blocks = list()
     diag = [
@@ -566,9 +532,7 @@ def _wvwt_terms(
     return y_blocks, diag
 
 
-def _assemble_dense_S(
-    factors: Any, lambd: Any, vinv: Any
-) -> Any:
+def _assemble_dense_S(factors: Any, lambd: Any, vinv: Any) -> Any:
     plan = factors.plan
     assert factors.hcc_dense is not None
     diag_idx = jnp.arange(plan.reduced_dim)
@@ -592,9 +556,7 @@ def _assemble_dense_S(
         )
         rows = _block_rows(info_a, pair.block_rows)
         cols = _block_rows(info_b, pair.block_cols)
-        
-        
-        
+
         S = S.at[rows[:, :, None], cols[:, None, :]].add(-summed)
         S = S.at[cols[:, :, None], rows[:, None, :]].add(-jnp.swapaxes(summed, 1, 2))
     for kt_i, info in enumerate(plan.kept_types):
@@ -609,10 +571,7 @@ def _assemble_dense_S(
 
 def _solve_spd_scaled(S: Any, b: Any) -> Any:
     diag = jnp.diagonal(S)
-    
-    
-    
-    
+
     scale = jnp.sqrt(jnp.maximum(jnp.abs(diag), jnp.finfo(S.dtype).tiny))
     S_scaled = S / (scale[:, None] * scale[None, :])
     eps = jnp.finfo(S.dtype).eps
@@ -623,9 +582,7 @@ def _solve_spd_scaled(S: Any, b: Any) -> Any:
     return jax.scipy.linalg.cho_solve(factor, b / scale) / scale
 
 
-def _back_substitute(
-    factors: Any, vinv: Any, dc: Any
-) -> Any:
+def _back_substitute(factors: Any, vinv: Any, dc: Any) -> Any:
     plan = factors.plan
     wt_dc = [
         jnp.zeros((info.count, info.dim), dtype=dc.dtype) for info in plan.elim_types
@@ -670,15 +627,13 @@ def solve_schur_cg(
     from ._solvers import _ConjugateGradientState
 
     plan = factors.plan
-    
+
     lam_eff = lambd + 1e-5
     vinv = _damped_vinv(factors, lam_eff)
     b_red = _reduced_rhs(factors, vinv)
 
-    
-    
     if cg_config.preconditioner is None:
-        precondition = lambda x: x  
+        precondition = lambda x: x
     else:
         _, wvwt_diag = _wvwt_terms(factors, vinv)
         diag_blocks = [
@@ -713,7 +668,7 @@ def solve_schur_cg(
 
     def matvec(x: Any) -> Any:
         out = lam_eff * x
-        
+
         for g, slots in enumerate(plan.group_slots):
             keep_jac = factors.keep_jacs[g]
             if keep_jac is None:
@@ -740,7 +695,7 @@ def solve_schur_cg(
                     contrib.flatten()
                 )
                 col += info.dim
-        
+
         wt_x = [
             jnp.zeros((info.count, info.dim), dtype=x.dtype) for info in plan.elim_types
         ]
@@ -767,7 +722,6 @@ def solve_schur_cg(
             )
         return out
 
-    
     b_norm = jnp.linalg.norm(b_red)
     eta = jnp.minimum(
         cg_config.eisenstat_walker_gamma
