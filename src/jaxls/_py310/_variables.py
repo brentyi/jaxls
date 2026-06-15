@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Any, Callable, ClassVar
+from typing import Any, ClassVar
 
 import jax
 import jax_dataclasses as jdc
@@ -14,7 +13,6 @@ from jax import numpy as jnp
 
 @total_ordering
 class _HashableSortableMeta(type):
-
     def __hash__(cls):
         return object.__hash__(cls)
 
@@ -27,7 +25,6 @@ class _HashableSortableMeta(type):
 
 @dataclass(frozen=True)
 class VarTypeOrdering:
-
     order_from_type: Any
 
     def ordered_dict_items(
@@ -61,13 +58,9 @@ class Var(metaclass=_HashableSortableMeta):
     tangent_dim: ClassVar[Any]
     retract_fn: ClassVar[Any]
 
-    
-    
-    
-    
     @classmethod
     def default_factory(cls) -> Any:
-        return cls._default_factory()  
+        return cls._default_factory()
 
     def with_value(self, value: Any) -> Any:
         return VarWithValue(self, value)
@@ -94,7 +87,7 @@ class Var(metaclass=_HashableSortableMeta):
             )
             default_factory = lambda: default
 
-        cls._default_factory = staticmethod(default_factory)  
+        cls._default_factory = staticmethod(default_factory)
         if retract_fn is not None:
             assert tangent_dim is not None
             cls.tangent_dim = tangent_dim
@@ -114,12 +107,10 @@ class Var(metaclass=_HashableSortableMeta):
 
         super().__init_subclass__()
 
-        
         jdc.pytree_dataclass(cls)
 
     @staticmethod
     def _euclidean_retract(pytree: Any, delta: Any) -> Any:
-        
         flat, unravel = flatten_util.ravel_pytree(pytree)
         del flat
         return jax.tree.map(jnp.add, pytree, unravel(delta))
@@ -127,7 +118,6 @@ class Var(metaclass=_HashableSortableMeta):
 
 @jdc.pytree_dataclass
 class VarValues:
-
     vals_from_type: Any
 
     ids_from_type: Any
@@ -177,7 +167,6 @@ class VarValues:
 
         for v in variables:
             if isinstance(v, Var):
-                
                 if type(v) not in cached_default_from_type:
                     cached_default_from_type[type(v)] = v.default_factory()
 
@@ -198,7 +187,6 @@ class VarValues:
                     )
                 )
             else:
-                
                 vars.append(v.variable)
                 vals.append(v.value)
 
@@ -221,7 +209,7 @@ class VarValues:
 
     def _get_tangent_dim(self) -> Any:
         total = 0
-        for var_type, ids in self.ids_from_type.items():  
+        for var_type, ids in self.ids_from_type.items():
             total += ids.shape[-1] * var_type.tangent_dim
         return total
 
@@ -231,21 +219,15 @@ class VarValues:
     def _retract(self, tangent: Any, ordering: Any) -> Any:
         vals_from_type = dict()
         tangent_slice_start = 0
-        for var_type, ids in (
-            
-            ordering.ordered_dict_items(self.ids_from_type)
-        ):
+        for var_type, ids in ordering.ordered_dict_items(self.ids_from_type):
             assert len(ids.shape) == 1
 
-            
-            
             tangent_slice_dim = var_type.tangent_dim * ids.shape[0]
             tangent_slice = tangent[
                 tangent_slice_start : tangent_slice_start + tangent_slice_dim
             ]
             tangent_slice_start += tangent_slice_dim
 
-            
             vals_from_type[var_type] = jax.vmap(var_type.retract_fn)(
                 self.vals_from_type[var_type],
                 tangent_slice.reshape((ids.shape[0], var_type.tangent_dim)),
@@ -256,26 +238,20 @@ class VarValues:
         )
 
 
-def sort_and_stack_vars(
-    variables: Any, values: Any = None
-) -> Any:
-    
+def sort_and_stack_vars(variables: Any, values: Any = None) -> Any:
     vars_from_type = dict()
     vals_from_type = dict() if values is not None else None
     for i in range(len(variables)):
         var = variables[i]
         val = values[i] if values is not None else None
 
-        
         if isinstance(var.id, int) or len(var.id.shape) == 0:
             var = jax.tree.map(lambda leaf: jnp.array(leaf)[None], var)
             if val is not None:
                 val = jax.tree.map(lambda leaf: jnp.array(leaf)[None], val)
         else:
-            
             assert len(var.id.shape) == 1, "Variable IDs must be 0D or 1D."
 
-        
         var_type = type(var)
         vars_from_type.setdefault(var_type, [])
         if vals_from_type is not None:
@@ -285,8 +261,6 @@ def sort_and_stack_vars(
         if vals_from_type is not None:
             vals_from_type[var_type].append(val)
 
-    
-    
     stacked_var_from_type = {
         var_type: jax.tree.map(lambda *leafs: jnp.concatenate(leafs, axis=0), *vars)
         for var_type, vars in vars_from_type.items()

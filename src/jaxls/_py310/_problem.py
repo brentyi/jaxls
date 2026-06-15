@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import dis
 import functools
-from typing import (
-    Any,
-    Callable,
-    Hashable,
-    Iterable)
+from typing import Any
 
 import jax
 import jax_dataclasses as jdc
@@ -15,12 +11,9 @@ from jax import numpy as jnp
 from loguru import logger
 
 from ._analyzed_cost import _AnalyzedCost, _augment_constraint_cost
-from ._cost import Cost, CostKind, CustomJacobianCache
-from ._schur import EliminationPlan
 from ._solvers import (
     ConjugateGradientConfig,
     NonlinearSolver,
-    SolveSummary,
     TerminationConfig,
     TrustRegionConfig,
 )
@@ -30,12 +23,11 @@ from ._sparse_matrices import (
     SparseCooCoordinates,
     SparseCsrCoordinates,
 )
-from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
+from ._variables import VarTypeOrdering, VarValues, sort_and_stack_vars
 
 
 @jdc.pytree_dataclass
 class _CostInfo:
-
     residual_vectors: Any
 
     residual_vector: Any
@@ -67,7 +59,6 @@ def _get_function_signature(func: Any) -> Any:
 
 @jdc.pytree_dataclass
 class LeastSquaresProblem:
-
     costs: Any
     variables: Any
 
@@ -89,11 +80,7 @@ class LeastSquaresProblem:
             max_variables=max_variables,
         )
 
-    def analyze(
-        self, use_onp: Any = False, schur_elimination: Any = True
-    ) -> Any:
-
-        
+    def analyze(self, use_onp: Any = False, schur_elimination: Any = True) -> Any:
         if use_onp:
             jnp = onp
         else:
@@ -112,7 +99,6 @@ class LeastSquaresProblem:
 
         costs = tuple(_deduplicate_compute_residual(cost) for cost in self.costs)
 
-        
         count_by_kind: Any = {
             "l2_squared": 0,
             "constraint_eq_zero": 0,
@@ -131,7 +117,6 @@ class LeastSquaresProblem:
                 1 if isinstance(v.id, int) or v.id.shape == () else v.id.shape[0]
             )
 
-        
         total_costs = sum(count_by_kind.values())
         logger.info(
             "Building optimization problem with {} terms and {} variables: "
@@ -144,14 +129,11 @@ class LeastSquaresProblem:
             count_by_kind["constraint_geq_zero"],
         )
 
-        
-        
         tangent_start_from_var_type = dict()
 
         def _sort_key(x: Any) -> Any:
             return str(x)
 
-        
         count_from_var_type = dict()
         for var in variables:
             if isinstance(var.id, int) or var.id.shape == ():
@@ -166,7 +148,6 @@ class LeastSquaresProblem:
             tangent_start_from_var_type[var_type] = tangent_dim_sum
             tangent_dim_sum += var_type.tangent_dim * count_from_var_type[var_type]
 
-        
         tangent_ordering = VarTypeOrdering(
             {
                 var_type: i
@@ -174,8 +155,6 @@ class LeastSquaresProblem:
             }
         )
 
-        
-        
         costs_from_group = dict()
         count_from_group = dict()
         constraint_index_from_group = dict()
@@ -193,11 +172,10 @@ class LeastSquaresProblem:
                 ),
             )
 
-            
             if group_key not in costs_from_group:
                 costs_from_group[group_key] = []
                 count_from_group[group_key] = 0
-                
+
                 if cost.kind != "l2_squared":
                     constraint_index_from_group[group_key] = constraint_index
                     constraint_index += 1
@@ -211,29 +189,22 @@ class LeastSquaresProblem:
 
             costs_from_group[group_key].append(cost)
 
-        
         stacked_costs = list()
         cost_counts = list()
         jac_coords = list()
 
-        
         sorted_ids_from_var_type = sort_and_stack_vars(variables)
         del variables
 
-        
         residual_dim_sum = 0
         for group_key in sorted(costs_from_group.keys(), key=_sort_key):
             group = costs_from_group[group_key]
             count = count_from_group[group_key]
 
-            
             stacked_cost: Any = jax.tree.map(
                 lambda *args: jnp.concatenate(args, axis=0), *group
             )
 
-            
-            
-            
             is_constraint_group = group_key in constraint_index_from_group
             if is_constraint_group:
                 group_constraint_index = constraint_index_from_group[group_key]
@@ -241,14 +212,11 @@ class LeastSquaresProblem:
                     lambda c: _augment_constraint_cost(c, group_constraint_index)
                 )(stacked_cost)
             else:
-                stacked_cost_expanded: Any = jax.vmap(_AnalyzedCost._make)(
-                    stacked_cost
-                )
+                stacked_cost_expanded: Any = jax.vmap(_AnalyzedCost._make)(stacked_cost)
 
             stacked_costs.append(stacked_cost_expanded)
             cost_counts.append(count)
 
-            
             if is_constraint_group:
                 logger.info(
                     "Vectorizing constraint group with {} constraints ({}), {} variables each: {}",
@@ -265,7 +233,6 @@ class LeastSquaresProblem:
                     stacked_cost_expanded._get_name(),
                 )
 
-            
             rows, cols = jax.vmap(
                 functools.partial(
                     _AnalyzedCost._compute_block_sparse_jac_indices,
@@ -291,7 +258,6 @@ class LeastSquaresProblem:
             jac_coords.append((rows.flatten(), cols.flatten()))
             residual_dim_sum += stacked_cost_expanded.residual_flat_dim * count
 
-        
         jac_coords_coo = SparseCooCoordinates(
             *jax.tree.map(lambda *arrays: jnp.concatenate(arrays, axis=0), *jac_coords),
             shape=(residual_dim_sum, tangent_dim_sum),
@@ -317,11 +283,6 @@ class LeastSquaresProblem:
             _residual_dim=residual_dim_sum,
         )
 
-        
-        
-        
-        
-        
         from ._schur import (
             _TracedVariableIdsError,
             build_elimination_plan,
@@ -333,8 +294,6 @@ class LeastSquaresProblem:
             try:
                 elimination = build_elimination_plan(analyzed, eliminate)
             except _TracedVariableIdsError:
-                
-                
                 logger.info(
                     "Variable elimination: variable IDs are traced; solves "
                     "will not use elimination"
@@ -384,34 +343,20 @@ class AnalyzedLeastSquaresProblem:
                 for var_type, ids in self._sorted_ids_from_var_type.items()
             )
 
-        
         has_constraints = any(cost.kind != "l2_squared" for cost in self._stacked_costs)
 
-        
         if has_constraints and augmented_lagrangian is None:
             from ._augmented_lagrangian import AugmentedLagrangianConfig
 
             augmented_lagrangian = AugmentedLagrangianConfig()
 
-        
-        
-        
-        
         conjugate_gradient_config = None
         if isinstance(linear_solver, ConjugateGradientConfig):
             conjugate_gradient_config = linear_solver
             linear_solver = "conjugate_gradient"
 
-        
-        
-        
-        
-        
-        
-        
         elimination = self._elimination if linear_solver != "cholmod" else None
 
-        
         solver = NonlinearSolver(
             linear_solver,
             trust_region,
@@ -430,8 +375,6 @@ class AnalyzedLeastSquaresProblem:
         residual_slices = list()
         jac_cache = list()
         for stacked_cost in self._stacked_costs:
-            
-            
             compute_residual_out = jax.vmap(
                 lambda cost: cost.compute_residual_flat(vals, *cost.args)
             )(stacked_cost)
@@ -452,7 +395,6 @@ class AnalyzedLeastSquaresProblem:
         cost_nonconstraint = jnp.array(0.0)
 
         for stacked_cost in self._stacked_costs:
-            
             compute_residual_out = jax.vmap(
                 lambda cost: cost.compute_residual_flat(vals, *cost.args)
             )(stacked_cost)
@@ -468,7 +410,6 @@ class AnalyzedLeastSquaresProblem:
 
             residual_vectors.append(residual)
 
-            
             if stacked_cost.kind == "l2_squared":
                 cost_nonconstraint = cost_nonconstraint + jnp.sum(residual**2)
 
@@ -487,14 +428,13 @@ class AnalyzedLeastSquaresProblem:
         constraint_slices = list()
         for stacked_cost in self._stacked_costs:
             if stacked_cost.kind == "l2_squared":
-                continue  
+                continue
 
-            
             assert stacked_cost.compute_residual_original is not None
             constraint_vals = jax.vmap(
                 lambda c: c.compute_residual_original(vals, *c.args)
             )(stacked_cost)
-            
+
             constraint_slices.append(constraint_vals)
 
         return tuple(constraint_slices)
@@ -503,20 +443,16 @@ class AnalyzedLeastSquaresProblem:
         constraint_slices = self._compute_constraint_values(vals)
         if len(constraint_slices) == 0:
             return jnp.array([])
-        
+
         return jnp.concatenate([c.reshape(-1) for c in constraint_slices], axis=0)
 
-    def _compute_jac_values(
-        self, vals: Any, jac_cache: Any
-    ) -> Any:
+    def _compute_jac_values(self, vals: Any, jac_cache: Any) -> Any:
         block_rows = list()
         residual_offset = 0
 
         for i, cost in enumerate(self._stacked_costs):
-            
-            def compute_jac_with_perturb(
-                cost: Any, jac_cache_i: Any = None
-            ) -> Any:
+
+            def compute_jac_with_perturb(cost: Any, jac_cache_i: Any = None) -> Any:
                 val_subset = vals._get_subset(
                     {
                         var_type: jnp.searchsorted(vals.ids_from_type[var_type], ids)
@@ -525,7 +461,6 @@ class AnalyzedLeastSquaresProblem:
                     self._tangent_ordering,
                 )
 
-                
                 if cost.jac_custom_fn is not None:
                     assert jac_cache_i is None, (
                         "`jac_custom_with_cache_fn` should be used if a Jacobian cache is used, not `jac_custom_fn`!"
@@ -545,7 +480,6 @@ class AnalyzedLeastSquaresProblem:
                     else jax.jacfwd,
                 }[cost.jac_mode]
 
-                
                 return jacfunc(
                     lambda tangent: cost.compute_residual_flat(
                         val_subset._retract(tangent, self._tangent_ordering),
@@ -555,14 +489,11 @@ class AnalyzedLeastSquaresProblem:
 
             optional_jac_cache_i = (jac_cache[i],) if jac_cache[i] is not None else ()
 
-            
             if cost.jac_batch_size is None:
                 stacked_jac = jax.vmap(compute_jac_with_perturb)(
                     cost, *optional_jac_cache_i
                 )
             else:
-                
-                
                 stacked_jac = jax.lax.map(
                     compute_jac_with_perturb,
                     cost,
@@ -573,20 +504,18 @@ class AnalyzedLeastSquaresProblem:
             assert stacked_jac.shape == (
                 num_costs,
                 cost.residual_flat_dim,
-                stacked_jac.shape[-1],  
+                stacked_jac.shape[-1],
             )
-            
+
             stacked_jac_start_col = 0
             start_cols = list()
             block_widths = list()
             for var_type, ids in self._tangent_ordering.ordered_dict_items(
-                
                 cost.sorted_ids_from_var_type
             ):
                 (num_costs_, num_vars) = ids.shape
                 assert num_costs == num_costs_
 
-                
                 for var_idx in range(ids.shape[-1]):
                     start_cols.append(
                         jnp.searchsorted(
@@ -638,11 +567,9 @@ class AnalyzedLeastSquaresProblem:
             make_point_jacobi_precoditioner,
         )
 
-        
         if method is None:
             method = LinearSolverCovarianceEstimatorConfig()
 
-        
         if scale_by_residual_variance:
             residual = self.compute_residual_vector(vals)
             m = self._residual_dim
@@ -652,14 +579,11 @@ class AnalyzedLeastSquaresProblem:
             residual_variance = jnp.array(1.0)
 
         if method == "cholmod_spinv":
-            
             import sksparse.cholmod
 
-            
             cost_info = self._compute_cost_info(vals)
             A_blocksparse = self._compute_jac_values(vals, cost_info.jac_cache)
 
-            
             jac_values = jnp.concatenate(
                 [
                     block_row.blocks_concat.flatten()
@@ -669,8 +593,6 @@ class AnalyzedLeastSquaresProblem:
             )
             import scipy.sparse
 
-            
-            
             A_csr = scipy.sparse.csr_matrix(
                 (
                     onp.asarray(jac_values, dtype=onp.float64),
@@ -679,16 +601,14 @@ class AnalyzedLeastSquaresProblem:
                 ),
                 shape=self._jac_coords_csr.shape,
             )
-            
+
             JTJ = (A_csr.T @ A_csr).tocsc()
-            
+
             n = JTJ.shape[0]
             JTJ = JTJ + 1e-8 * scipy.sparse.eye(n, format="csc", dtype=onp.float64)
 
-            
             factor = sksparse.cholmod.cholesky(JTJ)
 
-            
             cov_dense = onp.zeros((n, n), dtype=onp.float64)
             for i in range(n):
                 e_i = onp.zeros(n, dtype=onp.float64)
@@ -704,11 +624,9 @@ class AnalyzedLeastSquaresProblem:
             )
 
         elif isinstance(method, LinearSolverCovarianceEstimatorConfig):
-            
             cost_info = self._compute_cost_info(vals)
             A_blocksparse = self._compute_jac_values(vals, cost_info.jac_cache)
 
-            
             A_multiply = A_blocksparse.multiply
             AT_multiply_ = jax.linear_transpose(
                 A_multiply, jnp.zeros((A_blocksparse.shape[1],))
@@ -718,7 +636,6 @@ class AnalyzedLeastSquaresProblem:
             def ATA_multiply(vec: Any) -> Any:
                 return AT_multiply(A_multiply(vec))
 
-            
             linear_solver = method.linear_solver
 
             if (
@@ -731,7 +648,6 @@ class AnalyzedLeastSquaresProblem:
                     else linear_solver
                 )
 
-                
                 if cg_config.preconditioner == "block_jacobi":
                     preconditioner = make_block_jacobi_precoditioner(
                         self, A_blocksparse
@@ -753,7 +669,6 @@ class AnalyzedLeastSquaresProblem:
                     return x
 
             elif linear_solver == "dense_cholesky":
-                
                 A_dense = A_blocksparse.to_dense()
                 ATA = A_dense.T @ A_dense
                 ATA = ATA + 1e-8 * jnp.eye(self._tangent_dim)

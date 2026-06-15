@@ -355,7 +355,9 @@ class NonlinearSolver:
         # (compute_column_norms is a full-Jacobian scatter — wasted on every
         # iteration past the first when the scaler is frozen anyway).
         jacobian_scaler = _compute_jacobian_scaler(
-            problem._compute_jac_values(vals, cost_info.jac_cache).compute_column_norms()
+            problem._compute_jac_values(
+                vals, cost_info.jac_cache
+            ).compute_column_norms()
         )
 
         state = _LmOuterState(
