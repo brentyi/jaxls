@@ -598,7 +598,10 @@ class NonlinearSolver:
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
-                # Add 1e-5 regularization to match dense_cholesky behavior.
+                # The extra 1e-5 keeps simple/underdetermined problems from blowing
+                # up, matching the CHOLMOD path (see beta=lambd + 1e-5 above); the
+                # Schur CG path in solve_schur_cg adds the same term. Only
+                # dense_cholesky omits it, using lambd alone.
                 lambda vec: AT_multiply(A_multiply(vec)) + (lambd + 1e-5) * vec,
                 ATb=ATb,
                 prev_linear_state=sol_prev.cg_state,
