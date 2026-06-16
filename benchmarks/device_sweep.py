@@ -332,40 +332,60 @@ def plot_ba_comparison() -> None:
                 cache[suffix] = json.loads(path.read_text()) if path.exists() else {}
             return cache[suffix] or None
 
-        # Baseline target: the converged cost the main full-CG run reaches.
-        # Speedups are "time for each method to reach that same cost" — the
-        # apples-to-apples question a reader actually cares about. A small
-        # tolerance absorbs matched-k jitter so a method that lands ~0.1%
-        # above the baseline floor still counts as having reached it.
+        # Threshold: the converged cost the main full-CG run reaches. We draw
+        # a dashed line there and label, on each curve, the wall-clock time it
+        # crosses — the apples-to-apples "how long to the same solution?". A
+        # small tolerance absorbs matched-k jitter so a method that lands
+        # ~0.1% above the baseline floor still counts as having reached it.
         base_data = _load("main")
         base_run = base_data["runs"].get("gpu:full CG") if base_data else None
-        target = min(base_run["costs"]) * 1.003 if base_run else None
-        t_base = _time_to_cost(base_run, c0, target) if base_run else None
+        threshold = min(base_run["costs"]) if base_run else None
+        target = threshold * 1.003 if threshold is not None else None
 
+        crossings = []  # (label, time, color) to annotate after curves drawn
         for label, suffix, method, color, marker in series:
             data = _load(suffix)
             run = data["runs"].get(f"gpu:{method}") if data else None
             if run is None:
                 continue
             times, best = _running_best(run, c0)
-            speed = ""
+            ax.plot(times, best, marker=marker, ms=5, color=color, label=label)
             t_hit = _time_to_cost(run, c0, target) if target is not None else None
-            if t_hit is not None and t_base is not None and t_hit > 0:
-                factor = t_base / t_hit
-                speed = f"  ({factor:.0f}× faster)" if factor >= 1.5 else ""
-            ax.plot(
-                times, best, marker=marker, ms=5, color=color, label=label + speed
-            )
+            if t_hit is not None and t_hit > 0:
+                crossings.append((label, t_hit, color))
             if run.get("budget_stopped_at_k") is not None:
                 ax.plot(times[-1], best[-1], marker="x", ms=11, mew=2, color=color)
-        if target is not None:
-            ax.axhline(
-                target / 1.003,
-                color="0.6",
-                lw=1,
-                ls=":",
-                zorder=0,
-                label="baseline converged cost",
+
+        if threshold is not None:
+            ax.axhline(threshold, color="0.4", lw=1.4, ls="--", zorder=0)
+            ax.annotate(
+                "baseline converged cost",
+                (0, threshold),
+                textcoords="offset points",
+                xytext=(4, 4),
+                ha="left",
+                va="bottom",
+                fontsize=8,
+                color="0.4",
+            )
+        # Mark where each method crosses the threshold and label the absolute
+        # time at that point — staggered vertically so the labels don't
+        # collide, with a leader dot on the threshold line.
+        crossings.sort(key=lambda c: c[1])
+        for i, (label, t_hit, color) in enumerate(crossings):
+            ax.plot([t_hit], [threshold], marker="o", ms=7, color=color, zorder=5)
+            txt = f"{t_hit * 1e3:.0f} ms" if t_hit < 1.0 else f"{t_hit:.1f} s"
+            ax.annotate(
+                txt,
+                (t_hit, threshold),
+                textcoords="offset points",
+                xytext=(0, 14 + 16 * i),
+                ha="center",
+                va="bottom",
+                fontsize=11,
+                fontweight="bold",
+                color=color,
+                arrowprops=dict(arrowstyle="-", color=color, lw=0.8),
             )
         ax.set_yscale("log")
         # symlog: linear through t=0 (so step 0 shows), log beyond — the
@@ -381,8 +401,9 @@ def plot_ba_comparison() -> None:
         ax.legend(fontsize=9, loc="upper right")
     fig.suptitle(
         "Bundle adjustment on GPU: cost vs wall-clock — Schur elimination "
-        "vs full-system CG\n(marker per LM step from step 0; speedup = time "
-        "to reach the baseline's converged cost; × = budget cut-off)",
+        "vs full-system CG\n(marker per LM step from step 0; dashed line = "
+        "baseline's converged cost, labels = time each method reaches it; "
+        "× = budget cut-off)",
         fontsize=13,
     )
     fig.tight_layout()
