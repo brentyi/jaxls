@@ -34,7 +34,7 @@ costs are those of the **returned (accepted) solution** — the solve summary's
 cost history also contains rejected proposals, which would not be honest to
 report.
 
-Reproduce: `uv run --extra dev --extra docs python benchmarks/matched_iters.py` (raw data saved to JSON;
+Reproduce: `uv run --extra dev --extra docs python benchmarks/device_sweep.py` (raw data saved to JSON;
 `--replot` regenerates plots without re-running).
 
 ## Correctness — exact reduced steps (pass)
@@ -70,7 +70,7 @@ in float32 (`benchmarks/float32_check.py`):
 > Schur+CG 26,767) and the orderings are unchanged; post-splice timing
 > runs coincided with other load on the machine (the unchanged
 > full-dense control line ran 4× slow) and were discarded rather than
-> published. Re-time with `uv run --extra dev --extra docs python benchmarks/matched_iters.py` on a
+> published. Re-time with `uv run --extra dev --extra docs python benchmarks/device_sweep.py` on a
 > quiet machine.
 
 Accepted cost / wall-clock at matched k (float64, min of 3, CPU):
@@ -195,13 +195,13 @@ within-run, against the same LM loop — which is what the table shows.
 ## Reproduce
 
 ```bash
-uv run --extra dev --extra docs python benchmarks/matched_iters.py      # matched-iteration study + plots
+uv run --extra dev --extra docs python benchmarks/device_sweep.py       # BA cost/time matrix + plots
 uv run --extra dev --extra docs python benchmarks/float32_check.py      # float32 robustness (Ladybug-49)
 pytest tests/test_schur.py              # correctness/validation suite
 ```
 
 BAL data downloads to /tmp automatically. Raw arrays are saved to
-`benchmarks/results/*.json`; `matched_iters.py --replot` regenerates plots.
+`benchmarks/results/*.json`; `device_sweep.py --replot` regenerates plots.
 
 ---
 
@@ -217,8 +217,7 @@ float64.
 > (since-reverted) spliced scaler plus the termination fixes. The
 > qualitative conclusions — assembly bottleneck, broadcast-vs-GEMM, the
 > termination bug, Schur-vs-full-system gaps — are config-independent;
-> the shipped-configuration BA tables live in "Final configuration" below
-> and in `benchmarks/regression.md`.
+> the shipped-configuration BA tables live in "Final configuration" below.
 
 Harness: `benchmarks/device_sweep.py` (same matched-k methodology: exactly k
 LM iterations, early termination off, warmup + min-of-3, per device via
@@ -227,9 +226,9 @@ Schur+CG, and full dense (small problems only).
 
 ## Where the GPU time went: batched einsum vs broadcast
 
-Profiling one Schur+dense outer iteration on Ladybug-49/GPU
-(`benchmarks/profile_schur.py`) showed the cost was *not* the Cholesky
-factorization but the **assembly of the reduced matrix**:
+Profiling one Schur+dense outer iteration on Ladybug-49/GPU (per-phase
+timing) showed the cost was *not* the Cholesky factorization but the
+**assembly of the reduced matrix**:
 
 | phase             | before  | after   |
 |-------------------|--------:|--------:|
@@ -356,8 +355,8 @@ baselines capped once their behavior was established):
 Added 2026-06-13. After the cross-device study above, two downstream
 regressions traced to the spliced column scaler forced a configuration
 change; this section records the final state and its benchmark numbers.
-The full per-problem regression tables live in `benchmarks/regression.md`
-(regenerate with `benchmarks/make_regression_report.py`).
+Per-problem A/B tables are reproducible via the benchmark suite
+(`python -m benchmarks.suite --gate` against a committed baseline).
 
 **What shipped:**
 
@@ -391,9 +390,9 @@ linear solver.
 GPU, accepted cost / outer LM steps / wall-clock at the largest k within
 a 25 s/solve budget; "(times out)" marks rows stopped by the budget. The
 baseline is jaxls@main's full-system CG — what `solve()` runs on these
-problems without this PR. (CPU numbers, cholmod, and the rest are in the
-complete tables in `regression.md`; main's full dense crashes on an
-int64/int32 index bug this PR fixes.)
+problems without this PR. (CPU numbers, cholmod, and the rest come from
+`benchmarks/device_sweep.py`; main's full dense crashes on an int64/int32
+index bug this PR fixes.)
 
 | problem | full CG (main) | **Schur+dense (PR)** | Schur+CG (PR) |
 |---|---|---|---|
@@ -422,7 +421,6 @@ legible).
 ```bash
 uv run --extra dev --extra docs python benchmarks/device_sweep.py                  # CPU+GPU, all problems
 uv run --extra dev --extra docs python benchmarks/device_sweep.py --devices gpu    # GPU only
-uv run --extra dev --extra docs python benchmarks/profile_schur.py --device gpu    # per-phase profile
 ```
 
 Requires a CUDA jaxlib for the GPU rows; falls back to CPU-only otherwise.
@@ -489,47 +487,3 @@ The honest summary: a 2x single-solve speedup on toy/Ladybug/Trafalgar is
 **not reachable from solver-internal changes** — the bottleneck is the fixed
 per-iteration kernel-dispatch chain. Throughput (batching) is the productive
 direction.
-
----
-
-# Analytic vs autodiff Jacobian (the op-count lever, measured)
-
-Added 2026-06-14. The "Performance ceiling" section predicted that an
-analytic Jacobian for the op-heavy BAL reprojection cost would help op
-count / compile time more than GPU single-solve wall-clock (which is
-dispatch-bound). `benchmarks/analytic_jac_ba.py` provides a hand-derived
-reprojection Jacobian (verified against autodiff to ~1e-10) and measures it.
-
-**The optimization path is unchanged** — analytic and autodiff produce the
-same Jacobian math, so the cost trajectory is identical step-for-step
-(max |Δcost| ~1e-2 absolute, ~1e-6 relative; both reach the same optimum).
-This is a speed/compile lever only, never an accuracy or convergence change.
-
-Dense, lambda0=1e2, 30 iterations, float64:
-
-| problem / device | warm solve | per-iter | compile | fusions | final cost (both) |
-|---|---|---|---|---|---|
-| Ladybug-49 / GPU   | 0.99x | 0.99x | **1.58x** | 168→151 | 26,779 |
-| Ladybug-49 / CPU   | 1.03x | 1.03x | 1.26x | 245→223 | 26,779 |
-| Trafalgar-138 / GPU| 0.95x | 0.95x | **1.79x** | 175→151 | 173,626 |
-| Trafalgar-138 / CPU| 1.04x | 1.04x | 1.16x | 249→227 | 173,626 |
-
-(ratio = autodiff / analytic; >1 means analytic is faster)
-
-- **GPU single-solve: no win (0.95-0.99x)** — confirms the dispatch-bound
-  diagnosis directly. The Jacobian, analytic or autodiff, is one big vmapped
-  fusion; replacing ~800 autodiff ops with the analytic form cuts HLO op
-  count (~10% fewer fusions) but the bottleneck is the per-iteration kernel
-  *chain*, not the Jacobian's internal op count.
-- **Compile time: 1.2-1.8x faster** — the real, repeatable analytic win. The
-  smaller Jacobian graph compiles faster, most on GPU.
-- **CPU wall-clock: a modest ~1.03-1.04x** — CPU is less dispatch-dominated,
-  so the smaller graph shows through slightly.
-
-Takeaway: for these problems an analytic Jacobian is a compile-time and
-mild-CPU win, not the GPU single-solve speedup it first appears to be —
-consistent with, and a direct test of, the dispatch-bound ceiling. It would
-matter more for costs whose autodiff graph is far larger relative to the
-solver chain, or in the batched/throughput regime.
-
-Reproduce: `uv run --extra dev --extra docs python benchmarks/analytic_jac_ba.py --problem trafalgar138 --device gpu`

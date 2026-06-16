@@ -7,9 +7,8 @@ Two things live here:
    day-to-day optimizer work and CI.
 2. **Study scripts** — the harnesses behind the deep-dive in
    [`results.md`](results.md) (Schur elimination, GPU optimization, the
-   LM/scaler investigation) and the main-vs-PR tables in
-   [`regression.md`](regression.md). Keep for reproducing those specific
-   figures; the suite is what you run normally.
+   LM/scaler investigation). Keep for reproducing those specific figures;
+   the suite is what you run normally.
 
 ## The suite
 
@@ -89,16 +88,13 @@ with jaxls.record_iteration_times() as times:
 # times[i] - times[0]  ->  elapsed seconds to reach iteration i
 ```
 
-## Study scripts (reproduce results.md / regression.md)
+## Study scripts (reproduce results.md)
 
 | script | what it produces |
 |---|---|
 | `device_sweep.py` | BA cost/time matrix + per-device and 3-up plots |
 | `trace_examples.py` | example cost-vs-time traces (main vs PR) |
-| `make_regression_report.py` | the `regression.md` tables |
-| `profile_schur.py` | per-phase Schur timing (where GPU time goes) |
 | `float32_check.py` | standalone float32 robustness check |
-| `matched_iters.py` / `plot_frontier.py` | the original matched-k study |
 
 BAL data auto-downloads to `/tmp`. The A/B scripts select the jaxls under
 test via `PYTHONPATH` / a git worktree; see each script's docstring.

@@ -1,8 +1,7 @@
 """Cross-device benchmark: linear-solver methods on CPU vs GPU.
 
-Extends the matched-iteration methodology of `matched_iters.py` to run the
-same study on both CPU and GPU, across a sweep of problem sizes, comparing
-every available linear solver:
+Runs a matched-iteration study on both CPU and GPU, across a sweep of problem
+sizes, comparing every available linear solver:
 
   - full CG       : conjugate gradient on the full system (no elimination)
   - full dense    : dense Cholesky on the full system (small problems only)
@@ -10,8 +9,8 @@ every available linear solver:
   - Schur + dense : variable elimination, dense reduced solve
   - Schur + CG    : variable elimination, matrix-free reduced CG
 
-Methodology (same as matched_iters.py): run exactly k Levenberg-Marquardt
-iterations with early termination off, for a sweep of k, and record
+Methodology: run exactly k Levenberg-Marquardt iterations with early
+termination off, for a sweep of k, and record
 (accepted cost, wall-clock) at each k. One warmup solve per configuration
 with `jax.block_until_ready` absorbs compilation and async dispatch; each
 timed point is the min of `repeats`.
@@ -133,7 +132,7 @@ METHODS: tuple[Method, ...] = (
 
 # ---------------------------------------------------------------------------
 # Timing — the measurement kernel itself is bal.run_k_iterations, shared with
-# matched_iters.py so the two scripts cannot drift apart methodologically.
+# the benchmark suite so they cannot drift apart methodologically.
 # ---------------------------------------------------------------------------
 
 

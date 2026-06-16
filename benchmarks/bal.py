@@ -46,8 +46,8 @@ def run_k_iterations(
     """Run exactly k LM iterations; return (accepted cost, min wall-clock).
 
     The shared measurement kernel for the matched-iteration benchmarks
-    (`matched_iters.py`, `device_sweep.py`). Each rule guards against a real
-    measurement bug: early termination is disabled so k is exact; one full
+    (`device_sweep.py` and the benchmark suite). Each rule guards against a
+    real measurement bug: early termination is disabled so k is exact; one full
     warmup solve with `jax.block_until_ready` absorbs compilation and
     asynchronously dispatched device work; each timed point is the min of
     `repeats`. The reported cost is recomputed from the returned (accepted)
