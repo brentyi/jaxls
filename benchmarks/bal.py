@@ -76,7 +76,7 @@ def run_k_iterations(
             ),
             verbose=False,
             return_summary=True,
-            **extra,
+            **extra,  # type: ignore[arg-type]  # only ever {"trust_region": ...}
         )
 
     # Warmup (absorbs compilation). If it blows past `warmup_budget_s`, this

@@ -89,12 +89,17 @@ def record_iteration_times() -> Any:
     times: Any = []
     _active_iteration_time_recorder = times
 
-    NonlinearSolver.solve.clear_cache()
+    _clear_solve_cache()
     try:
         yield times
     finally:
         _active_iteration_time_recorder = prev
-        NonlinearSolver.solve.clear_cache()
+        _clear_solve_cache()
+
+
+def _clear_solve_cache() -> Any:
+
+    NonlinearSolver.solve.clear_cache()
 
 
 def _record_iteration_time(anchor: Any) -> Any:
@@ -292,6 +297,7 @@ class NonlinearSolver:
         if self.termination.early_termination:
 
             def should_continue(state: Any) -> Any:
+
                 basic_checks = ~jnp.isnan(state.solution.cost_info.cost_total) & (
                     state.summary.iterations < self.termination.max_iterations
                 )
@@ -356,6 +362,7 @@ class NonlinearSolver:
         ATb: Any,
         schur_factors: Any = None,
     ) -> Any:
+
         if self.trust_region is not None:
             lambd = jnp.minimum(
                 inner_state.lambd * inner_state.lambda_growth,
@@ -712,6 +719,7 @@ class TerminationConfig:
         iterations: Any,
         accepted: Any,
     ) -> Any:
+
         cost_reldelta = (
             jnp.abs(cost_nonconstraint_updated - sol_prev.cost_info.cost_nonconstraint)
             / sol_prev.cost_info.cost_nonconstraint

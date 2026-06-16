@@ -137,7 +137,7 @@ METHODS: tuple[Method, ...] = (
 # ---------------------------------------------------------------------------
 
 
-def device_for(platform: str) -> jax.Device | None:
+def device_for(platform: str) -> "jax.Device | None":  # type: ignore[name-defined]
     try:
         return jax.devices(platform)[0]
     except RuntimeError:

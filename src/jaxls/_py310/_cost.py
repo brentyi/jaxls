@@ -97,6 +97,7 @@ class Cost:
         jac_custom_with_cache_fn: Any = None,
         name: Any = None,
     ) -> Any:
+
         def decorator(
             compute_residual: Any,
         ) -> Any:

@@ -11,6 +11,7 @@ cholmod. Covers:
 """
 
 import sys
+from typing import Literal
 
 import jax
 import jax.numpy as jnp
@@ -341,11 +342,14 @@ def test_schur_cg_preconditioner_options() -> None:
     # Unpreconditioned CG's convergence rate is bound by the raw conditioning
     # of the reduced system, so it lags the preconditioned options at any
     # fixed iteration budget; it gets a looser parity bound.
-    for preconditioner, tol in (
+    preconditioners: tuple[
+        tuple[Literal["block_jacobi", "point_jacobi"] | None, float], ...
+    ] = (
         ("block_jacobi", 1e-2),
         ("point_jacobi", 1e-2),
         (None, 1e-1),
-    ):
+    )
+    for preconditioner, tol in preconditioners:
         sol, _ = problem.solve(
             init,
             linear_solver=jaxls.ConjugateGradientConfig(preconditioner=preconditioner),

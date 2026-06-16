@@ -152,12 +152,18 @@ def record_iteration_times() -> Iterator[list[float]]:
     # reused and silently record nothing. Clear the cache on the way in (force
     # a callback-bearing recompile) and on the way out (restore the zero-
     # overhead executable for normal solves).
-    NonlinearSolver.solve.clear_cache()
+    _clear_solve_cache()
     try:
         yield times
     finally:
         _active_iteration_time_recorder = prev
-        NonlinearSolver.solve.clear_cache()
+        _clear_solve_cache()
+
+
+def _clear_solve_cache() -> None:
+    # NonlinearSolver.solve is wrapped by @jdc.jit, whose .clear_cache() the
+    # type checker can't see through the FunctionType it infers.
+    NonlinearSolver.solve.clear_cache()  # type: ignore[attr-defined]
 
 
 def _record_iteration_time(anchor: jax.Array) -> None:
@@ -435,7 +441,9 @@ class NonlinearSolver:
         # (compute_column_norms is a full-Jacobian scatter — wasted on every
         # iteration past the first when the scaler is frozen anyway).
         jacobian_scaler = _compute_jacobian_scaler(
-            problem._compute_jac_values(vals, cost_info.jac_cache).compute_column_norms()
+            problem._compute_jac_values(
+                vals, cost_info.jac_cache
+            ).compute_column_norms()
         )
 
         state = _LmOuterState(

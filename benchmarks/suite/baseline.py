@@ -66,6 +66,9 @@ def render_report(diffs: list[Diff], skipped: dict[str, str], meta: dict) -> str
         lines += [f"## ⚠️ {len(regressions)} regression(s)", ""]
         lines += ["| metric | baseline | current | change |", "|---|---:|---:|---:|"]
         for d in regressions:
+            # regressed is only set when a baseline exists (see
+            # diff_against_baseline), so d.baseline is non-None here.
+            assert d.baseline is not None
             rc = f"{d.rel_change:+.1%}" if d.rel_change is not None else "—"
             lines.append(
                 f"| {d.key} | {d.baseline.value:.6g} | {d.current.value:.6g} | {rc} |"

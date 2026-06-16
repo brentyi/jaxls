@@ -67,6 +67,7 @@ class EliminationPlan:
 def infer_eliminate(
     problem: Any,
 ) -> Any:
+
     slots_per_group = [
         {
             var_type: ids.shape[-1]
@@ -105,6 +106,7 @@ def build_elimination_plan(
     problem: Any,
     eliminate: Any,
 ) -> Any:
+
     elim_set = list()
     for var_type in eliminate:
         if var_type not in elim_set:

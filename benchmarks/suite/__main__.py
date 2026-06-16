@@ -38,7 +38,8 @@ class Args:
     update_baseline: bool = False
     """Overwrite the committed baseline with this run's metrics."""
     only: tuple[str, ...] = ()
-    """Run only these workloads (default: all). Choices: """ + ", ".join(wl.ALL)
+    """Run only these workloads (default: all); see benchmarks/README.md for
+    the choices, or pass an unknown name to have them listed."""
     report_path: Path = Path("benchmarks/results/suite_report.md")
     results_path: Path = Path("benchmarks/results/suite_results.json")
     repeats: int = 3

@@ -215,6 +215,7 @@ def float32_robustness(cfg: SuiteConfig) -> WorkloadResult:
     if skip is not None:
         res.skipped = skip
         return res
+    assert d is not None  # skip is None => parsed result present
     res.metrics.append(
         Metric(
             "float32.ladybug49.nan_count",
@@ -246,7 +247,7 @@ def float32_robustness(cfg: SuiteConfig) -> WorkloadResult:
 def pyroki_ik(cfg: SuiteConfig) -> WorkloadResult:
     res = WorkloadResult(name="pyroki_ik")
     try:
-        import pyroki  # noqa: F401
+        import pyroki  # type: ignore[import-not-found]  # noqa: F401
     except ImportError:
         res.skipped = "pyroki not installed (pip install the pyroki repo)"
         return res
@@ -263,6 +264,7 @@ def pyroki_ik(cfg: SuiteConfig) -> WorkloadResult:
     if skip is not None:
         res.skipped = skip
         return res
+    assert rows is not None  # skip is None => parsed result present
     for r in rows:
         b = r["batch"]
         res.metrics.append(

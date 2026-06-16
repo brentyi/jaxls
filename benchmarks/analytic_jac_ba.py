@@ -153,7 +153,7 @@ def build(problem_name: str, analytic: bool):
         reprojection_cost,
         (CameraVar(jnp.array(cam_idx)), PointVar(jnp.array(pt_idx)), jnp.array(obs)),
         name="reprojection",
-        **kw,
+        **kw,  # type: ignore[arg-type]  # {} or {"jac_custom_fn": ...}
     )
     prob = jaxls.LeastSquaresProblem(
         [cost], [CameraVar(jnp.arange(ncam)), PointVar(jnp.arange(npt))]
@@ -198,7 +198,7 @@ def hlo_kernels(prob, init) -> tuple[int, int]:
             trust_region=jaxls.TrustRegionConfig(lambda_initial=1e2),
         )
 
-    txt = solve.lower().compile().as_text()
+    txt = solve.lower().compile().as_text() or ""
     return txt.count("fusion("), txt.count("custom-call(")
 
 

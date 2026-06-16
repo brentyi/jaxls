@@ -81,6 +81,7 @@ class LeastSquaresProblem:
         )
 
     def analyze(self, use_onp: Any = False, schur_elimination: Any = True) -> Any:
+
         if use_onp:
             jnp = onp
         else:

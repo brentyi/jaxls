@@ -24,7 +24,7 @@ from jax import numpy as jnp
 from robot_descriptions.loaders.yourdfpy import load_robot_description
 
 import jaxls
-import pyroki as pk
+import pyroki as pk  # type: ignore[import-not-found]
 
 
 def newton_raphson(f, x, iters):
