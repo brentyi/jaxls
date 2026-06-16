@@ -15,8 +15,8 @@ Timing methodology (each rule guards against a real measurement bug):
   elimination path, so its run-to-run variation is the noise floor.
 
 Usage:
-    python benchmarks/matched_iters.py            # run everything
-    python benchmarks/matched_iters.py --replot   # regenerate plots from JSON
+    uv run --extra dev --extra docs python benchmarks/matched_iters.py            # run everything
+    uv run --extra dev --extra docs python benchmarks/matched_iters.py --replot   # regenerate plots from JSON
 """
 
 from __future__ import annotations

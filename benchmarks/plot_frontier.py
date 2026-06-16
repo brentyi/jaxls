@@ -2,7 +2,7 @@
 
 Reads the matched-iteration data saved by `matched_iters.py` and renders a
 two-panel comparison of full CG, Schur + CG, and Schur + dense on
-Ladybug-49. Usage: python benchmarks/plot_frontier.py
+Ladybug-49. Usage: uv run --extra dev --extra docs python benchmarks/plot_frontier.py
 """
 
 from __future__ import annotations

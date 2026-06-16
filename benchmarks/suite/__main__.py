@@ -1,13 +1,13 @@
 """jaxls benchmark + regression suite — one entry point.
 
-    python -m benchmarks.suite                 # full run, report to stdout
-    python -m benchmarks.suite --quick         # fast GPU-only inner loop
-    python -m benchmarks.suite --gate          # diff vs baseline, exit 1 on regression
-    python -m benchmarks.suite --update-baseline
-    python -m benchmarks.suite --only bundle_adjustment float32_robustness
+Run via uv from the repo root (the `dev` extra brings tyro; `docs` brings
+matplotlib + scikit-sparse):
 
-Run from the repo root (the suite uses PYTHONPATH=src for subprocess
-workloads). Requires `tyro` (already a dev dependency).
+    uv run --extra dev --extra docs python -m benchmarks.suite                 # full run, report to stdout
+    uv run --extra dev --extra docs python -m benchmarks.suite --quick         # fast GPU-only inner loop
+    uv run --extra dev --extra docs python -m benchmarks.suite --gate          # diff vs baseline, exit 1 on regression
+    uv run --extra dev --extra docs python -m benchmarks.suite --update-baseline
+    uv run --extra dev --extra docs python -m benchmarks.suite --only bundle_adjustment float32_robustness
 """
 
 from __future__ import annotations

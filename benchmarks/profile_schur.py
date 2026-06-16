@@ -12,7 +12,7 @@ where the per-iteration cost actually goes:
   back_substitute        : recover eliminated update
 
 Run:
-    python benchmarks/profile_schur.py --problem ladybug49 --device gpu
+    uv run --extra dev --extra docs python benchmarks/profile_schur.py --problem ladybug49 --device gpu
 """
 
 from __future__ import annotations

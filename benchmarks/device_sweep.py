@@ -22,10 +22,10 @@ CPU device is always available; the GPU rows are skipped if no GPU backend
 is present.
 
 Usage:
-    python benchmarks/device_sweep.py                 # run everything
-    python benchmarks/device_sweep.py --replot        # plots from JSON only
-    python benchmarks/device_sweep.py --problems toy ladybug49
-    python benchmarks/device_sweep.py --devices cpu   # CPU only
+    uv run --extra dev --extra docs python benchmarks/device_sweep.py                 # run everything
+    uv run --extra dev --extra docs python benchmarks/device_sweep.py --replot        # plots from JSON only
+    uv run --extra dev --extra docs python benchmarks/device_sweep.py --problems toy ladybug49
+    uv run --extra dev --extra docs python benchmarks/device_sweep.py --devices cpu   # CPU only
 """
 
 from __future__ import annotations

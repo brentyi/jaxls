@@ -4,7 +4,7 @@ Forming S = H_cc - W V^{-1} W^T cancels catastrophically in float32; a naive
 implementation NaNs in the Cholesky factorization. Requirement: a full
 float32 solve with zero NaNs, converging to a cost comparable to float64.
 
-Usage: python benchmarks/float32_check.py
+Usage: uv run --extra dev --extra docs python benchmarks/float32_check.py
 """
 
 from __future__ import annotations

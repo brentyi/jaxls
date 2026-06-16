@@ -7,7 +7,7 @@ Inputs (written by the regression suite; see results.md "Reproduce"):
     results/device_{toy,ladybug49,trafalgar138}_tuned_{main,final}.json
         BA feature sweep at lambda_initial=1e2 (uniform across methods).
 
-Regenerate with: python benchmarks/make_regression_report.py
+Regenerate with: uv run --extra dev --extra docs python benchmarks/make_regression_report.py
 """
 
 from __future__ import annotations

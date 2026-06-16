@@ -26,14 +26,14 @@ uv run --extra dev ./transpile_py310.py
 uv run --extra docs sphinx-build -b dirhtml docs_source/source docs
 
 # Run benchmark on example notebooks.
-uv run --extra examples --extra docs python benchmark.py
-uv run --extra examples --extra docs python benchmark.py --category robotics  # Filter by category
+uv run --extra dev --extra docs python benchmark.py
+uv run --extra dev --extra docs python benchmark.py --category robotics  # Filter by category
 
 # Benchmark + regression suite (BA / examples / pyroki / float32). See
 # benchmarks/README.md. Run from the repo root.
-python -m benchmarks.suite              # full run + report vs committed baseline
-python -m benchmarks.suite --quick      # fast GPU-only inner loop
-python -m benchmarks.suite --gate       # exit 1 on regression (CI)
+uv run --extra dev --extra docs python -m benchmarks.suite              # full run + report vs committed baseline
+uv run --extra dev --extra docs python -m benchmarks.suite --quick      # fast GPU-only inner loop
+uv run --extra dev --extra docs python -m benchmarks.suite --gate       # exit 1 on regression (CI)
 ```
 
 ## Style Guidelines

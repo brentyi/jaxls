@@ -34,7 +34,7 @@ costs are those of the **returned (accepted) solution** — the solve summary's
 cost history also contains rejected proposals, which would not be honest to
 report.
 
-Reproduce: `python benchmarks/matched_iters.py` (raw data saved to JSON;
+Reproduce: `uv run --extra dev --extra docs python benchmarks/matched_iters.py` (raw data saved to JSON;
 `--replot` regenerates plots without re-running).
 
 ## Correctness — exact reduced steps (pass)
@@ -70,7 +70,7 @@ in float32 (`benchmarks/float32_check.py`):
 > Schur+CG 26,767) and the orderings are unchanged; post-splice timing
 > runs coincided with other load on the machine (the unchanged
 > full-dense control line ran 4× slow) and were discarded rather than
-> published. Re-time with `python benchmarks/matched_iters.py` on a
+> published. Re-time with `uv run --extra dev --extra docs python benchmarks/matched_iters.py` on a
 > quiet machine.
 
 Accepted cost / wall-clock at matched k (float64, min of 3, CPU):
@@ -195,8 +195,8 @@ within-run, against the same LM loop — which is what the table shows.
 ## Reproduce
 
 ```bash
-python benchmarks/matched_iters.py      # matched-iteration study + plots
-python benchmarks/float32_check.py      # float32 robustness (Ladybug-49)
+uv run --extra dev --extra docs python benchmarks/matched_iters.py      # matched-iteration study + plots
+uv run --extra dev --extra docs python benchmarks/float32_check.py      # float32 robustness (Ladybug-49)
 pytest tests/test_schur.py              # correctness/validation suite
 ```
 
@@ -420,9 +420,9 @@ legible).
 ## Reproduce (cross-device)
 
 ```bash
-python benchmarks/device_sweep.py                  # CPU+GPU, all problems
-python benchmarks/device_sweep.py --devices gpu    # GPU only
-python benchmarks/profile_schur.py --device gpu    # per-phase profile
+uv run --extra dev --extra docs python benchmarks/device_sweep.py                  # CPU+GPU, all problems
+uv run --extra dev --extra docs python benchmarks/device_sweep.py --devices gpu    # GPU only
+uv run --extra dev --extra docs python benchmarks/profile_schur.py --device gpu    # per-phase profile
 ```
 
 Requires a CUDA jaxlib for the GPU rows; falls back to CPU-only otherwise.
@@ -532,4 +532,4 @@ consistent with, and a direct test of, the dispatch-bound ceiling. It would
 matter more for costs whose autodiff graph is far larger relative to the
 solver chain, or in the batched/throughput regime.
 
-Reproduce: `python benchmarks/analytic_jac_ba.py --problem trafalgar138 --device gpu`
+Reproduce: `uv run --extra dev --extra docs python benchmarks/analytic_jac_ba.py --problem trafalgar138 --device gpu`
