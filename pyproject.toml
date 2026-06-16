@@ -26,8 +26,8 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "jax>=0.4.0",
-    "jaxlib",
+    "jax>=0.6.0",
+    "jaxlib>=0.6.0",
     "jaxlie>=1.0.0",
     "jax_dataclasses>=1.6.2",
     "loguru",
