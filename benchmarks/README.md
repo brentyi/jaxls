@@ -13,23 +13,30 @@ Two things live here:
 
 ## The suite
 
+Run everything through `uv` (matching the Makefile / DEV_NOTES). The `dev`
+extra brings `tyro`; `docs` brings `matplotlib` + `scikit-sparse` (cholmod).
+
 ```bash
 # Default run: the gate set (bundle_adjustment + float32), diff vs baseline.
-python -m benchmarks.suite
+uv run --extra dev --extra docs python -m benchmarks.suite
 
 # Fast inner loop while hill-climbing (GPU only, no slow CPU baselines, ~30s).
-python -m benchmarks.suite --quick --only bundle_adjustment
+uv run --extra dev --extra docs python -m benchmarks.suite --quick --only bundle_adjustment
 
 # CI / regression gate: exit 1 if any metric regressed past tolerance.
-python -m benchmarks.suite --gate
+uv run --extra dev --extra docs python -m benchmarks.suite --gate
 
 # Bless the current numbers as the new baseline (do this deliberately).
-python -m benchmarks.suite --update-baseline
+uv run --extra dev --extra docs python -m benchmarks.suite --update-baseline
 
 # Opt-in workloads (kept out of the deterministic gate; run on their own).
-python -m benchmarks.suite --only pyroki_ik          # downstream IK regression
-python -m benchmarks.suite --only example_notebooks  # ~minutes, 19 notebooks
+uv run --extra dev --extra docs python -m benchmarks.suite --only pyroki_ik          # downstream IK regression
+uv run --extra dev --extra docs python -m benchmarks.suite --only example_notebooks  # ~minutes, 19 notebooks
 ```
+
+GPU rows need a CUDA jaxlib in the environment (`uv pip install "jax[cuda12]"`);
+without it the suite falls back to CPU. `pyroki_ik` additionally needs the
+pyroki package installed.
 
 The default/gate set is `bundle_adjustment` + `float32_robustness` — fast and
 in-process-reliable. `pyroki_ik` (needs pyroki installed) and
@@ -37,10 +44,8 @@ in-process-reliable. `pyroki_ik` (needs pyroki installed) and
 run fine standalone but are slow and/or unreliable as co-tenant subprocesses
 of a CUDA-warmed parent, so they don't gate.
 
-Run from the repo root. Needs a CUDA jaxlib for the GPU rows (falls back to
-CPU otherwise) and `tyro` (dev dependency). Outputs:
-`results/suite_results.json` (raw metrics) and `results/suite_report.md`
-(human-readable diff vs baseline).
+Run from the repo root. Outputs: `results/suite_results.json` (raw metrics)
+and `results/suite_report.md` (human-readable diff vs baseline).
 
 ### How it works
 
@@ -70,10 +75,19 @@ methodology stays consistent.
 
 ### Per-iteration timestamps
 
-`SolveSummary.time_history` records host `perf_counter` per LM step via a
-callback inside the solve, so one solve yields a cost-vs-time trace (no
-matched-k re-solving). This is what the example traces and BA plots use; it
-is also available to any jaxls user for profiling their own solves.
+`jaxls.record_iteration_times()` is a context manager that records a host
+`perf_counter` timestamp per LM step (via a callback inside the solve), so one
+solve yields a cost-vs-time trace (no matched-k re-solving). The timestamps
+live in a host-side Python list — always float64, off the jitted path and out
+of `SolveSummary` — so they resolve millisecond steps even without
+`jax_enable_x64`. This is what the example traces and BA plots use; it is also
+available to any jaxls user for profiling their own solves:
+
+```python
+with jaxls.record_iteration_times() as times:
+    sol = problem.solve(init)
+# times[i] - times[0]  ->  elapsed seconds to reach iteration i
+```
 
 ## Study scripts (reproduce results.md / regression.md)
 

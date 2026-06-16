@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import dataclasses
+import time
 from typing import (
     TYPE_CHECKING,
     Callable,
     Hashable,
+    Iterator,
     Literal,
     assert_never,
     cast,
@@ -14,7 +17,6 @@ from typing import (
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
-import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -103,33 +105,78 @@ def _cholmod_solve_on_host(
     return cost.solve_A(ATb)
 
 
-def _host_perf_counter(anchor: jax.Array) -> jax.Array:
-    """Wall-clock seconds (`time.perf_counter`) read on the host from inside
-    a jitted solve, via `jax.pure_callback`, for `SolveSummary.time_history`.
+_active_iteration_time_recorder: list[float] | None = None
 
-    `anchor` is a value that depends on the just-computed iterate (its cost):
-    the callback consumes it so XLA cannot common-subexpression-eliminate the
-    (otherwise argument-free) callbacks together, hoist them out of the loop,
-    or fire one before that iteration's work completes. We ignore its value
-    and just return the host clock at call time.
 
-    Timestamps include asynchronous-dispatch latency, so use differences from
-    `time_history[0]`, not absolute values, and treat the largest gap as a
-    loose upper bound; for precise totals wrap the whole solve in
-    `block_until_ready`. Recording is opt-in
-    (`TerminationConfig.record_time_history`) because the per-iteration host
-    callback adds a synchronization point that is unwanted on the default
-    solve path (and awkward under vmap/pmap)."""
-    import time
+@contextlib.contextmanager
+def record_iteration_times() -> Iterator[list[float]]:
+    """Record a host wall-clock timestamp at each outer LM iteration of any
+    `solve()` running in this block, for cost-vs-time benchmarking.
 
-    # Match the active float width: a float64 callback result errors when
-    # jax_enable_x64 is off.
-    dtype = jnp.zeros(()).dtype
+    Returns a list that is filled with `time.perf_counter()` values (one per
+    outer iteration, in order); `times[i] - times[0]` is the elapsed time to
+    reach iteration `i`. Off the normal solve path entirely — the timestamps
+    never enter the jitted computation or `SolveSummary`, so there is zero
+    overhead and no dtype dependence when not recording, and the values are
+    always host float64 (the in-array alternative would be float32 without
+    jax_enable_x64, too coarse to resolve millisecond steps).
 
-    def _now(_anchor: object) -> onp.ndarray:
-        return onp.asarray(time.perf_counter(), dtype=dtype)
+    Timestamps include async-dispatch latency, so read differences, not
+    absolute values, and wrap the solve in `block_until_ready` for precise
+    totals. Not reentrant / not for concurrent solves from multiple threads
+    (one active recorder at a time).
 
-    return jax.pure_callback(_now, jax.ShapeDtypeStruct((), dtype), anchor)
+        with jaxls.record_iteration_times() as times:
+            sol = problem.solve(init)
+        # times[1:] - times[0]  ->  per-iteration elapsed seconds
+
+    The recording callback is decided at trace time, so whether timestamps are
+    captured is baked into the compiled solve. Entering and leaving this block
+    therefore clears the solver's JIT cache, so the first solve inside it
+    recompiles *with* the callback (even if an identical solve was already
+    compiled without one) and the first solve after it recompiles *without*.
+    The compile inside the block also acts as the warmup; for steady-state
+    timing, run the solve twice in the block and read the second:
+
+        with jaxls.record_iteration_times() as times:
+            jax.block_until_ready(problem.solve(init))   # warmup, compiles
+            times.clear()
+            sol = jax.block_until_ready(problem.solve(init))
+    """
+    global _active_iteration_time_recorder
+    prev = _active_iteration_time_recorder
+    times: list[float] = []
+    _active_iteration_time_recorder = times
+    # The callback's presence is fixed at trace time and not part of the JIT
+    # cache key, so a cached (callback-free) executable would otherwise be
+    # reused and silently record nothing. Clear the cache on the way in (force
+    # a callback-bearing recompile) and on the way out (restore the zero-
+    # overhead executable for normal solves).
+    NonlinearSolver.solve.clear_cache()
+    try:
+        yield times
+    finally:
+        _active_iteration_time_recorder = prev
+        NonlinearSolver.solve.clear_cache()
+
+
+def _record_iteration_time(anchor: jax.Array) -> None:
+    """Append `time.perf_counter()` to the active recorder, if any, via
+    `jax.debug.callback` so it works inside the jitted `lax.while_loop`.
+
+    `anchor` is a value that depends on the just-computed iterate (its cost);
+    the callback consumes it so the timestamp is ordered after that
+    iteration's work and the callbacks are not merged/hoisted by XLA. A no-op
+    (no callback emitted) when no `record_iteration_times()` block is active,
+    so the default solve path is untouched."""
+    if _active_iteration_time_recorder is None:
+        return
+
+    def _stamp(_anchor: object) -> None:
+        if _active_iteration_time_recorder is not None:
+            _active_iteration_time_recorder.append(time.perf_counter())
+
+    jax.debug.callback(_stamp, anchor)
 
 
 def _compute_jacobian_scaler(column_norms: jax.Array) -> jax.Array:
@@ -243,12 +290,6 @@ class SolveSummary:
     cost_history: jax.Array
     """History of non-augmented costs (l2_squared terms only, excludes constraint penalties)."""
     lambda_history: jax.Array
-    time_history: jax.Array
-    """Per-outer-iteration host wall-clock timestamps (`time.perf_counter`
-    seconds). `time_history[i] - time_history[0]` is the elapsed time to
-    reach iteration `i`. All zeros unless
-    `TerminationConfig.record_time_history=True`; see `_host_perf_counter`
-    for accuracy caveats. Entries past `iterations` are zero."""
 
 
 @jdc.pytree_dataclass
@@ -370,11 +411,9 @@ class NonlinearSolver:
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
-        time_history = jnp.zeros(self.termination.max_iterations)
-        if self.termination.record_time_history:
-            time_history = time_history.at[0].set(
-                _host_perf_counter(cost_info.cost_total)
-            )
+        # Timestamp the initial point (no-op unless a record_iteration_times()
+        # block is active); kept off the solver state entirely.
+        _record_iteration_time(cost_info.cost_total)
 
         # Initialize AL state if constraints are present.
         al_state: AugmentedLagrangianState | None = None
@@ -414,7 +453,6 @@ class NonlinearSolver:
                 iterations=jnp.array(0),
                 cost_history=cost_history,
                 lambda_history=lambda_history,
-                time_history=time_history,
                 termination_criteria=jnp.array([False, False, False]),
                 termination_deltas=jnp.zeros(3),
             ),
@@ -637,13 +675,10 @@ class NonlinearSolver:
                 cg_state=cg_state,
             )
             next.local_delta = local_delta
-            time_history = next.summary.time_history
-            if self.termination.record_time_history:
-                # Anchor the timestamp on this iterate's cost so the callback
-                # can't be reordered/hoisted ahead of the step's work.
-                time_history = time_history.at[iterations].set(
-                    _host_perf_counter(proposed_cost_info.cost_total)
-                )
+            # Timestamp this iterate (no-op unless a record_iteration_times()
+            # block is active). Anchored on this step's cost so the callback
+            # can't be reordered/hoisted ahead of the work it measures.
+            _record_iteration_time(proposed_cost_info.cost_total)
             next.summary = SolveSummary(
                 iterations=iterations,
                 termination_criteria=term_criteria,
@@ -652,7 +687,6 @@ class NonlinearSolver:
                     proposed_cost_info.cost_nonconstraint
                 ),
                 lambda_history=next.summary.lambda_history.at[iterations].set(lambd),
-                time_history=time_history,
             )
 
         return next
@@ -936,11 +970,6 @@ class TerminationConfig:
     early_termination: jdc.Static[bool] = True
     """If set to `True`, terminate when any of the tolerances are met. If
     `False`, always run `max_iterations` steps."""
-    record_time_history: jdc.Static[bool] = False
-    """If `True`, record a host wall-clock timestamp per outer iteration into
-    `SolveSummary.time_history` (one `jax.pure_callback` per step). Off by
-    default: the callback adds a host synchronization point that is unwanted
-    on the normal solve path. Mainly for benchmarking convergence-vs-time."""
     cost_tolerance: float | jax.Array = 1e-5
     """We terminate if `|cost change| / cost < cost_tolerance`. For constrained
     problems, this acts as a floor for the adaptive inner solver tolerance."""

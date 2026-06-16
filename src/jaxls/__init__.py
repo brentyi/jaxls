@@ -18,6 +18,7 @@ if TYPE_CHECKING or sys.version_info >= (3, 12):
     from ._problem import AnalyzedLeastSquaresProblem as AnalyzedLeastSquaresProblem
     from ._problem import LeastSquaresProblem as LeastSquaresProblem
     from ._solvers import ConjugateGradientConfig as ConjugateGradientConfig
+    from ._solvers import record_iteration_times as record_iteration_times
     from ._solvers import SolveSummary as SolveSummary
     from ._solvers import TerminationConfig as TerminationConfig
     from ._solvers import TrustRegionConfig as TrustRegionConfig
@@ -42,6 +43,7 @@ elif sys.version_info >= (3, 10):
     )
     from ._py310._problem import LeastSquaresProblem as LeastSquaresProblem
     from ._py310._solvers import ConjugateGradientConfig as ConjugateGradientConfig
+    from ._py310._solvers import record_iteration_times as record_iteration_times
     from ._py310._solvers import SolveSummary as SolveSummary
     from ._py310._solvers import TerminationConfig as TerminationConfig
     from ._py310._solvers import TrustRegionConfig as TrustRegionConfig

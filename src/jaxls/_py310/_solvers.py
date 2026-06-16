@@ -1,13 +1,14 @@
 from __future__ import annotations
 from typing import Any
 
+import contextlib
 import dataclasses
+import time
 from typing_extensions import assert_never
 
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
-import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -78,15 +79,33 @@ def _cholmod_solve_on_host(
     return cost.solve_A(ATb)
 
 
-def _host_perf_counter(anchor: Any) -> Any:
-    import time
+_active_iteration_time_recorder: Any = None
 
-    dtype = jnp.zeros(()).dtype
 
-    def _now(_anchor: Any) -> Any:
-        return onp.asarray(time.perf_counter(), dtype=dtype)
+@contextlib.contextmanager
+def record_iteration_times() -> Any:
+    global _active_iteration_time_recorder
+    prev = _active_iteration_time_recorder
+    times: Any = []
+    _active_iteration_time_recorder = times
 
-    return jax.pure_callback(_now, jax.ShapeDtypeStruct((), dtype), anchor)
+    NonlinearSolver.solve.clear_cache()
+    try:
+        yield times
+    finally:
+        _active_iteration_time_recorder = prev
+        NonlinearSolver.solve.clear_cache()
+
+
+def _record_iteration_time(anchor: Any) -> Any:
+    if _active_iteration_time_recorder is None:
+        return
+
+    def _stamp(_anchor: Any) -> Any:
+        if _active_iteration_time_recorder is not None:
+            _active_iteration_time_recorder.append(time.perf_counter())
+
+    jax.debug.callback(_stamp, anchor)
 
 
 def _compute_jacobian_scaler(column_norms: Any) -> Any:
@@ -160,7 +179,6 @@ class SolveSummary:
     termination_deltas: Any
     cost_history: Any
     lambda_history: Any
-    time_history: Any
 
 
 @jdc.pytree_dataclass
@@ -223,11 +241,8 @@ class NonlinearSolver:
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
-        time_history = jnp.zeros(self.termination.max_iterations)
-        if self.termination.record_time_history:
-            time_history = time_history.at[0].set(
-                _host_perf_counter(cost_info.cost_total)
-            )
+
+        _record_iteration_time(cost_info.cost_total)
 
         al_state: Any = None
         if self.augmented_lagrangian is not None:
@@ -264,7 +279,6 @@ class NonlinearSolver:
                 iterations=jnp.array(0),
                 cost_history=cost_history,
                 lambda_history=lambda_history,
-                time_history=time_history,
                 termination_criteria=jnp.array([False, False, False]),
                 termination_deltas=jnp.zeros(3),
             ),
@@ -442,11 +456,8 @@ class NonlinearSolver:
                 cg_state=cg_state,
             )
             next.local_delta = local_delta
-            time_history = next.summary.time_history
-            if self.termination.record_time_history:
-                time_history = time_history.at[iterations].set(
-                    _host_perf_counter(proposed_cost_info.cost_total)
-                )
+
+            _record_iteration_time(proposed_cost_info.cost_total)
             next.summary = SolveSummary(
                 iterations=iterations,
                 termination_criteria=term_criteria,
@@ -455,7 +466,6 @@ class NonlinearSolver:
                     proposed_cost_info.cost_nonconstraint
                 ),
                 lambda_history=next.summary.lambda_history.at[iterations].set(lambd),
-                time_history=time_history,
             )
 
         return next
@@ -687,7 +697,6 @@ class TrustRegionConfig:
 class TerminationConfig:
     max_iterations: jdc.Static[Any] = 100
     early_termination: jdc.Static[Any] = True
-    record_time_history: jdc.Static[Any] = False
     cost_tolerance: Any = 1e-5
     gradient_tolerance: Any = 1e-4
     gradient_tolerance_start_step: Any = 10

@@ -15,8 +15,8 @@ than assuming it.
 The Jacobian is verified against autodiff to ~1e-8 before any timing.
 
 Usage:
-    python benchmarks/analytic_jac_ba.py                  # default: ladybug49
-    python benchmarks/analytic_jac_ba.py --problem trafalgar138 --device gpu
+    uv run --extra dev --extra docs python benchmarks/analytic_jac_ba.py                  # default: ladybug49
+    uv run --extra dev --extra docs python benchmarks/analytic_jac_ba.py --problem trafalgar138 --device gpu
 """
 
 from __future__ import annotations
@@ -192,7 +192,7 @@ def hlo_kernels(prob, init) -> tuple[int, int]:
             init,
             linear_solver="dense_cholesky",
             termination=jaxls.TerminationConfig(
-                max_iterations=30, early_termination=False, record_time_history=True
+                max_iterations=30, early_termination=False
             ),
             return_summary=True,
             trust_region=jaxls.TrustRegionConfig(lambda_initial=1e2),
@@ -215,7 +215,7 @@ def bench(problem_name: str, device: str, repeats: int = 5) -> dict:
                 init,
                 linear_solver="dense_cholesky",
                 termination=jaxls.TerminationConfig(
-                    max_iterations=30, early_termination=False, record_time_history=True
+                    max_iterations=30, early_termination=False
                 ),
                 return_summary=True,
                 trust_region=jaxls.TrustRegionConfig(lambda_initial=1e2),
@@ -231,13 +231,24 @@ def bench(problem_name: str, device: str, repeats: int = 5) -> dict:
             s = time.perf_counter()
             jax.block_until_ready(solve())
             warm = min(warm, time.perf_counter() - s)
+        # Per-step timestamps from a recorded solve (host float64). Entering
+        # the recorder recompiles with the callback; warm up, then measure.
+        with jaxls.record_iteration_times() as times:
+            jax.block_until_ready(solve())
+            times.clear()
+            jax.block_until_ready(solve())
         fusions, customs = hlo_kernels(prob, init)
         n = int(summary.iterations)
-        th = onp.asarray(summary.time_history)[: n + 1]
+        elapsed = [t - times[0] for t in times][: n + 1]
         # Running-best accepted cost; cost_history records proposals.
         ch = onp.asarray(summary.cost_history)[: n + 1].copy()
         for i in range(1, len(ch)):
             ch[i] = min(ch[i], ch[i - 1])
+        # cost_history is only max_iterations long (init + max_iters-1 steps),
+        # while the recorder has no cap; align both to the shorter length.
+        m = min(len(ch), len(elapsed))
+        ch = ch[:m]
+        elapsed = elapsed[:m]
         out[label] = {
             "warm_ms": warm * 1e3,
             "per_iter_ms": warm / 30 * 1e3,
@@ -246,7 +257,7 @@ def bench(problem_name: str, device: str, repeats: int = 5) -> dict:
             "fusions": fusions,
             "custom_calls": customs,
             "cost_history": ch.tolist(),
-            "elapsed_s": (th - th[0]).tolist(),
+            "elapsed_s": elapsed,
         }
     return out
 

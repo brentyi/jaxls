@@ -1,16 +1,16 @@
 """Per-iteration cost-vs-time traces for the example notebooks.
 
-Uses the in-solve timestamps now recorded in `SolveSummary.time_history`
+Uses the in-solve timestamps recorded via `jaxls.record_iteration_times()`
 (host callback per outer LM step), so a single solve yields a full
 convergence trace — no matched-k re-solving. Every top-level solve in a
 notebook is instrumented and the one with the largest relative cost drop is
 kept (the headline optimization, not a warmup/forward/demo solve); the
-captured (cost_history, time_history, iterations) is dumped as JSON, then
+captured (cost_history, elapsed_s, iterations) is dumped as JSON, then
 plotted as a grid of cost-vs-time subplots (one per notebook), running-best
 cost with a marker per LM step from step 0.
 
-    python benchmarks/trace_examples.py            # run + plot
-    python benchmarks/trace_examples.py --plot     # plot from saved JSON
+    uv run --extra dev --extra docs python benchmarks/trace_examples.py            # run + plot
+    uv run --extra dev --extra docs python benchmarks/trace_examples.py --plot     # plot from saved JSON
 """
 
 from __future__ import annotations
@@ -30,14 +30,17 @@ TRACE_JSON = RESULTS / "example_traces.json"
 # the one with the largest cost reduction — the notebook's headline
 # optimization, not an incidental warmup/forward/demo solve.
 #
-# Both configs carry SolveSummary.time_history (main is the
-# instrumentation-timestamps branch off main), so per-step times are real on
-# both sides. A warmup solve absorbs compilation before the timed one.
+# Per-step timestamps come from `jaxls.record_iteration_times()` (host
+# float64 list, off the jitted path). The `main` config predates that API
+# and instead exposes `SolveSummary.time_history`; we feature-detect and use
+# whichever is present so both sides yield real per-step times. A warmup
+# solve absorbs compilation before the timed one.
 INSTRUMENT = """
 import jax, jaxls, jaxls._problem, json as _json
 import numpy as _onp
 _traces = []
 _orig = jaxls._problem.AnalyzedLeastSquaresProblem.solve
+_HAS_RECORDER = hasattr(jaxls, "record_iteration_times")
 
 def _traced(self, *a, **k):
     import jax.core
@@ -50,20 +53,30 @@ def _traced(self, *a, **k):
     if _tr(self) or _tr(a) or _tr(k):
         return _orig(self, *a, **k)
     k = dict(k); want = k.get("return_summary", False); k["return_summary"] = True
-    # Turn on per-iteration timestamps (opt-in on TerminationConfig).
-    import dataclasses as _dc
-    _term = k.get("termination", None) or jaxls.TerminationConfig()
-    k["termination"] = _dc.replace(_term, record_time_history=True)
-    jax.block_until_ready(_orig(self, *a, **k))           # warmup / compile
-    sol, summ = _orig(self, *a, **k)
-    jax.block_until_ready((sol, summ))
+    if _HAS_RECORDER:
+        with jaxls.record_iteration_times() as _times:
+            jax.block_until_ready(_orig(self, *a, **k))    # warmup / compile
+            _times.clear()
+            sol, summ = _orig(self, *a, **k)
+            jax.block_until_ready((sol, summ))
+        elapsed = [t - _times[0] for t in _times]
+    else:
+        # Legacy main: timestamps always recorded in SolveSummary.time_history.
+        jax.block_until_ready(_orig(self, *a, **k))       # warmup / compile
+        sol, summ = _orig(self, *a, **k)
+        jax.block_until_ready((sol, summ))
+        th = _onp.asarray(summ.time_history)
+        elapsed = (th - th[0]).tolist()
     n = int(summ.iterations)
-    ch = _onp.asarray(summ.cost_history)[: n + 1]
-    th = _onp.asarray(summ.time_history)[: n + 1]
+    # cost_history holds init at [0] + one slot per step but is only
+    # max_iterations long, so it caps at init + (max_iterations-1) steps; the
+    # timestamp recorder has no such cap. Align both to the shorter length.
+    ch = _onp.asarray(summ.cost_history)[: n + 1].tolist()
+    m = min(len(ch), len(elapsed))
     _traces.append({
         "iterations": n,
-        "cost_history": ch.tolist(),
-        "elapsed_s": (th - th[0]).tolist(),
+        "cost_history": ch[:m],
+        "elapsed_s": elapsed[:m],
     })
     return (sol, summ) if want else sol
 
@@ -85,6 +98,17 @@ if _best is not None and _drop(_best) > 0:
 
 # jaxls under test per label; PYTHONPATH for the notebook subprocess.
 CONFIGS = {"main": "/tmp/jaxls-main/src", "PR": "src"}
+
+
+def _list_notebooks() -> list[Path]:
+    """Source notebooks under the examples tree. Excludes checkpoints and the
+    `tmp*.ipynb` instrumented copies this script writes (a crash/kill can skip
+    their cleanup, and we must not re-trace those stragglers next run)."""
+    return sorted(
+        p
+        for p in EXAMPLES_DIR.rglob("*.ipynb")
+        if ".ipynb_checkpoints" not in str(p) and not p.name.startswith("tmp")
+    )
 
 
 def run_one(nb_path: Path, src: str, timeout: float) -> dict | None:
@@ -137,9 +161,7 @@ def trace_single(src: str = "src", timeout: float = 300.0) -> dict:
     {name: trace_rec}. Used by the benchmark suite for single-config metrics
     (the A/B `run_all` traces two configs)."""
     out: dict = {}
-    nbs = sorted(
-        p for p in EXAMPLES_DIR.rglob("*.ipynb") if ".ipynb_checkpoints" not in str(p)
-    )
+    nbs = _list_notebooks()
     for i, nb in enumerate(nbs):
         print(f"[{i + 1}/{len(nbs)}] {nb.stem}", flush=True)
         rec = run_one(nb, src, timeout)
@@ -150,9 +172,7 @@ def trace_single(src: str = "src", timeout: float = 300.0) -> dict:
 
 def run_all(timeout: float) -> dict:
     traces: dict = {}
-    nbs = sorted(
-        p for p in EXAMPLES_DIR.rglob("*.ipynb") if ".ipynb_checkpoints" not in str(p)
-    )
+    nbs = _list_notebooks()
     for label, src in CONFIGS.items():
         print(f"\n=== config: {label} ({src}) ===", flush=True)
         for i, nb in enumerate(nbs):
