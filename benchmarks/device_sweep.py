@@ -301,46 +301,89 @@ def plot_ba_comparison() -> None:
         ("Schur+dense (PR)", "final", "Schur + dense", "#1f77b4", "^"),
         ("Schur+CG (PR)", "final", "Schur + CG", "#2ca02c", "s"),
     ]
+
+    def _running_best(run: dict, c0: float) -> tuple[list[float], list[float]]:
+        # "Best solution found by time t." Matched-k runs independent solves
+        # per k, so an unconverged inexact-CG baseline can be non-monotone in
+        # k; cummin gives the honest, comparable curve. Step 0 (initial cost
+        # at t=0) is the common anchor every method descends from.
+        times = [0.0] + list(run["times"])
+        best = [c0] + list(run["costs"])
+        for i in range(1, len(best)):
+            best[i] = min(best[i], best[i - 1])
+        return times, best
+
+    def _time_to_cost(run: dict, c0: float, target: float) -> float | None:
+        """First wall-clock time the running-best cost reaches `target`."""
+        for t, b in zip(*_running_best(run, c0)):
+            if b <= target:
+                return t
+        return None
+
     initial = json.loads((RESULTS_DIR / "ba_initial_cost.json").read_text())
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5.0))
     for ax, (prob, title) in zip(axes, problems):
         c0 = initial.get(prob)
         cache: dict[str, dict] = {}
-        for label, suffix, method, color, marker in series:
-            data = cache.get(suffix)
-            if data is None:
+
+        def _load(suffix: str) -> dict | None:
+            if suffix not in cache:
                 path = RESULTS_DIR / f"device_{prob}_tuned_{suffix}.json"
-                if not path.exists():
-                    continue
-                data = cache[suffix] = json.loads(path.read_text())
-            run = data["runs"].get(f"gpu:{method}")
+                cache[suffix] = json.loads(path.read_text()) if path.exists() else {}
+            return cache[suffix] or None
+
+        # Baseline target: the converged cost the main full-CG run reaches.
+        # Speedups are "time for each method to reach that same cost" — the
+        # apples-to-apples question a reader actually cares about. A small
+        # tolerance absorbs matched-k jitter so a method that lands ~0.1%
+        # above the baseline floor still counts as having reached it.
+        base_data = _load("main")
+        base_run = base_data["runs"].get("gpu:full CG") if base_data else None
+        target = min(base_run["costs"]) * 1.003 if base_run else None
+        t_base = _time_to_cost(base_run, c0, target) if base_run else None
+
+        for label, suffix, method, color, marker in series:
+            data = _load(suffix)
+            run = data["runs"].get(f"gpu:{method}") if data else None
             if run is None:
                 continue
-            # Running-best cost ("best solution found by time t"). Matched-k
-            # is independent solves per k, so an unconverged inexact-CG
-            # baseline can be non-monotone in k; cummin gives the honest,
-            # comparable convergence curve. Prepend step 0 (initial cost at
-            # t=0), the common anchor every method descends from.
-            times = [0.0] + list(run["times"])
-            best = [c0] + list(run["costs"])
-            for i in range(1, len(best)):
-                best[i] = min(best[i], best[i - 1])
-            ax.plot(times, best, marker=marker, ms=5, color=color, label=label)
+            times, best = _running_best(run, c0)
+            speed = ""
+            t_hit = _time_to_cost(run, c0, target) if target is not None else None
+            if t_hit is not None and t_base is not None and t_hit > 0:
+                factor = t_base / t_hit
+                speed = f"  ({factor:.0f}× faster)" if factor >= 1.5 else ""
+            ax.plot(
+                times, best, marker=marker, ms=5, color=color, label=label + speed
+            )
             if run.get("budget_stopped_at_k") is not None:
                 ax.plot(times[-1], best[-1], marker="x", ms=11, mew=2, color=color)
+        if target is not None:
+            ax.axhline(
+                target / 1.003,
+                color="0.6",
+                lw=1,
+                ls=":",
+                zorder=0,
+                label="baseline converged cost",
+            )
         ax.set_yscale("log")
         # symlog: linear through t=0 (so step 0 shows), log beyond — the
         # fast Schur methods (~0.1 s) and the slow baseline (~10-30 s)
         # otherwise can't share a readable x-axis.
         ax.set_xscale("symlog", linthresh=1e-2)
         ax.set_xlim(left=0)
-        ax.set_xlabel("wall-clock (s, symlog)")
-        ax.set_ylabel("accepted cost")
-        ax.set_title(title)
-        ax.legend(fontsize=8)
+        ax.set_xlabel("wall-clock (s, symlog)", fontsize=11)
+        ax.set_ylabel("accepted cost", fontsize=11)
+        ax.set_title(title, fontsize=13)
+        ax.tick_params(labelsize=10)
+        ax.grid(True, which="major", ls="-", lw=0.4, alpha=0.3)
+        ax.legend(fontsize=9, loc="upper right")
     fig.suptitle(
-        "Bundle adjustment on GPU: cost vs wall-clock (marker per LM step "
-        "from step 0; × = budget cut-off)"
+        "Bundle adjustment on GPU: cost vs wall-clock — Schur elimination "
+        "vs full-system CG\n(marker per LM step from step 0; speedup = time "
+        "to reach the baseline's converged cost; × = budget cut-off)",
+        fontsize=13,
     )
     fig.tight_layout()
     out = RESULTS_DIR / "ba_comparison_gpu.png"

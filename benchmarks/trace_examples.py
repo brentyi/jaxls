@@ -191,6 +191,37 @@ def run_all(timeout: float) -> dict:
     return traces
 
 
+def _running_best(costs: list[float]) -> list[float]:
+    # cost_history records each step's proposed cost, so a rejected step can
+    # bump it up; cummin shows the best solution found so far.
+    best = list(costs)
+    for i in range(1, len(best)):
+        best[i] = min(best[i], best[i - 1])
+    return best
+
+
+def _speedup_label(traces_for_name: dict) -> str:
+    """PR-vs-main speedup: ratio of wall-clock to reach main's final cost.
+    Empty string unless both configs are present and the ratio is meaningful."""
+    main, pr = traces_for_name.get("main"), traces_for_name.get("PR")
+    if main is None or pr is None:
+        return ""
+    target = min(main["cost_history"]) * 1.003
+    t_main = main["elapsed_s"][-1]
+
+    def time_to(rec: dict) -> float | None:
+        for t, b in zip(rec["elapsed_s"], _running_best(rec["cost_history"])):
+            if b <= target:
+                return t
+        return None
+
+    t_pr = time_to(pr)
+    if t_pr is None or t_pr <= 0 or t_main <= 0:
+        return ""
+    factor = t_main / t_pr
+    return f"  ({factor:.1f}× faster)" if factor >= 1.2 else ""
+
+
 def plot(traces: dict) -> None:
     import math
 
@@ -200,7 +231,9 @@ def plot(traces: dict) -> None:
     names = sorted(traces)
     ncol = 4
     nrow = math.ceil(len(names) / ncol)
-    fig, axes = plt.subplots(nrow, ncol, figsize=(4 * ncol, 3 * nrow), squeeze=False)
+    fig, axes = plt.subplots(
+        nrow, ncol, figsize=(4.5 * ncol, 3.4 * nrow), squeeze=False
+    )
     for ax in axes.flat:
         ax.set_visible(False)
     for ax, name in zip(axes.flat, names):
@@ -209,31 +242,30 @@ def plot(traces: dict) -> None:
             rec = traces[name].get(label)
             if rec is None:
                 continue
-            # Running-best: cost_history records each step's proposed cost, so
-            # a rejected step can bump it up; cummin shows "best so far".
-            best = list(rec["cost_history"])
-            for i in range(1, len(best)):
-                best[i] = min(best[i], best[i - 1])
+            best = _running_best(rec["cost_history"])
             ax.plot(
                 rec["elapsed_s"],
                 best,
                 marker=marker,
-                ms=4,
+                ms=5,
                 ls=ls,
                 color=color,
-                label=label,
+                label=f"{label} ({rec['iterations']} steps)",
             )
         ax.set_yscale("log")
         ax.set_xscale("symlog", linthresh=1e-2)
         ax.set_xlim(left=0)
-        ax.set_title(name, fontsize=9)
-        ax.set_xlabel("wall-clock (s)", fontsize=8)
-        ax.set_ylabel("cost", fontsize=8)
-        ax.tick_params(labelsize=7)
-        ax.legend(fontsize=7)
+        ax.set_title(name + _speedup_label(traces[name]), fontsize=11)
+        ax.set_xlabel("wall-clock (s)", fontsize=10)
+        ax.set_ylabel("cost", fontsize=10)
+        ax.tick_params(labelsize=9)
+        ax.grid(True, which="major", ls="-", lw=0.4, alpha=0.3)
+        ax.legend(fontsize=9)
     fig.suptitle(
         "jaxls examples: cost vs wall-clock per LM step — main (dashed) vs PR "
-        "(solid); real in-solve timestamps on both."
+        "(solid)\nreal in-solve timestamps on both; speedup = time to reach "
+        "main's final cost",
+        fontsize=14,
     )
     fig.tight_layout()
     out = RESULTS / "example_traces.png"

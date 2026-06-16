@@ -265,26 +265,41 @@ def bench(problem_name: str, device: str, repeats: int = 5) -> dict:
 def plot(problem_name: str, device: str, res: dict) -> str:
     import matplotlib.pyplot as plt
 
-    fig, (ax_step, ax_time) = plt.subplots(1, 2, figsize=(11, 4.2))
+    fig, (ax_step, ax_time) = plt.subplots(1, 2, figsize=(12, 4.6))
     style = {"autodiff": ("#d62728", "o", "--"), "analytic": ("#1f77b4", "^", "-")}
     for label, (color, marker, ls) in style.items():
         r = res[label]
         ch = r["cost_history"]
         steps = list(range(len(ch)))
-        ax_step.plot(steps, ch, marker=marker, ms=4, ls=ls, color=color, label=label)
+        leg = f"{label} ({r['warm_ms']:.1f} ms)"
+        ax_step.plot(steps, ch, marker=marker, ms=4, ls=ls, color=color, label=leg)
         ax_time.plot(
-            r["elapsed_s"], ch, marker=marker, ms=4, ls=ls, color=color, label=label
+            r["elapsed_s"], ch, marker=marker, ms=4, ls=ls, color=color, label=leg
         )
     for ax, xlab in [(ax_step, "outer LM step"), (ax_time, "wall-clock (s)")]:
         ax.set_yscale("log")
-        ax.set_xlabel(xlab)
-        ax.set_ylabel("accepted cost")
-        ax.legend()
+        ax.set_xlabel(xlab, fontsize=11)
+        ax.set_ylabel("accepted cost", fontsize=11)
+        ax.tick_params(labelsize=10)
+        ax.grid(True, which="major", ls="-", lw=0.4, alpha=0.3)
+        ax.legend(fontsize=10)
     ax_time.set_xscale("symlog", linthresh=1e-2)
     ax_time.set_xlim(left=0)
+    # Report the measured ratio honestly. On these problems the two are within
+    # noise (jaxls is host-dispatch-bound, so saving Jacobian device-FLOPs
+    # barely moves the wall-clock); the legend carries the per-solve ms.
+    ms_auto, ms_an = res["autodiff"]["warm_ms"], res["analytic"]["warm_ms"]
+    ratio = ms_auto / ms_an
+    if abs(ratio - 1.0) <= 0.05:
+        verdict = "matched wall-clock (within noise)"
+    elif ratio > 1.0:
+        verdict = f"analytic {ratio:.2f}× faster per solve"
+    else:
+        verdict = f"analytic {1 / ratio:.2f}× slower per solve"
     fig.suptitle(
         f"{problem_name} ({device}): analytic vs autodiff Jacobian — "
-        "identical cost path, different speed"
+        f"identical cost path, {verdict}",
+        fontsize=13,
     )
     fig.tight_layout()
     out = (
