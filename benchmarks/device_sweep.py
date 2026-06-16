@@ -332,22 +332,26 @@ def plot_ba_comparison() -> None:
                 cache[suffix] = json.loads(path.read_text()) if path.exists() else {}
             return cache[suffix] or None
 
-        # Threshold: the converged cost the main full-CG run reaches. We draw
-        # a dashed line there and label, on each curve, the wall-clock time it
-        # crosses — the apples-to-apples "how long to the same solution?". A
-        # small tolerance absorbs matched-k jitter so a method that lands
-        # ~0.1% above the baseline floor still counts as having reached it.
-        base_data = _load("main")
-        base_run = base_data["runs"].get("gpu:full CG") if base_data else None
-        threshold = min(base_run["costs"]) if base_run else None
-        target = threshold * 1.003 if threshold is not None else None
-
-        crossings = []  # (label, time, color) to annotate after curves drawn
+        # Collect the runs present for this problem.
+        runs = []  # (label, run, color, marker)
         for label, suffix, method, color, marker in series:
             data = _load(suffix)
             run = data["runs"].get(f"gpu:{method}") if data else None
-            if run is None:
-                continue
+            if run is not None:
+                runs.append((label, run, color, marker))
+
+        # Threshold: the *worst* converged cost across the three methods —
+        # i.e. the best cost every method actually reaches. Labeling each
+        # curve's crossing time there gives an apples-to-apples "how long to
+        # the same solution?" that every method can answer (a stricter
+        # threshold would leave the slowest-converging method unlabeled). A
+        # small tolerance absorbs matched-k jitter so a method that lands
+        # ~0.1% above its floor still counts as having reached it.
+        threshold = max(min(run["costs"]) for _, run, _, _ in runs) if runs else None
+        target = threshold * 1.003 if threshold is not None else None
+
+        crossings = []  # (label, time, color) to annotate after curves drawn
+        for label, run, color, marker in runs:
             times, best = _running_best(run, c0)
             ax.plot(times, best, marker=marker, ms=5, color=color, label=label)
             t_hit = _time_to_cost(run, c0, target) if target is not None else None
@@ -359,7 +363,7 @@ def plot_ba_comparison() -> None:
         if threshold is not None:
             ax.axhline(threshold, color="0.4", lw=1.4, ls="--", zorder=0)
             ax.annotate(
-                "baseline converged cost",
+                "shared cost target",
                 (0, threshold),
                 textcoords="offset points",
                 xytext=(4, 4),
@@ -402,8 +406,8 @@ def plot_ba_comparison() -> None:
     fig.suptitle(
         "Bundle adjustment on GPU: cost vs wall-clock — Schur elimination "
         "vs full-system CG\n(marker per LM step from step 0; dashed line = "
-        "baseline's converged cost, labels = time each method reaches it; "
-        "× = budget cut-off)",
+        "shared cost target reached by all three methods, labels = time each "
+        "reaches it; × = budget cut-off)",
         fontsize=13,
     )
     fig.tight_layout()
