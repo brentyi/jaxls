@@ -464,7 +464,7 @@ def _render_study_figure(runs: dict, main: dict, title: str, out: "Path") -> Non
         ax2.grid(True, axis="y", alpha=0.22, zorder=0)
         for x, s in zip(xs, speed):
             ax2.text(
-                x,
+                float(x),
                 s * 1.08,
                 (f"{s:.0f}×" if s >= 10 else f"{s:.1f}×" if s >= 1 else f"{s:.2g}×"),
                 ha="center",

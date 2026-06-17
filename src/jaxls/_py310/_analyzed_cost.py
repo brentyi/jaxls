@@ -55,6 +55,7 @@ class _AnalyzedCost(Cost[Any]):
     def _make(
         cost: Any,
     ) -> Any:
+
         if cost.kind != "l2_squared":
             return _augment_constraint_cost(cost)
 

@@ -74,6 +74,7 @@ class EliminationPlan:
 def infer_eliminate(
     problem: Any,
 ) -> Any:
+
     slots_per_group = [
         {
             var_type: ids.shape[-1]
@@ -112,6 +113,7 @@ def build_elimination_plan(
     problem: Any,
     eliminate: Any,
 ) -> Any:
+
     elim_set = list()
     for var_type in eliminate:
         if var_type not in elim_set:
@@ -599,6 +601,7 @@ def _assemble_dense_S(factors: Any, lambd: Any, vinv: Any) -> Any:
 
 
 def _iter_S_block_sources(plan: Any):
+
     for kt_i, info in enumerate(plan.kept_types):
         idx = onp.arange(info.count, dtype=onp.int64)
         yield "diag", kt_i, (lambda info=info, idx=idx: (info, idx, info, idx))
@@ -647,6 +650,7 @@ def build_sparse_s_pattern(plan: Any) -> Any:
     cols_parts = list()
 
     def emit(rows: Any, cols: Any) -> Any:
+
         rows_parts.append(onp.repeat(rows, cols.shape[1], axis=1).reshape(-1))
         cols_parts.append(onp.tile(cols, (1, rows.shape[1])).reshape(-1))
 
