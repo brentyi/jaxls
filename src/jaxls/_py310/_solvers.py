@@ -3,12 +3,14 @@ from typing import Any
 
 import contextlib
 import dataclasses
+import functools
 import time
 from typing_extensions import assert_never
 
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
+import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -27,6 +29,7 @@ from ._augmented_lagrangian import (
 from ._schur import (
     prepare_schur,
     solve_schur_cg,
+    solve_schur_cholmod,
     solve_schur_dense,
 )
 from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
@@ -79,6 +82,60 @@ def _cholmod_solve_on_host(
     return cost.solve_A(ATb)
 
 
+_cholmod_symmetric_analyze_cache: Any = {}
+
+
+def _cholmod_solve_symmetric(
+    s_values: Any,
+    rows: Any,
+    cols: Any,
+    reduced_dim: Any,
+    b: Any,
+) -> Any:
+    return jax.pure_callback(
+        functools.partial(_cholmod_solve_symmetric_on_host, reduced_dim=reduced_dim),
+        b,
+        s_values,
+        rows,
+        cols,
+        b,
+        vmap_method="sequential",
+    )
+
+
+def _cholmod_solve_symmetric_on_host(
+    s_values: Any,
+    rows: Any,
+    cols: Any,
+    b: Any,
+    *,
+    reduced_dim: Any,
+) -> Any:
+    import sksparse.cholmod
+
+    rows_onp = onp.asarray(rows)
+    cols_onp = onp.asarray(cols)
+    S = scipy.sparse.coo_matrix(
+        (onp.asarray(s_values), (rows_onp, cols_onp)),
+        shape=(reduced_dim, reduced_dim),
+    ).tocsc()
+
+    cache_key = (rows_onp.tobytes(), cols_onp.tobytes(), reduced_dim)
+    factor = _cholmod_symmetric_analyze_cache.get(cache_key, None)
+    if factor is None:
+        factor = sksparse.cholmod.analyze(S)
+        _cholmod_symmetric_analyze_cache[cache_key] = factor
+
+        max_cache_size = 512
+        if len(_cholmod_symmetric_analyze_cache) > max_cache_size:
+            _cholmod_symmetric_analyze_cache.pop(
+                next(iter(_cholmod_symmetric_analyze_cache))
+            )
+
+    factor = factor.cholesky(S)
+    return factor.solve_A(onp.asarray(b))
+
+
 _active_iteration_time_recorder: Any = None
 
 
@@ -98,7 +155,6 @@ def record_iteration_times() -> Any:
 
 
 def _clear_solve_cache() -> Any:
-
     NonlinearSolver.solve.clear_cache()
 
 
@@ -297,7 +353,6 @@ class NonlinearSolver:
         if self.termination.early_termination:
 
             def should_continue(state: Any) -> Any:
-
                 basic_checks = ~jnp.isnan(state.solution.cost_info.cost_total) & (
                     state.summary.iterations < self.termination.max_iterations
                 )
@@ -362,7 +417,6 @@ class NonlinearSolver:
         ATb: Any,
         schur_factors: Any = None,
     ) -> Any:
-
         if self.trust_region is not None:
             lambd = jnp.minimum(
                 inner_state.lambd * inner_state.lambda_growth,
@@ -383,6 +437,8 @@ class NonlinearSolver:
                 )
             elif self.linear_solver == "dense_cholesky":
                 local_delta = solve_schur_dense(schur_factors, lambd)
+            elif self.linear_solver == "cholmod":
+                local_delta = solve_schur_cholmod(schur_factors, lambd)
             else:
                 raise AssertionError(
                     f"Unexpected elimination plan for {self.linear_solver}."
@@ -719,7 +775,6 @@ class TerminationConfig:
         iterations: Any,
         accepted: Any,
     ) -> Any:
-
         cost_reldelta = (
             jnp.abs(cost_nonconstraint_updated - sol_prev.cost_info.cost_nonconstraint)
             / sol_prev.cost_info.cost_nonconstraint

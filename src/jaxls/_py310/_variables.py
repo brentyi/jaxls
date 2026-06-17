@@ -111,7 +111,6 @@ class Var(metaclass=_HashableSortableMeta):
 
     @staticmethod
     def _euclidean_retract(pytree: Any, delta: Any) -> Any:
-
         flat, unravel = flatten_util.ravel_pytree(pytree)
         del flat
         return jax.tree.map(jnp.add, pytree, unravel(delta))
@@ -240,7 +239,6 @@ class VarValues:
 
 
 def sort_and_stack_vars(variables: Any, values: Any = None) -> Any:
-
     vars_from_type = dict()
     vals_from_type = dict() if values is not None else None
     for i in range(len(variables)):

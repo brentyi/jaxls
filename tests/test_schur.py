@@ -1,8 +1,8 @@
 """Tests for variable elimination (Schur complement).
 
 Elimination is automatic: `solve()` eliminates dominant block-diagonal
-variable types for the dense and conjugate-gradient solvers, and never for
-cholmod. Covers:
+variable types for all three reduced-solve paths (dense Cholesky, CG, and
+CHOLMOD sparse-direct on the reduced system). Covers:
 - Exactness: the (automatic) reduced solve reproduces the full dense step.
 - Multiple kept types, and multiple eliminated types.
 - Automatic inference: what gets eliminated, and graceful fallbacks.
@@ -277,6 +277,88 @@ def test_schur_single_step_exactness() -> None:
         assert rel < 1e-8, f"lambda={lambd}: relative step difference {rel}"
 
 
+try:
+    import sksparse.cholmod  # noqa: F401
+
+    _HAS_CHOLMOD = True
+except Exception:
+    _HAS_CHOLMOD = False
+
+requires_cholmod = pytest.mark.skipif(
+    not _HAS_CHOLMOD, reason="sksparse.cholmod not available"
+)
+
+
+def test_sparse_s_equals_dense_s() -> None:
+    """The sparse COO assembly of S (summed) reproduces the dense S, for a
+    sweep of damping values. Pure assembly check, no CHOLMOD needed."""
+    import scipy.sparse
+
+    problem, init = _make_ba_problem(with_bias=True)
+    cost_info = problem._compute_cost_info(init)
+    A = problem._compute_jac_values(init, cost_info.jac_cache)
+    ATb = -A.to_dense().T @ cost_info.residual_vector
+
+    plan = _schur.build_elimination_plan(problem, (PointVar,))
+    assert plan.sparse_s_pattern is not None
+    factors_dense = _schur.prepare_schur(plan, A, ATb, linear_solver="dense_cholesky")
+    factors_sparse = _schur.prepare_schur(plan, A, ATb, linear_solver="cholmod")
+    for lambd in (1e-4, 1e-2, 1.0):
+        vinv = _schur._damped_vinv(factors_dense, lambd)
+        S_dense = _schur._assemble_dense_S(factors_dense, lambd, vinv)
+
+        vinv_s = _schur._damped_vinv(factors_sparse, lambd)
+        s_values = _schur._assemble_S_values(factors_sparse, lambd, vinv_s)
+        pat = plan.sparse_s_pattern
+        S_sparse = scipy.sparse.coo_matrix(
+            (onp.asarray(s_values), (onp.asarray(pat.rows), onp.asarray(pat.cols))),
+            shape=(plan.reduced_dim, plan.reduced_dim),
+        ).toarray()
+
+        rel = float(
+            onp.linalg.norm(S_sparse - onp.asarray(S_dense))
+            / onp.linalg.norm(onp.asarray(S_dense))
+        )
+        assert rel < 1e-10, f"lambda={lambd}: sparse vs dense S relative diff {rel}"
+
+
+@requires_cholmod
+def test_schur_cholmod_single_step_exactness() -> None:
+    """The CHOLMOD reduced step equals the explicit full dense solve. The
+    CHOLMOD path regularizes by lambd + 1e-5, so the reference matches."""
+    problem, init = _make_ba_problem(with_bias=True)
+    cost_info = problem._compute_cost_info(init)
+    A = problem._compute_jac_values(init, cost_info.jac_cache)
+    A_dense = A.to_dense()
+    ATb = -A_dense.T @ cost_info.residual_vector
+
+    plan = _schur.build_elimination_plan(problem, (PointVar,))
+    factors = _schur.prepare_schur(plan, A, ATb, linear_solver="cholmod")
+    for lambd in (1e-4, 1e-2, 1.0):
+        ATA = A_dense.T @ A_dense + (lambd + 1e-5) * jnp.eye(A_dense.shape[1])
+        ref = jnp.linalg.solve(ATA, ATb)
+        step = _schur.solve_schur_cholmod(factors, lambd)
+        rel = float(jnp.linalg.norm(step - ref) / jnp.linalg.norm(ref))
+        assert rel < 1e-8, f"lambda={lambd}: relative step difference {rel}"
+
+
+@requires_cholmod
+def test_schur_cholmod_converges() -> None:
+    """End-to-end: Schur + CHOLMOD reaches the same optimum as Schur + dense
+    over a full LM trajectory."""
+    problem, init = _make_ba_problem()
+    _, summary_dense = problem.solve(
+        init, linear_solver="dense_cholesky", **_solve_kwargs(20)
+    )
+    _, summary_cholmod = problem.solve(
+        init, linear_solver="cholmod", **_solve_kwargs(20)
+    )
+    cost_dense = _cost_history(summary_dense, 20)[-1]
+    cost_cholmod = _cost_history(summary_cholmod, 20)[-1]
+    rel = abs(cost_cholmod - cost_dense) / (abs(cost_dense) + 1e-12)
+    assert rel < 1e-5, f"final cost mismatch: dense={cost_dense} cholmod={cost_cholmod}"
+
+
 def test_schur_dense_exactness_multiple_elim_types() -> None:
     """Two eliminated types (in different costs) at once."""
     n_pts = 12
@@ -379,9 +461,9 @@ def test_no_elimination_when_ineligible() -> None:
     assert costs_history[-1] < costs_history[0]
 
 
-def test_no_elimination_for_cholmod(monkeypatch: pytest.MonkeyPatch) -> None:
-    """cholmod always factors the full (sparse) system; the precomputed
-    elimination plan must not be handed to the solver."""
+def test_cholmod_receives_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+    """cholmod now solves the reduced (Schur) system sparse-directly, so the
+    precomputed elimination plan IS handed to the solver."""
     problem, init = _make_ba_problem()
     assert problem._elimination is not None  # Plan was prebuilt by analyze().
     captured = {}
@@ -399,7 +481,7 @@ def test_no_elimination_for_cholmod(monkeypatch: pytest.MonkeyPatch) -> None:
         # CHOLMOD itself may be unavailable in this environment; the solver
         # is constructed (and the plan selected) before factorization.
         pass
-    assert captured["elimination"] is None, "cholmod received an elimination plan"
+    assert captured["elimination"] is not None, "cholmod did not receive the plan"
 
 
 def test_solver_receives_prebuilt_plan(monkeypatch: pytest.MonkeyPatch) -> None:

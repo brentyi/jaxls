@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import functools
 import time
 from typing import (
     TYPE_CHECKING,
@@ -17,6 +18,7 @@ from typing import (
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
+import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -39,6 +41,7 @@ from ._schur import (
     SchurFactors,
     prepare_schur,
     solve_schur_cg,
+    solve_schur_cholmod,
     solve_schur_dense,
 )
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
@@ -103,6 +106,69 @@ def _cholmod_solve_on_host(
         beta=lambd + 1e-5,
     )
     return cost.solve_A(ATb)
+
+
+_cholmod_symmetric_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
+
+
+def _cholmod_solve_symmetric(
+    s_values: jax.Array,
+    rows: jax.Array,
+    cols: jax.Array,
+    reduced_dim: int,
+    b: jax.Array,
+) -> jax.Array:
+    """JIT-friendly CHOLMOD solve of a symmetric system S x = b, where S is
+    given in COO form (s_values at (rows, cols), duplicates summed). Used by
+    the Schur + CHOLMOD reduced solve."""
+    return jax.pure_callback(
+        functools.partial(_cholmod_solve_symmetric_on_host, reduced_dim=reduced_dim),
+        b,  # Result shape/dtype.
+        s_values,
+        rows,
+        cols,
+        b,
+        vmap_method="sequential",
+    )
+
+
+def _cholmod_solve_symmetric_on_host(
+    s_values: jax.Array,
+    rows: jax.Array,
+    cols: jax.Array,
+    b: jax.Array,
+    *,
+    reduced_dim: int,
+) -> jax.Array:
+    """Factor a symmetric sparse S (COO: s_values at (rows, cols)) with CHOLMOD
+    and solve S x = b. Runs on the host."""
+    import sksparse.cholmod
+
+    rows_onp = onp.asarray(rows)
+    cols_onp = onp.asarray(cols)
+    S = scipy.sparse.coo_matrix(
+        (onp.asarray(s_values), (rows_onp, cols_onp)),
+        shape=(reduced_dim, reduced_dim),
+    ).tocsc()  # Sums duplicate (i, j) entries.
+
+    # Cache the symbolic analysis. The COO coordinates are fixed across solves
+    # for a given problem, so the summed CSC pattern is stable.
+    cache_key = (rows_onp.tobytes(), cols_onp.tobytes(), reduced_dim)
+    factor = _cholmod_symmetric_analyze_cache.get(cache_key, None)
+    if factor is None:
+        factor = sksparse.cholmod.analyze(S)
+        _cholmod_symmetric_analyze_cache[cache_key] = factor
+
+        max_cache_size = 512
+        if len(_cholmod_symmetric_analyze_cache) > max_cache_size:
+            _cholmod_symmetric_analyze_cache.pop(
+                next(iter(_cholmod_symmetric_analyze_cache))
+            )
+
+    # Numeric refactorization reusing the cached symbolic analysis. The 1e-5
+    # diagonal floor is already folded into s_values by the caller.
+    factor = factor.cholesky(S)
+    return factor.solve_A(onp.asarray(b))
 
 
 _active_iteration_time_recorder: list[float] | None = None
@@ -583,6 +649,8 @@ class NonlinearSolver:
                 )
             elif self.linear_solver == "dense_cholesky":
                 local_delta = solve_schur_dense(schur_factors, lambd)
+            elif self.linear_solver == "cholmod":
+                local_delta = solve_schur_cholmod(schur_factors, lambd)
             else:
                 raise AssertionError(
                     f"Unexpected elimination plan for {self.linear_solver}."

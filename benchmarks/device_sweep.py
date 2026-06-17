@@ -5,9 +5,10 @@ sizes, comparing every available linear solver:
 
   - full CG       : conjugate gradient on the full system (no elimination)
   - full dense    : dense Cholesky on the full system (small problems only)
-  - cholmod       : sparse Cholesky on the full system (CPU only)
-  - Schur + dense : variable elimination, dense reduced solve
-  - Schur + CG    : variable elimination, matrix-free reduced CG
+  - cholmod         : sparse Cholesky on the full system (CPU only)
+  - Schur + dense   : variable elimination, dense reduced solve
+  - Schur + CG      : variable elimination, matrix-free reduced CG
+  - Schur + cholmod : variable elimination, sparse-direct reduced solve (CPU only)
 
 Methodology: run exactly k Levenberg-Marquardt iterations with early
 termination off, for a sweep of k, and record
@@ -121,6 +122,10 @@ METHODS: tuple[Method, ...] = (
     Method("cholmod", "cholmod", elimination=False, devices=("cpu",)),
     Method("Schur + dense", "dense_cholesky", elimination=True),
     Method("Schur + CG", "conjugate_gradient", elimination=True),
+    # Variable elimination with a sparse-direct CHOLMOD factorization of the
+    # reduced system (Ceres/g2o-style). CPU only: CHOLMOD runs as a host
+    # callback.
+    Method("Schur + cholmod", "cholmod", elimination=True, devices=("cpu",)),
     Method(
         "full dense",
         "dense_cholesky",
@@ -199,86 +204,279 @@ def run_study(spec: ProblemSpec, devices: list[str], repeats: int) -> dict:
     return results
 
 
+# Damping used for the cholmod-vs-Schur+cholmod comparison. Bundle-adjustment
+# curvature scales want lambda ~1e1-1e3; 1e2 matches the benchmark suite
+# (suite/workloads.py ba_lambda_initial) and is applied identically to both
+# methods so the comparison is apples-to-apples.
+_CHOLMOD_BA_LAMBDA = 1e2
+
+
+def run_cholmod_study(spec: ProblemSpec, repeats: int) -> dict:
+    """CPU-only matched-iteration study of full-system CHOLMOD vs Schur +
+    CHOLMOD (sparse-direct on the reduced system), both with the same tuned
+    damping. Writes device_<name>_cholmod.json."""
+    print(f"\n## {spec.title} — CHOLMOD comparison")
+    problem_elim, init = spec.load(True)
+    problem_full, _ = spec.load(False)
+    dev = device_for("cpu")
+    assert dev is not None  # CPU is always available.
+    elim_d = jax.device_put(problem_elim, dev)
+    full_d = jax.device_put(problem_full, dev)
+    init_d = jax.device_put(init, dev)
+
+    results: dict = {"title": spec.title, "ks": list(spec.ks), "runs": {}}
+    for label, target, elim in (
+        ("cholmod", full_d, False),
+        ("Schur + cholmod", elim_d, True),
+    ):
+        del elim  # `target` already selects the right problem variant.
+        costs, times = [], []
+        for k in spec.ks:
+            cost, t = run_k_iterations(
+                target,
+                init_d,
+                k,
+                linear_solver="cholmod",
+                repeats=repeats,
+                lambda_initial=_CHOLMOD_BA_LAMBDA,
+            )
+            costs.append(cost)
+            times.append(t)
+            print(f"    {label:<16} k={k:>2}: {t:>8.3f}s  cost={cost:g}")
+        results["runs"][f"cpu:{label}"] = {
+            "method": label,
+            "device": "cpu",
+            "ks": list(spec.ks),
+            "costs": costs,
+            "times": times,
+        }
+        gc.collect()
+
+    out = RESULTS_DIR / f"device_{spec.name}_cholmod.json"
+    out.write_text(json.dumps(results, indent=2))
+    print(f"  wrote {out}")
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Plotting
 # ---------------------------------------------------------------------------
 
+# Method styling. Full-system methods get warm/neutral colors and a thin line;
+# Schur (variable-elimination) methods get a cool family and a thicker line, so
+# elimination-vs-full reads at a glance without spending the linestyle (which
+# encodes tuned-PR "-" vs main-baseline "--").
 _COLOR = {
-    "full CG": "#d62728",
-    "full dense": "#7f7f7f",
-    "cholmod": "#9467bd",
-    "Schur + dense": "#1f77b4",
-    "Schur + CG": "#2ca02c",
+    "full CG": "#d62728",  # red
+    "full dense": "#7f7f7f",  # gray
+    "cholmod": "#e377c2",  # pink
+    "Schur + dense": "#1f77b4",  # blue
+    "Schur + CG": "#2ca02c",  # green
+    "Schur + cholmod": "#17becf",  # teal
 }
+_SCHUR_LINEWIDTH = 2.8
+_FULL_LINEWIDTH = 1.4
+
+# Draw order: full-system methods first, then Schur, so the legend groups them.
+_METHOD_ORDER = (
+    "full CG",
+    "full dense",
+    "cholmod",
+    "Schur + dense",
+    "Schur + CG",
+    "Schur + cholmod",
+)
+
+
+def _is_schur(method: str) -> bool:
+    return method.startswith("Schur")
+
+
+def _load_runs(name: str) -> "tuple[dict, dict, str] | None":
+    """Gather plot data for one problem. Returns (final_runs, main_runs, title),
+    each runs dict keyed by "device:method".
+
+    Sources, in priority order: the tuned PR JSON, then the plain sweep JSON
+    (so methods added after the tuned pair was generated still appear; a
+    device:method already present from the tuned data is not overwritten). The
+    tuned main-baseline JSON is returned separately for the dashed comparison."""
+    final: dict = {}
+    main: dict = {}
+    title = None
+    tuned_final = RESULTS_DIR / f"device_{name}_tuned_final.json"
+    if tuned_final.exists():
+        d = json.loads(tuned_final.read_text())
+        title = d["title"]
+        final.update(d["runs"])
+        tuned_main = RESULTS_DIR / f"device_{name}_tuned_main.json"
+        if tuned_main.exists():
+            main.update(json.loads(tuned_main.read_text())["runs"])
+    plain = RESULTS_DIR / f"device_{name}.json"
+    if plain.exists():
+        d = json.loads(plain.read_text())
+        title = title or d["title"]
+        for k, r in d["runs"].items():
+            final.setdefault(k, r)  # don't overwrite a tuned curve
+    if not final:
+        return None
+    return final, main, title or name
+
+
+def _time_to(run: dict, target: float) -> float | None:
+    """Wall-clock at which a run first reaches `target` cost (or below)."""
+    for t, c in zip(run["times"], run["costs"]):
+        if c <= target:
+            return t
+    return None
 
 
 def plot_study(name: str) -> None:
-    """One figure per device: cost vs LM steps (left) and cost vs
-    wall-clock (right). Prefers the tuned PR/main pair of JSONs (main's
-    methods drawn dashed); falls back to the plain sweep JSON."""
-    import matplotlib.pyplot as plt
+    """One figure per device, two stacked panels telling the elimination story:
 
-    sources = []  # (style label prefix, linestyle, data)
-    tuned_final = RESULTS_DIR / f"device_{name}_tuned_final.json"
-    if tuned_final.exists():
-        sources.append(("", "-", json.loads(tuned_final.read_text())))
-        tuned_main = RESULTS_DIR / f"device_{name}_tuned_main.json"
-        if tuned_main.exists():
-            sources.append(("main: ", "--", json.loads(tuned_main.read_text())))
-    else:
-        sources.append(
-            ("", "-", json.loads((RESULTS_DIR / f"device_{name}.json").read_text()))
-        )
-    title = sources[0][2]["title"]
+    - top: suboptimality gap (cost - best-observed optimum) vs wall-clock,
+      log-log. A method's curve plunging to the floor marks when it reaches the
+      solution; its horizontal position is the time-to-solution. Schur
+      (variable-elimination) methods are cool-colored and thick, full-system
+      methods warm/neutral and thin, so elimination-vs-full reads at a glance.
+    - bottom: speedup-to-solution of each method over the fastest full-system
+      method (bars). This is the headline number.
+
+    The tuned main-system baseline (if present) is drawn dashed in the top
+    panel for context; it is not included in the speedup bars."""
+    loaded = _load_runs(name)
+    if loaded is None:
+        return
+    final, main, title = loaded
 
     for device in ("cpu", "gpu"):
-        fig, (ax_steps, ax_time) = plt.subplots(1, 2, figsize=(12, 4.5))
-        plotted = False
-        for prefix, ls, data in sources:
-            for run in data["runs"].values():
-                if run["device"] != device:
-                    continue
-                plotted = True
-                color = _COLOR[run["method"]]
-                label = prefix + run["method"]
-                run_ks = run.get("ks", data["ks"])
-                ax_steps.plot(
-                    run_ks,
-                    run["costs"],
-                    marker="o",
-                    ms=3,
-                    ls=ls,
-                    color=color,
-                    label=label,
-                )
-                ax_time.plot(
-                    run["times"],
-                    run["costs"],
-                    marker="o",
-                    ms=3,
-                    ls=ls,
-                    color=color,
-                    label=label,
-                )
-        if not plotted:
-            plt.close(fig)
+        runs = {r["method"]: r for r in final.values() if r["device"] == device}
+        if not runs:
             continue
-        for ax, xlabel, xlog in (
-            (ax_steps, "outer LM steps", False),
-            (ax_time, "wall-clock (s)", True),
-        ):
-            ax.set_yscale("log")
-            if xlog:
-                ax.set_xscale("log")
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel("accepted cost (log)")
-        ax_steps.legend(fontsize=8)
-        fig.suptitle(f"{title} — {device.upper()}")
-        fig.tight_layout()
+        main_d = {r["method"]: r for r in main.values() if r["device"] == device}
         out = RESULTS_DIR / f"device_{name}_{device}.png"
-        fig.savefig(out, dpi=150)
-        print(f"wrote {out}")
-        plt.close(fig)
+        _render_study_figure(runs, main_d, f"{title} — {device.upper()}", out)
+
+
+def plot_cholmod_comparison(name: str) -> None:
+    """Focused CPU comparison: full-system CHOLMOD vs Schur + CHOLMOD, from
+    device_<name>_cholmod.json. Same two-panel layout as plot_study; the
+    speedup bar is Schur + CHOLMOD over full-system CHOLMOD."""
+    path = RESULTS_DIR / f"device_{name}_cholmod.json"
+    if not path.exists():
+        return
+    data = json.loads(path.read_text())
+    runs = {r["method"]: r for r in data["runs"].values() if r["device"] == "cpu"}
+    if not runs:
+        return
+    out = RESULTS_DIR / f"device_{name}_cholmod.png"
+    _render_study_figure(runs, {}, f"{data['title']} — CHOLMOD (CPU)", out)
+
+
+def _render_study_figure(runs: dict, main: dict, title: str, out: "Path") -> None:
+    """Render one two-panel study figure (top: suboptimality gap vs wall-clock;
+    bottom: speedup-to-solution bars over the fastest full-system method) for a
+    set of method runs (keyed by method name). `main` holds optional dashed
+    main-system baselines."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    methods = [m for m in _METHOD_ORDER if m in runs]
+    if not methods:
+        return
+    copt = min(min(r["costs"]) for r in runs.values())
+    # "Everyone reaches this" threshold, for an apples-to-apples speedup.
+    target = max(r["costs"][-1] for r in runs.values()) * 1.03
+
+    fig = plt.figure(figsize=(7.0, 7.2), constrained_layout=True)
+    gs = fig.add_gridspec(2, 1, height_ratios=[1.5, 1.0])
+    ax = fig.add_subplot(gs[0])
+    ax2 = fig.add_subplot(gs[1])
+
+    # --- top: suboptimality gap vs wall-clock ---
+    for m in methods:
+        color, is_schur = _COLOR[m], _is_schur(m)
+        r = runs[m]
+        gap = [max(c - copt, 1.0) for c in r["costs"]]
+        ax.plot(
+            r["times"],
+            gap,
+            marker="o",
+            ms=3.5,
+            lw=_SCHUR_LINEWIDTH if is_schur else _FULL_LINEWIDTH,
+            color=color,
+            label=m,
+            zorder=3 if is_schur else 2,
+            solid_capstyle="round",
+        )
+    # Main-system baselines, dashed and thin, for context.
+    for m, r in main.items():
+        if m not in _COLOR:
+            continue
+        gap = [max(c - copt, 1.0) for c in r["costs"]]
+        ax.plot(
+            r["times"],
+            gap,
+            marker="o",
+            ms=2.5,
+            lw=1.3,
+            ls="--",
+            color=_COLOR[m],
+            label=f"main: {m}",
+            zorder=1,
+        )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("wall-clock (s)")
+    ax.set_ylabel("cost above optimum")
+    ax.grid(True, which="major", alpha=0.25)
+    ax.grid(True, which="minor", alpha=0.07)
+    ax.legend(fontsize=8, framealpha=0.92, loc="lower left")
+
+    # --- bottom: speedup-to-solution over fastest full-system method ---
+    tt = {m: _time_to(runs[m], target) for m in methods}
+    full_times = [t for m in methods if (t := tt[m]) is not None and not _is_schur(m)]
+    bar_methods = [m for m in methods if tt[m] is not None]
+    if full_times and bar_methods:
+        base = min(full_times)
+        speed = [base / t for m in bar_methods if (t := tt[m]) is not None]
+        xs = np.arange(len(bar_methods))
+        ax2.bar(
+            xs,
+            speed,
+            width=0.72,
+            color=[_COLOR[m] for m in bar_methods],
+            edgecolor=["#222" if _is_schur(m) else "none" for m in bar_methods],
+            linewidth=1.3,
+            zorder=3,
+        )
+        ax2.axhline(1.0, color="k", lw=0.9, ls="--", alpha=0.55, zorder=1)
+        ax2.set_yscale("log")
+        ax2.set_ylim(top=max(speed) * 2.3)
+        ax2.set_xticks(xs)
+        ax2.set_xticklabels(
+            [
+                m.replace("Schur + ", "Schur\n").replace("full ", "full\n")
+                for m in bar_methods
+            ],
+            fontsize=8,
+        )
+        ax2.set_ylabel("speedup to solution\n(vs fastest full-system)")
+        ax2.grid(True, axis="y", alpha=0.22, zorder=0)
+        for x, s in zip(xs, speed):
+            ax2.text(
+                x,
+                s * 1.08,
+                (f"{s:.0f}×" if s >= 10 else f"{s:.1f}×" if s >= 1 else f"{s:.2g}×"),
+                ha="center",
+                va="bottom",
+                fontsize=8.5,
+                fontweight="bold",
+            )
+
+    fig.suptitle(title, fontsize=12, fontweight="bold")
+    fig.savefig(out, dpi=150)
+    print(f"wrote {out}")
+    plt.close(fig)
 
 
 def plot_ba_comparison() -> None:
@@ -431,6 +629,11 @@ def main() -> None:
         "--devices", nargs="+", default=["cpu", "gpu"], choices=["cpu", "gpu"]
     )
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument(
+        "--cholmod",
+        action="store_true",
+        help="CPU CHOLMOD vs Schur+CHOLMOD comparison instead of the full sweep.",
+    )
     args = parser.parse_args()
     RESULTS_DIR.mkdir(exist_ok=True)
 
@@ -441,9 +644,14 @@ def main() -> None:
 
     for prob_name in args.problems:
         spec = PROBLEMS[prob_name]
-        if not args.replot:
-            run_study(spec, args.devices, args.repeats)
-        plot_study(spec.name)
+        if args.cholmod:
+            if not args.replot:
+                run_cholmod_study(spec, args.repeats)
+            plot_cholmod_comparison(spec.name)
+        else:
+            if not args.replot:
+                run_study(spec, args.devices, args.repeats)
+            plot_study(spec.name)
 
 
 if __name__ == "__main__":

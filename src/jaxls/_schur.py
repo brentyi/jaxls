@@ -136,6 +136,25 @@ class _CrossPairs:
 
 
 @jdc.pytree_dataclass
+class _SparseSPattern:
+    """Host-precomputed COO structure of the reduced matrix S, for the sparse
+    (CHOLMOD) reduced solve. The off-diagonal kept-kept blocks of S sit at
+    fixed positions determined only by the problem's incidence structure, so
+    the scalar (row, col) coordinates can be built once on the host. The
+    matching values are produced per inner iteration by `_assemble_S_values`,
+    in the same block order used here.
+
+    We emit the FULL symmetric matrix (both triangles). CHOLMOD reads only the
+    lower triangle, but a consistent full matrix keeps the scipy COO->CSC
+    conversion and the cache key unambiguous."""
+
+    rows: jax.Array
+    """(nnz,) scalar row indices, concatenated over all block sources."""
+    cols: jax.Array
+    """(nnz,) scalar column indices, in the same order as `rows`."""
+
+
+@jdc.pytree_dataclass
 class EliminationPlan:
     """Static structure for Schur-complement variable elimination. Built once
     per solve by `build_elimination_plan`; safe to reuse across solves with
@@ -150,6 +169,9 @@ class EliminationPlan:
     """Total tangent dimension of the kept variables."""
     tangent_dim: jdc.Static[int]
     """Total tangent dimension of the full problem."""
+    sparse_s_pattern: _SparseSPattern | None = None
+    """COO coordinates of S for the CHOLMOD reduced solve; None unless the
+    sparse path is requested."""
 
 
 def infer_eliminate(
@@ -399,7 +421,7 @@ def build_elimination_plan(
                 )
             )
 
-    return EliminationPlan(
+    plan = EliminationPlan(
         kept_types=tuple(kept_types),
         elim_types=tuple(elim_types),
         group_slots=tuple(group_slots),
@@ -408,6 +430,12 @@ def build_elimination_plan(
         reduced_dim=reduced_dim,
         tangent_dim=problem._tangent_dim,
     )
+    # Precompute the COO structure of S for the CHOLMOD reduced solve. This is
+    # cheap host-side index work and makes the plan solver-agnostic: the dense
+    # and CG paths simply ignore it.
+    with jdc.copy_and_mutate(plan, validate=False) as plan:
+        plan.sparse_s_pattern = build_sparse_s_pattern(plan)
+    return plan
 
 
 def _matching_pairs(
@@ -447,7 +475,11 @@ class SchurFactors:
     keep_diag: tuple[jax.Array, ...]
     """Per kept type: (count, dim, dim) block diagonal of H_cc."""
     hcc_dense: jax.Array | None
-    """(reduced_dim, reduced_dim) dense H_cc; None for the CG path."""
+    """(reduced_dim, reduced_dim) dense H_cc; None for the CG and sparse paths."""
+    hcc_offdiag: tuple[jax.Array, ...]
+    """Per off-diagonal kept-kept source (in `_S_block_index_sources` order):
+    (K, dim_a, dim_b) H_cc coupling blocks, for the sparse (CHOLMOD) path.
+    Empty for the dense and CG paths."""
     keep_jacs: tuple[jax.Array | None, ...]
     """Per group: (num_costs, residual_dim, total_kept_width) kept-slot
     Jacobian columns, for the matrix-free H_cc product; None for the
@@ -471,6 +503,7 @@ def prepare_schur(
     assert len(blocks_by_group) == len(plan.group_slots)
     dtype = ATb.dtype
     need_dense = linear_solver == "dense_cholesky"
+    need_sparse = linear_solver == "cholmod"
 
     def slot_jac(g: int, slot: _Slot) -> jax.Array:
         info = (plan.kept_types if slot.is_kept else plan.elim_types)[slot.type_index]
@@ -524,8 +557,23 @@ def prepare_schur(
         for info in plan.elim_types
     )
 
-    # Dense H_cc for the direct paths: scatter the block diagonal, then any
-    # off-diagonal kept-kept couplings within each cost group.
+    # H_cc off-diagonal kept-kept couplings within each cost group. Needed by
+    # both direct paths: the dense path scatters them into `hcc_dense`, the
+    # sparse (CHOLMOD) path keeps them as blocks in `hcc_offdiag` (in the same
+    # order as `_S_block_index_sources`).
+    hcc_offdiag = list[jax.Array]()
+    if need_dense or need_sparse:
+        for g, slots in enumerate(plan.group_slots):
+            kept_slots = [s for s in slots if s.is_kept]
+            for a in range(len(kept_slots)):
+                for b in range(a + 1, len(kept_slots)):
+                    slot_a, slot_b = kept_slots[a], kept_slots[b]
+                    hcc_offdiag.append(
+                        _batched_gram(slot_jac(g, slot_a), slot_jac(g, slot_b))
+                    )
+
+    # Dense H_cc for the dense direct path: scatter the block diagonal, then
+    # the off-diagonal couplings computed above.
     hcc_dense = None
     if need_dense:
         hcc_dense = jnp.zeros((plan.reduced_dim, plan.reduced_dim), dtype=dtype)
@@ -538,12 +586,14 @@ def prepare_schur(
             hcc_dense = hcc_dense.at[rows[:, :, None], rows[:, None, :]].add(
                 keep_diag[kt_i]
             )
+        i = 0
         for g, slots in enumerate(plan.group_slots):
             kept_slots = [s for s in slots if s.is_kept]
             for a in range(len(kept_slots)):
                 for b in range(a + 1, len(kept_slots)):
                     slot_a, slot_b = kept_slots[a], kept_slots[b]
-                    blk = _batched_gram(slot_jac(g, slot_a), slot_jac(g, slot_b))
+                    blk = hcc_offdiag[i]
+                    i += 1
                     rows = _block_rows(plan.kept_types[slot_a.type_index], slot_a.index)
                     cols = _block_rows(plan.kept_types[slot_b.type_index], slot_b.index)
                     hcc_dense = hcc_dense.at[rows[:, :, None], cols[:, None, :]].add(
@@ -552,6 +602,9 @@ def prepare_schur(
                     hcc_dense = hcc_dense.at[cols[:, :, None], rows[:, None, :]].add(
                         jnp.swapaxes(blk, 1, 2)
                     )
+        # The dense path scatters off-diagonals into `hcc_dense`; don't also
+        # carry them as separate blocks.
+        hcc_offdiag = []
 
     # Kept-column Jacobian per group, for the matrix-free H_cc product.
     keep_jacs = list[jax.Array | None]()
@@ -573,6 +626,7 @@ def prepare_schur(
         cross_blocks=tuple(cross_blocks),
         keep_diag=tuple(keep_diag),
         hcc_dense=hcc_dense,
+        hcc_offdiag=tuple(hcc_offdiag),
         keep_jacs=tuple(keep_jacs),
         b_keep=b_keep,
         b_elim=b_elim,
@@ -738,6 +792,151 @@ def _assemble_dense_S(
     return S
 
 
+def _iter_S_block_sources(plan: EliminationPlan):
+    """Single source of truth for the block structure of the reduced matrix S,
+    shared by the index builder (`build_sparse_s_pattern`) and the value builder
+    (`_assemble_S_values`) so the two cannot drift out of sync. Yields one
+    descriptor `(kind, idx, geometry)` per dense block, in assembly order:
+
+    - ("diag", kt_i, geometry): the (count, dim, dim) diagonal block of kept
+      type kt_i (keep_diag - wvwt_diag + lambda*I).
+    - ("offdiag", j, geometry): the j-th H_cc off-diagonal kept-kept coupling
+      block, then its transpose.
+    - ("pair", j, geometry): the j-th -W V^{-1} W^T pair block, then its
+      transpose.
+
+    Off-diagonal sources are emitted as a (block, transpose) pair: the index
+    builder swaps (row, col) for the transpose; the value builder swaps axes.
+
+    `geometry` is a zero-arg callable returning (info_row, idx_row, info_col,
+    idx_col) host numpy index arrays — used ONLY by the index builder. It is a
+    thunk so the value builder (which runs under jax.jit, where the underlying
+    `slot.index` / `pair.block_rows` are tracers) never materializes it.
+    """
+    # 1. Per-kept-type diagonal blocks.
+    for kt_i, info in enumerate(plan.kept_types):
+        idx = onp.arange(info.count, dtype=onp.int64)
+        yield "diag", kt_i, (lambda info=info, idx=idx: (info, idx, info, idx))
+
+    # 2. H_cc off-diagonal kept-kept couplings within each cost group.
+    j = 0
+    for slots in plan.group_slots:
+        kept_slots = [s for s in slots if s.is_kept]
+        for a in range(len(kept_slots)):
+            for b in range(a + 1, len(kept_slots)):
+                slot_a, slot_b = kept_slots[a], kept_slots[b]
+                yield (
+                    "offdiag",
+                    j,
+                    lambda slot_a=slot_a, slot_b=slot_b: (
+                        plan.kept_types[slot_a.type_index],
+                        onp.asarray(slot_a.index),
+                        plan.kept_types[slot_b.type_index],
+                        onp.asarray(slot_b.index),
+                    ),
+                )
+                j += 1
+
+    # 3. -W V^{-1} W^T off-diagonal pair blocks.
+    for j, pair in enumerate(plan.pairs):
+        yield (
+            "pair",
+            j,
+            lambda pair=pair: (
+                plan.kept_types[plan.combos[pair.combo_a].kept_type_index],
+                onp.asarray(pair.block_rows),
+                plan.kept_types[plan.combos[pair.combo_b].kept_type_index],
+                onp.asarray(pair.block_cols),
+            ),
+        )
+
+
+def _block_rows_onp(info: _TypeInfo, index: onp.ndarray) -> onp.ndarray:
+    """Host-side `_block_rows`: tangent rows (reduced layout) for a batch of
+    variables of one type. Shape (len(index), dim)."""
+    return (
+        info.start
+        + index[:, None] * info.dim
+        + onp.arange(info.dim, dtype=onp.int64)[None, :]
+    )
+
+
+def build_sparse_s_pattern(plan: EliminationPlan) -> _SparseSPattern:
+    """Build the host-side COO coordinates of S, emitting the full symmetric
+    matrix (each off-diagonal source adds both the block and its transpose).
+    Must run outside jax.jit (the block indices come from concrete plan
+    structure). The block order matches `_assemble_S_values`."""
+    rows_parts = list[onp.ndarray]()
+    cols_parts = list[onp.ndarray]()
+
+    def emit(rows: onp.ndarray, cols: onp.ndarray) -> None:
+        # Expand each (K, dim_r)/(K, dim_c) block into K*dim_r*dim_c scalar
+        # (row, col) pairs, row-major within each block: every row index is
+        # paired with every col index of the same block.
+        rows_parts.append(onp.repeat(rows, cols.shape[1], axis=1).reshape(-1))
+        cols_parts.append(onp.tile(cols, (1, rows.shape[1])).reshape(-1))
+
+    for kind, _, geometry in _iter_S_block_sources(plan):
+        info_r, idx_r, info_c, idx_c = geometry()
+        rows = _block_rows_onp(info_r, idx_r)
+        cols = _block_rows_onp(info_c, idx_c)
+        emit(rows, cols)
+        if kind != "diag":
+            emit(cols, rows)  # transpose
+
+    rows_all = (
+        onp.concatenate(rows_parts) if rows_parts else onp.zeros((0,), dtype=onp.int64)
+    )
+    cols_all = (
+        onp.concatenate(cols_parts) if cols_parts else onp.zeros((0,), dtype=onp.int64)
+    )
+    return _SparseSPattern(
+        rows=jnp.asarray(rows_all.astype(onp.int32)),
+        cols=jnp.asarray(cols_all.astype(onp.int32)),
+    )
+
+
+def _assemble_S_values(
+    factors: SchurFactors, lambd: jax.Array | float, vinv: list[jax.Array]
+) -> jax.Array:
+    """Flat values of S matching `plan.sparse_s_pattern` coordinates, in the
+    block order of `_iter_S_block_sources`. Reuses the same block quantities as
+    `_assemble_dense_S`."""
+    plan = factors.plan
+    y_blocks, wvwt_diag = _wvwt_terms(factors, vinv)
+    parts = list[jax.Array]()
+
+    for kind, idx, _ in _iter_S_block_sources(plan):
+        if kind == "diag":
+            info = plan.kept_types[idx]
+            blk = (
+                factors.keep_diag[idx]
+                - wvwt_diag[idx]
+                + lambd * jnp.eye(info.dim, dtype=factors.b_keep.dtype)
+            )
+        elif kind == "offdiag":
+            # Damping-independent; precomputed in `prepare_schur`.
+            blk = factors.hcc_offdiag[idx]
+        else:  # "pair": -W V^{-1} W^T.
+            pair = plan.pairs[idx]
+            blk = -jax.ops.segment_sum(
+                _batched_outer_last(
+                    y_blocks[pair.combo_a][pair.obs_a],
+                    factors.cross_blocks[pair.combo_b][pair.obs_b],
+                ),
+                pair.block_id,
+                num_segments=pair.num_blocks,
+                indices_are_sorted=True,
+            )
+        parts.append(blk.reshape(-1))
+        if kind != "diag":
+            parts.append(jnp.swapaxes(blk, 1, 2).reshape(-1))  # transpose
+
+    return (
+        jnp.concatenate(parts) if parts else jnp.zeros((0,), dtype=factors.b_keep.dtype)
+    )
+
+
 def _solve_spd_scaled(S: jax.Array, b: jax.Array) -> jax.Array:
     """Solve S x = b with S symmetric positive definite, robustly.
 
@@ -803,6 +1002,38 @@ def solve_schur_dense(factors: SchurFactors, lambd: jax.Array | float) -> jax.Ar
     b_red = _reduced_rhs(factors, vinv)
     S = _assemble_dense_S(factors, lambd, vinv)
     dc = _solve_spd_scaled(S, b_red)
+    return _back_substitute(factors, vinv, dc)
+
+
+def solve_schur_cholmod(factors: SchurFactors, lambd: jax.Array | float) -> jax.Array:
+    """Direct reduced solve via CHOLMOD: assemble the reduced system S as a
+    sparse symmetric matrix and factor it with a fill-reducing ordering, then
+    back-substitute the eliminated variables. This is the Ceres/g2o-style
+    "Schur + sparse-direct-on-reduced-system" combination: the cheap,
+    block-diagonal landmark elimination is done on-device, and only the small,
+    irregular camera system goes to CHOLMOD.
+
+    Like the full-system CHOLMOD path, S is regularized by lambd + 1e-5 (the
+    extra 1e-5 is folded into the diagonal so CHOLMOD's `beta` is not needed)."""
+    from ._solvers import _cholmod_solve_symmetric
+
+    plan = factors.plan
+    pattern = plan.sparse_s_pattern
+    assert pattern is not None, (
+        "solve_schur_cholmod requires plan.sparse_s_pattern; build the plan "
+        "with the sparse path enabled."
+    )
+    # Regularize by lambd + 1e-5 everywhere (V, the kept diagonal, and the RHS
+    # via V), matching the full-system CHOLMOD path which damps ATA + (lambd +
+    # 1e-5) I. Damping V and the kept block by the same amount keeps the Schur
+    # complement equal to the Schur complement of that regularized full system.
+    lam_eff = jnp.asarray(lambd) + 1e-5
+    vinv = _damped_vinv(factors, lam_eff)
+    b_red = _reduced_rhs(factors, vinv)
+    s_values = _assemble_S_values(factors, lam_eff, vinv)
+    dc = _cholmod_solve_symmetric(
+        s_values, pattern.rows, pattern.cols, plan.reduced_dim, b_red
+    )
     return _back_substitute(factors, vinv, dc)
 
 

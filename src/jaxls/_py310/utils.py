@@ -43,7 +43,6 @@ def jax_log(fmt: Any, *args, **kwargs) -> Any:
 def print_deprecation_warning(
     message0: Any, message1: Any = None, stack_level: Any = 2
 ) -> Any:
-
     frame = inspect.currentframe()
     for _ in range(stack_level):
         if not frame:

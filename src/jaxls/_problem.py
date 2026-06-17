@@ -159,10 +159,11 @@ class LeastSquaresProblem:
                 type exists (for example, landmarks in bundle adjustment),
                 precompute a Schur-complement elimination plan; solves then
                 run on the much smaller, better-conditioned reduced system.
-                Set to False to skip elimination and solve the full system
-                — useful for debugging, benchmarking against the
-                non-eliminated solve, or when the reduced system would be too
-                large to form densely.
+                All three linear solvers use the plan: "dense_cholesky" and
+                "conjugate_gradient" solve the reduced system densely / matrix-
+                free, and "cholmod" factors it sparse-directly. Set to False to
+                skip elimination and solve the full system — useful for
+                debugging or benchmarking against the non-eliminated solve.
 
         Returns:
             An AnalyzedLeastSquaresProblem ready for solving.
@@ -446,8 +447,9 @@ class AnalyzedLeastSquaresProblem:
     _residual_dim: jdc.Static[int]
     _elimination: EliminationPlan | None = None
     """Schur-complement elimination plan, precomputed by `analyze()` when a
-    dominant block-diagonal variable type exists. Used by `solve()` unless
-    `schur_elimination=False` or the linear solver is cholmod."""
+    dominant block-diagonal variable type exists. Used by `solve()` for all
+    reduced-solve paths (dense Cholesky, CG, and CHOLMOD) unless
+    `schur_elimination=False`."""
 
     @overload
     def solve(
@@ -548,10 +550,10 @@ class AnalyzedLeastSquaresProblem:
         # `analyze()` when a dominant block-diagonal variable type exists
         # (for example, landmarks in bundle adjustment); the linear solves
         # then run on the much smaller, better-conditioned reduced system and
-        # back-substitute the eliminated variables. Never used for cholmod,
-        # whose sparse factorization of the full system would be replaced by
-        # a dense reduced factorization that scales worse.
-        elimination = self._elimination if linear_solver != "cholmod" else None
+        # back-substitute the eliminated variables. All three reduced-solve
+        # paths are supported: dense Cholesky, matrix-free CG, and CHOLMOD
+        # (sparse-direct on the reduced system, the Ceres/g2o combination).
+        elimination = self._elimination
 
         # Create unified solver (handles both constrained and unconstrained).
         solver = NonlinearSolver(

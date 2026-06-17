@@ -226,7 +226,6 @@ def problem_show(
     max_costs: Any = 1000,
     max_variables: Any = 500,
 ) -> Any:
-
     total_costs = _count_total_costs(problem)
     total_vars_by_type = _count_total_variables(problem)
     total_vars = sum(total_vars_by_type.values())

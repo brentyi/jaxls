@@ -81,7 +81,6 @@ class LeastSquaresProblem:
         )
 
     def analyze(self, use_onp: Any = False, schur_elimination: Any = True) -> Any:
-
         if use_onp:
             jnp = onp
         else:
@@ -356,7 +355,7 @@ class AnalyzedLeastSquaresProblem:
             conjugate_gradient_config = linear_solver
             linear_solver = "conjugate_gradient"
 
-        elimination = self._elimination if linear_solver != "cholmod" else None
+        elimination = self._elimination
 
         solver = NonlinearSolver(
             linear_solver,

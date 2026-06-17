@@ -34,7 +34,6 @@ def make_point_jacobi_precoditioner(
 
 
 def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
-
     gram_diagonal_blocks = list()
     for var_type, ids in graph._tangent_ordering.ordered_dict_items(
         graph._sorted_ids_from_var_type

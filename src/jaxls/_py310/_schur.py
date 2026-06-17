@@ -54,6 +54,12 @@ class _CrossPairs:
 
 
 @jdc.pytree_dataclass
+class _SparseSPattern:
+    rows: Any
+    cols: Any
+
+
+@jdc.pytree_dataclass
 class EliminationPlan:
     kept_types: jdc.Static[Any]
     elim_types: jdc.Static[Any]
@@ -62,12 +68,12 @@ class EliminationPlan:
     pairs: Any
     reduced_dim: jdc.Static[Any]
     tangent_dim: jdc.Static[Any]
+    sparse_s_pattern: Any = None
 
 
 def infer_eliminate(
     problem: Any,
 ) -> Any:
-
     slots_per_group = [
         {
             var_type: ids.shape[-1]
@@ -106,7 +112,6 @@ def build_elimination_plan(
     problem: Any,
     eliminate: Any,
 ) -> Any:
-
     elim_set = list()
     for var_type in eliminate:
         if var_type not in elim_set:
@@ -281,7 +286,7 @@ def build_elimination_plan(
                 )
             )
 
-    return EliminationPlan(
+    plan = EliminationPlan(
         kept_types=tuple(kept_types),
         elim_types=tuple(elim_types),
         group_slots=tuple(group_slots),
@@ -290,6 +295,10 @@ def build_elimination_plan(
         reduced_dim=reduced_dim,
         tangent_dim=problem._tangent_dim,
     )
+
+    with jdc.copy_and_mutate(plan, validate=False) as plan:
+        plan.sparse_s_pattern = build_sparse_s_pattern(plan)
+    return plan
 
 
 def _matching_pairs(elim_a: Any, elim_b: Any, num_elim: Any) -> Any:
@@ -320,6 +329,7 @@ class SchurFactors:
     cross_blocks: Any
     keep_diag: Any
     hcc_dense: Any
+    hcc_offdiag: Any
     keep_jacs: Any
     b_keep: Any
     b_elim: Any
@@ -337,6 +347,7 @@ def prepare_schur(
     assert len(blocks_by_group) == len(plan.group_slots)
     dtype = ATb.dtype
     need_dense = linear_solver == "dense_cholesky"
+    need_sparse = linear_solver == "cholmod"
 
     def slot_jac(g: Any, slot: Any) -> Any:
         info = (plan.kept_types if slot.is_kept else plan.elim_types)[slot.type_index]
@@ -385,6 +396,17 @@ def prepare_schur(
         for info in plan.elim_types
     )
 
+    hcc_offdiag = list()
+    if need_dense or need_sparse:
+        for g, slots in enumerate(plan.group_slots):
+            kept_slots = [s for s in slots if s.is_kept]
+            for a in range(len(kept_slots)):
+                for b in range(a + 1, len(kept_slots)):
+                    slot_a, slot_b = kept_slots[a], kept_slots[b]
+                    hcc_offdiag.append(
+                        _batched_gram(slot_jac(g, slot_a), slot_jac(g, slot_b))
+                    )
+
     hcc_dense = None
     if need_dense:
         hcc_dense = jnp.zeros((plan.reduced_dim, plan.reduced_dim), dtype=dtype)
@@ -397,12 +419,14 @@ def prepare_schur(
             hcc_dense = hcc_dense.at[rows[:, :, None], rows[:, None, :]].add(
                 keep_diag[kt_i]
             )
+        i = 0
         for g, slots in enumerate(plan.group_slots):
             kept_slots = [s for s in slots if s.is_kept]
             for a in range(len(kept_slots)):
                 for b in range(a + 1, len(kept_slots)):
                     slot_a, slot_b = kept_slots[a], kept_slots[b]
-                    blk = _batched_gram(slot_jac(g, slot_a), slot_jac(g, slot_b))
+                    blk = hcc_offdiag[i]
+                    i += 1
                     rows = _block_rows(plan.kept_types[slot_a.type_index], slot_a.index)
                     cols = _block_rows(plan.kept_types[slot_b.type_index], slot_b.index)
                     hcc_dense = hcc_dense.at[rows[:, :, None], cols[:, None, :]].add(
@@ -411,6 +435,8 @@ def prepare_schur(
                     hcc_dense = hcc_dense.at[cols[:, :, None], rows[:, None, :]].add(
                         jnp.swapaxes(blk, 1, 2)
                     )
+
+        hcc_offdiag = []
 
     keep_jacs = list()
     if linear_solver == "conjugate_gradient":
@@ -431,6 +457,7 @@ def prepare_schur(
         cross_blocks=tuple(cross_blocks),
         keep_diag=tuple(keep_diag),
         hcc_dense=hcc_dense,
+        hcc_offdiag=tuple(hcc_offdiag),
         keep_jacs=tuple(keep_jacs),
         b_keep=b_keep,
         b_elim=b_elim,
@@ -571,6 +598,113 @@ def _assemble_dense_S(factors: Any, lambd: Any, vinv: Any) -> Any:
     return S
 
 
+def _iter_S_block_sources(plan: Any):
+    for kt_i, info in enumerate(plan.kept_types):
+        idx = onp.arange(info.count, dtype=onp.int64)
+        yield "diag", kt_i, (lambda info=info, idx=idx: (info, idx, info, idx))
+
+    j = 0
+    for slots in plan.group_slots:
+        kept_slots = [s for s in slots if s.is_kept]
+        for a in range(len(kept_slots)):
+            for b in range(a + 1, len(kept_slots)):
+                slot_a, slot_b = kept_slots[a], kept_slots[b]
+                yield (
+                    "offdiag",
+                    j,
+                    lambda slot_a=slot_a, slot_b=slot_b: (
+                        plan.kept_types[slot_a.type_index],
+                        onp.asarray(slot_a.index),
+                        plan.kept_types[slot_b.type_index],
+                        onp.asarray(slot_b.index),
+                    ),
+                )
+                j += 1
+
+    for j, pair in enumerate(plan.pairs):
+        yield (
+            "pair",
+            j,
+            lambda pair=pair: (
+                plan.kept_types[plan.combos[pair.combo_a].kept_type_index],
+                onp.asarray(pair.block_rows),
+                plan.kept_types[plan.combos[pair.combo_b].kept_type_index],
+                onp.asarray(pair.block_cols),
+            ),
+        )
+
+
+def _block_rows_onp(info: Any, index: Any) -> Any:
+    return (
+        info.start
+        + index[:, None] * info.dim
+        + onp.arange(info.dim, dtype=onp.int64)[None, :]
+    )
+
+
+def build_sparse_s_pattern(plan: Any) -> Any:
+    rows_parts = list()
+    cols_parts = list()
+
+    def emit(rows: Any, cols: Any) -> Any:
+        rows_parts.append(onp.repeat(rows, cols.shape[1], axis=1).reshape(-1))
+        cols_parts.append(onp.tile(cols, (1, rows.shape[1])).reshape(-1))
+
+    for kind, _, geometry in _iter_S_block_sources(plan):
+        info_r, idx_r, info_c, idx_c = geometry()
+        rows = _block_rows_onp(info_r, idx_r)
+        cols = _block_rows_onp(info_c, idx_c)
+        emit(rows, cols)
+        if kind != "diag":
+            emit(cols, rows)
+
+    rows_all = (
+        onp.concatenate(rows_parts) if rows_parts else onp.zeros((0,), dtype=onp.int64)
+    )
+    cols_all = (
+        onp.concatenate(cols_parts) if cols_parts else onp.zeros((0,), dtype=onp.int64)
+    )
+    return _SparseSPattern(
+        rows=jnp.asarray(rows_all.astype(onp.int32)),
+        cols=jnp.asarray(cols_all.astype(onp.int32)),
+    )
+
+
+def _assemble_S_values(factors: Any, lambd: Any, vinv: Any) -> Any:
+    plan = factors.plan
+    y_blocks, wvwt_diag = _wvwt_terms(factors, vinv)
+    parts = list()
+
+    for kind, idx, _ in _iter_S_block_sources(plan):
+        if kind == "diag":
+            info = plan.kept_types[idx]
+            blk = (
+                factors.keep_diag[idx]
+                - wvwt_diag[idx]
+                + lambd * jnp.eye(info.dim, dtype=factors.b_keep.dtype)
+            )
+        elif kind == "offdiag":
+            blk = factors.hcc_offdiag[idx]
+        else:
+            pair = plan.pairs[idx]
+            blk = -jax.ops.segment_sum(
+                _batched_outer_last(
+                    y_blocks[pair.combo_a][pair.obs_a],
+                    factors.cross_blocks[pair.combo_b][pair.obs_b],
+                ),
+                pair.block_id,
+                num_segments=pair.num_blocks,
+                indices_are_sorted=True,
+            )
+        parts.append(blk.reshape(-1))
+        if kind != "diag":
+            parts.append(jnp.swapaxes(blk, 1, 2).reshape(-1))
+
+    return (
+        jnp.concatenate(parts) if parts else jnp.zeros((0,), dtype=factors.b_keep.dtype)
+    )
+
+
 def _solve_spd_scaled(S: Any, b: Any) -> Any:
     diag = jnp.diagonal(S)
 
@@ -617,6 +751,26 @@ def solve_schur_dense(factors: Any, lambd: Any) -> Any:
     b_red = _reduced_rhs(factors, vinv)
     S = _assemble_dense_S(factors, lambd, vinv)
     dc = _solve_spd_scaled(S, b_red)
+    return _back_substitute(factors, vinv, dc)
+
+
+def solve_schur_cholmod(factors: Any, lambd: Any) -> Any:
+    from ._solvers import _cholmod_solve_symmetric
+
+    plan = factors.plan
+    pattern = plan.sparse_s_pattern
+    assert pattern is not None, (
+        "solve_schur_cholmod requires plan.sparse_s_pattern; build the plan "
+        "with the sparse path enabled."
+    )
+
+    lam_eff = jnp.asarray(lambd) + 1e-5
+    vinv = _damped_vinv(factors, lam_eff)
+    b_red = _reduced_rhs(factors, vinv)
+    s_values = _assemble_S_values(factors, lam_eff, vinv)
+    dc = _cholmod_solve_symmetric(
+        s_values, pattern.rows, pattern.cols, plan.reduced_dim, b_red
+    )
     return _back_substitute(factors, vinv, dc)
 
 
