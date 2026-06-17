@@ -139,8 +139,8 @@ def bundle_adjustment(cfg: SuiteConfig) -> WorkloadResult:
     for prob in problems:
         spec = ds.PROBLEMS[prob]
         ks = spec.ks[: 5 if cfg.quick else len(spec.ks)]
-        elim, init = spec.load(True)
-        full, _ = spec.load(False)
+        elim, init = spec.load("auto")
+        full, _ = spec.load("off")
         for platform in _device_list(cfg):
             dev = ds.device_for(platform)
             elim_d = jax.device_put(elim, dev)

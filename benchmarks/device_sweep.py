@@ -35,7 +35,7 @@ import gc
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal
 
 import jax
 
@@ -61,15 +61,21 @@ class ProblemSpec:
     ks: tuple[int, ...]
     full_dense_ok: bool
     """Whether a dense full-system solve is feasible (small problems only)."""
-    load: Callable[[bool], tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues]]
+    load: Callable[
+        [Literal["auto", "off"]],
+        tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues],
+    ]
     """load(schur_elimination) -> (problem, initial_vals)."""
 
 
 def _bal_loader(
     name: str, dest: str
-) -> Callable[[bool], tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues]]:
+) -> Callable[
+    [Literal["auto", "off"]],
+    tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues],
+]:
     def load(
-        schur_elimination: bool,
+        schur_elimination: Literal["auto", "off"],
     ) -> tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues]:
         path = download_bal(name, Path(dest))
         return load_bal(path, schur_elimination=schur_elimination)
@@ -151,8 +157,8 @@ def device_for(platform: str) -> "jax.Device | None":  # type: ignore[name-defin
 def run_study(spec: ProblemSpec, devices: list[str], repeats: int) -> dict:
     """Run the full method x device x k grid for one problem."""
     print(f"\n## {spec.title}")
-    problem_elim, init = spec.load(True)
-    problem_full, _ = spec.load(False)
+    problem_elim, init = spec.load("auto")
+    problem_full, _ = spec.load("off")
 
     results: dict = {"title": spec.title, "ks": list(spec.ks), "runs": {}}
     for platform in devices:
@@ -216,8 +222,8 @@ def run_cholmod_study(spec: ProblemSpec, repeats: int) -> dict:
     CHOLMOD (sparse-direct on the reduced system), both with the same tuned
     damping. Writes device_<name>_cholmod.json."""
     print(f"\n## {spec.title} — CHOLMOD comparison")
-    problem_elim, init = spec.load(True)
-    problem_full, _ = spec.load(False)
+    problem_elim, init = spec.load("auto")
+    problem_full, _ = spec.load("off")
     dev = device_for("cpu")
     assert dev is not None  # CPU is always available.
     elim_d = jax.device_put(problem_elim, dev)

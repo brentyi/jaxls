@@ -14,6 +14,7 @@ import inspect
 import time
 import urllib.request
 from pathlib import Path
+from typing import Literal
 
 import jax
 import jax.numpy as jnp
@@ -23,11 +24,12 @@ import jaxls
 
 
 def _analyze(
-    problem: jaxls.LeastSquaresProblem, schur_elimination: bool
+    problem: jaxls.LeastSquaresProblem,
+    schur_elimination: Literal["auto", "off"],
 ) -> jaxls.AnalyzedLeastSquaresProblem:
-    """analyze() with `schur_elimination` when supported. jaxls@main predates
-    elimination; passing the flag through this shim lets the same benchmark
-    scripts run against both versions for before/after comparisons."""
+    """analyze() forwarding `schur_elimination`. jaxls@main predates
+    elimination (no such parameter); the shim lets the same benchmark scripts
+    run against both versions for before/after comparisons."""
     if "schur_elimination" in inspect.signature(problem.analyze).parameters:
         return problem.analyze(schur_elimination=schur_elimination)
     return problem.analyze()
@@ -183,7 +185,7 @@ def _parse_bal(
 
 def load_bal(
     path: Path,
-    schur_elimination: bool = True,
+    schur_elimination: Literal["auto", "off"] = "auto",
 ) -> tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues]:
     """Parse a BAL problem file and build the jaxls problem + initial values."""
     cam_idx, pt_idx, obs, cameras, points = _parse_bal(str(path))
@@ -220,7 +222,7 @@ def make_toy_ba(
     n_cams: int = 30,
     n_pts: int = 700,
     obs_per_point: int = 6,
-    schur_elimination: bool = True,
+    schur_elimination: Literal["auto", "off"] = "auto",
 ) -> tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues]:
     """Synthetic, well-conditioned BA problem. Small enough that a full dense
     solve is feasible, for the exactness anchor and the well-conditioned

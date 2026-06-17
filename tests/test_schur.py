@@ -66,7 +66,7 @@ def _make_ba_problem(
     with_bias: bool = False,
     extra_costs: list[jaxls.Cost] | None = None,
     extra_variables: list[jaxls.Var] | None = None,
-    schur_elimination: bool = True,
+    schur_elimination: Literal["auto", "off"] | tuple[type[jaxls.Var], ...] = "auto",
 ) -> tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues]:
     """Small synthetic bundle adjustment problem. Includes a kept-only cost
     group (camera priors) and an eliminated-only cost group (point priors).
@@ -209,8 +209,8 @@ def _solve_without_elimination(
     **fixture_kwargs,
 ) -> tuple[jaxls.VarValues, jaxls.SolveSummary]:
     """Reference solve on the full system: rebuilds the (deterministic)
-    fixture with `analyze(schur_elimination=False)` and solves it."""
-    problem, init = _make_ba_problem(schur_elimination=False, **fixture_kwargs)
+    fixture with `analyze(schur_elimination="off")` and solves it."""
+    problem, init = _make_ba_problem(schur_elimination="off", **fixture_kwargs)
     assert problem._elimination is None
     return problem.solve(
         init,
@@ -502,7 +502,7 @@ def test_solver_receives_prebuilt_plan(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_analyze_flag_skips_plan() -> None:
-    """analyze(schur_elimination=False) must not build a plan, and solves of
+    """analyze(schur_elimination="off") must not build a plan, and solves of
     the resulting problem run on the full system."""
     costs = [
         jaxls.Cost(
@@ -513,11 +513,60 @@ def test_analyze_flag_skips_plan() -> None:
     variables: list[jaxls.Var] = [CamVar(jnp.array([0])), PointVar(jnp.arange(2))]
     with_plan = jaxls.LeastSquaresProblem(costs, variables).analyze()
     without_plan = jaxls.LeastSquaresProblem(costs, variables).analyze(
-        schur_elimination=False
+        schur_elimination="off"
     )
     assert with_plan._elimination is not None
     assert without_plan._elimination is None
     without_plan.solve(None, linear_solver="dense_cholesky", verbose=False)
+
+
+def test_analyze_explicit_eliminate_tuple() -> None:
+    """A tuple of variable types eliminates exactly those types, bypassing
+    inference. Eliminating PointVar here matches what "auto" would pick, and the
+    resulting solve still converges."""
+    problem, init = _make_ba_problem(schur_elimination=(PointVar,))
+    assert problem._elimination is not None
+    assert [t.count for t in problem._elimination.elim_types]  # non-empty
+    # The eliminated type is PointVar; cameras are kept.
+    elim_dim = problem._tangent_dim - problem._elimination.reduced_dim
+    assert elim_dim == 12 * PointVar.tangent_dim  # n_pts default = 12
+    problem.solve(init, linear_solver="dense_cholesky", **_solve_kwargs(5))
+
+
+def test_analyze_explicit_eliminate_rejects_bad_type() -> None:
+    """An explicit tuple naming a non-block-diagonal type is rejected at
+    analyze() time (build_elimination_plan raises). A cost couples two
+    PointVars, so the point block is not block-diagonal; CamVar is kept."""
+    costs = [
+        jaxls.Cost(
+            lambda vals, p0, p1: vals[p0] - vals[p1],
+            (PointVar(jnp.array([0])), PointVar(jnp.array([1]))),
+        ),
+        jaxls.Cost(
+            lambda vals, cam, pt: vals[cam][:3] - vals[pt],
+            (CamVar(jnp.array([0])), PointVar(jnp.array([0]))),
+        ),
+    ]
+    variables: list[jaxls.Var] = [CamVar(jnp.array([0])), PointVar(jnp.arange(2))]
+    with pytest.raises(ValueError, match="couples multiple eliminated"):
+        jaxls.LeastSquaresProblem(costs, variables).analyze(
+            schur_elimination=(PointVar,)
+        )
+
+
+def test_analyze_rejects_invalid_schur_arg() -> None:
+    """schur_elimination must be 'auto', 'off', or a tuple of types."""
+    costs = [
+        jaxls.Cost(
+            lambda vals, cam, pt: vals[cam][:3] - vals[pt],
+            (CamVar(jnp.array([0])), PointVar(jnp.array([0]))),
+        )
+    ]
+    prob = jaxls.LeastSquaresProblem(
+        costs, [CamVar(jnp.array([0])), PointVar(jnp.arange(1))]
+    )
+    with pytest.raises(ValueError, match="must be 'auto', 'off'"):
+        prob.analyze(schur_elimination="sometimes")  # type: ignore[arg-type]
 
 
 def test_plan_rejects_coupled_same_type() -> None:

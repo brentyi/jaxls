@@ -80,7 +80,11 @@ class LeastSquaresProblem:
             max_variables=max_variables,
         )
 
-    def analyze(self, use_onp: Any = False, schur_elimination: Any = True) -> Any:
+    def analyze(
+        self,
+        use_onp: Any = False,
+        schur_elimination: Any = "auto",
+    ) -> Any:
 
         if use_onp:
             jnp = onp
@@ -290,7 +294,17 @@ class LeastSquaresProblem:
             infer_eliminate,
         )
 
-        eliminate = infer_eliminate(analyzed) if schur_elimination else ()
+        if schur_elimination == "auto":
+            eliminate = infer_eliminate(analyzed)
+        elif schur_elimination == "off":
+            eliminate = ()
+        elif isinstance(schur_elimination, tuple):
+            eliminate = schur_elimination
+        else:
+            raise ValueError(
+                "schur_elimination must be 'auto', 'off', or a tuple of "
+                f"variable types; got {schur_elimination!r}."
+            )
         if len(eliminate) > 0:
             try:
                 elimination = build_elimination_plan(analyzed, eliminate)

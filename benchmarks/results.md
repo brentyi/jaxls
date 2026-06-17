@@ -2,12 +2,13 @@
 
 Branch `schur-elimination-v2`: a from-scratch reimplementation of variable
 elimination for bundle adjustment, measured with the matched-iteration
-methodology below. Elimination is automatic by default: `solve()` eliminates
-dominant block-diagonal variable types (chosen from the problem structure,
-logged) for the dense and conjugate-gradient solvers, and never for cholmod,
-whose sparse full-system factorization scales better than a dense reduced
-one. `schur_elimination=False` opts out; the "full CG"/"full dense"
-baselines below use it. Hardware: Apple Silicon CPU, float64
+methodology below. Elimination is automatic by default
+(`analyze(schur_elimination="auto")`): `solve()` eliminates dominant
+block-diagonal variable types (chosen from the problem structure, logged) and
+all three linear solvers use the reduced system — dense Cholesky and CG solve
+it densely / matrix-free, and cholmod factors it sparse-directly.
+`schur_elimination="off"` opts out; the "full CG"/"full dense" baselines below
+use it. Hardware: Apple Silicon CPU, float64
 unless noted. Absolute times are hardware-dependent; the exactness results
 and the matched-iteration *orderings* are the portable claims.
 

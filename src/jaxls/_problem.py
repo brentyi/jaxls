@@ -145,7 +145,9 @@ class LeastSquaresProblem:
         )
 
     def analyze(
-        self, use_onp: bool = False, schur_elimination: bool = True
+        self,
+        use_onp: bool = False,
+        schur_elimination: Literal["auto", "off"] | tuple[type[Var], ...] = "auto",
     ) -> AnalyzedLeastSquaresProblem:
         """Analyze sparsity pattern of least squares problem. Needed before solving.
 
@@ -155,15 +157,31 @@ class LeastSquaresProblem:
         Args:
             use_onp: If True, use numpy instead of jax.numpy for index computations.
                 Can be faster for problem setup on CPU.
-            schur_elimination: If True and a dominant block-diagonal variable
-                type exists (for example, landmarks in bundle adjustment),
-                precompute a Schur-complement elimination plan; solves then
-                run on the much smaller, better-conditioned reduced system.
-                All three linear solvers use the plan: "dense_cholesky" and
-                "conjugate_gradient" solve the reduced system densely / matrix-
-                free, and "cholmod" factors it sparse-directly. Set to False to
-                skip elimination and solve the full system — useful for
-                debugging or benchmarking against the non-eliminated solve.
+            schur_elimination: Controls Schur-complement variable elimination.
+                When a dominant block-diagonal variable type is eliminated (for
+                example, landmarks in bundle adjustment), solves run on the much
+                smaller, better-conditioned reduced system and then
+                back-substitute the eliminated variables. All three linear
+                solvers use the plan: "dense_cholesky" and "conjugate_gradient"
+                solve the reduced system densely / matrix-free, and "cholmod"
+                factors it sparse-directly.
+
+                - ``"auto"`` (default): automatically eliminate a dominant
+                  block-diagonal variable type if one exists, otherwise solve
+                  the full system.
+                - ``"off"``: skip elimination and solve the full system —
+                  useful for debugging or benchmarking against the
+                  non-eliminated solve.
+                - a tuple of variable types, e.g. ``(LandmarkVar,)``: eliminate
+                  exactly these types. Each must be block-diagonal (no single
+                  cost may touch more than one variable of the type), or
+                  building the plan raises a ``ValueError``.
+
+                Only a single level of elimination is currently supported: the
+                eliminated types are removed in one Schur step and the remaining
+                types form the reduced system. (Nested / multi-level elimination
+                — eliminating further types from the already-reduced system — is
+                not implemented.)
 
         Returns:
             An AnalyzedLeastSquaresProblem ready for solving.
@@ -407,7 +425,17 @@ class LeastSquaresProblem:
             infer_eliminate,
         )
 
-        eliminate = infer_eliminate(analyzed) if schur_elimination else ()
+        if schur_elimination == "auto":
+            eliminate = infer_eliminate(analyzed)
+        elif schur_elimination == "off":
+            eliminate = ()
+        elif isinstance(schur_elimination, tuple):
+            eliminate = schur_elimination
+        else:
+            raise ValueError(
+                "schur_elimination must be 'auto', 'off', or a tuple of "
+                f"variable types; got {schur_elimination!r}."
+            )
         if len(eliminate) > 0:
             try:
                 elimination = build_elimination_plan(analyzed, eliminate)
@@ -447,9 +475,9 @@ class AnalyzedLeastSquaresProblem:
     _residual_dim: jdc.Static[int]
     _elimination: EliminationPlan | None = None
     """Schur-complement elimination plan, precomputed by `analyze()` when a
-    dominant block-diagonal variable type exists. Used by `solve()` for all
-    reduced-solve paths (dense Cholesky, CG, and CHOLMOD) unless
-    `schur_elimination=False`."""
+    dominant block-diagonal variable type is eliminated. Used by `solve()` for
+    all reduced-solve paths (dense Cholesky, CG, and CHOLMOD); None when
+    `analyze(schur_elimination="off")` or no type was eliminated."""
 
     @overload
     def solve(
