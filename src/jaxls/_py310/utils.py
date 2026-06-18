@@ -6,7 +6,20 @@ from functools import partial
 
 import jax
 import termcolor
+from jax import numpy as jnp
 from loguru import logger
+
+
+def _batched_gram(a: Any, b: Any) -> Any:
+    return jnp.sum(a[..., :, :, None] * b[..., :, None, :], axis=-3)
+
+
+def _batched_outer_last(a: Any, b: Any) -> Any:
+    return jnp.sum(a[..., :, None, :] * b[..., None, :, :], axis=-1)
+
+
+def _batched_matmul(a: Any, b: Any) -> Any:
+    return jnp.sum(a[..., :, :, None] * b[..., None, :, :], axis=-2)
 
 
 @contextlib.contextmanager
@@ -30,6 +43,7 @@ def jax_log(fmt: Any, *args, **kwargs) -> Any:
 def print_deprecation_warning(
     message0: Any, message1: Any = None, stack_level: Any = 2
 ) -> Any:
+
     frame = inspect.currentframe()
     for _ in range(stack_level):
         if not frame:

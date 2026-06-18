@@ -1,0 +1,318 @@
+{
+  "meta": {
+    "jaxls": "/home/brent/jaxls/src/jaxls/__init__.py",
+    "devices": [
+      "gpu",
+      "cpu"
+    ],
+    "quick": false,
+    "baseline": "baseline.json"
+  },
+  "metrics": {
+    "toy.gpu.full_cg.cost": {
+      "value": 5913.723888460381,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.gpu.full_cg.time": {
+      "value": 0.07491348299663514,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.gpu.schur_dense.cost": {
+      "value": 5913.723884249479,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.gpu.schur_dense.time": {
+      "value": 0.02682858897605911,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.gpu.schur_cg.cost": {
+      "value": 5913.723885442614,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.gpu.schur_cg.time": {
+      "value": 0.032702618977054954,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.cpu.full_cg.cost": {
+      "value": 5913.723888460916,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.cpu.full_cg.time": {
+      "value": 0.2743255959940143,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.cpu.schur_dense.cost": {
+      "value": 5913.723884249483,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.cpu.schur_dense.time": {
+      "value": 0.0633065280271694,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.cpu.schur_cg.cost": {
+      "value": 5913.72388544262,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "toy.cpu.schur_cg.time": {
+      "value": 0.3201562390313484,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.gpu.full_cg.cost": {
+      "value": 26997.88885164329,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.gpu.full_cg.time": {
+      "value": 8.418146082025487,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.gpu.schur_dense.cost": {
+      "value": 26779.09611144552,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.gpu.schur_dense.time": {
+      "value": 0.07681672601029277,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.gpu.schur_cg.cost": {
+      "value": 26874.3014152529,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.gpu.schur_cg.time": {
+      "value": 0.5777458370430395,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.cpu.full_cg.cost": {
+      "value": 34263.44280161518,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=2"
+    },
+    "ladybug49.cpu.full_cg.time": {
+      "value": 29.228925258968957,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=2"
+    },
+    "ladybug49.cpu.schur_dense.cost": {
+      "value": 26779.116647798262,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.cpu.schur_dense.time": {
+      "value": 0.8472943399683572,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "ladybug49.cpu.schur_cg.cost": {
+      "value": 26887.171530858235,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=30"
+    },
+    "ladybug49.cpu.schur_cg.time": {
+      "value": 26.030747681041248,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=30"
+    },
+    "trafalgar138.gpu.full_cg.cost": {
+      "value": 210085.48831159686,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=4"
+    },
+    "trafalgar138.gpu.full_cg.time": {
+      "value": 26.193290175986476,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=4"
+    },
+    "trafalgar138.gpu.schur_dense.cost": {
+      "value": 173626.54810044504,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "trafalgar138.gpu.schur_dense.time": {
+      "value": 0.22934570698998868,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "trafalgar138.gpu.schur_cg.cost": {
+      "value": 173626.61255608813,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "trafalgar138.gpu.schur_cg.time": {
+      "value": 5.172860280028544,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "trafalgar138.cpu.full_cg.cost": {
+      "value": 218215.04808663815,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=2"
+    },
+    "trafalgar138.cpu.full_cg.time": {
+      "value": 610.3361833519884,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=2"
+    },
+    "trafalgar138.cpu.schur_dense.cost": {
+      "value": 173626.54786369647,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "trafalgar138.cpu.schur_dense.time": {
+      "value": 4.959632423997391,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "trafalgar138.cpu.schur_cg.cost": {
+      "value": 209779.3431301261,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.02,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=4"
+    },
+    "trafalgar138.cpu.schur_cg.time": {
+      "value": 30.598396679968573,
+      "unit": "s",
+      "direction": "lower_better",
+      "rel_tol": 0.3,
+      "abs_tol": 0.0,
+      "notes": "budget-stopped at k=4"
+    },
+    "float32.ladybug49.nan_count": {
+      "value": 0.0,
+      "unit": "",
+      "direction": "lower_better",
+      "rel_tol": 0.0,
+      "abs_tol": 0.0,
+      "notes": ""
+    },
+    "float32.ladybug49.best_cost": {
+      "value": 28277.06640625,
+      "unit": "cost",
+      "direction": "lower_better",
+      "rel_tol": 0.05,
+      "abs_tol": 0.0,
+      "notes": "float32 direct Schur path"
+    }
+  },
+  "skipped": {}
+}

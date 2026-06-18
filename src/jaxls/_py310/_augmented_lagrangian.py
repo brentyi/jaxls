@@ -82,6 +82,7 @@ def initialize_al_state(
     config: Any,
     verbose: Any = False,
 ) -> Any:
+
     is_inequality = tuple(
         cost.kind in ("constraint_leq_zero", "constraint_geq_zero")
         for cost in problem._stacked_costs
@@ -217,6 +218,7 @@ def update_problem_al_params(
     problem: Any,
     al_state: Any,
 ) -> Any:
+
     from ._analyzed_cost import AugmentedLagrangianParams
 
     updated_costs = []
@@ -253,6 +255,7 @@ def check_al_convergence(
     al_state: Any,
     config: Any,
 ) -> Any:
+
     converged_absolute = (
         jnp.maximum(al_state.snorm, al_state.constraint_violation)
         < config.tolerance_absolute

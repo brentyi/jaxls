@@ -4,6 +4,8 @@ from typing import Any
 
 from jax import numpy as jnp
 
+from .utils import _batched_gram
+
 
 def make_point_jacobi_precoditioner(
     A_blocksparse: Any,
@@ -32,6 +34,7 @@ def make_point_jacobi_precoditioner(
 
 
 def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
+
     gram_diagonal_blocks = list()
     for var_type, ids in graph._tangent_ordering.ordered_dict_items(
         graph._sorted_ids_from_var_type
@@ -66,7 +69,8 @@ def make_block_jacobi_precoditioner(graph: Any, A_blocksparse: Any) -> Any:
                 )
             )
 
-            gram_blocks = jnp.einsum("frvt,frva->fvta", A_blocks, A_blocks)
+            A_fvrt = jnp.swapaxes(A_blocks, 1, 2)
+            gram_blocks = _batched_gram(A_fvrt, A_fvrt)
             assert gram_blocks.shape == (
                 num_costs,
                 num_vars,

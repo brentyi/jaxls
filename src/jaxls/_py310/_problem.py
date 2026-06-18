@@ -80,7 +80,12 @@ class LeastSquaresProblem:
             max_variables=max_variables,
         )
 
-    def analyze(self, use_onp: Any = False) -> Any:
+    def analyze(
+        self,
+        use_onp: Any = False,
+        schur_elimination: Any = "auto",
+    ) -> Any:
+
         if use_onp:
             jnp = onp
         else:
@@ -271,7 +276,7 @@ class LeastSquaresProblem:
             shape=(residual_dim_sum, tangent_dim_sum),
         )
 
-        return AnalyzedLeastSquaresProblem(
+        analyzed = AnalyzedLeastSquaresProblem(
             _stacked_costs=tuple(stacked_costs),
             _cost_counts=tuple(cost_counts),
             _sorted_ids_from_var_type=sorted_ids_from_var_type,
@@ -282,6 +287,44 @@ class LeastSquaresProblem:
             _tangent_dim=tangent_dim_sum,
             _residual_dim=residual_dim_sum,
         )
+
+        from ._schur import (
+            _TracedVariableIdsError,
+            build_elimination_plan,
+            infer_eliminate,
+        )
+
+        if schur_elimination == "auto":
+            eliminate = infer_eliminate(analyzed)
+        elif schur_elimination == "off":
+            eliminate = ()
+        elif isinstance(schur_elimination, tuple):
+            eliminate = schur_elimination
+        else:
+            raise ValueError(
+                "schur_elimination must be 'auto', 'off', or a tuple of "
+                f"variable types; got {schur_elimination!r}."
+            )
+        if len(eliminate) > 0:
+            try:
+                elimination = build_elimination_plan(analyzed, eliminate)
+            except _TracedVariableIdsError:
+                logger.info(
+                    "Variable elimination: variable IDs are traced; solves "
+                    "will not use elimination"
+                )
+            else:
+                logger.info(
+                    "Variable elimination: eliminating {} ({} of {} tangent "
+                    "dims); reduced system is {}-dimensional",
+                    ", ".join(var_type.__name__ for var_type in eliminate),
+                    analyzed._tangent_dim - elimination.reduced_dim,
+                    analyzed._tangent_dim,
+                    elimination.reduced_dim,
+                )
+                with jdc.copy_and_mutate(analyzed, validate=False) as analyzed:
+                    analyzed._elimination = elimination
+        return analyzed
 
 
 @jdc.pytree_dataclass
@@ -295,6 +338,7 @@ class AnalyzedLeastSquaresProblem:
     _tangent_start_from_var_type: jdc.Static[Any]
     _tangent_dim: jdc.Static[Any]
     _residual_dim: jdc.Static[Any]
+    _elimination: Any = None
 
     def solve(
         self,
@@ -326,6 +370,8 @@ class AnalyzedLeastSquaresProblem:
             conjugate_gradient_config = linear_solver
             linear_solver = "conjugate_gradient"
 
+        elimination = self._elimination
+
         solver = NonlinearSolver(
             linear_solver,
             trust_region,
@@ -334,6 +380,7 @@ class AnalyzedLeastSquaresProblem:
             sparse_mode,
             verbose,
             augmented_lagrangian if has_constraints else None,
+            elimination,
         )
         return solver.solve(
             problem=self, initial_vals=initial_vals, return_summary=return_summary

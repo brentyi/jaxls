@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import contextlib
+import dataclasses
+import functools
+import time
 from typing import (
     TYPE_CHECKING,
     Callable,
     Hashable,
+    Iterator,
     Literal,
     assert_never,
     cast,
@@ -13,6 +18,7 @@ from typing import (
 import jax
 import jax.flatten_util
 import jax_dataclasses as jdc
+import numpy as onp
 import scipy
 import scipy.sparse
 from jax import numpy as jnp
@@ -29,6 +35,14 @@ from ._augmented_lagrangian import (
     initialize_al_state,
     update_al_state,
     update_problem_al_params,
+)
+from ._schur import (
+    EliminationPlan,
+    SchurFactors,
+    prepare_schur,
+    solve_schur_cg,
+    solve_schur_cholmod,
+    solve_schur_dense,
 )
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
@@ -92,6 +106,165 @@ def _cholmod_solve_on_host(
         beta=lambd + 1e-5,
     )
     return cost.solve_A(ATb)
+
+
+_cholmod_symmetric_analyze_cache: dict[Hashable, sksparse.cholmod.Factor] = {}
+
+
+def _cholmod_solve_symmetric(
+    s_values: jax.Array,
+    rows: jax.Array,
+    cols: jax.Array,
+    reduced_dim: int,
+    b: jax.Array,
+) -> jax.Array:
+    """JIT-friendly CHOLMOD solve of a symmetric system S x = b, where S is
+    given in COO form (s_values at (rows, cols), duplicates summed). Used by
+    the Schur + CHOLMOD reduced solve."""
+    return jax.pure_callback(
+        functools.partial(_cholmod_solve_symmetric_on_host, reduced_dim=reduced_dim),
+        b,  # Result shape/dtype.
+        s_values,
+        rows,
+        cols,
+        b,
+        vmap_method="sequential",
+    )
+
+
+def _cholmod_solve_symmetric_on_host(
+    s_values: jax.Array,
+    rows: jax.Array,
+    cols: jax.Array,
+    b: jax.Array,
+    *,
+    reduced_dim: int,
+) -> jax.Array:
+    """Factor a symmetric sparse S (COO: s_values at (rows, cols)) with CHOLMOD
+    and solve S x = b. Runs on the host."""
+    import sksparse.cholmod
+
+    rows_onp = onp.asarray(rows)
+    cols_onp = onp.asarray(cols)
+    S = scipy.sparse.coo_matrix(
+        (onp.asarray(s_values), (rows_onp, cols_onp)),
+        shape=(reduced_dim, reduced_dim),
+    ).tocsc()  # Sums duplicate (i, j) entries.
+
+    # Cache the symbolic analysis. The COO coordinates are fixed across solves
+    # for a given problem, so the summed CSC pattern is stable.
+    cache_key = (rows_onp.tobytes(), cols_onp.tobytes(), reduced_dim)
+    factor = _cholmod_symmetric_analyze_cache.get(cache_key, None)
+    if factor is None:
+        factor = sksparse.cholmod.analyze(S)
+        _cholmod_symmetric_analyze_cache[cache_key] = factor
+
+        max_cache_size = 512
+        if len(_cholmod_symmetric_analyze_cache) > max_cache_size:
+            _cholmod_symmetric_analyze_cache.pop(
+                next(iter(_cholmod_symmetric_analyze_cache))
+            )
+
+    # Numeric refactorization reusing the cached symbolic analysis. The 1e-5
+    # diagonal floor is already folded into s_values by the caller.
+    factor = factor.cholesky(S)
+    return factor.solve_A(onp.asarray(b))
+
+
+_active_iteration_time_recorder: list[float] | None = None
+
+
+@contextlib.contextmanager
+def record_iteration_times() -> Iterator[list[float]]:
+    """Record a host wall-clock timestamp at each outer LM iteration of any
+    `solve()` running in this block, for cost-vs-time benchmarking.
+
+    Returns a list that is filled with `time.perf_counter()` values (one per
+    outer iteration, in order); `times[i] - times[0]` is the elapsed time to
+    reach iteration `i`. Off the normal solve path entirely — the timestamps
+    never enter the jitted computation or `SolveSummary`, so there is zero
+    overhead and no dtype dependence when not recording, and the values are
+    always host float64 (the in-array alternative would be float32 without
+    jax_enable_x64, too coarse to resolve millisecond steps).
+
+    Timestamps include async-dispatch latency, so read differences, not
+    absolute values, and wrap the solve in `block_until_ready` for precise
+    totals. Not reentrant / not for concurrent solves from multiple threads
+    (one active recorder at a time).
+
+        with jaxls.record_iteration_times() as times:
+            sol = problem.solve(init)
+        # times[1:] - times[0]  ->  per-iteration elapsed seconds
+
+    The recording callback is decided at trace time, so whether timestamps are
+    captured is baked into the compiled solve. Entering and leaving this block
+    therefore clears the solver's JIT cache, so the first solve inside it
+    recompiles *with* the callback (even if an identical solve was already
+    compiled without one) and the first solve after it recompiles *without*.
+    The compile inside the block also acts as the warmup; for steady-state
+    timing, run the solve twice in the block and read the second:
+
+        with jaxls.record_iteration_times() as times:
+            jax.block_until_ready(problem.solve(init))   # warmup, compiles
+            times.clear()
+            sol = jax.block_until_ready(problem.solve(init))
+    """
+    global _active_iteration_time_recorder
+    prev = _active_iteration_time_recorder
+    times: list[float] = []
+    _active_iteration_time_recorder = times
+    # The callback's presence is fixed at trace time and not part of the JIT
+    # cache key, so a cached (callback-free) executable would otherwise be
+    # reused and silently record nothing. Clear the cache on the way in (force
+    # a callback-bearing recompile) and on the way out (restore the zero-
+    # overhead executable for normal solves).
+    _clear_solve_cache()
+    try:
+        yield times
+    finally:
+        _active_iteration_time_recorder = prev
+        _clear_solve_cache()
+
+
+def _clear_solve_cache() -> None:
+    # NonlinearSolver.solve is wrapped by @jdc.jit, whose .clear_cache() the
+    # type checker can't see through the FunctionType it infers.
+    NonlinearSolver.solve.clear_cache()  # type: ignore[attr-defined]
+
+
+def _record_iteration_time(anchor: jax.Array) -> None:
+    """Append `time.perf_counter()` to the active recorder, if any, via
+    `jax.debug.callback` so it works inside the jitted `lax.while_loop`.
+
+    `anchor` is a value that depends on the just-computed iterate (its cost);
+    the callback consumes it so the timestamp is ordered after that
+    iteration's work and the callbacks are not merged/hoisted by XLA. A no-op
+    (no callback emitted) when no `record_iteration_times()` block is active,
+    so the default solve path is untouched."""
+    if _active_iteration_time_recorder is None:
+        return
+
+    def _stamp(_anchor: object) -> None:
+        if _active_iteration_time_recorder is not None:
+            _active_iteration_time_recorder.append(time.perf_counter())
+
+    jax.debug.callback(_stamp, anchor)
+
+
+def _compute_jacobian_scaler(column_norms: jax.Array) -> jax.Array:
+    """Column scaling for the Levenberg-Marquardt normal equations.
+
+    This is the historical jaxls scaler: bounded gain in (1, 2], so weak
+    directions are never amplified and lambdas tuned against it keep their
+    meaning. A Marquardt-style scale-invariant splice
+    (``min(legacy, 1.5/n)``) was evaluated and rejected: it silently
+    re-denominates every tuned lambda for problems whose column norms
+    exceed unit (IK, pose graphs), regressing downstream workloads, and its
+    bundle-adjustment motivation disappeared once rejected-step termination
+    handling was fixed and lambda escalation made adaptive. Measurements and
+    derivation: benchmarks/results.md, "The column-scaling math".
+    """
+    return 1.0 / (1.0 + column_norms) + 1.0
 
 
 @jdc.pytree_dataclass
@@ -213,6 +386,14 @@ class _LmInnerState:
     sol_proposed: _SolutionState
     local_delta: jax.Array
     summary: SolveSummary
+    lambda_growth: jax.Array = dataclasses.field(default_factory=lambda: jnp.array(2.0))
+    """Lambda escalation factor; doubled after each consecutive rejection
+    within one outer step, so a grossly under-damped lambda recovers in
+    O(log log) tries instead of O(log). This is the rejection-side half of
+    the strategy in H.B. Nielsen (1999), "Damping Parameter in Marquardt's
+    Method", IMM-REP-1999-05, DTU; the decrease-on-acceptance rule remains
+    jaxls's plain halving. A no-op whenever the first proposal is accepted,
+    so well-tuned solves are unaffected."""
 
 
 @jdc.pytree_dataclass
@@ -225,6 +406,11 @@ class _LmOuterState:
     lambd: float | jax.Array
     jacobian_scaler: jax.Array
     al_state: AugmentedLagrangianState | None  # AL state when constraints present.
+    last_step_accepted: jax.Array = dataclasses.field(
+        default_factory=lambda: jnp.array(True)
+    )
+    """Whether the last outer step found an acceptable proposal. When False
+    with lambda at its maximum, no further progress is possible."""
 
 
 @jdc.pytree_dataclass
@@ -241,6 +427,22 @@ class NonlinearSolver:
     verbose: jdc.Static[bool]
     augmented_lagrangian: AugmentedLagrangianConfig | None = None
     """Configuration for Augmented Lagrangian method. Set when constraints are present."""
+    elimination: EliminationPlan | None = None
+    """Schur-complement variable elimination plan. Set when `eliminate` is
+    passed to `solve()`."""
+
+    def _resolve_cg_config(self) -> ConjugateGradientConfig:
+        """CG settings for this solve. A `ConjugateGradientConfig` passed to
+        `solve(linear_solver=...)` reaches this class as the string
+        "conjugate_gradient" plus the separate `conjugate_gradient_config`
+        field (see `AnalyzedLeastSquaresProblem.solve`), so both fields must
+        be consulted; reading only `linear_solver` silently drops user
+        settings."""
+        if isinstance(self.linear_solver, ConjugateGradientConfig):
+            return self.linear_solver
+        if self.conjugate_gradient_config is not None:
+            return self.conjugate_gradient_config
+        return ConjugateGradientConfig()
 
     @overload
     def solve(
@@ -281,6 +483,9 @@ class NonlinearSolver:
         lambda_history = jnp.zeros(self.termination.max_iterations)
         if self.trust_region is not None:
             lambda_history = lambda_history.at[0].set(self.trust_region.lambda_initial)
+        # Timestamp the initial point (no-op unless a record_iteration_times()
+        # block is active); kept off the solver state entirely.
+        _record_iteration_time(cost_info.cost_total)
 
         # Initialize AL state if constraints are present.
         al_state: AugmentedLagrangianState | None = None
@@ -297,6 +502,16 @@ class NonlinearSolver:
             cost_info = problem._compute_cost_info(vals)
             cost_history = cost_history.at[0].set(cost_info.cost_nonconstraint)
 
+        # Jacobian column scaler: depends only on the linearization at the
+        # initial point, so compute it once here rather than every outer step
+        # (compute_column_norms is a full-Jacobian scatter — wasted on every
+        # iteration past the first when the scaler is frozen anyway).
+        jacobian_scaler = _compute_jacobian_scaler(
+            problem._compute_jac_values(
+                vals, cost_info.jac_cache
+            ).compute_column_norms()
+        )
+
         state = _LmOuterState(
             solution=_SolutionState(
                 vals=vals,
@@ -305,11 +520,7 @@ class NonlinearSolver:
                 if self.linear_solver != "conjugate_gradient"
                 else _ConjugateGradientState(
                     ATb_norm_prev=0.0,
-                    eta=(
-                        ConjugateGradientConfig()
-                        if self.conjugate_gradient_config is None
-                        else self.conjugate_gradient_config
-                    ).tolerance_max,
+                    eta=self._resolve_cg_config().tolerance_max,
                 ),
             ),
             summary=SolveSummary(
@@ -322,7 +533,7 @@ class NonlinearSolver:
             lambd=self.trust_region.lambda_initial
             if self.trust_region is not None
             else 0.0,
-            jacobian_scaler=jnp.ones(problem._tangent_dim),
+            jacobian_scaler=jacobian_scaler,
             al_state=al_state,
         )
 
@@ -334,6 +545,17 @@ class NonlinearSolver:
                 basic_checks = ~jnp.isnan(state.solution.cost_info.cost_total) & (
                     state.summary.iterations < self.termination.max_iterations
                 )
+                # No acceptable step exists even at maximum damping: further
+                # outer steps would re-reject the same proposals until the
+                # iteration cap. Unconstrained only: under augmented
+                # Lagrangian, a penalty update reshapes the cost surface and
+                # can restore progress, so a maxed-out lambda sweep must not
+                # end the solve before the AL machinery gets that chance.
+                if self.trust_region is not None and self.augmented_lagrangian is None:
+                    basic_checks = basic_checks & ~(
+                        ~state.last_step_accepted
+                        & (state.lambd >= self.trust_region.lambda_max)
+                    )
 
                 # For unconstrained: stop when termination criteria met or step rejected.
                 if self.augmented_lagrangian is None:
@@ -397,6 +619,7 @@ class NonlinearSolver:
         A_multiply: Callable[[jax.Array], jax.Array],
         AT_multiply: Callable[[jax.Array], jax.Array],
         ATb: jax.Array,
+        schur_factors: SchurFactors | None = None,
     ) -> _LmInnerState:
         """Levenberg-Marquardt inner step. Tries one lambda value."""
         # Compute lambda for this iteration.
@@ -404,7 +627,7 @@ class NonlinearSolver:
         # - For GN: keep lambda at 0
         if self.trust_region is not None:
             lambd = jnp.minimum(
-                inner_state.lambd * self.trust_region.lambda_factor,
+                inner_state.lambd * inner_state.lambda_growth,
                 self.trust_region.lambda_max,
             )
         else:
@@ -416,23 +639,37 @@ class NonlinearSolver:
 
         # Solve the linear system.
         cg_state: _ConjugateGradientState | None = None
-        if (
+        if schur_factors is not None:
+            # Variable elimination: solve the reduced (Schur complement)
+            # system, then back-substitute the eliminated variables.
+            if self.linear_solver == "conjugate_gradient":
+                assert isinstance(sol_prev.cg_state, _ConjugateGradientState)
+                local_delta, cg_state = solve_schur_cg(
+                    schur_factors, lambd, self._resolve_cg_config(), sol_prev.cg_state
+                )
+            elif self.linear_solver == "dense_cholesky":
+                local_delta = solve_schur_dense(schur_factors, lambd)
+            elif self.linear_solver == "cholmod":
+                local_delta = solve_schur_cholmod(schur_factors, lambd)
+            else:
+                raise AssertionError(
+                    f"Unexpected elimination plan for {self.linear_solver}."
+                )
+        elif (
             isinstance(self.linear_solver, ConjugateGradientConfig)
             or self.linear_solver == "conjugate_gradient"
         ):
-            # Use default CG config if specified as a string, otherwise use the provided config.
-            cg_config = (
-                ConjugateGradientConfig()
-                if self.linear_solver == "conjugate_gradient"
-                else self.linear_solver
-            )
+            cg_config = self._resolve_cg_config()
             assert isinstance(sol_prev.cg_state, _ConjugateGradientState)
             local_delta, cg_state = cg_config._solve(
                 problem,
                 A_blocksparse,
                 # We could also use (lambd * ATA_diagonals * vec) for
                 # scale-invariant damping. But this is hard to match with CHOLMOD.
-                # Add 1e-5 regularization to match dense_cholesky behavior.
+                # The extra 1e-5 keeps simple/underdetermined problems from blowing
+                # up, matching the CHOLMOD path (see beta=lambd + 1e-5 above); the
+                # Schur CG path in solve_schur_cg adds the same term. Only
+                # dense_cholesky omits it, using lambd alone.
                 lambda vec: AT_multiply(A_multiply(vec)) + (lambd + 1e-5) * vec,
                 ATb=ATb,
                 prev_linear_state=sol_prev.cg_state,
@@ -472,14 +709,22 @@ class NonlinearSolver:
         if self.trust_region is None:
             accepted = jnp.array(True)
         else:
-            cost_predicted = jnp.sum(
-                (
-                    A_blocksparse.multiply(scaled_local_delta)
-                    + sol_prev.cost_info.residual_vector
-                )
-                ** 2
+            # Predicted reduction of the linear model, expanded analytically:
+            #   |r|^2 - |r + J dx|^2 = -2 dx^T J^T r - |J dx|^2
+            #                        =  2 dx^T ATb   - |J dx|^2.
+            # The expanded form avoids the catastrophic cancellation of
+            # subtracting two O(cost) sums over ~1e5+ residual terms, which
+            # otherwise reduces `step_quality` to rounding noise once the
+            # true per-step reduction approaches eps * cost.
+            #
+            # `A_blocksparse` is the column-scaled Jacobian and `local_delta`
+            # / `ATb` live in the same scaled coordinates, so the products
+            # are exactly J dx and dx^T J^T r in the original space.
+            # (Multiplying by `scaled_local_delta` here would apply the
+            # column scaling twice.)
+            predicted_reduction = 2.0 * jnp.dot(local_delta, ATb) - jnp.sum(
+                A_blocksparse.multiply(local_delta) ** 2
             )
-            predicted_reduction = sol_prev.cost_info.cost_total - cost_predicted
             actual_reduction = (
                 sol_prev.cost_info.cost_total - proposed_cost_info.cost_total
             )
@@ -496,9 +741,12 @@ class NonlinearSolver:
             tangent_ordering=problem._tangent_ordering,
             ATb=ATb,
             iterations=iterations,
+            accepted=accepted,
         )
         with jdc.copy_and_mutate(inner_state) as next:
             next.lambd = lambd
+            # Accelerate the next escalation step (see `lambda_growth`).
+            next.lambda_growth = inner_state.lambda_growth * 2.0
             next.accepted = accepted
             next.sol_proposed = _SolutionState(
                 vals=proposed_vals,
@@ -506,6 +754,10 @@ class NonlinearSolver:
                 cg_state=cg_state,
             )
             next.local_delta = local_delta
+            # Timestamp this iterate (no-op unless a record_iteration_times()
+            # block is active). Anchored on this step's cost so the callback
+            # can't be reordered/hoisted ahead of the work it measures.
+            _record_iteration_time(proposed_cost_info.cost_total)
             next.summary = SolveSummary(
                 iterations=iterations,
                 termination_criteria=term_criteria,
@@ -535,14 +787,9 @@ class NonlinearSolver:
             sol_prev.vals, sol_prev.cost_info.jac_cache
         )
 
-        # Compute Jacobian scaler on first iteration only. We use jnp.where to
-        # avoid double JIT compilation (one trace for first=True, one for first=False).
-        with jdc.copy_and_mutate(state, validate=False) as state:
-            state.jacobian_scaler = jnp.where(
-                state.summary.iterations == 0,
-                1.0 / (1.0 + A_blocksparse.compute_column_norms()) + 1.0,
-                state.jacobian_scaler,
-            )
+        # The Jacobian scaler is frozen at the initial linearization (computed
+        # once in `solve`), so just apply it — no per-iteration column-norm
+        # scatter.
         A_blocksparse = A_blocksparse.scale_columns(state.jacobian_scaler)
 
         # Get flattened version for COO/CSR matrices.
@@ -583,6 +830,15 @@ class NonlinearSolver:
         # Compute right-hand side of normal equation.
         ATb = -AT_multiply(sol_prev.cost_info.residual_vector)
 
+        # Variable elimination: precompute the damping-independent parts of
+        # the Schur-complement system once per outer step. The inner (lambda
+        # search) loop below only redoes the damping-dependent work.
+        schur_factors: SchurFactors | None = None
+        if self.elimination is not None:
+            schur_factors = prepare_schur(
+                self.elimination, A_blocksparse, ATb, linear_solver=self.linear_solver
+            )
+
         # Inner loop: search for a good lambda value.
         #
         # For Levenberg-Marquardt, we try increasing lambdas until the step is
@@ -607,6 +863,11 @@ class NonlinearSolver:
 
         init_inner_state = _LmInnerState(
             lambd=init_lambd,
+            lambda_growth=jnp.asarray(
+                self.trust_region.lambda_factor
+                if self.trust_region is not None
+                else 2.0
+            ),
             accepted=jnp.array(False),
             # Dummy values - will be overwritten by first lm_inner_step call.
             sol_proposed=sol_prev,
@@ -630,6 +891,7 @@ class NonlinearSolver:
                 A_multiply,
                 AT_multiply,
                 ATb,
+                schur_factors,
             ),
             init_val=init_inner_state,
         )
@@ -655,6 +917,7 @@ class NonlinearSolver:
                 sol_prev,
             )
             state_next.lambd = lambd_next
+            state_next.last_step_accepted = inner_state_final.accepted
 
         # Debug: log step acceptance and ATb_norm.
         if self.verbose:
@@ -807,17 +1070,20 @@ class TerminationConfig:
         tangent_ordering: VarTypeOrdering,
         ATb: jax.Array,
         iterations: jax.Array,
+        accepted: jax.Array,
     ) -> tuple[jax.Array, jax.Array]:
         """Check for convergence!"""
 
         # Cost tolerance: use cost_nonconstraint for meaningful convergence check.
         # For constrained problems, the total cost changes with each AL update,
         # but cost_nonconstraint (original objective) provides stable convergence.
+        # Only accepted proposals count: the cost delta of a rejected step says
+        # nothing about progress, since the step is not taken.
         cost_reldelta = (
             jnp.abs(cost_nonconstraint_updated - sol_prev.cost_info.cost_nonconstraint)
             / sol_prev.cost_info.cost_nonconstraint
         )
-        converged_cost = cost_reldelta < self.cost_tolerance
+        converged_cost = (cost_reldelta < self.cost_tolerance) & accepted
 
         # Gradient tolerance: infinity norm of the gradient step.
         flat_vals = jax.flatten_util.ravel_pytree(sol_prev.vals)[0]
@@ -835,11 +1101,17 @@ class TerminationConfig:
             False,
         )
 
-        # Parameter tolerance.
+        # Parameter tolerance. Like the cost criterion above, only accepted
+        # proposals count: a rejected step is not taken, so its size says
+        # nothing about convergence — and treating it as converged exits the
+        # lambda-escalation loop early, freezing LM into re-proposing the
+        # same rejected step forever (measurements: benchmarks/results.md).
+        # When no acceptable step exists at any damping, the lambda_max
+        # check in the outer loop terminates instead.
         param_delta = jnp.linalg.norm(jnp.abs(tangent)) / (
             jnp.linalg.norm(flat_vals) + self.parameter_tolerance
         )
-        converged_parameters = param_delta < self.parameter_tolerance
+        converged_parameters = (param_delta < self.parameter_tolerance) & accepted
 
         # Check termination flags. We'll terminate if any of the conditions are met.
         term_flags = jnp.array(
