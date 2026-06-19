@@ -31,7 +31,7 @@
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -215,6 +215,7 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="design/typed_api/">Typed API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/schur_complement/">Schur complement elimination</a></li>
 <li class="toctree-l1"><a class="reference internal" href="design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
@@ -441,7 +442,7 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/brentyi/jaxls.git#egg=jaxls[dev,docs]&quot;</span>
 </pre></div>
 </div>
-<p>We recommend Python &gt;=3.12. The test matrix also coverse Python 3.10 and 3.11,
+<p>We recommend Python &gt;=3.12. The test matrix also covers Python 3.10 and 3.11,
 but this uses a transpiled version of the source code that may be deprecated in
 the future.</p>
 <section id="goals">
@@ -468,6 +469,9 @@ See <a class="reference internal" href="guide/advanced/custom_jacobians/"><span 
 <li><p>Optimization on manifolds, including SO(2), SO(3), SE(2), SE(3).
 See <a class="reference internal" href="guide/advanced/non_euclidean/"><span class="doc">Non-Euclidean variables</span></a>.</p></li>
 <li><p>Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.</p></li>
+<li><p>Automatic Schur-complement variable elimination for problems with a dominant
+block-diagonal type, such as landmarks in bundle adjustment.
+See <a class="reference internal" href="design/schur_complement/"><span class="doc">Schur complement elimination</span></a>.</p></li>
 <li><p>Linear subproblem solvers. See <a class="reference internal" href="guide/tips_and_gotchas/"><span class="doc">Tips and gotchas</span></a> for selection guidance.</p>
 <ul>
 <li><p>Sparse iterative with Conjugate Gradient (recommended for most problems).</p>

@@ -30,7 +30,7 @@
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -211,6 +211,7 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../../../design/typed_api/">Typed API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/schur_complement/">Schur complement elimination</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
@@ -364,10 +365,15 @@ document.write(`
   <h1>Source code for jaxls._solvers</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">functools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">TYPE_CHECKING</span><span class="p">,</span>
     <span class="n">Callable</span><span class="p">,</span>
     <span class="n">Hashable</span><span class="p">,</span>
+    <span class="n">Iterator</span><span class="p">,</span>
     <span class="n">Literal</span><span class="p">,</span>
     <span class="n">assert_never</span><span class="p">,</span>
     <span class="n">cast</span><span class="p">,</span>
@@ -377,6 +383,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.flatten_util</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax_dataclasses</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jdc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">onp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">scipy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">scipy.sparse</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">jnp</span>
@@ -394,9 +401,17 @@ document.write(`
     <span class="n">update_al_state</span><span class="p">,</span>
     <span class="n">update_problem_al_params</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._schur</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EliminationPlan</span><span class="p">,</span>
+    <span class="n">SchurFactors</span><span class="p">,</span>
+    <span class="n">prepare_schur</span><span class="p">,</span>
+    <span class="n">solve_schur_cg</span><span class="p">,</span>
+    <span class="n">solve_schur_cholmod</span><span class="p">,</span>
+    <span class="n">solve_schur_dense</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._sparse_matrices</span><span class="w"> </span><span class="kn">import</span> <span class="n">BlockRowSparseMatrix</span><span class="p">,</span> <span class="n">SparseCooMatrix</span><span class="p">,</span> <span class="n">SparseCsrMatrix</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._variables</span><span class="w"> </span><span class="kn">import</span> <span class="n">VarTypeOrdering</span><span class="p">,</span> <span class="n">VarValues</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">jax_log</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">_log</span><span class="p">,</span> <span class="n">jax_log</span><span class="p">,</span> <span class="n">tikhonov_floor</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">sksparse.cholmod</span>
@@ -426,7 +441,15 @@ document.write(`
     <span class="n">ATb</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">lambd</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve a linear system using CHOLMOD. Should be called on the host.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve a linear system using CHOLMOD. Should be called on the host.</span>
+
+<span class="sd">    Unlike the Schur path&#39;s `_cholmod_solve_symmetric_on_host`, this full-system</span>
+<span class="sd">    solve does not need the Jacobi-scaling + Tikhonov-floor robustness: it never</span>
+<span class="sd">    forms a normal-equations matrix by subtraction (it factors A Aᵀ directly via</span>
+<span class="sd">    `cholesky_AAt`, which is positive definite by construction once `beta &gt; 0`),</span>
+<span class="sd">    so it is not exposed to the catastrophic float32 cancellation that can leave</span>
+<span class="sd">    the Schur complement S = H_cc - W V^{-1} W^T numerically indefinite.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">sksparse.cholmod</span>
 
     <span class="c1"># Matrix is transposed when we convert CSR to CSC.</span>
@@ -456,6 +479,237 @@ document.write(`
         <span class="n">beta</span><span class="o">=</span><span class="n">lambd</span> <span class="o">+</span> <span class="mf">1e-5</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">cost</span><span class="o">.</span><span class="n">solve_A</span><span class="p">(</span><span class="n">ATb</span><span class="p">)</span>
+
+
+<span class="n">_cholmod_symmetric_analyze_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Hashable</span><span class="p">,</span> <span class="n">sksparse</span><span class="o">.</span><span class="n">cholmod</span><span class="o">.</span><span class="n">Factor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cholmod_solve_symmetric</span><span class="p">(</span>
+    <span class="n">s_values</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">rows</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">cols</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">reduced_dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">b</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;JIT-friendly CHOLMOD solve of a symmetric system S x = b, where S is</span>
+<span class="sd">    given in COO form (s_values at (rows, cols), duplicates summed). Used by</span>
+<span class="sd">    the Schur + CHOLMOD reduced solve.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">pure_callback</span><span class="p">(</span>
+        <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">_cholmod_solve_symmetric_on_host</span><span class="p">,</span> <span class="n">reduced_dim</span><span class="o">=</span><span class="n">reduced_dim</span><span class="p">),</span>
+        <span class="n">b</span><span class="p">,</span>  <span class="c1"># Result shape/dtype.</span>
+        <span class="n">s_values</span><span class="p">,</span>
+        <span class="n">rows</span><span class="p">,</span>
+        <span class="n">cols</span><span class="p">,</span>
+        <span class="n">b</span><span class="p">,</span>
+        <span class="n">vmap_method</span><span class="o">=</span><span class="s2">&quot;sequential&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cholmod_solve_symmetric_on_host</span><span class="p">(</span>
+    <span class="n">s_values</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">rows</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">cols</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="n">b</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">reduced_dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factor a symmetric sparse S (COO: s_values at (rows, cols)) with CHOLMOD</span>
+<span class="sd">    and solve S x = b. Runs on the host.&quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sksparse.cholmod</span>
+
+    <span class="n">rows_onp</span> <span class="o">=</span> <span class="n">onp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+    <span class="n">cols_onp</span> <span class="o">=</span> <span class="n">onp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
+    <span class="n">b_onp</span> <span class="o">=</span> <span class="n">onp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">b_onp</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="n">S</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">coo_matrix</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">onp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">s_values</span><span class="p">),</span> <span class="p">(</span><span class="n">rows_onp</span><span class="p">,</span> <span class="n">cols_onp</span><span class="p">)),</span>
+        <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">reduced_dim</span><span class="p">,</span> <span class="n">reduced_dim</span><span class="p">),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">tocsc</span><span class="p">()</span>  <span class="c1"># Sums duplicate (i, j) entries.</span>
+
+    <span class="c1"># Symmetric Jacobi scaling plus a precision-adaptive Tikhonov floor, the</span>
+    <span class="c1"># same robustness the dense path applies in `_schur._solve_spd_scaled`.</span>
+    <span class="c1"># Forming S = H_cc - W V^{-1} W^T cancels catastrophically in float32 and</span>
+    <span class="c1"># can leave S numerically indefinite, which CHOLMOD rejects outright</span>
+    <span class="c1"># (CholmodNotPositiveDefiniteError) rather than producing a NaN the LM</span>
+    <span class="c1"># ratio test would catch. We solve the scaled system D S D y = D b with</span>
+    <span class="c1"># D = diag(1 / sqrt(|diag S|)) and recover x = D y. Diagonal scaling does</span>
+    <span class="c1"># not touch the sparsity pattern, so the cached symbolic factorization</span>
+    <span class="c1"># stays valid; the floor is a no-op for well-conditioned float64.</span>
+    <span class="n">diag</span> <span class="o">=</span> <span class="n">S</span><span class="o">.</span><span class="n">diagonal</span><span class="p">()</span>
+    <span class="n">inv_scale</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">onp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">onp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">onp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">diag</span><span class="p">),</span> <span class="n">onp</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">tiny</span><span class="p">))</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">diags</span><span class="p">(</span><span class="n">inv_scale</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;csc&quot;</span><span class="p">)</span>
+    <span class="c1"># CSC @ CSC stays CSC, so the sparsity pattern (and the cached symbolic</span>
+    <span class="c1"># factorization keyed on it) is preserved. setdiag only updates entries in</span>
+    <span class="c1"># place here (it never expands nnz) because every diagonal entry is</span>
+    <span class="c1"># already structurally present: `build_sparse_s_pattern` always emits a</span>
+    <span class="c1"># diagonal block per kept type (`_iter_S_block_sources`). If that ever</span>
+    <span class="c1"># changed, a structurally-missing diagonal would make setdiag grow nnz and</span>
+    <span class="c1"># desync from the cached symbolic factor.</span>
+    <span class="n">S</span> <span class="o">=</span> <span class="n">D</span> <span class="o">@</span> <span class="n">S</span> <span class="o">@</span> <span class="n">D</span>
+    <span class="n">S</span><span class="o">.</span><span class="n">setdiag</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">diagonal</span><span class="p">()</span> <span class="o">+</span> <span class="n">tikhonov_floor</span><span class="p">(</span><span class="n">dtype</span><span class="p">))</span>
+
+    <span class="c1"># Cache the symbolic analysis. The COO coordinates are fixed across solves</span>
+    <span class="c1"># for a given problem, so the summed CSC pattern is stable.</span>
+    <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">rows_onp</span><span class="o">.</span><span class="n">tobytes</span><span class="p">(),</span> <span class="n">cols_onp</span><span class="o">.</span><span class="n">tobytes</span><span class="p">(),</span> <span class="n">reduced_dim</span><span class="p">)</span>
+    <span class="n">factor</span> <span class="o">=</span> <span class="n">_cholmod_symmetric_analyze_cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cache_key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">factor</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="n">sksparse</span><span class="o">.</span><span class="n">cholmod</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span><span class="n">S</span><span class="p">)</span>
+        <span class="n">_cholmod_symmetric_analyze_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">factor</span>
+
+        <span class="n">max_cache_size</span> <span class="o">=</span> <span class="mi">512</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">_cholmod_symmetric_analyze_cache</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_cache_size</span><span class="p">:</span>
+            <span class="n">_cholmod_symmetric_analyze_cache</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span>
+                <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">_cholmod_symmetric_analyze_cache</span><span class="p">))</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Numeric refactorization reusing the cached symbolic analysis. The 1e-5</span>
+    <span class="c1"># diagonal floor is already folded into s_values by the caller; the Jacobi</span>
+    <span class="c1"># scaling and Tikhonov floor above keep the factorization finite in float32.</span>
+    <span class="n">factor</span> <span class="o">=</span> <span class="n">factor</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">S</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">inv_scale</span> <span class="o">*</span> <span class="n">factor</span><span class="o">.</span><span class="n">solve_A</span><span class="p">(</span><span class="n">inv_scale</span> <span class="o">*</span> <span class="n">b_onp</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+
+
+<span class="n">_active_iteration_time_recorder</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="record_iteration_times">
+<a class="viewcode-back" href="../../../api/solver_config/#jaxls.record_iteration_times">[docs]</a>
+<span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">record_iteration_times</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Record a host wall-clock timestamp at each outer LM iteration of any</span>
+<span class="sd">    `solve()` running in this block, for cost-vs-time benchmarking.</span>
+
+<span class="sd">    Returns a list that is filled with `time.perf_counter()` values (one per</span>
+<span class="sd">    outer iteration, in order); `times[i] - times[0]` is the elapsed time to</span>
+<span class="sd">    reach iteration `i`. Off the normal solve path entirely — the timestamps</span>
+<span class="sd">    never enter the jitted computation or `SolveSummary`, so there is zero</span>
+<span class="sd">    overhead and no dtype dependence when not recording, and the values are</span>
+<span class="sd">    always host float64 (the in-array alternative would be float32 without</span>
+<span class="sd">    jax_enable_x64, too coarse to resolve millisecond steps).</span>
+
+<span class="sd">    Timestamps include async-dispatch latency, so read differences, not</span>
+<span class="sd">    absolute values, and wrap the solve in `block_until_ready` for precise</span>
+<span class="sd">    totals. Not reentrant / not for concurrent solves from multiple threads</span>
+<span class="sd">    (one active recorder at a time)::</span>
+
+<span class="sd">        with jaxls.record_iteration_times() as times:</span>
+<span class="sd">            sol = problem.solve(init)</span>
+<span class="sd">        # times[1:] - times[0]  -&gt;  per-iteration elapsed seconds</span>
+
+<span class="sd">    The recording callback is decided at trace time, so whether timestamps are</span>
+<span class="sd">    captured is baked into the compiled solve. Entering and leaving this block</span>
+<span class="sd">    therefore clears the solver&#39;s JIT cache, so the first solve inside it</span>
+<span class="sd">    recompiles *with* the callback (even if an identical solve was already</span>
+<span class="sd">    compiled without one) and the first solve after it recompiles *without*.</span>
+<span class="sd">    The compile inside the block also acts as the warmup; for steady-state</span>
+<span class="sd">    timing, run the solve twice in the block and read the second::</span>
+
+<span class="sd">        with jaxls.record_iteration_times() as times:</span>
+<span class="sd">            jax.block_until_ready(problem.solve(init))   # warmup, compiles</span>
+<span class="sd">            times.clear()</span>
+<span class="sd">            sol = jax.block_until_ready(problem.solve(init))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_active_iteration_time_recorder</span>
+    <span class="n">prev</span> <span class="o">=</span> <span class="n">_active_iteration_time_recorder</span>
+    <span class="n">times</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">_active_iteration_time_recorder</span> <span class="o">=</span> <span class="n">times</span>
+    <span class="c1"># The callback&#39;s presence is fixed at trace time and not part of the JIT</span>
+    <span class="c1"># cache key, so a cached (callback-free) executable would otherwise be</span>
+    <span class="c1"># reused and silently record nothing. Clear the cache on the way in (force</span>
+    <span class="c1"># a callback-bearing recompile) and on the way out (restore the zero-</span>
+    <span class="c1"># overhead executable for normal solves).</span>
+    <span class="n">_clear_solve_cache</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">times</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_active_iteration_time_recorder</span> <span class="o">=</span> <span class="n">prev</span>
+        <span class="n">_clear_solve_cache</span><span class="p">()</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_clear_solve_cache</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="c1"># NonlinearSolver.solve is wrapped by @jdc.jit, whose .clear_cache() the</span>
+    <span class="c1"># type checker can&#39;t see through the FunctionType it infers.</span>
+    <span class="n">NonlinearSolver</span><span class="o">.</span><span class="n">solve</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>  <span class="c1"># type: ignore[attr-defined]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_record_iteration_time</span><span class="p">(</span><span class="n">anchor</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Append `time.perf_counter()` to the active recorder, if any, via</span>
+<span class="sd">    `jax.debug.callback` so it works inside the jitted `lax.while_loop`.</span>
+
+<span class="sd">    `anchor` is a value that depends on the just-computed iterate (its cost);</span>
+<span class="sd">    the callback consumes it so the timestamp is ordered after that</span>
+<span class="sd">    iteration&#39;s work and the callbacks are not merged/hoisted by XLA. A no-op</span>
+<span class="sd">    (no callback emitted) when no `record_iteration_times()` block is active,</span>
+<span class="sd">    so the default solve path is untouched.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">_active_iteration_time_recorder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_stamp</span><span class="p">(</span><span class="n">_anchor</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_active_iteration_time_recorder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_active_iteration_time_recorder</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">())</span>
+
+    <span class="n">jax</span><span class="o">.</span><span class="n">debug</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">_stamp</span><span class="p">,</span> <span class="n">anchor</span><span class="p">)</span>
+
+
+<span class="c1"># Host-side wall-clock for the verbose &quot;solved in ...&quot; timing. Filled by a</span>
+<span class="c1"># fire-and-forget `jax.debug.callback` at the start of the outer loop and read</span>
+<span class="c1"># by the terminated-log callback; both run on the host, so the elapsed time is</span>
+<span class="c1"># computed entirely host-side with no device&lt;-&gt;host round-trip (nothing is</span>
+<span class="c1"># returned to the device). Single-threaded, like `_active_iteration_time_recorder`.</span>
+<span class="n">_solve_start_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_record_solve_start</span><span class="p">(</span><span class="n">anchor</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stamp the host start time of the outer loop into `_solve_start_time`.</span>
+
+<span class="sd">    `anchor` depends on the pre-loop iterate (its cost) and is consumed by the</span>
+<span class="sd">    callback, so the stamp is ordered before the loop and XLA cannot hoist it.</span>
+<span class="sd">    Fire-and-forget (`jax.debug.callback` returns nothing to the device), so it</span>
+<span class="sd">    adds no round-trip. The matching read happens in the terminated-log</span>
+<span class="sd">    callback, which subtracts on the host.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_stamp</span><span class="p">(</span><span class="n">_anchor</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">global</span> <span class="n">_solve_start_time</span>
+        <span class="n">_solve_start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+
+    <span class="n">jax</span><span class="o">.</span><span class="n">debug</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">_stamp</span><span class="p">,</span> <span class="n">anchor</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_log_terminated</span><span class="p">(</span>
+    <span class="n">fmt</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Emit the verbose terminated line with the elapsed solve time appended.</span>
+
+<span class="sd">    Like `jax_log`, this is a `jax.debug.callback`, but the host function also</span>
+<span class="sd">    reads `_solve_start_time` and subtracts the current host time, so the</span>
+<span class="sd">    elapsed seconds are computed host-side from two host timestamps, with no</span>
+<span class="sd">    value returned to the device (no round-trip). The `(solved in ...)` suffix</span>
+<span class="sd">    is owned here, so the caller&#39;s `fmt` describes only its own fields.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_emit</span><span class="p">(</span><span class="o">*</span><span class="n">host_args</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">_solve_start_time</span>
+        <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span> <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)</span>
+        <span class="n">_log</span><span class="p">(</span><span class="n">fmt</span> <span class="o">+</span> <span class="s2">&quot; (solved in </span><span class="si">{:.4f}</span><span class="s2"> sec)&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">host_args</span><span class="p">,</span> <span class="n">elapsed</span><span class="p">)</span>
+
+    <span class="n">jax</span><span class="o">.</span><span class="n">debug</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">_emit</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_compute_jacobian_scaler</span><span class="p">(</span><span class="n">column_norms</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Column scaling for the Levenberg-Marquardt normal equations.</span>
+
+<span class="sd">    This is the historical jaxls scaler: bounded gain in (1, 2], so weak</span>
+<span class="sd">    directions are never amplified and lambdas tuned against it keep their</span>
+<span class="sd">    meaning. A Marquardt-style scale-invariant splice</span>
+<span class="sd">    (``min(legacy, 1.5/n)``) was evaluated and rejected: it silently</span>
+<span class="sd">    re-denominates every tuned lambda for problems whose column norms</span>
+<span class="sd">    exceed unit (IK, pose graphs), regressing downstream workloads, and its</span>
+<span class="sd">    bundle-adjustment motivation disappeared once rejected-step termination</span>
+<span class="sd">    handling was fixed and lambda escalation made adaptive. Measurements and</span>
+<span class="sd">    derivation: benchmarks/results.md, &quot;The column-scaling math&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">column_norms</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1.0</span>
 
 
 <span class="nd">@jdc</span><span class="o">.</span><span class="n">pytree_dataclass</span>
@@ -583,6 +837,14 @@ document.write(`
     <span class="n">sol_proposed</span><span class="p">:</span> <span class="n">_SolutionState</span>
     <span class="n">local_delta</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">summary</span><span class="p">:</span> <span class="n">SolveSummary</span>
+    <span class="n">lambda_growth</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span> <span class="o">=</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">2.0</span><span class="p">))</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lambda escalation factor; doubled after each consecutive rejection</span>
+<span class="sd">    within one outer step, so a grossly under-damped lambda recovers in</span>
+<span class="sd">    O(log log) tries instead of O(log). This is the rejection-side half of</span>
+<span class="sd">    the strategy in H.B. Nielsen (1999), &quot;Damping Parameter in Marquardt&#39;s</span>
+<span class="sd">    Method&quot;, IMM-REP-1999-05, DTU; the decrease-on-acceptance rule remains</span>
+<span class="sd">    jaxls&#39;s plain halving. A no-op whenever the first proposal is accepted,</span>
+<span class="sd">    so well-tuned solves are unaffected.&quot;&quot;&quot;</span>
 
 
 <span class="nd">@jdc</span><span class="o">.</span><span class="n">pytree_dataclass</span>
@@ -595,6 +857,11 @@ document.write(`
     <span class="n">lambd</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">jacobian_scaler</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
     <span class="n">al_state</span><span class="p">:</span> <span class="n">AugmentedLagrangianState</span> <span class="o">|</span> <span class="kc">None</span>  <span class="c1"># AL state when constraints present.</span>
+    <span class="n">last_step_accepted</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span> <span class="o">=</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Whether the last outer step found an acceptable proposal. When False</span>
+<span class="sd">    with lambda at its maximum, no further progress is possible.&quot;&quot;&quot;</span>
 
 
 <span class="nd">@jdc</span><span class="o">.</span><span class="n">pytree_dataclass</span>
@@ -611,6 +878,22 @@ document.write(`
     <span class="n">verbose</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span>
     <span class="n">augmented_lagrangian</span><span class="p">:</span> <span class="n">AugmentedLagrangianConfig</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration for Augmented Lagrangian method. Set when constraints are present.&quot;&quot;&quot;</span>
+    <span class="n">elimination</span><span class="p">:</span> <span class="n">EliminationPlan</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Schur-complement variable elimination plan. Set when `eliminate` is</span>
+<span class="sd">    passed to `solve()`.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_cg_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConjugateGradientConfig</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;CG settings for this solve. A `ConjugateGradientConfig` passed to</span>
+<span class="sd">        `solve(linear_solver=...)` reaches this class as the string</span>
+<span class="sd">        &quot;conjugate_gradient&quot; plus the separate `conjugate_gradient_config`</span>
+<span class="sd">        field (see `AnalyzedLeastSquaresProblem.solve`), so both fields must</span>
+<span class="sd">        be consulted; reading only `linear_solver` silently drops user</span>
+<span class="sd">        settings.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span><span class="p">,</span> <span class="n">ConjugateGradientConfig</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conjugate_gradient_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">conjugate_gradient_config</span>
+        <span class="k">return</span> <span class="n">ConjugateGradientConfig</span><span class="p">()</span>
 
     <span class="nd">@overload</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">(</span>
@@ -651,6 +934,9 @@ document.write(`
         <span class="n">lambda_history</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">termination</span><span class="o">.</span><span class="n">max_iterations</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">lambda_history</span> <span class="o">=</span> <span class="n">lambda_history</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span><span class="o">.</span><span class="n">lambda_initial</span><span class="p">)</span>
+        <span class="c1"># Timestamp the initial point (no-op unless a record_iteration_times()</span>
+        <span class="c1"># block is active); kept off the solver state entirely.</span>
+        <span class="n">_record_iteration_time</span><span class="p">(</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_total</span><span class="p">)</span>
 
         <span class="c1"># Initialize AL state if constraints are present.</span>
         <span class="n">al_state</span><span class="p">:</span> <span class="n">AugmentedLagrangianState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
@@ -667,6 +953,16 @@ document.write(`
             <span class="n">cost_info</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">_compute_cost_info</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
             <span class="n">cost_history</span> <span class="o">=</span> <span class="n">cost_history</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_nonconstraint</span><span class="p">)</span>
 
+        <span class="c1"># Jacobian column scaler: depends only on the linearization at the</span>
+        <span class="c1"># initial point, so compute it once here rather than every outer step</span>
+        <span class="c1"># (compute_column_norms is a full-Jacobian scatter — wasted on every</span>
+        <span class="c1"># iteration past the first when the scaler is frozen anyway).</span>
+        <span class="n">jacobian_scaler</span> <span class="o">=</span> <span class="n">_compute_jacobian_scaler</span><span class="p">(</span>
+            <span class="n">problem</span><span class="o">.</span><span class="n">_compute_jac_values</span><span class="p">(</span>
+                <span class="n">vals</span><span class="p">,</span> <span class="n">cost_info</span><span class="o">.</span><span class="n">jac_cache</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">compute_column_norms</span><span class="p">()</span>
+        <span class="p">)</span>
+
         <span class="n">state</span> <span class="o">=</span> <span class="n">_LmOuterState</span><span class="p">(</span>
             <span class="n">solution</span><span class="o">=</span><span class="n">_SolutionState</span><span class="p">(</span>
                 <span class="n">vals</span><span class="o">=</span><span class="n">vals</span><span class="p">,</span>
@@ -675,11 +971,7 @@ document.write(`
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span> <span class="o">!=</span> <span class="s2">&quot;conjugate_gradient&quot;</span>
                 <span class="k">else</span> <span class="n">_ConjugateGradientState</span><span class="p">(</span>
                     <span class="n">ATb_norm_prev</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-                    <span class="n">eta</span><span class="o">=</span><span class="p">(</span>
-                        <span class="n">ConjugateGradientConfig</span><span class="p">()</span>
-                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conjugate_gradient_config</span> <span class="ow">is</span> <span class="kc">None</span>
-                        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">conjugate_gradient_config</span>
-                    <span class="p">)</span><span class="o">.</span><span class="n">tolerance_max</span><span class="p">,</span>
+                    <span class="n">eta</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_resolve_cg_config</span><span class="p">()</span><span class="o">.</span><span class="n">tolerance_max</span><span class="p">,</span>
                 <span class="p">),</span>
             <span class="p">),</span>
             <span class="n">summary</span><span class="o">=</span><span class="n">SolveSummary</span><span class="p">(</span>
@@ -692,9 +984,17 @@ document.write(`
             <span class="n">lambd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span><span class="o">.</span><span class="n">lambda_initial</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
             <span class="k">else</span> <span class="mf">0.0</span><span class="p">,</span>
-            <span class="n">jacobian_scaler</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">problem</span><span class="o">.</span><span class="n">_tangent_dim</span><span class="p">),</span>
+            <span class="n">jacobian_scaler</span><span class="o">=</span><span class="n">jacobian_scaler</span><span class="p">,</span>
             <span class="n">al_state</span><span class="o">=</span><span class="n">al_state</span><span class="p">,</span>
         <span class="p">)</span>
+
+        <span class="c1"># Wall-clock start of the outer loop, for the verbose &quot;solved in ...&quot;</span>
+        <span class="c1"># timing. A fire-and-forget host callback records the start time;</span>
+        <span class="c1"># the terminated-log callback reads it and subtracts, all host-side</span>
+        <span class="c1"># (no device&lt;-&gt;host round-trip). Anchored on the pre-loop cost so the</span>
+        <span class="c1"># stamp is ordered before the loop; only emitted when verbose.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+            <span class="n">_record_solve_start</span><span class="p">(</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_total</span><span class="p">)</span>
 
         <span class="c1"># Optimization.</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">termination</span><span class="o">.</span><span class="n">early_termination</span><span class="p">:</span>
@@ -704,6 +1004,17 @@ document.write(`
                 <span class="n">basic_checks</span> <span class="o">=</span> <span class="o">~</span><span class="n">jnp</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">solution</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_total</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span>
                     <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">iterations</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">termination</span><span class="o">.</span><span class="n">max_iterations</span>
                 <span class="p">)</span>
+                <span class="c1"># No acceptable step exists even at maximum damping: further</span>
+                <span class="c1"># outer steps would re-reject the same proposals until the</span>
+                <span class="c1"># iteration cap. Unconstrained only: under augmented</span>
+                <span class="c1"># Lagrangian, a penalty update reshapes the cost surface and</span>
+                <span class="c1"># can restore progress, so a maxed-out lambda sweep must not</span>
+                <span class="c1"># end the solve before the AL machinery gets that chance.</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">augmented_lagrangian</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">basic_checks</span> <span class="o">=</span> <span class="n">basic_checks</span> <span class="o">&amp;</span> <span class="o">~</span><span class="p">(</span>
+                        <span class="o">~</span><span class="n">state</span><span class="o">.</span><span class="n">last_step_accepted</span>
+                        <span class="o">&amp;</span> <span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">lambd</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span><span class="o">.</span><span class="n">lambda_max</span><span class="p">)</span>
+                    <span class="p">)</span>
 
                 <span class="c1"># For unconstrained: stop when termination criteria met or step rejected.</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">augmented_lagrangian</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -742,14 +1053,19 @@ document.write(`
                 <span class="n">init_val</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
-            <span class="n">jax_log</span><span class="p">(</span>
-                <span class="s2">&quot;Terminated @ iteration #</span><span class="si">{i}</span><span class="s2">: cost=</span><span class="si">{cost:.4f}</span><span class="s2"> criteria=</span><span class="si">{criteria}</span><span class="s2">, term_deltas=</span><span class="si">{cost_delta:.1e}</span><span class="s2">,</span><span class="si">{grad_mag:.1e}</span><span class="s2">,</span><span class="si">{param_delta:.1e}</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">i</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">iterations</span><span class="p">,</span>
-                <span class="n">cost</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">solution</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_nonconstraint</span><span class="p">,</span>
-                <span class="n">criteria</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_criteria</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
-                <span class="n">cost_delta</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_deltas</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                <span class="n">grad_mag</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_deltas</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                <span class="n">param_delta</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_deltas</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+            <span class="c1"># The elapsed solve time is appended host-side by `_log_terminated`</span>
+            <span class="c1"># (it reads the start stamp recorded above and subtracts the current</span>
+            <span class="c1"># host time), so it does not enter the device computation. The</span>
+            <span class="c1"># fields below are positional device values, ordered after the loop.</span>
+            <span class="n">_log_terminated</span><span class="p">(</span>
+                <span class="s2">&quot;Terminated @ iteration #</span><span class="si">{}</span><span class="s2">: cost=</span><span class="si">{:.4f}</span><span class="s2"> criteria=</span><span class="si">{}</span><span class="s2">, &quot;</span>
+                <span class="s2">&quot;term_deltas=</span><span class="si">{:.1e}</span><span class="s2">,</span><span class="si">{:.1e}</span><span class="s2">,</span><span class="si">{:.1e}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">iterations</span><span class="p">,</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">solution</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_nonconstraint</span><span class="p">,</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_criteria</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_deltas</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_deltas</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">termination_deltas</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">return_summary</span><span class="p">:</span>
@@ -767,6 +1083,7 @@ document.write(`
         <span class="n">A_multiply</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span>
         <span class="n">AT_multiply</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span>
         <span class="n">ATb</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+        <span class="n">schur_factors</span><span class="p">:</span> <span class="n">SchurFactors</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_LmInnerState</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Levenberg-Marquardt inner step. Tries one lambda value.&quot;&quot;&quot;</span>
         <span class="c1"># Compute lambda for this iteration.</span>
@@ -774,7 +1091,7 @@ document.write(`
         <span class="c1"># - For GN: keep lambda at 0</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">lambd</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span>
-                <span class="n">inner_state</span><span class="o">.</span><span class="n">lambd</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span><span class="o">.</span><span class="n">lambda_factor</span><span class="p">,</span>
+                <span class="n">inner_state</span><span class="o">.</span><span class="n">lambd</span> <span class="o">*</span> <span class="n">inner_state</span><span class="o">.</span><span class="n">lambda_growth</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span><span class="o">.</span><span class="n">lambda_max</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -786,23 +1103,37 @@ document.write(`
 
         <span class="c1"># Solve the linear system.</span>
         <span class="n">cg_state</span><span class="p">:</span> <span class="n">_ConjugateGradientState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="p">(</span>
+        <span class="k">if</span> <span class="n">schur_factors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Variable elimination: solve the reduced (Schur complement)</span>
+            <span class="c1"># system, then back-substitute the eliminated variables.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span> <span class="o">==</span> <span class="s2">&quot;conjugate_gradient&quot;</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sol_prev</span><span class="o">.</span><span class="n">cg_state</span><span class="p">,</span> <span class="n">_ConjugateGradientState</span><span class="p">)</span>
+                <span class="n">local_delta</span><span class="p">,</span> <span class="n">cg_state</span> <span class="o">=</span> <span class="n">solve_schur_cg</span><span class="p">(</span>
+                    <span class="n">schur_factors</span><span class="p">,</span> <span class="n">lambd</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_cg_config</span><span class="p">(),</span> <span class="n">sol_prev</span><span class="o">.</span><span class="n">cg_state</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span> <span class="o">==</span> <span class="s2">&quot;dense_cholesky&quot;</span><span class="p">:</span>
+                <span class="n">local_delta</span> <span class="o">=</span> <span class="n">solve_schur_dense</span><span class="p">(</span><span class="n">schur_factors</span><span class="p">,</span> <span class="n">lambd</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span> <span class="o">==</span> <span class="s2">&quot;cholmod&quot;</span><span class="p">:</span>
+                <span class="n">local_delta</span> <span class="o">=</span> <span class="n">solve_schur_cholmod</span><span class="p">(</span><span class="n">schur_factors</span><span class="p">,</span> <span class="n">lambd</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Unexpected elimination plan for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span>
             <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span><span class="p">,</span> <span class="n">ConjugateGradientConfig</span><span class="p">)</span>
             <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span> <span class="o">==</span> <span class="s2">&quot;conjugate_gradient&quot;</span>
         <span class="p">):</span>
-            <span class="c1"># Use default CG config if specified as a string, otherwise use the provided config.</span>
-            <span class="n">cg_config</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">ConjugateGradientConfig</span><span class="p">()</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span> <span class="o">==</span> <span class="s2">&quot;conjugate_gradient&quot;</span>
-                <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span>
-            <span class="p">)</span>
+            <span class="n">cg_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_cg_config</span><span class="p">()</span>
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sol_prev</span><span class="o">.</span><span class="n">cg_state</span><span class="p">,</span> <span class="n">_ConjugateGradientState</span><span class="p">)</span>
             <span class="n">local_delta</span><span class="p">,</span> <span class="n">cg_state</span> <span class="o">=</span> <span class="n">cg_config</span><span class="o">.</span><span class="n">_solve</span><span class="p">(</span>
                 <span class="n">problem</span><span class="p">,</span>
                 <span class="n">A_blocksparse</span><span class="p">,</span>
                 <span class="c1"># We could also use (lambd * ATA_diagonals * vec) for</span>
                 <span class="c1"># scale-invariant damping. But this is hard to match with CHOLMOD.</span>
-                <span class="c1"># Add 1e-5 regularization to match dense_cholesky behavior.</span>
+                <span class="c1"># The extra 1e-5 keeps simple/underdetermined problems from blowing</span>
+                <span class="c1"># up, matching the CHOLMOD path (see beta=lambd + 1e-5 above); the</span>
+                <span class="c1"># Schur CG path in solve_schur_cg adds the same term. Only</span>
+                <span class="c1"># dense_cholesky omits it, using lambd alone.</span>
                 <span class="k">lambda</span> <span class="n">vec</span><span class="p">:</span> <span class="n">AT_multiply</span><span class="p">(</span><span class="n">A_multiply</span><span class="p">(</span><span class="n">vec</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="n">lambd</span> <span class="o">+</span> <span class="mf">1e-5</span><span class="p">)</span> <span class="o">*</span> <span class="n">vec</span><span class="p">,</span>
                 <span class="n">ATb</span><span class="o">=</span><span class="n">ATb</span><span class="p">,</span>
                 <span class="n">prev_linear_state</span><span class="o">=</span><span class="n">sol_prev</span><span class="o">.</span><span class="n">cg_state</span><span class="p">,</span>
@@ -842,14 +1173,22 @@ document.write(`
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">accepted</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">cost_predicted</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
-                <span class="p">(</span>
-                    <span class="n">A_blocksparse</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">scaled_local_delta</span><span class="p">)</span>
-                    <span class="o">+</span> <span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">residual_vector</span>
-                <span class="p">)</span>
-                <span class="o">**</span> <span class="mi">2</span>
+            <span class="c1"># Predicted reduction of the linear model, expanded analytically:</span>
+            <span class="c1">#   |r|^2 - |r + J dx|^2 = -2 dx^T J^T r - |J dx|^2</span>
+            <span class="c1">#                        =  2 dx^T ATb   - |J dx|^2.</span>
+            <span class="c1"># The expanded form avoids the catastrophic cancellation of</span>
+            <span class="c1"># subtracting two O(cost) sums over ~1e5+ residual terms, which</span>
+            <span class="c1"># otherwise reduces `step_quality` to rounding noise once the</span>
+            <span class="c1"># true per-step reduction approaches eps * cost.</span>
+            <span class="c1">#</span>
+            <span class="c1"># `A_blocksparse` is the column-scaled Jacobian and `local_delta`</span>
+            <span class="c1"># / `ATb` live in the same scaled coordinates, so the products</span>
+            <span class="c1"># are exactly J dx and dx^T J^T r in the original space.</span>
+            <span class="c1"># (Multiplying by `scaled_local_delta` here would apply the</span>
+            <span class="c1"># column scaling twice.)</span>
+            <span class="n">predicted_reduction</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">local_delta</span><span class="p">,</span> <span class="n">ATb</span><span class="p">)</span> <span class="o">-</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+                <span class="n">A_blocksparse</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">local_delta</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
             <span class="p">)</span>
-            <span class="n">predicted_reduction</span> <span class="o">=</span> <span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_total</span> <span class="o">-</span> <span class="n">cost_predicted</span>
             <span class="n">actual_reduction</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_total</span> <span class="o">-</span> <span class="n">proposed_cost_info</span><span class="o">.</span><span class="n">cost_total</span>
             <span class="p">)</span>
@@ -866,9 +1205,12 @@ document.write(`
             <span class="n">tangent_ordering</span><span class="o">=</span><span class="n">problem</span><span class="o">.</span><span class="n">_tangent_ordering</span><span class="p">,</span>
             <span class="n">ATb</span><span class="o">=</span><span class="n">ATb</span><span class="p">,</span>
             <span class="n">iterations</span><span class="o">=</span><span class="n">iterations</span><span class="p">,</span>
+            <span class="n">accepted</span><span class="o">=</span><span class="n">accepted</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">with</span> <span class="n">jdc</span><span class="o">.</span><span class="n">copy_and_mutate</span><span class="p">(</span><span class="n">inner_state</span><span class="p">)</span> <span class="k">as</span> <span class="nb">next</span><span class="p">:</span>
             <span class="nb">next</span><span class="o">.</span><span class="n">lambd</span> <span class="o">=</span> <span class="n">lambd</span>
+            <span class="c1"># Accelerate the next escalation step (see `lambda_growth`).</span>
+            <span class="nb">next</span><span class="o">.</span><span class="n">lambda_growth</span> <span class="o">=</span> <span class="n">inner_state</span><span class="o">.</span><span class="n">lambda_growth</span> <span class="o">*</span> <span class="mf">2.0</span>
             <span class="nb">next</span><span class="o">.</span><span class="n">accepted</span> <span class="o">=</span> <span class="n">accepted</span>
             <span class="nb">next</span><span class="o">.</span><span class="n">sol_proposed</span> <span class="o">=</span> <span class="n">_SolutionState</span><span class="p">(</span>
                 <span class="n">vals</span><span class="o">=</span><span class="n">proposed_vals</span><span class="p">,</span>
@@ -876,6 +1218,10 @@ document.write(`
                 <span class="n">cg_state</span><span class="o">=</span><span class="n">cg_state</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="nb">next</span><span class="o">.</span><span class="n">local_delta</span> <span class="o">=</span> <span class="n">local_delta</span>
+            <span class="c1"># Timestamp this iterate (no-op unless a record_iteration_times()</span>
+            <span class="c1"># block is active). Anchored on this step&#39;s cost so the callback</span>
+            <span class="c1"># can&#39;t be reordered/hoisted ahead of the work it measures.</span>
+            <span class="n">_record_iteration_time</span><span class="p">(</span><span class="n">proposed_cost_info</span><span class="o">.</span><span class="n">cost_total</span><span class="p">)</span>
             <span class="nb">next</span><span class="o">.</span><span class="n">summary</span> <span class="o">=</span> <span class="n">SolveSummary</span><span class="p">(</span>
                 <span class="n">iterations</span><span class="o">=</span><span class="n">iterations</span><span class="p">,</span>
                 <span class="n">termination_criteria</span><span class="o">=</span><span class="n">term_criteria</span><span class="p">,</span>
@@ -905,14 +1251,9 @@ document.write(`
             <span class="n">sol_prev</span><span class="o">.</span><span class="n">vals</span><span class="p">,</span> <span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">jac_cache</span>
         <span class="p">)</span>
 
-        <span class="c1"># Compute Jacobian scaler on first iteration only. We use jnp.where to</span>
-        <span class="c1"># avoid double JIT compilation (one trace for first=True, one for first=False).</span>
-        <span class="k">with</span> <span class="n">jdc</span><span class="o">.</span><span class="n">copy_and_mutate</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">state</span><span class="p">:</span>
-            <span class="n">state</span><span class="o">.</span><span class="n">jacobian_scaler</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                <span class="n">state</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">iterations</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span>
-                <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">A_blocksparse</span><span class="o">.</span><span class="n">compute_column_norms</span><span class="p">())</span> <span class="o">+</span> <span class="mf">1.0</span><span class="p">,</span>
-                <span class="n">state</span><span class="o">.</span><span class="n">jacobian_scaler</span><span class="p">,</span>
-            <span class="p">)</span>
+        <span class="c1"># The Jacobian scaler is frozen at the initial linearization (computed</span>
+        <span class="c1"># once in `solve`), so just apply it — no per-iteration column-norm</span>
+        <span class="c1"># scatter.</span>
         <span class="n">A_blocksparse</span> <span class="o">=</span> <span class="n">A_blocksparse</span><span class="o">.</span><span class="n">scale_columns</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">jacobian_scaler</span><span class="p">)</span>
 
         <span class="c1"># Get flattened version for COO/CSR matrices.</span>
@@ -953,6 +1294,15 @@ document.write(`
         <span class="c1"># Compute right-hand side of normal equation.</span>
         <span class="n">ATb</span> <span class="o">=</span> <span class="o">-</span><span class="n">AT_multiply</span><span class="p">(</span><span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">residual_vector</span><span class="p">)</span>
 
+        <span class="c1"># Variable elimination: precompute the damping-independent parts of</span>
+        <span class="c1"># the Schur-complement system once per outer step. The inner (lambda</span>
+        <span class="c1"># search) loop below only redoes the damping-dependent work.</span>
+        <span class="n">schur_factors</span><span class="p">:</span> <span class="n">SchurFactors</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">elimination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">schur_factors</span> <span class="o">=</span> <span class="n">prepare_schur</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">elimination</span><span class="p">,</span> <span class="n">A_blocksparse</span><span class="p">,</span> <span class="n">ATb</span><span class="p">,</span> <span class="n">linear_solver</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">linear_solver</span>
+            <span class="p">)</span>
+
         <span class="c1"># Inner loop: search for a good lambda value.</span>
         <span class="c1">#</span>
         <span class="c1"># For Levenberg-Marquardt, we try increasing lambdas until the step is</span>
@@ -977,6 +1327,11 @@ document.write(`
 
         <span class="n">init_inner_state</span> <span class="o">=</span> <span class="n">_LmInnerState</span><span class="p">(</span>
             <span class="n">lambd</span><span class="o">=</span><span class="n">init_lambd</span><span class="p">,</span>
+            <span class="n">lambda_growth</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span><span class="o">.</span><span class="n">lambda_factor</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_region</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="mf">2.0</span>
+            <span class="p">),</span>
             <span class="n">accepted</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="kc">False</span><span class="p">),</span>
             <span class="c1"># Dummy values - will be overwritten by first lm_inner_step call.</span>
             <span class="n">sol_proposed</span><span class="o">=</span><span class="n">sol_prev</span><span class="p">,</span>
@@ -1000,6 +1355,7 @@ document.write(`
                 <span class="n">A_multiply</span><span class="p">,</span>
                 <span class="n">AT_multiply</span><span class="p">,</span>
                 <span class="n">ATb</span><span class="p">,</span>
+                <span class="n">schur_factors</span><span class="p">,</span>
             <span class="p">),</span>
             <span class="n">init_val</span><span class="o">=</span><span class="n">init_inner_state</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1025,6 +1381,7 @@ document.write(`
                 <span class="n">sol_prev</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">state_next</span><span class="o">.</span><span class="n">lambd</span> <span class="o">=</span> <span class="n">lambd_next</span>
+            <span class="n">state_next</span><span class="o">.</span><span class="n">last_step_accepted</span> <span class="o">=</span> <span class="n">inner_state_final</span><span class="o">.</span><span class="n">accepted</span>
 
         <span class="c1"># Debug: log step acceptance and ATb_norm.</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
@@ -1182,17 +1539,20 @@ document.write(`
         <span class="n">tangent_ordering</span><span class="p">:</span> <span class="n">VarTypeOrdering</span><span class="p">,</span>
         <span class="n">ATb</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
         <span class="n">iterations</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
+        <span class="n">accepted</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check for convergence!&quot;&quot;&quot;</span>
 
         <span class="c1"># Cost tolerance: use cost_nonconstraint for meaningful convergence check.</span>
         <span class="c1"># For constrained problems, the total cost changes with each AL update,</span>
         <span class="c1"># but cost_nonconstraint (original objective) provides stable convergence.</span>
+        <span class="c1"># Only accepted proposals count: the cost delta of a rejected step says</span>
+        <span class="c1"># nothing about progress, since the step is not taken.</span>
         <span class="n">cost_reldelta</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">cost_nonconstraint_updated</span> <span class="o">-</span> <span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_nonconstraint</span><span class="p">)</span>
             <span class="o">/</span> <span class="n">sol_prev</span><span class="o">.</span><span class="n">cost_info</span><span class="o">.</span><span class="n">cost_nonconstraint</span>
         <span class="p">)</span>
-        <span class="n">converged_cost</span> <span class="o">=</span> <span class="n">cost_reldelta</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">cost_tolerance</span>
+        <span class="n">converged_cost</span> <span class="o">=</span> <span class="p">(</span><span class="n">cost_reldelta</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">cost_tolerance</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">accepted</span>
 
         <span class="c1"># Gradient tolerance: infinity norm of the gradient step.</span>
         <span class="n">flat_vals</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">flatten_util</span><span class="o">.</span><span class="n">ravel_pytree</span><span class="p">(</span><span class="n">sol_prev</span><span class="o">.</span><span class="n">vals</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
@@ -1210,11 +1570,17 @@ document.write(`
             <span class="kc">False</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="c1"># Parameter tolerance.</span>
+        <span class="c1"># Parameter tolerance. Like the cost criterion above, only accepted</span>
+        <span class="c1"># proposals count: a rejected step is not taken, so its size says</span>
+        <span class="c1"># nothing about convergence — and treating it as converged exits the</span>
+        <span class="c1"># lambda-escalation loop early, freezing LM into re-proposing the</span>
+        <span class="c1"># same rejected step forever (measurements: benchmarks/results.md).</span>
+        <span class="c1"># When no acceptable step exists at any damping, the lambda_max</span>
+        <span class="c1"># check in the outer loop terminates instead.</span>
         <span class="n">param_delta</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">tangent</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span>
             <span class="n">jnp</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">flat_vals</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_tolerance</span>
         <span class="p">)</span>
-        <span class="n">converged_parameters</span> <span class="o">=</span> <span class="n">param_delta</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_tolerance</span>
+        <span class="n">converged_parameters</span> <span class="o">=</span> <span class="p">(</span><span class="n">param_delta</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameter_tolerance</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">accepted</span>
 
         <span class="c1"># Check termination flags. We&#39;ll terminate if any of the conditions are met.</span>
         <span class="n">term_flags</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>

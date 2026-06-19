@@ -31,7 +31,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -212,6 +212,7 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../../design/typed_api/">Typed API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/schur_complement/">Schur complement elimination</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
@@ -536,14 +537,42 @@ Only costs where all variables are visible are shown.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="jaxls.LeastSquaresProblem.analyze">
-<span class="sig-name descname"><span class="pre">analyze</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">use_onp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem" title="jaxls._problem.AnalyzedLeastSquaresProblem"><span class="pre">AnalyzedLeastSquaresProblem</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#LeastSquaresProblem.analyze"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.LeastSquaresProblem.analyze" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">analyze</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">use_onp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">schur_elimination</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'auto'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'off'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#type" title="(in Python v3.14)"><span class="pre">type</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#jaxls.Var" title="jaxls._variables.Var"><span class="pre">Var</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'auto'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#jaxls.AnalyzedLeastSquaresProblem" title="jaxls._problem.AnalyzedLeastSquaresProblem"><span class="pre">AnalyzedLeastSquaresProblem</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#LeastSquaresProblem.analyze"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.LeastSquaresProblem.analyze" title="Link to this definition">#</a></dt>
 <dd><p>Analyze sparsity pattern of least squares problem. Needed before solving.</p>
 <p>Processes all costs and variables to compute the sparse Jacobian structure,
 group costs by structure for vectorization, and prepare for optimization.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>use_onp</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, use numpy instead of jax.numpy for index computations.
-Can be faster for problem setup on CPU.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>use_onp</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, use numpy instead of jax.numpy for index computations.
+Can be faster for problem setup on CPU.</p></li>
+<li><p><strong>schur_elimination</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><em>Literal</em></a><em>[</em><em>'auto'</em><em>, </em><em>'off'</em><em>] </em><em>| </em><em>tuple</em><em>[</em><em>type</em><em>[</em><em>~jaxls._variables.Var</em><em>]</em><em>, </em><em>...</em><em>]</em>) – <p>Controls Schur-complement variable elimination.
+When a dominant block-diagonal variable type is eliminated (for
+example, landmarks in bundle adjustment), solves run on the much
+smaller, better-conditioned reduced system and then
+back-substitute the eliminated variables. Every <code class="docutils literal notranslate"><span class="pre">linear_solver</span></code>
+applies elimination, differing only in how it solves the reduced
+system: “dense_cholesky” factors it densely, “conjugate_gradient”
+solves it matrix-free, and “cholmod” factors it sparse-directly.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> (default): automatically eliminate a dominant
+block-diagonal variable type if one exists, otherwise solve
+the full system.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;off&quot;</span></code>: skip elimination and solve the full system.
+Useful for debugging or benchmarking against the
+non-eliminated solve.</p></li>
+<li><p>a tuple of variable types, e.g. <code class="docutils literal notranslate"><span class="pre">(LandmarkVar,)</span></code>: eliminate
+exactly these types. Each must be block-diagonal (no single
+cost may touch more than one variable of the type), or
+building the plan raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
+</ul>
+<p>Only a single level of elimination is currently supported: the
+eliminated types are removed in one Schur step and the remaining
+types form the reduced system. (Nested / multi-level elimination,
+eliminating further types from the already-reduced system, is
+not implemented.)</p>
+</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>An AnalyzedLeastSquaresProblem ready for solving.</p>
@@ -559,7 +588,7 @@ Can be faster for problem setup on CPU.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="jaxls.AnalyzedLeastSquaresProblem">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">AnalyzedLeastSquaresProblem</span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#AnalyzedLeastSquaresProblem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AnalyzedLeastSquaresProblem" title="Link to this definition">#</a></dt>
-<dd><p>AnalyzedLeastSquaresProblem(_stacked_costs: ‘tuple[_AnalyzedCost, …]’, _cost_counts: ‘jdc.Static[tuple[int, …]]’, _sorted_ids_from_var_type: ‘dict[type[Var], jax.Array]’, _jac_coords_coo: ‘SparseCooCoordinates’, _jac_coords_csr: ‘SparseCsrCoordinates’, _tangent_ordering: ‘jdc.Static[VarTypeOrdering]’, _tangent_start_from_var_type: ‘jdc.Static[dict[type[Var[Any]], int]]’, _tangent_dim: ‘jdc.Static[int]’, _residual_dim: ‘jdc.Static[int]’)</p>
+<dd><p>AnalyzedLeastSquaresProblem(_stacked_costs: ‘tuple[_AnalyzedCost, …]’, _cost_counts: ‘jdc.Static[tuple[int, …]]’, _sorted_ids_from_var_type: ‘dict[type[Var], jax.Array]’, _jac_coords_coo: ‘SparseCooCoordinates’, _jac_coords_csr: ‘SparseCsrCoordinates’, _tangent_ordering: ‘jdc.Static[VarTypeOrdering]’, _tangent_start_from_var_type: ‘jdc.Static[dict[type[Var[Any]], int]]’, _tangent_dim: ‘jdc.Static[int]’, _residual_dim: ‘jdc.Static[int]’, _elimination: ‘EliminationPlan | None’ = None)</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="jaxls.AnalyzedLeastSquaresProblem.solve">
 <span class="sig-name descname"><span class="pre">solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial_vals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'conjugate_gradient'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'cholmod'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'dense_cholesky'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="../solver_config/#jaxls.ConjugateGradientConfig" title="jaxls._solvers.ConjugateGradientConfig"><span class="pre">ConjugateGradientConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'conjugate_gradient'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trust_region</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.TrustRegionConfig" title="jaxls._solvers.TrustRegionConfig"><span class="pre">TrustRegionConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TrustRegionConfig()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">termination</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.TerminationConfig" title="jaxls._solvers.TerminationConfig"><span class="pre">TerminationConfig</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TerminationConfig()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'blockrow'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'coo'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'csr'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'blockrow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">augmented_lagrangian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../solver_config/#jaxls.AugmentedLagrangianConfig" title="jaxls.AugmentedLagrangianConfig"><span class="pre">AugmentedLagrangianConfig</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_summary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="k"><span class="pre">False</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#jaxls.VarValues" title="jaxls._variables.VarValues"><span class="pre">VarValues</span></a></span></span><a class="reference internal" href="../../_modules/jaxls/_problem/#AnalyzedLeastSquaresProblem.solve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.AnalyzedLeastSquaresProblem.solve" title="Link to this definition">#</a></dt>
@@ -573,7 +602,16 @@ Lagrangian method will be automatically used.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>initial_vals</strong> – Initial values for the variables. If None, default values will be used.</p></li>
-<li><p><strong>linear_solver</strong> – The linear solver to use.</p></li>
+<li><p><strong>linear_solver</strong> – The linear solver to use. When a dominant
+block-diagonal variable type exists (for example, landmarks
+in bundle adjustment), all three solvers automatically
+eliminate it via the Schur complement and run on the much
+smaller, better-conditioned reduced system; the decision is
+logged. They differ only in how they solve that reduced
+system: “conjugate_gradient” matrix-free, “dense_cholesky”
+dense, and “cholmod” sparse-direct. See
+<a class="reference internal" href="#jaxls.LeastSquaresProblem.analyze" title="jaxls.LeastSquaresProblem.analyze"><code class="xref py py-meth docutils literal notranslate"><span class="pre">LeastSquaresProblem.analyze()</span></code></a> to control or disable
+elimination.</p></li>
 <li><p><strong>trust_region</strong> – Configuration for Levenberg-Marquardt trust region.</p></li>
 <li><p><strong>termination</strong> – Configuration for termination criteria.</p></li>
 <li><p><strong>sparse_mode</strong> – The representation to use for sparse matrix
@@ -635,12 +673,10 @@ manifold variables like SE3, SO3, etc.</p>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>vals</strong> (<a class="reference internal" href="#jaxls.VarValues" title="jaxls.VarValues"><em>VarValues</em></a>) – Variable values at which to compute covariance (typically
 the solution from solve()).</p></li>
-<li><p><strong>method</strong> (<em>Literal</em><em>[</em><em>'cholmod_spinv'</em><em>] </em><em>| </em><em>LinearSolverCovarianceEstimatorConfig</em><em> | </em><em>None</em>) – <p>Covariance computation method. Options:
-- None (default): Use CG with block-Jacobi preconditioning.</p>
-<blockquote>
-<div><p>GPU-friendly and adapts to problem structure.</p>
-</div></blockquote>
+<li><p><strong>method</strong> (<em>Literal</em><em>[</em><em>'cholmod_spinv'</em><em>] </em><em>| </em><em>LinearSolverCovarianceEstimatorConfig</em><em> | </em><em>None</em>) – <p>Covariance computation method. Options:</p>
 <ul>
+<li><p>None (default): Use CG with block-Jacobi preconditioning.
+GPU-friendly and adapts to problem structure.</p></li>
 <li><p>LinearSolverCovarianceEstimatorConfig: Custom linear solver config.</p></li>
 <li><p>”cholmod_spinv”: Use CHOLMOD’s sparse inverse. Fast extraction
 but requires sksparse and only includes entries in the

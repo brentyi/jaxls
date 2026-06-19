@@ -44,7 +44,7 @@
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../../_static/copybutton.js?v=fd10adb8"></script>
-    <script src="../../../_static/js/custom.js?v=58150dd0"></script>
+    <script src="../../../_static/js/custom.js?v=b8ccbbc1"></script>
     <script src="../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'examples/robotics/obstacle_avoidance';</script>
     <link rel="index" title="Index" href="../../../genindex/" />
@@ -212,6 +212,7 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../../../design/typed_api/">Typed API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/schur_complement/">Schur complement elimination</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
@@ -479,6 +480,18 @@ start to goal while avoiding circular obstacles.</p>
 </pre></div>
 </div>
 </div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0619 03:25:57.282764 1026073 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.286267 1026074 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.290920 1026076 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.296247 1026075 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.300223 1025946 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.301097 1025946 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.301950 1025946 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:25:57.302809 1025946 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="variables-and-costs">
@@ -646,474 +659,498 @@ start to goal while avoiding circular obstacles.</p>
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.19e+01 cost_prev=11.4616 cost_new=0.9302
 <span class=" -Color -Color-Bold">INFO    </span> |  step #1: cost=0.8331 lambd=0.0003 inexact_tol=1.0e-02
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00119 (avg 0.00030)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.09714 (avg 0.00243)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.83190 (avg 0.02311)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.96e-01 cost_prev=0.9302 cost_new=0.8834
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.09713 (avg 0.00243)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.83191 (avg 0.02311)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.98e-01 cost_prev=0.9302 cost_new=0.8834
 <span class=" -Color -Color-Bold">INFO    </span> |  step #2: cost=0.7775 lambd=0.0001 inexact_tol=6.3e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00125 (avg 0.00031)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.10585 (avg 0.00265)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.77627 (avg 0.02156)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.80e-02 cost_prev=0.8834 cost_new=0.8828
-<span class=" -Color -Color-Bold">INFO    </span> |  step #3: cost=0.7712 lambd=0.0001 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.75e-02 cost_prev=0.8834 cost_new=0.8828
+<span class=" -Color -Color-Bold">INFO    </span> |  step #3: cost=0.7712 lambd=0.0001 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00122 (avg 0.00030)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.11158 (avg 0.00279)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.76997 (avg 0.02139)
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.31e-03 cost_prev=0.8828 cost_new=0.8828
 <span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.0361e-02, csupn=7.0361e-02, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #4: cost=0.7707 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |  step #4: cost=0.7707 lambd=0.0000 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00122 (avg 0.00030)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.44837 (avg 0.01121)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.76945 (avg 0.02137)
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.18e+00 cost_prev=1.2190 cost_new=1.1491
-<span class=" -Color -Color-Bold">INFO    </span> |  step #5: cost=0.9132 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |  step #5: cost=0.9132 lambd=0.0000 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00134 (avg 0.00034)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.23599 (avg 0.00590)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91181 (avg 0.02533)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91182 (avg 0.02533)
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.96e-01 cost_prev=1.1491 cost_new=1.1436
-<span class=" -Color -Color-Bold">INFO    </span> |  step #6: cost=0.9509 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |  step #6: cost=0.9509 lambd=0.0000 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00148 (avg 0.00037)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.19274 (avg 0.00482)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.94939 (avg 0.02637)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.86e-02 cost_prev=1.1436 cost_new=1.1435
-<span class=" -Color -Color-Bold">INFO    </span> |  step #7: cost=0.9518 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.85e-02 cost_prev=1.1436 cost_new=1.1435
+<span class=" -Color -Color-Bold">INFO    </span> |  step #7: cost=0.9518 lambd=0.0000 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00148 (avg 0.00037)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.19162 (avg 0.00479)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95036 (avg 0.02640)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.88e-03 cost_prev=1.1435 cost_new=1.1435
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.4076e-02, csupn=2.4076e-02, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #8: cost=0.9522 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.87e-03 cost_prev=1.1435 cost_new=1.1435
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=2.4075e-02, csupn=2.4075e-02, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #8: cost=0.9522 lambd=0.0000 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00148 (avg 0.00037)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.30073 (avg 0.00752)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95070 (avg 0.02641)
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.96e-01 cost_prev=1.2529 cost_new=1.2444
-<span class=" -Color -Color-Bold">INFO    </span> |  step #9: cost=1.0277 lambd=0.0000 inexact_tol=2.1e-03
+<span class=" -Color -Color-Bold">INFO    </span> |  step #9: cost=1.0277 lambd=0.0000 inexact_tol=2.0e-03
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00161 (avg 0.00040)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.21676 (avg 0.00542)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.02608 (avg 0.02850)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.07e-03 cost_prev=1.2444 cost_new=1.2444
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.1835e-03, csupn=6.1835e-03, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #10: cost=1.0277 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.91e-03 cost_prev=1.2444 cost_new=1.2444
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.1830e-03, csupn=6.1830e-03, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #10: cost=1.0277 lambd=0.0000 inexact_tol=1.4e-04
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00161 (avg 0.00040)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.24424 (avg 0.00611)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.02605 (avg 0.02850)
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.00e-01 cost_prev=1.2719 cost_new=1.2712
-<span class=" -Color -Color-Bold">INFO    </span> |  step #11: cost=1.0498 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #11: cost=1.0498 lambd=0.0000 inexact_tol=1.4e-04
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00164 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22144 (avg 0.00554)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04813 (avg 0.02911)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=5.79e-04 cost_prev=1.2712 cost_new=1.2712
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.15e-04 cost_prev=1.2712 cost_new=1.2712
 <span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.0778e-03, csupn=1.0778e-03, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #12: cost=1.0498 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #12: cost=1.0498 lambd=0.0000 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00164 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22616 (avg 0.00565)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04813 (avg 0.02911)
 <span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.75e-02 cost_prev=1.2759 cost_new=1.2759
-<span class=" -Color -Color-Bold">INFO    </span> |  step #13: cost=1.0536 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #13: cost=1.0536 lambd=0.0000 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22226 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05200 (avg 0.02922)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.70e-04 cost_prev=1.2759 cost_new=1.2759
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.8895e-04, csupn=1.8895e-04, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #14: cost=1.0536 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.61e-04 cost_prev=1.2759 cost_new=1.2759
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.8787e-04, csupn=1.8787e-04, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #14: cost=1.0536 lambd=0.0000 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22308 (avg 0.00558)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05200 (avg 0.02922)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.07e-03 cost_prev=1.2767 cost_new=1.2767
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.4213e-05, csupn=3.4213e-05, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #15: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.06e-03 cost_prev=1.2767 cost_new=1.2767
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.2902e-05, csupn=3.2902e-05, max_rho=1.0706e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #15: cost=1.0543 lambd=0.0000 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #16: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #16: cost=1.0543 lambd=0.0000 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #17: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #17: cost=1.0543 lambd=0.0003 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #18: cost=1.0543 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #18: cost=1.0543 lambd=0.0051 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #19: cost=1.0543 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #19: cost=1.0543 lambd=0.1638 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #20: cost=1.0543 lambd=0.0003 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #20: cost=1.0543 lambd=10.4858 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
 <span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
 <span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.45e-04 cost_prev=1.2769 cost_new=1.2769
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.9870e-06, csupn=7.9870e-06, max_rho=1.0706e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #21: cost=1.0544 lambd=0.0002 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |  step #21: cost=1.0543 lambd=1342.1772 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22246 (avg 0.00556)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05279 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.60e-04 cost_prev=1.2769 cost_new=1.2769
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.8678e-06, csupn=7.8678e-06, max_rho=4.2824e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #22: cost=1.0544 lambd=0.0001 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.22255 (avg 0.00556)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.89e-04 cost_prev=1.2769 cost_new=1.2769
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.2663e-05, csupn=3.2663e-05, max_rho=4.2824e+01
+<span class=" -Color -Color-Bold">INFO    </span> |  step #22: cost=1.0543 lambd=671.0886 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.13904 (avg 0.00348)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05280 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.80e-04 cost_prev=1.1935 cost_new=1.1935
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=7.9870e-06, csupn=7.9870e-06, max_rho=4.2824e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #23: cost=1.0544 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05578 (avg 0.00139)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #23: cost=1.0543 lambd=2684.3545 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05563 (avg 0.00139)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05277 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.92e-03 cost_prev=1.1100 cost_new=1.1085
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.7730e-04, csupn=0.0000e+00, max_rho=4.2824e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #24: cost=1.0543 lambd=0.0000 inexact_tol=1.5e-04
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05578 (avg 0.00139)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #24: cost=1.0543 lambd=21474.8359 inexact_tol=2.4e-05
 <span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05282 (avg 0.00132)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05268 (avg 0.02924)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.30e-02 cost_prev=1.1071 cost_new=1.0764
-<span class=" -Color -Color-Bold">INFO    </span> |  step #25: cost=1.0434 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00163 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.03300 (avg 0.00082)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04181 (avg 0.02894)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.07e+00 cost_prev=1.0764 cost_new=1.0461
-<span class=" -Color -Color-Bold">INFO    </span> |  step #26: cost=0.9435 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00147 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.10259 (avg 0.00256)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.94204 (avg 0.02617)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.47e+00 cost_prev=1.0461 cost_new=1.0058
-<span class=" -Color -Color-Bold">INFO    </span> |  step #27: cost=0.9217 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00149 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08418 (avg 0.00210)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.92017 (avg 0.02556)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.79e-02 cost_prev=1.0058 cost_new=1.0050
-<span class=" -Color -Color-Bold">INFO    </span> |  step #28: cost=0.9221 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08283 (avg 0.00207)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.92059 (avg 0.02557)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.17e-02 cost_prev=1.0050 cost_new=1.0049
-<span class=" -Color -Color-Bold">INFO    </span> |  step #29: cost=0.9211 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08382 (avg 0.00210)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91957 (avg 0.02554)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.53e-03 cost_prev=1.0049 cost_new=1.0049
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=5.8322e-02, csupn=5.8322e-02, max_rho=4.2824e+01
-<span class=" -Color -Color-Bold">INFO    </span> |  step #30: cost=0.9206 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.47436 (avg 0.01186)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91904 (avg 0.02553)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.92e+00 cost_prev=1.3949 cost_new=1.1356
-<span class=" -Color -Color-Bold">INFO    </span> |  step #31: cost=1.0855 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00191 (avg 0.00048)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05005 (avg 0.00125)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.08361 (avg 0.03010)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.99e-01 cost_prev=1.1356 cost_new=1.0921
-<span class=" -Color -Color-Bold">INFO    </span> |  step #32: cost=1.0651 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #33: cost=1.0651 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #34: cost=1.0651 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #35: cost=1.0651 lambd=0.0001 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #36: cost=1.0651 lambd=0.0002 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #37: cost=1.0651 lambd=0.0003 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #38: cost=1.0651 lambd=0.0006 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #39: cost=1.0651 lambd=0.0013 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #40: cost=1.0651 lambd=0.0026 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #41: cost=1.0651 lambd=0.0051 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #42: cost=1.0651 lambd=0.0102 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #43: cost=1.0651 lambd=0.0205 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #44: cost=1.0651 lambd=0.0410 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00184 (avg 0.00046)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02691 (avg 0.00067)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.06331 (avg 0.02954)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.05e-01 cost_prev=1.0921 cost_new=1.0892
-<span class=" -Color -Color-Bold">INFO    </span> |  step #45: cost=1.0003 lambd=0.0205 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00126 (avg 0.00031)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.08890 (avg 0.00222)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99903 (avg 0.02775)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.76e+00 cost_prev=1.0892 cost_new=1.0462
-<span class=" -Color -Color-Bold">INFO    </span> |  step #46: cost=1.0062 lambd=0.0102 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00158 (avg 0.00039)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04001 (avg 0.00100)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00464 (avg 0.02791)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.79e-02 cost_prev=1.0462 cost_new=1.0443
-<span class=" -Color -Color-Bold">INFO    </span> |  step #47: cost=1.0014 lambd=0.0051 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04295 (avg 0.00107)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99985 (avg 0.02777)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.50e-02 cost_prev=1.0443 cost_new=1.0437
-<span class=" -Color -Color-Bold">INFO    </span> |  step #48: cost=0.9985 lambd=0.0026 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00152 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04516 (avg 0.00113)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99699 (avg 0.02769)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.30e-02 cost_prev=1.0437 cost_new=1.0434
-<span class=" -Color -Color-Bold">INFO    </span> |  step #49: cost=0.9969 lambd=0.0013 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00151 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04650 (avg 0.00116)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99543 (avg 0.02765)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.22e-02 cost_prev=1.0434 cost_new=1.0431
-<span class=" -Color -Color-Bold">INFO    </span> |  step #50: cost=0.9972 lambd=0.0006 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04593 (avg 0.00115)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99568 (avg 0.02766)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.23e-02 cost_prev=1.0431 cost_new=1.0428
-<span class=" -Color -Color-Bold">INFO    </span> |  step #51: cost=0.9968 lambd=0.0003 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00152 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04598 (avg 0.00115)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99526 (avg 0.02765)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.28e-02 cost_prev=1.0428 cost_new=1.0423
-<span class=" -Color -Color-Bold">INFO    </span> |  step #52: cost=0.9961 lambd=0.0002 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04618 (avg 0.00115)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99462 (avg 0.02763)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.37e-02 cost_prev=1.0423 cost_new=1.0419
-<span class=" -Color -Color-Bold">INFO    </span> |  step #53: cost=0.9953 lambd=0.0001 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04655 (avg 0.00116)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99378 (avg 0.02760)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.43e-02 cost_prev=1.0419 cost_new=1.0414
-<span class=" -Color -Color-Bold">INFO    </span> |  step #54: cost=0.9943 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04709 (avg 0.00118)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99275 (avg 0.02758)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.45e-02 cost_prev=1.0414 cost_new=1.0409
-<span class=" -Color -Color-Bold">INFO    </span> |  step #55: cost=0.9931 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04778 (avg 0.00119)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99160 (avg 0.02754)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.41e-02 cost_prev=1.0409 cost_new=1.0405
-<span class=" -Color -Color-Bold">INFO    </span> |  step #56: cost=0.9919 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04859 (avg 0.00121)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99037 (avg 0.02751)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.29e-02 cost_prev=1.0405 cost_new=1.0402
-<span class=" -Color -Color-Bold">INFO    </span> |  step #57: cost=0.9907 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.04946 (avg 0.00124)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98916 (avg 0.02748)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.18e-02 cost_prev=1.0402 cost_new=1.0399
-<span class=" -Color -Color-Bold">INFO    </span> |  step #58: cost=0.9895 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05034 (avg 0.00126)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98801 (avg 0.02744)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.03e-02 cost_prev=1.0399 cost_new=1.0397
-<span class=" -Color -Color-Bold">INFO    </span> |  step #59: cost=0.9885 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05118 (avg 0.00128)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98697 (avg 0.02742)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=8.80e-03 cost_prev=1.0397 cost_new=1.0396
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=1.9573e-02, csupn=1.9573e-02, max_rho=1.7129e+02
-<span class=" -Color -Color-Bold">INFO    </span> |  step #60: cost=0.9876 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.16703 (avg 0.00418)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98607 (avg 0.02739)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=4.18e+00 cost_prev=1.1546 cost_new=1.0663
-<span class=" -Color -Color-Bold">INFO    </span> |  step #61: cost=1.0532 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00169 (avg 0.00042)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01316 (avg 0.00033)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05146 (avg 0.02921)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.24e-02 cost_prev=1.0663 cost_new=1.0615
-<span class=" -Color -Color-Bold">INFO    </span> |  step #62: cost=1.0455 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #63: cost=1.0455 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #64: cost=1.0455 lambd=0.0000 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #65: cost=1.0455 lambd=0.0001 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #66: cost=1.0455 lambd=0.0002 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #67: cost=1.0455 lambd=0.0003 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #68: cost=1.0455 lambd=0.0006 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #69: cost=1.0455 lambd=0.0013 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #70: cost=1.0455 lambd=0.0026 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #71: cost=1.0455 lambd=0.0051 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #72: cost=1.0455 lambd=0.0102 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #73: cost=1.0455 lambd=0.0205 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #74: cost=1.0455 lambd=0.0410 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #75: cost=1.0455 lambd=0.0819 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #76: cost=1.0455 lambd=0.1638 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #77: cost=1.0455 lambd=0.3277 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #78: cost=1.0455 lambd=0.6554 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #79: cost=1.0455 lambd=1.3107 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #80: cost=1.0455 lambd=2.6214 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #81: cost=1.0455 lambd=5.2429 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #82: cost=1.0455 lambd=10.4858 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #83: cost=1.0455 lambd=20.9715 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |  step #84: cost=1.0455 lambd=41.9430 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00171 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01597 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.04382 (avg 0.02900)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.73e+00 cost_prev=1.0615 cost_new=1.0396
-<span class=" -Color -Color-Bold">INFO    </span> |  step #85: cost=1.0023 lambd=20.9715 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00163 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.03732 (avg 0.00093)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00065 (avg 0.02780)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.42e+00 cost_prev=1.0396 cost_new=1.0322
-<span class=" -Color -Color-Bold">INFO    </span> |  step #86: cost=1.0073 lambd=10.4858 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00166 (avg 0.00041)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02494 (avg 0.00062)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00562 (avg 0.02793)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.63e-01 cost_prev=1.0322 cost_new=1.0302
-<span class=" -Color -Color-Bold">INFO    </span> |  step #87: cost=1.0068 lambd=5.2429 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00173 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02337 (avg 0.00058)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00507 (avg 0.02792)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=9.38e-02 cost_prev=1.0302 cost_new=1.0282
-<span class=" -Color -Color-Bold">INFO    </span> |  step #88: cost=1.0053 lambd=2.6214 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00173 (avg 0.00043)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02288 (avg 0.00057)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00359 (avg 0.02788)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.84e-02 cost_prev=1.0282 cost_new=1.0255
-<span class=" -Color -Color-Bold">INFO    </span> |  step #89: cost=1.0026 lambd=1.3107 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00166 (avg 0.00042)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02297 (avg 0.00057)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.00092 (avg 0.02780)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.94e-02 cost_prev=1.0255 cost_new=1.0212
-<span class=" -Color -Color-Bold">INFO    </span> |  step #90: cost=0.9973 lambd=0.6554 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00159 (avg 0.00040)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02389 (avg 0.00060)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.99572 (avg 0.02766)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=7.04e-02 cost_prev=1.0212 cost_new=1.0151
-<span class=" -Color -Color-Bold">INFO    </span> |  step #91: cost=0.9901 lambd=0.3277 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00154 (avg 0.00039)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02497 (avg 0.00062)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.98859 (avg 0.02746)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.03e-02 cost_prev=1.0151 cost_new=1.0066
-<span class=" -Color -Color-Bold">INFO    </span> |  step #92: cost=0.9777 lambd=0.1638 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.02891 (avg 0.00072)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.97620 (avg 0.02712)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=8.89e-02 cost_prev=1.0066 cost_new=0.9964
-<span class=" -Color -Color-Bold">INFO    </span> |  step #93: cost=0.9591 lambd=0.0819 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00153 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.03738 (avg 0.00093)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.95755 (avg 0.02660)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.43e-01 cost_prev=0.9964 cost_new=0.9867
-<span class=" -Color -Color-Bold">INFO    </span> |  step #94: cost=0.9352 lambd=0.0410 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00152 (avg 0.00038)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05151 (avg 0.00129)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.93370 (avg 0.02594)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.93e-01 cost_prev=0.9867 cost_new=0.9828
-<span class=" -Color -Color-Bold">INFO    </span> |  step #95: cost=0.9235 lambd=0.0205 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05931 (avg 0.00148)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.92202 (avg 0.02561)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=6.50e-02 cost_prev=0.9828 cost_new=0.9815
-<span class=" -Color -Color-Bold">INFO    </span> |  step #96: cost=0.9162 lambd=0.0102 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.06536 (avg 0.00163)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91469 (avg 0.02541)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=2.81e-02 cost_prev=0.9815 cost_new=0.9811
-<span class=" -Color -Color-Bold">INFO    </span> |  step #97: cost=0.9121 lambd=0.0051 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.06906 (avg 0.00173)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.91059 (avg 0.02529)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=1.16e-02 cost_prev=0.9811 cost_new=0.9810
-<span class=" -Color -Color-Bold">INFO    </span> |  step #98: cost=0.9099 lambd=0.0026 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00150 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.07110 (avg 0.00178)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.90843 (avg 0.02523)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=5.14e-03 cost_prev=0.9810 cost_new=0.9810
-<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=6.0159e-02, csupn=6.0159e-02, max_rho=1.7129e+02
-<span class=" -Color -Color-Bold">INFO    </span> |  step #99: cost=0.9088 lambd=0.0013 inexact_tol=1.5e-04
-<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00149 (avg 0.00037)
-<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.43579 (avg 0.01089)
-<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 0.90728 (avg 0.02520)
-<span class=" -Color -Color-Bold">INFO    </span> |      accepted=True ATb_norm=3.75e+00 cost_prev=1.3446 cost_new=1.1252
-<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #100: cost=1.0642 criteria=[0 0 0], term_deltas=1.7e-01,2.7e+00,3.7e-03
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05578 (avg 0.00139)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #25: cost=1.0543 lambd=343597.3750 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05578 (avg 0.00139)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |  step #26: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.05578 (avg 0.00139)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=2.60e-03 cost_prev=1.1101 cost_new=1.1101
+<span class=" -Color -Color-Bold">INFO    </span> |  AL update: snorm=3.2663e-05, csupn=3.2663e-05, max_rho=1.7129e+02
+<span class=" -Color -Color-Bold">INFO    </span> |  step #27: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #28: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #29: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #30: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #31: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #32: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #33: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #34: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #35: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #36: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #37: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #38: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #39: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #40: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #41: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #42: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #43: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #44: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #45: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #46: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #47: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #48: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #49: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #50: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #51: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #52: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #53: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #54: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #55: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #56: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #57: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #58: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #59: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #60: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #61: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #62: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #63: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #64: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #65: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #66: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #67: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #68: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #69: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #70: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #71: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #72: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #73: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #74: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #75: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #76: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #77: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #78: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #79: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #80: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #81: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #82: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #83: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #84: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #85: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #86: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #87: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #88: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #89: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #90: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #91: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #92: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #93: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #94: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #95: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #96: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #97: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #98: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> |  step #99: cost=1.0543 lambd=1000000.0000 inexact_tol=2.4e-05
+<span class=" -Color -Color-Bold">INFO    </span> |      - anchor_cost(2): 0.00165 (avg 0.00041)
+<span class=" -Color -Color-Bold">INFO    </span> |      - augmented_obstacle_constraint(40): 0.01409 (avg 0.00035)
+<span class=" -Color -Color-Bold">INFO    </span> |      - smoothness_cost(18): 1.05267 (avg 0.02924)
+<span class=" -Color -Color-Bold">INFO    </span> |      accepted=False ATb_norm=1.10e-02 cost_prev=1.0684 cost_new=1.0684
+<span class=" -Color -Color-Bold">INFO    </span> | Terminated @ iteration #100: cost=1.0543 criteria=[0 0 0], term_deltas=0.0e+00,7.7e-03,2.1e-10 (solved in 0.4786 sec)
 </pre></div>
 </div>
 </div>
@@ -1238,7 +1275,7 @@ start to goal while avoiding circular obstacles.</p>
 </details>
 <div class="cell_output docutils container">
 <div class="output text_html"><div>                        <script type="text/javascript">window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
-        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="e18edc0c-5b6e-4de0-95f8-9514435d6aef" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("e18edc0c-5b6e-4de0-95f8-9514435d6aef")) {                    Plotly.newPlot(                        "e18edc0c-5b6e-4de0-95f8-9514435d6aef",                        [{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.0,0.5263158082962036,1.0526316165924072,1.5789473056793213,2.1052632331848145,2.6315789222717285,3.1578946113586426,3.6842105388641357,4.210526466369629,4.736842155456543,5.263157844543457,5.789473533630371,6.315789222717285,6.842105388641357,7.3684210777282715,7.894737243652344,8.421052932739258,8.947368621826172,9.473684310913086,10.0],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[10.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.001096092164516449,0.6224334836006165,1.2399812936782837,1.8495848178863525,2.4480464458465576,3.0316696166992188,3.5967390537261963,4.139975070953369,4.661486625671387,5.165163516998291,5.654297828674316,6.132838249206543,6.613283634185791,7.095311164855957,7.57834005355835,8.061881065368652,8.54587459564209,9.030303001403809,9.5149564743042,9.999974250793457],"y":[-0.00351781421341002,-0.16470424830913544,-0.3117147386074066,-0.4315578043460846,-0.5102421045303345,-0.5341255068778992,-0.48900407552719116,-0.3608531355857849,-0.17426882684230804,0.04066850244998932,0.2546529173851013,0.4373777210712433,0.5467910766601562,0.5907868146896362,0.5789273381233215,0.5202503204345703,0.4238448143005371,0.2992614507675171,0.1555843949317932,0.0023503643460571766],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.001096092164516449],"y":[-0.00351781421341002],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[9.999974250793457],"y":[0.0023503643460571766],"type":"scatter","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.45],"title":{"text":"x"},"range":[-1,11]},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x","scaleratio":1},"xaxis2":{"anchor":"y2","domain":[0.55,1.0],"title":{"text":"x"},"range":[-1,11]},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x2","scaleratio":1},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Initial (straight line)","x":0.225,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Optimized (avoids obstacles)","x":0.775,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"shapes":[{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x","y0":-0.5,"y1":2.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x2","y0":-0.5,"y1":2.5,"yref":"y2"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x","y0":-2.5,"y1":0.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x2","y0":-2.5,"y1":0.5,"yref":"y2"}],"margin":{"t":40,"b":40,"l":40,"r":40},"height":400,"showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div></div>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.0.min.js" integrity="sha256-bO3dS6yCpk9aK4gUpNELtCiDeSYvGYnK7jFI58NQnHI=" crossorigin="anonymous"></script>                <div id="c4715b91-f8e8-45db-be64-0a1540c0afc1" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script type="text/javascript">                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("c4715b91-f8e8-45db-be64-0a1540c0afc1")) {                    Plotly.newPlot(                        "c4715b91-f8e8-45db-be64-0a1540c0afc1",                        [{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.0,0.5263158082962036,1.0526316165924072,1.5789473056793213,2.1052632331848145,2.6315789222717285,3.1578946113586426,3.6842105388641357,4.210526466369629,4.736842155456543,5.263157844543457,5.789473533630371,6.315789222717285,6.842105388641357,7.3684210777282715,7.894737243652344,8.421052932739258,8.947368621826172,9.473684310913086,10.0],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[10.0],"y":[0.0],"type":"scatter","xaxis":"x","yaxis":"y"},{"hovertemplate":"(%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"steelblue","width":2},"marker":{"color":"steelblue","size":6},"mode":"lines+markers","name":"Path","x":[0.0005202144966460764,0.5559121966362,1.1092233657836914,1.6583727598190308,2.201279640197754,2.735863208770752,3.260042190551758,3.7717361450195312,4.268864631652832,4.757253170013428,5.242729187011719,5.731118202209473,6.22824764251709,6.739943504333496,7.264124870300293,7.798710346221924,8.341620445251465,8.890771865844727,9.444085121154785,9.999480247497559],"y":[-0.0028238247614353895,-0.16066105663776398,-0.3072029948234558,-0.4311543107032776,-0.5212197303771973,-0.5661039352416992,-0.554511547088623,-0.4751474857330322,-0.31671571731567383,-0.11084386706352234,0.11084135621786118,0.3167131841182709,0.4751449525356293,0.554509162902832,0.5661017894744873,0.5212180018424988,0.4311530292034149,0.30720213055610657,0.16066063940525055,0.0028238240629434586],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Start (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"green","size":14,"symbol":"circle"},"mode":"markers","name":"Start","x":[0.0005202144966460764],"y":[-0.0028238247614353895],"type":"scatter","xaxis":"x2","yaxis":"y2"},{"hovertemplate":"Goal (%{x:.2f}, %{y:.2f})\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"orange","size":14,"symbol":"square"},"mode":"markers","name":"Goal","x":[9.999480247497559],"y":[0.0028238240629434586],"type":"scatter","xaxis":"x2","yaxis":"y2"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"anchor":"y","domain":[0.0,0.45],"title":{"text":"x"},"range":[-1,11]},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x","scaleratio":1},"xaxis2":{"anchor":"y2","domain":[0.55,1.0],"title":{"text":"x"},"range":[-1,11]},"yaxis2":{"anchor":"x2","domain":[0.0,1.0],"title":{"text":"y"},"range":[-4,4],"scaleanchor":"x2","scaleratio":1},"annotations":[{"font":{"size":16},"showarrow":false,"text":"Initial (straight line)","x":0.225,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"},{"font":{"size":16},"showarrow":false,"text":"Optimized (avoids obstacles)","x":0.775,"xanchor":"center","xref":"paper","y":1.0,"yanchor":"bottom","yref":"paper"}],"shapes":[{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x","y0":-0.5,"y1":2.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":2.0,"x1":5.0,"xref":"x2","y0":-0.5,"y1":2.5,"yref":"y2"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x","y0":-2.5,"y1":0.5,"yref":"y"},{"fillcolor":"rgba(255, 99, 71, 0.3)","line":{"color":"tomato","width":2},"type":"circle","x0":5.0,"x1":8.0,"xref":"x2","y0":-2.5,"y1":0.5,"yref":"y2"}],"margin":{"t":40,"b":40,"l":40,"r":40},"height":400,"showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div></div>
 </div>
 <p>The optimizer found a smooth trajectory that avoids both obstacles while connecting start to goal. The inequality constraints keep waypoints outside the obstacle regions.</p>
 <p>For solver configuration options, see <a class="reference internal" href="../../../api/solver_config/#jaxls.TrustRegionConfig" title="jaxls.TrustRegionConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.TrustRegionConfig</span></code></a> and <a class="reference internal" href="../../../api/solver_config/#jaxls.AugmentedLagrangianConfig" title="jaxls.AugmentedLagrangianConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">jaxls.AugmentedLagrangianConfig</span></code></a>.</p>

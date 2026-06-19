@@ -30,7 +30,7 @@
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -211,6 +211,7 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../../../design/typed_api/">Typed API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../design/schur_complement/">Schur complement elimination</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
@@ -385,6 +386,7 @@ document.write(`
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">._analyzed_cost</span><span class="w"> </span><span class="kn">import</span> <span class="n">_AnalyzedCost</span><span class="p">,</span> <span class="n">_augment_constraint_cost</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._cost</span><span class="w"> </span><span class="kn">import</span> <span class="n">Cost</span><span class="p">,</span> <span class="n">CostKind</span><span class="p">,</span> <span class="n">CustomJacobianCache</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._schur</span><span class="w"> </span><span class="kn">import</span> <span class="n">EliminationPlan</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._solvers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ConjugateGradientConfig</span><span class="p">,</span>
     <span class="n">NonlinearSolver</span><span class="p">,</span>
@@ -514,7 +516,11 @@ document.write(`
 
 <div class="viewcode-block" id="LeastSquaresProblem.analyze">
 <a class="viewcode-back" href="../../../api/core/#jaxls.LeastSquaresProblem.analyze">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">analyze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_onp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnalyzedLeastSquaresProblem</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">analyze</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">use_onp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">schur_elimination</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span> <span class="s2">&quot;off&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">Var</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnalyzedLeastSquaresProblem</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Analyze sparsity pattern of least squares problem. Needed before solving.</span>
 
 <span class="sd">        Processes all costs and variables to compute the sparse Jacobian structure,</span>
@@ -523,6 +529,31 @@ document.write(`
 <span class="sd">        Args:</span>
 <span class="sd">            use_onp: If True, use numpy instead of jax.numpy for index computations.</span>
 <span class="sd">                Can be faster for problem setup on CPU.</span>
+<span class="sd">            schur_elimination: Controls Schur-complement variable elimination.</span>
+<span class="sd">                When a dominant block-diagonal variable type is eliminated (for</span>
+<span class="sd">                example, landmarks in bundle adjustment), solves run on the much</span>
+<span class="sd">                smaller, better-conditioned reduced system and then</span>
+<span class="sd">                back-substitute the eliminated variables. Every ``linear_solver``</span>
+<span class="sd">                applies elimination, differing only in how it solves the reduced</span>
+<span class="sd">                system: &quot;dense_cholesky&quot; factors it densely, &quot;conjugate_gradient&quot;</span>
+<span class="sd">                solves it matrix-free, and &quot;cholmod&quot; factors it sparse-directly.</span>
+
+<span class="sd">                - ``&quot;auto&quot;`` (default): automatically eliminate a dominant</span>
+<span class="sd">                  block-diagonal variable type if one exists, otherwise solve</span>
+<span class="sd">                  the full system.</span>
+<span class="sd">                - ``&quot;off&quot;``: skip elimination and solve the full system.</span>
+<span class="sd">                  Useful for debugging or benchmarking against the</span>
+<span class="sd">                  non-eliminated solve.</span>
+<span class="sd">                - a tuple of variable types, e.g. ``(LandmarkVar,)``: eliminate</span>
+<span class="sd">                  exactly these types. Each must be block-diagonal (no single</span>
+<span class="sd">                  cost may touch more than one variable of the type), or</span>
+<span class="sd">                  building the plan raises a ``ValueError``.</span>
+
+<span class="sd">                Only a single level of elimination is currently supported: the</span>
+<span class="sd">                eliminated types are removed in one Schur step and the remaining</span>
+<span class="sd">                types form the reduced system. (Nested / multi-level elimination,</span>
+<span class="sd">                eliminating further types from the already-reduced system, is</span>
+<span class="sd">                not implemented.)</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            An AnalyzedLeastSquaresProblem ready for solving.</span>
@@ -743,7 +774,7 @@ document.write(`
             <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">residual_dim_sum</span><span class="p">,</span> <span class="n">tangent_dim_sum</span><span class="p">),</span>
         <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">AnalyzedLeastSquaresProblem</span><span class="p">(</span>
+        <span class="n">analyzed</span> <span class="o">=</span> <span class="n">AnalyzedLeastSquaresProblem</span><span class="p">(</span>
             <span class="n">_stacked_costs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">stacked_costs</span><span class="p">),</span>
             <span class="n">_cost_counts</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">cost_counts</span><span class="p">),</span>
             <span class="n">_sorted_ids_from_var_type</span><span class="o">=</span><span class="n">sorted_ids_from_var_type</span><span class="p">,</span>
@@ -753,7 +784,52 @@ document.write(`
             <span class="n">_tangent_start_from_var_type</span><span class="o">=</span><span class="n">tangent_start_from_var_type</span><span class="p">,</span>
             <span class="n">_tangent_dim</span><span class="o">=</span><span class="n">tangent_dim_sum</span><span class="p">,</span>
             <span class="n">_residual_dim</span><span class="o">=</span><span class="n">residual_dim_sum</span><span class="p">,</span>
-        <span class="p">)</span></div>
+        <span class="p">)</span>
+
+        <span class="c1"># Precompute the Schur-complement elimination plan when a dominant</span>
+        <span class="c1"># block-diagonal variable type exists (for example, landmarks in</span>
+        <span class="c1"># bundle adjustment). This is host-side index structure that depends</span>
+        <span class="c1"># only on the problem&#39;s sparsity, so it belongs with the rest of the</span>
+        <span class="c1"># analysis; `solve()` decides whether to use it.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._schur</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">_TracedVariableIdsError</span><span class="p">,</span>
+            <span class="n">build_elimination_plan</span><span class="p">,</span>
+            <span class="n">infer_eliminate</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">schur_elimination</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
+            <span class="n">eliminate</span> <span class="o">=</span> <span class="n">infer_eliminate</span><span class="p">(</span><span class="n">analyzed</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">schur_elimination</span> <span class="o">==</span> <span class="s2">&quot;off&quot;</span><span class="p">:</span>
+            <span class="n">eliminate</span> <span class="o">=</span> <span class="p">()</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">schur_elimination</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">eliminate</span> <span class="o">=</span> <span class="n">schur_elimination</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;schur_elimination must be &#39;auto&#39;, &#39;off&#39;, or a tuple of &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;variable types; got </span><span class="si">{</span><span class="n">schur_elimination</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">eliminate</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">elimination</span> <span class="o">=</span> <span class="n">build_elimination_plan</span><span class="p">(</span><span class="n">analyzed</span><span class="p">,</span> <span class="n">eliminate</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">_TracedVariableIdsError</span><span class="p">:</span>
+                <span class="c1"># Variable IDs are tracers (analyze() itself is being</span>
+                <span class="c1"># traced); solves will run without elimination.</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;Variable elimination: variable IDs are traced; solves &quot;</span>
+                    <span class="s2">&quot;will not use elimination&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;Variable elimination: eliminating </span><span class="si">{}</span><span class="s2"> (</span><span class="si">{}</span><span class="s2"> of </span><span class="si">{}</span><span class="s2"> tangent &quot;</span>
+                    <span class="s2">&quot;dims); reduced system is </span><span class="si">{}</span><span class="s2">-dimensional&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">var_type</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">var_type</span> <span class="ow">in</span> <span class="n">eliminate</span><span class="p">),</span>
+                    <span class="n">analyzed</span><span class="o">.</span><span class="n">_tangent_dim</span> <span class="o">-</span> <span class="n">elimination</span><span class="o">.</span><span class="n">reduced_dim</span><span class="p">,</span>
+                    <span class="n">analyzed</span><span class="o">.</span><span class="n">_tangent_dim</span><span class="p">,</span>
+                    <span class="n">elimination</span><span class="o">.</span><span class="n">reduced_dim</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">with</span> <span class="n">jdc</span><span class="o">.</span><span class="n">copy_and_mutate</span><span class="p">(</span><span class="n">analyzed</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">analyzed</span><span class="p">:</span>
+                    <span class="n">analyzed</span><span class="o">.</span><span class="n">_elimination</span> <span class="o">=</span> <span class="n">elimination</span>
+        <span class="k">return</span> <span class="n">analyzed</span></div>
 </div>
 
 
@@ -773,6 +849,11 @@ document.write(`
     <span class="n">_tangent_start_from_var_type</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">Var</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span> <span class="nb">int</span><span class="p">]]</span>
     <span class="n">_tangent_dim</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
     <span class="n">_residual_dim</span><span class="p">:</span> <span class="n">jdc</span><span class="o">.</span><span class="n">Static</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">_elimination</span><span class="p">:</span> <span class="n">EliminationPlan</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Schur-complement elimination plan, precomputed by `analyze()` when a</span>
+<span class="sd">    dominant block-diagonal variable type is eliminated. Used by `solve()` for</span>
+<span class="sd">    all reduced-solve paths (dense Cholesky, CG, and CHOLMOD); None when</span>
+<span class="sd">    `analyze(schur_elimination=&quot;off&quot;)` or no type was eliminated.&quot;&quot;&quot;</span>
 
     <span class="nd">@overload</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">(</span>
@@ -827,7 +908,16 @@ document.write(`
 
 <span class="sd">        Args:</span>
 <span class="sd">            initial_vals: Initial values for the variables. If None, default values will be used.</span>
-<span class="sd">            linear_solver: The linear solver to use.</span>
+<span class="sd">            linear_solver: The linear solver to use. When a dominant</span>
+<span class="sd">                block-diagonal variable type exists (for example, landmarks</span>
+<span class="sd">                in bundle adjustment), all three solvers automatically</span>
+<span class="sd">                eliminate it via the Schur complement and run on the much</span>
+<span class="sd">                smaller, better-conditioned reduced system; the decision is</span>
+<span class="sd">                logged. They differ only in how they solve that reduced</span>
+<span class="sd">                system: &quot;conjugate_gradient&quot; matrix-free, &quot;dense_cholesky&quot;</span>
+<span class="sd">                dense, and &quot;cholmod&quot; sparse-direct. See</span>
+<span class="sd">                :meth:`LeastSquaresProblem.analyze` to control or disable</span>
+<span class="sd">                elimination.</span>
 <span class="sd">            trust_region: Configuration for Levenberg-Marquardt trust region.</span>
 <span class="sd">            termination: Configuration for termination criteria.</span>
 <span class="sd">            sparse_mode: The representation to use for sparse matrix</span>
@@ -865,6 +955,15 @@ document.write(`
             <span class="n">conjugate_gradient_config</span> <span class="o">=</span> <span class="n">linear_solver</span>
             <span class="n">linear_solver</span> <span class="o">=</span> <span class="s2">&quot;conjugate_gradient&quot;</span>
 
+        <span class="c1"># Schur-complement variable elimination: the plan was precomputed by</span>
+        <span class="c1"># `analyze()` when a dominant block-diagonal variable type exists</span>
+        <span class="c1"># (for example, landmarks in bundle adjustment); the linear solves</span>
+        <span class="c1"># then run on the much smaller, better-conditioned reduced system and</span>
+        <span class="c1"># back-substitute the eliminated variables. All three reduced-solve</span>
+        <span class="c1"># paths are supported: dense Cholesky, matrix-free CG, and CHOLMOD</span>
+        <span class="c1"># (sparse-direct on the reduced system, the Ceres/g2o combination).</span>
+        <span class="n">elimination</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elimination</span>
+
         <span class="c1"># Create unified solver (handles both constrained and unconstrained).</span>
         <span class="n">solver</span> <span class="o">=</span> <span class="n">NonlinearSolver</span><span class="p">(</span>
             <span class="n">linear_solver</span><span class="p">,</span>
@@ -874,6 +973,7 @@ document.write(`
             <span class="n">sparse_mode</span><span class="p">,</span>
             <span class="n">verbose</span><span class="p">,</span>
             <span class="n">augmented_lagrangian</span> <span class="k">if</span> <span class="n">has_constraints</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">elimination</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
             <span class="n">problem</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">initial_vals</span><span class="o">=</span><span class="n">initial_vals</span><span class="p">,</span> <span class="n">return_summary</span><span class="o">=</span><span class="n">return_summary</span>
@@ -1151,6 +1251,7 @@ document.write(`
 <span class="sd">            vals: Variable values at which to compute covariance (typically</span>
 <span class="sd">                the solution from solve()).</span>
 <span class="sd">            method: Covariance computation method. Options:</span>
+
 <span class="sd">                - None (default): Use CG with block-Jacobi preconditioning.</span>
 <span class="sd">                  GPU-friendly and adapts to problem structure.</span>
 <span class="sd">                - LinearSolverCovarianceEstimatorConfig: Custom linear solver config.</span>

@@ -1,0 +1,875 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Schur complement elimination &#8212; jaxls</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=2a1f1aab" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=55b5f74b"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=fd10adb8"></script>
+    <script src="../../_static/js/custom.js?v=b8ccbbc1"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'design/schur_complement';</script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="What’s traced?" href="../traced_vs_static/" />
+    <link rel="prev" title="Sparse matrices" href="../sparse_matrices/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search/"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">jaxls</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../guide/basics/">Basics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../guide/tips_and_gotchas/">Tips and gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../guide/advanced/">Advanced</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/non_euclidean/">Non-Euclidean variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/custom_jacobians/">Custom Jacobians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/constraints/">Constraints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/robust_costs/">Robust costs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../guide/advanced/covariance/">Covariance estimation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/mechanics/">Mechanics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/spring_equilibrium/">Spring equilibrium</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/cloth_draping/">Cloth draping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/mechanics/truss_analysis/">Truss analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/vision/">Vision</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/camera_calibration/">Camera calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_2d/">SE(2) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/pose_graph_3d/">SE(3) pose graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/bundle_adjustment/">Bundle adjustment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/vision/smplh_shape_fitting/">SMPL-H shape fitting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/robotics/">Robotics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/inverse_kinematics/">Inverse kinematics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/obstacle_avoidance/">Obstacle avoidance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_collocation/">Cart-pole (collocation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cart_pole_shooting/">Cart-pole (shooting)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/cam_design/">Cam profile optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/robotics/imu_sensor_fusion/">IMU fusion + calibration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../examples/portfolio/">Portfolio optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/mean_variance/">Mean-variance allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/manifold_allocation/">Manifold allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/reparameterized_allocation/">Reparameterized allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/cvar_optimization/">CVaR allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/portfolio/black_litterman/">Black-Litterman allocation</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../api/core/">Core API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/lie_group_variables/">Lie group variables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/solver_config/">Solver configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/covariance/">Covariance Estimation</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Design Notes</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../typed_api/">Typed API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Schur complement elimination</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../traced_vs_static/">What’s traced?</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/brentyi/jaxls/issues/new?title=Issue%20on%20page%20%2Fdesign/schur_complement.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/design/schur_complement.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Schur complement elimination</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-reduced-system">The reduced system</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#bundle-adjustment-as-an-example">Bundle adjustment as an example</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#automatic-elimination">Automatic elimination</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#how-the-choice-is-made">How the choice is made</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#controlling-elimination">Controlling elimination</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#each-solver-uses-the-reduced-system">Each solver uses the reduced system</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-reduced-solve-is-exact">The reduced solve is exact</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#see-also">See also</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="schur-complement-elimination">
+<h1>Schur complement elimination<a class="headerlink" href="#schur-complement-elimination" title="Link to this heading">#</a></h1>
+<p>Many least squares problems have a Hessian with a dominant variable type
+whose own block is block-diagonal: variables of that type never couple to
+each other, only to the rest of the problem. When that block is large, it
+is much cheaper to eliminate it analytically and solve the smaller, better-
+conditioned system that remains. jaxls does this automatically via a
+Schur-complement elimination.</p>
+<p>This page discusses:</p>
+<ul class="simple">
+<li><p>The Hessian structure that makes elimination possible, and the reduced
+system it produces</p></li>
+<li><p>How jaxls decides what to eliminate (<code class="docutils literal notranslate"><span class="pre">analyze(schur_elimination=...)</span></code>)</p></li>
+<li><p>How each linear solver uses the reduced system</p></li>
+<li><p>Verifying that the reduced solve is exact</p></li>
+</ul>
+<section id="the-reduced-system">
+<h2>The reduced system<a class="headerlink" href="#the-reduced-system" title="Link to this heading">#</a></h2>
+<p>Partition the variables into a set we <em>keep</em> (<span class="math notranslate nohighlight">\(c\)</span>) and a set we <em>eliminate</em>
+(<span class="math notranslate nohighlight">\(l\)</span>). A damped Gauss-Newton (Levenberg-Marquardt) step solves the normal
+equations, written in block form as</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{bmatrix} H_{cc} &amp; W \\ W^\top &amp; V \end{bmatrix}
+\begin{bmatrix} \Delta c \\ \Delta l \end{bmatrix}
+=
+\begin{bmatrix} b_c \\ b_l \end{bmatrix},
+\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\(H = J^\top J + \lambda I\)</span> is the damped Hessian and <span class="math notranslate nohighlight">\(b = -J^\top r\)</span> is the
+gradient. The block <span class="math notranslate nohighlight">\(V\)</span> is the Hessian of the eliminated variables among
+themselves. The structure jaxls exploits is this: when no single cost couples
+two eliminated variables, <span class="math notranslate nohighlight">\(V\)</span> is block-diagonal: one small block per
+eliminated variable. Block-diagonal matrices are cheap to invert.</p>
+<p>That lets us solve the second block row for <span class="math notranslate nohighlight">\(\Delta l\)</span> and substitute it into
+the first, leaving a smaller <em>reduced</em> (or <em>Schur-complement</em>) system in
+<span class="math notranslate nohighlight">\(\Delta c\)</span> alone:</p>
+<div class="math notranslate nohighlight">
+\[
+S\,\Delta c = b_c - W V^{-1} b_l,
+\qquad
+S = H_{cc} - W V^{-1} W^\top.
+\]</div>
+<p>Once <span class="math notranslate nohighlight">\(\Delta c\)</span> is known, the eliminated update is recovered by
+back-substitution:</p>
+<div class="math notranslate nohighlight">
+\[
+\Delta l = V^{-1}\,(b_l - W^\top \Delta c).
+\]</div>
+<p>This helps in two ways. The reduced matrix <span class="math notranslate nohighlight">\(S\)</span> is much smaller than the full
+Hessian, and it is better conditioned, so the linear solver does much less
+work. Inverting <span class="math notranslate nohighlight">\(V\)</span>, the one step that could be costly, is inexpensive because
+<span class="math notranslate nohighlight">\(V\)</span> is block-diagonal.</p>
+<section id="bundle-adjustment-as-an-example">
+<h3>Bundle adjustment as an example<a class="headerlink" href="#bundle-adjustment-as-an-example" title="Link to this heading">#</a></h3>
+<p>Bundle adjustment is the canonical case. It jointly optimizes camera poses and
+3D landmark positions; there are typically far more landmarks than cameras, and
+every landmark couples only to the cameras that observe it, never to another
+landmark. So the landmark block of the Hessian is block-diagonal (one block per
+landmark) and dominates the problem by size. Eliminating the landmarks leaves
+the small camera-only system <span class="math notranslate nohighlight">\(S\)</span>, which is what the linear solver actually
+factors or iterates on. The same structure appears whenever a problem has a
+large, mutually-uncoupled variable type, so the technique is not specific to
+vision.</p>
+</section>
+</section>
+<section id="automatic-elimination">
+<h2>Automatic elimination<a class="headerlink" href="#automatic-elimination" title="Link to this heading">#</a></h2>
+<p>Elimination is on by default. <a class="reference internal" href="../../api/core/#jaxls.LeastSquaresProblem.analyze" title="jaxls.LeastSquaresProblem.analyze"><code class="xref py py-func docutils literal notranslate"><span class="pre">analyze()</span></code></a>
+inspects the problem’s sparsity, and if a dominant block-diagonal variable
+type exists it builds an elimination plan; then
+<a class="reference internal" href="../../api/core/#jaxls.AnalyzedLeastSquaresProblem.solve" title="jaxls.AnalyzedLeastSquaresProblem.solve"><code class="xref py py-func docutils literal notranslate"><span class="pre">solve()</span></code></a> runs on the reduced
+system and back-substitutes. Nothing else in your code changes.</p>
+<p>To make this concrete, we build a small synthetic bundle adjustment problem:
+a handful of cameras, many points, each point seen by a few cameras.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">jaxls</span>
+
+<span class="n">jax</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;jax_enable_x64&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">CameraVar</span><span class="p">(</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">6</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Toy 6-DoF camera (3 rotation, 3 translation).&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">PointVar</span><span class="p">(</span><span class="n">jaxls</span><span class="o">.</span><span class="n">Var</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span> <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;3D landmark position.&quot;&quot;&quot;</span>
+
+
+<span class="c1"># A few cameras, many points; each point is observed by three cameras.</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">n_cameras</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">n_points</span> <span class="o">=</span> <span class="mi">60</span>
+
+<span class="n">cam_indices</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">point_indices</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_points</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n_cameras</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">cam_indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+        <span class="n">point_indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+<span class="n">cam_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">cam_indices</span><span class="p">)</span>
+<span class="n">point_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">point_indices</span><span class="p">)</span>
+<span class="n">observations</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="p">(</span><span class="n">cam_indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">2</span><span class="p">)))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0619 03:21:42.908476 1018465 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.910351 1018464 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.914509 1018463 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.921053 1018466 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.924540 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.925406 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.926260 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+W0619 03:21:42.927125 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
+</pre></div>
+</div>
+</div>
+</div>
+<p>We build a single batched cost over all observations, plus the variables:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nd">@jaxls</span><span class="o">.</span><span class="n">Cost</span><span class="o">.</span><span class="n">factory</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">reprojection_cost</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">cam</span><span class="p">:</span> <span class="n">CameraVar</span><span class="p">,</span> <span class="n">point</span><span class="p">:</span> <span class="n">PointVar</span><span class="p">,</span> <span class="n">observed</span><span class="p">):</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">point</span><span class="p">]</span> <span class="o">+</span> <span class="n">vals</span><span class="p">[</span><span class="n">cam</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span>
+    <span class="n">predicted</span> <span class="o">=</span> <span class="n">p</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="mf">5.0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">predicted</span> <span class="o">-</span> <span class="n">observed</span>
+
+
+<span class="n">costs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">reprojection_cost</span><span class="p">(</span>
+        <span class="n">CameraVar</span><span class="p">(</span><span class="n">cam_indices</span><span class="p">),</span>
+        <span class="n">PointVar</span><span class="p">(</span><span class="n">point_indices</span><span class="p">),</span>
+        <span class="n">observations</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">]</span>
+<span class="n">variables</span> <span class="o">=</span> <span class="p">[</span><span class="n">CameraVar</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_cameras</span><span class="p">)),</span> <span class="n">PointVar</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_points</span><span class="p">))]</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="n">variables</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Green">2026-06-19 03:21:43.252</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">231</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
+<span class=" -Color -Color-Green">2026-06-19 03:21:43.739</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">358</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
+<span class=" -Color -Color-Green">2026-06-19 03:21:44.405</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">450</span> - <span class=" -Color -Color-Bold">Variable elimination: eliminating PointVar (180 of 228 tangent dims); reduced system is 48-dimensional</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>The log line from <code class="docutils literal notranslate"><span class="pre">analyze()</span></code> (above) reports what was eliminated and how much
+the system shrank. We can also inspect it directly: the full tangent dimension
+versus the reduced (kept) dimension.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plan</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">_elimination</span>
+<span class="k">assert</span> <span class="n">plan</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># An elimination plan was built.</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;full tangent dim:    </span><span class="si">{</span><span class="n">problem</span><span class="o">.</span><span class="n">_tangent_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;reduced (kept) dim:  </span><span class="si">{</span><span class="n">plan</span><span class="o">.</span><span class="n">reduced_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;eliminated dim:      </span><span class="si">{</span><span class="n">problem</span><span class="o">.</span><span class="n">_tangent_dim</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">plan</span><span class="o">.</span><span class="n">reduced_dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>full tangent dim:    228
+reduced (kept) dim:  48
+eliminated dim:      180
+</pre></div>
+</div>
+</div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">PointVar</span></code> block (3 dims × 60 points = 180) is eliminated, leaving only the
+camera system (6 dims × 8 cameras = 48) for the linear solver to handle directly.</p>
+<section id="how-the-choice-is-made">
+<h3>How the choice is made<a class="headerlink" href="#how-the-choice-is-made" title="Link to this heading">#</a></h3>
+<p>The automatic rule (<code class="docutils literal notranslate"><span class="pre">schur_elimination=&quot;auto&quot;</span></code>, the default):</p>
+<ul class="simple">
+<li><p>A variable type is <em>eligible</em> to be eliminated only if no single cost couples
+two variables of that type, which is what makes its Hessian block
+block-diagonal. In a pose graph, where a cost couples two poses, the pose type
+is <em>not</em> eligible, so no elimination happens and the full system is solved.</p></li>
+<li><p>jaxls eliminates a <em>set</em> of eligible types, not just one: it adds them
+greedily by total tangent size (preferring many small variables), as long
+as the combined block stays block-diagonal, and always keeps at least one
+type for the reduced system. In bundle adjustment with both 3D points and
+per-point colors, for instance, both can be eliminated together.</p></li>
+<li><p>Elimination is only used if the eliminated block covers at least 5% of
+the tangent dimension. Below that, the per-iteration bookkeeping starts
+to outweigh the smaller system, so the full solve is used instead.</p></li>
+</ul>
+</section>
+</section>
+<section id="controlling-elimination">
+<h2>Controlling elimination<a class="headerlink" href="#controlling-elimination" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">analyze(schur_elimination=...)</span></code> takes three forms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> (default): infer a dominant block-diagonal type as above.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;off&quot;</span></code>: skip elimination and solve the full system. Useful for debugging or
+benchmarking against the non-eliminated solve.</p></li>
+<li><p>a tuple of variable types, e.g. <code class="docutils literal notranslate"><span class="pre">(PointVar,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(PointVar,</span> <span class="pre">ColorVar)</span></code>:
+eliminate exactly those types. Each must be block-diagonal, or <code class="docutils literal notranslate"><span class="pre">analyze()</span></code>
+raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
+</ul>
+<p>Multiple types can be eliminated at once (as the tuple form and the automatic
+rule above both allow); they are removed together in one Schur step. What is
+<em>not</em> supported is nested elimination: eliminating a further type from the
+already-reduced system in a second step.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Explicit: eliminate exactly the point variables (same as &quot;auto&quot; picks here).</span>
+<span class="n">problem_explicit</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="n">variables</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span>
+    <span class="n">schur_elimination</span><span class="o">=</span><span class="p">(</span><span class="n">PointVar</span><span class="p">,)</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;explicit plan present:&quot;</span><span class="p">,</span> <span class="n">problem_explicit</span><span class="o">.</span><span class="n">_elimination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Off: solve the full system.</span>
+<span class="n">problem_off</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">LeastSquaresProblem</span><span class="p">(</span><span class="n">costs</span><span class="p">,</span> <span class="n">variables</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span>
+    <span class="n">schur_elimination</span><span class="o">=</span><span class="s2">&quot;off&quot;</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;plan when off:        &quot;</span><span class="p">,</span> <span class="n">problem_off</span><span class="o">.</span><span class="n">_elimination</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>explicit plan present: True
+plan when off:         None
+</pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Green">2026-06-19 03:21:44.418</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">231</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
+<span class=" -Color -Color-Green">2026-06-19 03:21:44.425</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">358</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
+<span class=" -Color -Color-Green">2026-06-19 03:21:44.440</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">450</span> - <span class=" -Color -Color-Bold">Variable elimination: eliminating PointVar (180 of 228 tangent dims); reduced system is 48-dimensional</span>
+<span class=" -Color -Color-Green">2026-06-19 03:21:44.441</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">231</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
+<span class=" -Color -Color-Green">2026-06-19 03:21:44.445</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">358</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="each-solver-uses-the-reduced-system">
+<h2>Each solver uses the reduced system<a class="headerlink" href="#each-solver-uses-the-reduced-system" title="Link to this heading">#</a></h2>
+<p>All three linear solvers consume the same elimination plan; they differ only in
+how they handle the reduced matrix <span class="math notranslate nohighlight">\(S\)</span>:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">linear_solver</span></code></p></th>
+<th class="head"><p>Reduced system <span class="math notranslate nohighlight">\(S\,\Delta c = \tilde b\)</span> is solved by</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dense_cholesky</span></code></p></td>
+<td><p>Forming <span class="math notranslate nohighlight">\(S\)</span> densely and Cholesky-factoring it.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">conjugate_gradient</span></code> (default)</p></td>
+<td><p>Matrix-free CG: <span class="math notranslate nohighlight">\(S\)</span> is never formed; each product applies <span class="math notranslate nohighlight">\(H_{cc}\)</span>, <span class="math notranslate nohighlight">\(V^{-1}\)</span>, and <span class="math notranslate nohighlight">\(W\)</span> in turn.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cholmod</span></code></p></td>
+<td><p>Assembling <span class="math notranslate nohighlight">\(S\)</span> as a sparse matrix and factoring it with CHOLMOD, the Ceres/g2o “Schur + sparse-direct” combination.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>In every case the block-diagonal elimination of <span class="math notranslate nohighlight">\(V\)</span> runs on-device, and only the
+small, well-conditioned reduced system reaches the linear solver.</p>
+</section>
+<section id="the-reduced-solve-is-exact">
+<h2>The reduced solve is exact<a class="headerlink" href="#the-reduced-solve-is-exact" title="Link to this heading">#</a></h2>
+<p>Eliminating <span class="math notranslate nohighlight">\(l\)</span> is exact algebra, not an approximation: the reduced step
+produces the identical update to solving the full damped system directly. We can
+check this by comparing a Schur solve against the same problem solved with
+elimination turned off.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">init</span> <span class="o">=</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">VarValues</span><span class="o">.</span><span class="n">make</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">CameraVar</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_cameras</span><span class="p">))</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="p">(</span><span class="n">n_cameras</span><span class="p">,</span> <span class="mi">6</span><span class="p">)))</span>
+        <span class="p">),</span>
+        <span class="n">PointVar</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_points</span><span class="p">))</span><span class="o">.</span><span class="n">with_value</span><span class="p">(</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="p">(</span><span class="n">n_points</span><span class="p">,</span> <span class="mi">3</span><span class="p">)))</span>
+        <span class="p">),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">solve_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+    <span class="n">linear_solver</span><span class="o">=</span><span class="s2">&quot;dense_cholesky&quot;</span><span class="p">,</span>
+    <span class="n">termination</span><span class="o">=</span><span class="n">jaxls</span><span class="o">.</span><span class="n">TerminationConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">early_termination</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">return_summary</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">_</span><span class="p">,</span> <span class="n">summary_schur</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="o">**</span><span class="n">solve_kwargs</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">summary_full</span> <span class="o">=</span> <span class="n">problem_off</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="o">**</span><span class="n">solve_kwargs</span><span class="p">)</span>
+
+<span class="n">c_schur</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">summary_schur</span><span class="o">.</span><span class="n">cost_history</span><span class="p">[:</span><span class="mi">10</span><span class="p">])</span>
+<span class="n">c_full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">summary_full</span><span class="o">.</span><span class="n">cost_history</span><span class="p">[:</span><span class="mi">10</span><span class="p">])</span>
+<span class="n">rel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">c_schur</span> <span class="o">-</span> <span class="n">c_full</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">c_full</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;max relative cost-trajectory difference: </span><span class="si">{</span><span class="n">rel</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>max relative cost-trajectory difference: 6.81e-13
+</pre></div>
+</div>
+</div>
+</div>
+<p>The two trajectories match to roundoff: the reduced solve traces exactly the
+same Levenberg-Marquardt path as the full solve, at a fraction of the
+linear-algebra cost.</p>
+</section>
+<section id="see-also">
+<h2>See also<a class="headerlink" href="#see-also" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../examples/vision/bundle_adjustment/"><span class="doc">Bundle adjustment</span></a>: a full bundle adjustment example
+where elimination is active automatically.</p></li>
+<li><p><a class="reference internal" href="../sparse_matrices/"><span class="doc">Sparse matrices</span></a>: how jaxls represents and multiplies the sparse Jacobian
+the elimination is built on.</p></li>
+<li><p><a class="reference internal" href="../../guide/tips_and_gotchas/"><span class="doc">Tips and gotchas</span></a>: choosing a linear solver.</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../sparse_matrices/"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Sparse matrices</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../traced_vs_static/"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">What’s traced?</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-reduced-system">The reduced system</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#bundle-adjustment-as-an-example">Bundle adjustment as an example</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#automatic-elimination">Automatic elimination</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#how-the-choice-is-made">How the choice is made</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#controlling-elimination">Controlling elimination</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#each-solver-uses-the-reduced-system">Each solver uses the reduced system</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-reduced-solve-is-exact">The reduced solve is exact</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#see-also">See also</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By brentyi
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

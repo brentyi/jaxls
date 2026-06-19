@@ -44,7 +44,7 @@
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=fd10adb8"></script>
-    <script src="../../_static/js/custom.js?v=58150dd0"></script>
+    <script src="../../_static/js/custom.js?v=b8ccbbc1"></script>
     <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/solver_config';</script>
     <link rel="index" title="Index" href="../../genindex/" />
@@ -212,6 +212,7 @@
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../../design/typed_api/">Typed API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../design/sparse_matrices/">Sparse matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../design/schur_complement/">Schur complement elimination</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../design/traced_vs_static/">What’s traced?</a></li>
 </ul>
 
@@ -446,6 +447,10 @@ document.write(`
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.inner_solve_tolerance</span></code></a></li>
 </ul>
 </li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#instrumentation">Instrumentation</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.record_iteration_times"><code class="docutils literal notranslate"><span class="pre">record_iteration_times()</span></code></a></li>
+</ul>
+</li>
 </ul>
             </nav>
         </div>
@@ -666,6 +671,50 @@ has approximately solved the current augmented subproblem.</p>
 
 </dd></dl>
 
+<section id="instrumentation">
+<h2>Instrumentation<a class="headerlink" href="#instrumentation" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="jaxls.record_iteration_times">
+<span class="sig-prename descclassname"><span class="pre">jaxls.</span></span><span class="sig-name descname"><span class="pre">record_iteration_times</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterator" title="(in Python v3.14)"><span class="pre">Iterator</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/jaxls/_solvers/#record_iteration_times"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#jaxls.record_iteration_times" title="Link to this definition">#</a></dt>
+<dd><p>Record a host wall-clock timestamp at each outer LM iteration of any
+<cite>solve()</cite> running in this block, for cost-vs-time benchmarking.</p>
+<p>Returns a list that is filled with <cite>time.perf_counter()</cite> values (one per
+outer iteration, in order); <cite>times[i] - times[0]</cite> is the elapsed time to
+reach iteration <cite>i</cite>. Off the normal solve path entirely — the timestamps
+never enter the jitted computation or <cite>SolveSummary</cite>, so there is zero
+overhead and no dtype dependence when not recording, and the values are
+always host float64 (the in-array alternative would be float32 without
+jax_enable_x64, too coarse to resolve millisecond steps).</p>
+<p>Timestamps include async-dispatch latency, so read differences, not
+absolute values, and wrap the solve in <cite>block_until_ready</cite> for precise
+totals. Not reentrant / not for concurrent solves from multiple threads
+(one active recorder at a time):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">record_iteration_times</span><span class="p">()</span> <span class="k">as</span> <span class="n">times</span><span class="p">:</span>
+    <span class="n">sol</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">init</span><span class="p">)</span>
+<span class="c1"># times[1:] - times[0]  -&gt;  per-iteration elapsed seconds</span>
+</pre></div>
+</div>
+<p>The recording callback is decided at trace time, so whether timestamps are
+captured is baked into the compiled solve. Entering and leaving this block
+therefore clears the solver’s JIT cache, so the first solve inside it
+recompiles <em>with</em> the callback (even if an identical solve was already
+compiled without one) and the first solve after it recompiles <em>without</em>.
+The compile inside the block also acts as the warmup; for steady-state
+timing, run the solve twice in the block and read the second:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">jaxls</span><span class="o">.</span><span class="n">record_iteration_times</span><span class="p">()</span> <span class="k">as</span> <span class="n">times</span><span class="p">:</span>
+    <span class="n">jax</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">(</span><span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">init</span><span class="p">))</span>   <span class="c1"># warmup, compiles</span>
+    <span class="n">times</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+    <span class="n">sol</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">(</span><span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">init</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterator" title="(in Python v3.14)"><em>Iterator</em></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
 </section>
 
 
@@ -749,6 +798,10 @@ has approximately solved the current augmented subproblem.</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.lambda_min"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_min</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.lambda_max"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.lambda_max</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.AugmentedLagrangianConfig.inner_solve_tolerance"><code class="docutils literal notranslate"><span class="pre">AugmentedLagrangianConfig.inner_solve_tolerance</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#instrumentation">Instrumentation</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#jaxls.record_iteration_times"><code class="docutils literal notranslate"><span class="pre">record_iteration_times()</span></code></a></li>
 </ul>
 </li>
 </ul>
