@@ -15,8 +15,13 @@ test:
 transpile:
 	uv run --extra dev ./transpile_py310.py
 
+# DOCS_EXTRA selects the dependency set for the docs build. Default "docs" is
+# CPU-only and portable; pass DOCS_EXTRA=docs-gpu to execute notebooks on the
+# GPU (see build_and_deploy_docs.sh, which picks this automatically).
+DOCS_EXTRA ?= docs
+
 docs:
-	uv run --extra docs sphinx-build -b dirhtml docs/source docs/build/dirhtml
+	uv run --extra $(DOCS_EXTRA) sphinx-build -b dirhtml docs/source docs/build/dirhtml
 
 docs-clean:
 	rm -rf docs/build

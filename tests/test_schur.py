@@ -705,3 +705,23 @@ def test_float32_end_to_end_no_nans() -> None:
         assert costs[-1] < costs[0]
     finally:
         jax.config.update("jax_enable_x64", True)
+
+
+@requires_cholmod
+def test_float32_cholmod_end_to_end() -> None:
+    """Full float32 solve through the Schur + CHOLMOD path. Forming S in
+    float32 cancels catastrophically and can leave it numerically indefinite;
+    without the host-side Jacobi scaling + Tikhonov floor in
+    `_cholmod_solve_symmetric_on_host`, CHOLMOD raises
+    CholmodNotPositiveDefiniteError instead of solving. The solve must run to
+    completion, produce no NaNs, and reduce the cost."""
+    jax.config.update("jax_enable_x64", False)
+    try:
+        problem, init = _make_ba_problem()
+        assert problem._elimination is not None
+        _, summary = problem.solve(init, linear_solver="cholmod", **_solve_kwargs())
+        costs = onp.asarray(summary.cost_history[:10])
+        assert not onp.any(onp.isnan(costs)), f"NaNs in float32 cost history: {costs}"
+        assert costs[-1] < costs[0]
+    finally:
+        jax.config.update("jax_enable_x64", True)

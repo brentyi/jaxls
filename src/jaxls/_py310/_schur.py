@@ -9,7 +9,12 @@ import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
 
-from .utils import _batched_gram, _batched_matmul, _batched_outer_last
+from .utils import (
+    _batched_gram,
+    _batched_matmul,
+    _batched_outer_last,
+    tikhonov_floor,
+)
 
 
 class _TracedVariableIdsError(ValueError):
@@ -104,7 +109,8 @@ def infer_eliminate(
             chosen.append(var_type)
 
     eliminated_dim = sum(sizes[t][0] for t in chosen)
-    if eliminated_dim * 2 < problem._tangent_dim:
+
+    if eliminated_dim * 20 < problem._tangent_dim:
         return ()
     return tuple(chosen)
 
@@ -714,8 +720,7 @@ def _solve_spd_scaled(S: Any, b: Any) -> Any:
 
     scale = jnp.sqrt(jnp.maximum(jnp.abs(diag), jnp.finfo(S.dtype).tiny))
     S_scaled = S / (scale[:, None] * scale[None, :])
-    eps = jnp.finfo(S.dtype).eps
-    floor = eps * (2e4 if S.dtype == jnp.float32 else 4.0)
+    floor = tikhonov_floor(S.dtype)
     diag_idx = jnp.arange(S.shape[0])
     S_scaled = S_scaled.at[diag_idx, diag_idx].add(floor)
     factor = jax.scipy.linalg.cho_factor(S_scaled)

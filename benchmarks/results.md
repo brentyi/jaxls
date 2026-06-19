@@ -113,6 +113,42 @@ full CG 0.13 s, full dense 6.4 s. So elimination costs nothing on easy
 problems (it is in fact mildly faster here too), and full dense is ~150×
 slower — the usual `O(n³)` cliff that makes it infeasible at real scale.
 
+## Elimination threshold (the `infer_eliminate` 5% floor)
+
+`infer_eliminate` only auto-eliminates when the eliminated block covers at
+least 5% of the tangent dimension. That floor was set from a sweep over the
+eliminated fraction on BA-style problems (12 LM iters, best-of-3, float64),
+forcing elimination on vs. off:
+
+`dense_cholesky` — wins at every fraction (dense factorization is `O(n³)` in
+the system dimension, so any shrink helps super-linearly):
+
+| eliminated % | speedup vs. full |
+|---|---|
+| 45% | 3.0× |
+| 33% | 2.9× |
+| 24% | 2.6× |
+| 12% | 2.6× |
+
+`conjugate_gradient` — wins down to a few percent, then the per-iteration
+`W V⁻¹ Wᵀ` bookkeeping starts to outweigh the smaller system:
+
+| eliminated % | speedup vs. full |
+|---|---|
+| 4.3% | 1.9× |
+| 0.9% | 1.02× (break-even) |
+| 0.2% | 0.72× (regresses) |
+
+So the real break-even is ~1%, not the 50% the threshold originally used. We
+set the floor to 5% — comfortably above break-even, capturing the broad
+win band, while leaving margin so `"auto"` never enables a regressing config.
+The large-absolute-reduced-dimension worry (a huge *kept* system reached by
+eliminating a huge block) does not arise in practice: eliminable types must be
+block-diagonal (no cost couples two of them), which is satisfied by small
+per-variable types (landmarks, biases, colors) and never by the large coupled
+types (poses, robot configs) that would make the reduced system large. Below
+5%, pass an explicit `schur_elimination=(SomeVar,)` to force elimination.
+
 ## Two Levenberg-Marquardt fixes that this work surfaced
 
 > **Superseded in part — see "Final configuration" at the end.** Fix 1 (the

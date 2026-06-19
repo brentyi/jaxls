@@ -2,12 +2,27 @@ import contextlib
 import inspect
 import time
 from functools import partial
-from typing import Generator
+from typing import Any, Generator
 
 import jax
+import numpy as onp
 import termcolor
 from jax import numpy as jnp
 from loguru import logger
+
+
+def tikhonov_floor(dtype: Any) -> float:
+    """Precision-adaptive Tikhonov floor for a robust SPD solve of the Schur
+    reduced system. Forming S = H_cc - W V^{-1} W^T cancels catastrophically in
+    float32 and can leave S numerically indefinite; this floor (added to the
+    Jacobi-scaled diagonal) restores positive-definiteness without measurably
+    perturbing float64 solves. Single source of truth for both the dense
+    on-device path (`_schur._solve_spd_scaled`) and the sparse CHOLMOD host
+    path (`_solvers._cholmod_solve_symmetric_on_host`), so the tuned constant
+    cannot drift between them. `dtype` may be a JAX or numpy float dtype."""
+    eps = float(onp.finfo(dtype).eps)
+    return eps * (2e4 if onp.dtype(dtype) == onp.float32 else 4.0)
+
 
 # Batched products over a tiny contraction axis, written as explicit
 # broadcast-multiply-sums rather than `einsum` / `dot_general`. When the

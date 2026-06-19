@@ -46,7 +46,7 @@ from ._schur import (
 )
 from ._sparse_matrices import BlockRowSparseMatrix, SparseCooMatrix, SparseCsrMatrix
 from ._variables import VarTypeOrdering, VarValues
-from .utils import jax_log
+from .utils import _log, jax_log, tikhonov_floor
 
 if TYPE_CHECKING:
     import sksparse.cholmod
@@ -76,7 +76,15 @@ def _cholmod_solve_on_host(
     ATb: jax.Array,
     lambd: float | jax.Array,
 ) -> jax.Array:
-    """Solve a linear system using CHOLMOD. Should be called on the host."""
+    """Solve a linear system using CHOLMOD. Should be called on the host.
+
+    Unlike the Schur path's `_cholmod_solve_symmetric_on_host`, this full-system
+    solve does not need the Jacobi-scaling + Tikhonov-floor robustness: it never
+    forms a normal-equations matrix by subtraction (it factors A Aᵀ directly via
+    `cholesky_AAt`, which is positive definite by construction once `beta > 0`),
+    so it is not exposed to the catastrophic float32 cancellation that can leave
+    the Schur complement S = H_cc - W V^{-1} W^T numerically indefinite.
+    """
     import sksparse.cholmod
 
     # Matrix is transposed when we convert CSR to CSC.
@@ -146,10 +154,34 @@ def _cholmod_solve_symmetric_on_host(
 
     rows_onp = onp.asarray(rows)
     cols_onp = onp.asarray(cols)
+    b_onp = onp.asarray(b)
+    dtype = b_onp.dtype
     S = scipy.sparse.coo_matrix(
         (onp.asarray(s_values), (rows_onp, cols_onp)),
         shape=(reduced_dim, reduced_dim),
     ).tocsc()  # Sums duplicate (i, j) entries.
+
+    # Symmetric Jacobi scaling plus a precision-adaptive Tikhonov floor, the
+    # same robustness the dense path applies in `_schur._solve_spd_scaled`.
+    # Forming S = H_cc - W V^{-1} W^T cancels catastrophically in float32 and
+    # can leave S numerically indefinite, which CHOLMOD rejects outright
+    # (CholmodNotPositiveDefiniteError) rather than producing a NaN the LM
+    # ratio test would catch. We solve the scaled system D S D y = D b with
+    # D = diag(1 / sqrt(|diag S|)) and recover x = D y. Diagonal scaling does
+    # not touch the sparsity pattern, so the cached symbolic factorization
+    # stays valid; the floor is a no-op for well-conditioned float64.
+    diag = S.diagonal()
+    inv_scale = 1.0 / onp.sqrt(onp.maximum(onp.abs(diag), onp.finfo(dtype).tiny))
+    D = scipy.sparse.diags(inv_scale, format="csc")
+    # CSC @ CSC stays CSC, so the sparsity pattern (and the cached symbolic
+    # factorization keyed on it) is preserved. setdiag only updates entries in
+    # place here (it never expands nnz) because every diagonal entry is
+    # already structurally present: `build_sparse_s_pattern` always emits a
+    # diagonal block per kept type (`_iter_S_block_sources`). If that ever
+    # changed, a structurally-missing diagonal would make setdiag grow nnz and
+    # desync from the cached symbolic factor.
+    S = D @ S @ D
+    S.setdiag(S.diagonal() + tikhonov_floor(dtype))
 
     # Cache the symbolic analysis. The COO coordinates are fixed across solves
     # for a given problem, so the summed CSC pattern is stable.
@@ -166,9 +198,10 @@ def _cholmod_solve_symmetric_on_host(
             )
 
     # Numeric refactorization reusing the cached symbolic analysis. The 1e-5
-    # diagonal floor is already folded into s_values by the caller.
+    # diagonal floor is already folded into s_values by the caller; the Jacobi
+    # scaling and Tikhonov floor above keep the factorization finite in float32.
     factor = factor.cholesky(S)
-    return factor.solve_A(onp.asarray(b))
+    return (inv_scale * factor.solve_A(inv_scale * b_onp)).astype(dtype)
 
 
 _active_iteration_time_recorder: list[float] | None = None
@@ -190,7 +223,7 @@ def record_iteration_times() -> Iterator[list[float]]:
     Timestamps include async-dispatch latency, so read differences, not
     absolute values, and wrap the solve in `block_until_ready` for precise
     totals. Not reentrant / not for concurrent solves from multiple threads
-    (one active recorder at a time).
+    (one active recorder at a time)::
 
         with jaxls.record_iteration_times() as times:
             sol = problem.solve(init)
@@ -202,7 +235,7 @@ def record_iteration_times() -> Iterator[list[float]]:
     recompiles *with* the callback (even if an identical solve was already
     compiled without one) and the first solve after it recompiles *without*.
     The compile inside the block also acts as the warmup; for steady-state
-    timing, run the solve twice in the block and read the second:
+    timing, run the solve twice in the block and read the second::
 
         with jaxls.record_iteration_times() as times:
             jax.block_until_ready(problem.solve(init))   # warmup, compiles
@@ -249,6 +282,50 @@ def _record_iteration_time(anchor: jax.Array) -> None:
             _active_iteration_time_recorder.append(time.perf_counter())
 
     jax.debug.callback(_stamp, anchor)
+
+
+# Host-side wall-clock for the verbose "solved in ..." timing. Filled by a
+# fire-and-forget `jax.debug.callback` at the start of the outer loop and read
+# by the terminated-log callback; both run on the host, so the elapsed time is
+# computed entirely host-side with no device<->host round-trip (nothing is
+# returned to the device). Single-threaded, like `_active_iteration_time_recorder`.
+_solve_start_time: float | None = None
+
+
+def _record_solve_start(anchor: jax.Array) -> None:
+    """Stamp the host start time of the outer loop into `_solve_start_time`.
+
+    `anchor` depends on the pre-loop iterate (its cost) and is consumed by the
+    callback, so the stamp is ordered before the loop and XLA cannot hoist it.
+    Fire-and-forget (`jax.debug.callback` returns nothing to the device), so it
+    adds no round-trip. The matching read happens in the terminated-log
+    callback, which subtracts on the host."""
+
+    def _stamp(_anchor: object) -> None:
+        global _solve_start_time
+        _solve_start_time = time.perf_counter()
+
+    jax.debug.callback(_stamp, anchor)
+
+
+def _log_terminated(
+    fmt: str,
+    *args: object,
+) -> None:
+    """Emit the verbose terminated line with the elapsed solve time appended.
+
+    Like `jax_log`, this is a `jax.debug.callback`, but the host function also
+    reads `_solve_start_time` and subtracts the current host time, so the
+    elapsed seconds are computed host-side from two host timestamps, with no
+    value returned to the device (no round-trip). The `(solved in ...)` suffix
+    is owned here, so the caller's `fmt` describes only its own fields."""
+
+    def _emit(*host_args: object) -> None:
+        start = _solve_start_time
+        elapsed = time.perf_counter() - start if start is not None else float("nan")
+        _log(fmt + " (solved in {:.4f} sec)", *host_args, elapsed)
+
+    jax.debug.callback(_emit, *args)
 
 
 def _compute_jacobian_scaler(column_norms: jax.Array) -> jax.Array:
@@ -537,6 +614,14 @@ class NonlinearSolver:
             al_state=al_state,
         )
 
+        # Wall-clock start of the outer loop, for the verbose "solved in ..."
+        # timing. A fire-and-forget host callback records the start time;
+        # the terminated-log callback reads it and subtracts, all host-side
+        # (no device<->host round-trip). Anchored on the pre-loop cost so the
+        # stamp is ordered before the loop; only emitted when verbose.
+        if self.verbose:
+            _record_solve_start(cost_info.cost_total)
+
         # Optimization.
         if self.termination.early_termination:
 
@@ -594,14 +679,19 @@ class NonlinearSolver:
                 init_val=state,
             )
         if self.verbose:
-            jax_log(
-                "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
-                i=state.summary.iterations,
-                cost=state.solution.cost_info.cost_nonconstraint,
-                criteria=state.summary.termination_criteria.astype(jnp.int32),
-                cost_delta=state.summary.termination_deltas[0],
-                grad_mag=state.summary.termination_deltas[1],
-                param_delta=state.summary.termination_deltas[2],
+            # The elapsed solve time is appended host-side by `_log_terminated`
+            # (it reads the start stamp recorded above and subtracts the current
+            # host time), so it does not enter the device computation. The
+            # fields below are positional device values, ordered after the loop.
+            _log_terminated(
+                "Terminated @ iteration #{}: cost={:.4f} criteria={}, "
+                "term_deltas={:.1e},{:.1e},{:.1e}",
+                state.summary.iterations,
+                state.solution.cost_info.cost_nonconstraint,
+                state.summary.termination_criteria.astype(jnp.int32),
+                state.summary.termination_deltas[0],
+                state.summary.termination_deltas[1],
+                state.summary.termination_deltas[2],
             )
 
         if return_summary:

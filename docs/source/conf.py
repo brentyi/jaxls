@@ -1,7 +1,14 @@
 # Configuration file for the Sphinx documentation builder.
 
+import os
 import sys
 from pathlib import Path
+
+# Quiet XLA's per-process C++ log spam (e.g. the harmless "GPU interconnect
+# information not available / NVLink" warning on consumer GPUs) when the docs
+# build executes notebooks on the GPU. 3 = errors only. Set before any notebook
+# kernel is spawned and only as a default, so an explicit override still wins.
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 
 # Add source to path for autodoc
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -61,7 +68,11 @@ nb_execution_mode = "force"
 nb_execution_timeout = 120
 nb_execution_raise_on_error = True
 nb_merge_streams = True
-nb_execution_parallel = 4
+# Execute notebooks serially. Parallel execution lets co-tenant notebooks
+# contend for the GPU/CPU, which inflates any wall-clock the notebooks measure
+# and report (e.g. the solver's verbose "solved in ..." line) and risks CUDA
+# OOM when several heavy solves run at once.
+nb_execution_parallel = 1
 
 # MyST parser settings - enable math with dollar signs
 myst_enable_extensions = [

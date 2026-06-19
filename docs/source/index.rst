@@ -46,6 +46,9 @@ We currently support:
 - Optimization on manifolds, including SO(2), SO(3), SE(2), SE(3).
   See :doc:`guide/advanced/non_euclidean`.
 - Nonlinear solvers: Levenberg-Marquardt and Gauss-Newton.
+- Automatic Schur-complement variable elimination for problems with a dominant
+  block-diagonal type, such as landmarks in bundle adjustment.
+  See :doc:`design/schur_complement`.
 - Linear subproblem solvers. See :doc:`guide/tips_and_gotchas` for selection guidance.
 
   - Sparse iterative with Conjugate Gradient (recommended for most problems).
@@ -124,6 +127,7 @@ Algorithmic references:
 
    design/typed_api
    design/sparse_matrices
+   design/schur_complement
    design/traced_vs_static
 
 .. |pyright| image:: https://github.com/brentyi/jaxls/actions/workflows/pyright.yml/badge.svg
