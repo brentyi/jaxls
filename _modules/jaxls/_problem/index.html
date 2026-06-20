@@ -30,7 +30,7 @@
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -555,6 +555,12 @@ document.write(`
 <span class="sd">                eliminating further types from the already-reduced system, is</span>
 <span class="sd">                not implemented.)</span>
 
+<span class="sd">                When no cost couples two variables the whole Hessian is</span>
+<span class="sd">                block-diagonal, and ``&quot;auto&quot;`` eliminates every type: the</span>
+<span class="sd">                reduced system is then empty and the step is an exact</span>
+<span class="sd">                per-variable blockwise inverse, so the ``linear_solver`` choice</span>
+<span class="sd">                has no effect.</span>
+
 <span class="sd">        Returns:</span>
 <span class="sd">            An AnalyzedLeastSquaresProblem ready for solving.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -827,6 +833,13 @@ document.write(`
                     <span class="n">analyzed</span><span class="o">.</span><span class="n">_tangent_dim</span><span class="p">,</span>
                     <span class="n">elimination</span><span class="o">.</span><span class="n">reduced_dim</span><span class="p">,</span>
                 <span class="p">)</span>
+                <span class="k">if</span> <span class="n">elimination</span><span class="o">.</span><span class="n">reduced_dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Variable elimination: every type was eliminated, so &quot;</span>
+                        <span class="s2">&quot;the Hessian is fully block-diagonal; the step is an &quot;</span>
+                        <span class="s2">&quot;exact blockwise inverse and the linear_solver choice &quot;</span>
+                        <span class="s2">&quot;is ignored.&quot;</span>
+                    <span class="p">)</span>
                 <span class="k">with</span> <span class="n">jdc</span><span class="o">.</span><span class="n">copy_and_mutate</span><span class="p">(</span><span class="n">analyzed</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">analyzed</span><span class="p">:</span>
                     <span class="n">analyzed</span><span class="o">.</span><span class="n">_elimination</span> <span class="o">=</span> <span class="n">elimination</span>
         <span class="k">return</span> <span class="n">analyzed</span></div>
@@ -963,6 +976,18 @@ document.write(`
         <span class="c1"># paths are supported: dense Cholesky, matrix-free CG, and CHOLMOD</span>
         <span class="c1"># (sparse-direct on the reduced system, the Ceres/g2o combination).</span>
         <span class="n">elimination</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elimination</span>
+
+        <span class="c1"># If every type was eliminated (a fully block-diagonal Hessian), the</span>
+        <span class="c1"># reduced system is empty and the step is an exact blockwise inverse, so</span>
+        <span class="c1"># `linear_solver` has no effect. Note it at the call site (the analyze()</span>
+        <span class="c1"># log says the same, but the user passes `linear_solver` here).</span>
+        <span class="k">if</span> <span class="n">verbose</span> <span class="ow">and</span> <span class="n">elimination</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">elimination</span><span class="o">.</span><span class="n">reduced_dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;The Hessian is fully block-diagonal (every variable type was &quot;</span>
+                <span class="s2">&quot;eliminated), so linear_solver=</span><span class="si">{!r}</span><span class="s2"> is ignored; the step is &quot;</span>
+                <span class="s2">&quot;solved by exact blockwise inversion.&quot;</span><span class="p">,</span>
+                <span class="n">linear_solver</span><span class="p">,</span>
+            <span class="p">)</span>
 
         <span class="c1"># Create unified solver (handles both constrained and unconstrained).</span>
         <span class="n">solver</span> <span class="o">=</span> <span class="n">NonlinearSolver</span><span class="p">(</span>

@@ -31,7 +31,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -436,11 +436,11 @@ document.write(`
                   
   <section class="tex2jax_ignore mathjax_ignore" id="schur-complement-elimination">
 <h1>Schur complement elimination<a class="headerlink" href="#schur-complement-elimination" title="Link to this heading">#</a></h1>
-<p>Many least squares problems have a Hessian with a dominant variable type
-whose own block is block-diagonal: variables of that type never couple to
-each other, only to the rest of the problem. When that block is large, it
-is much cheaper to eliminate it analytically and solve the smaller, better-
-conditioned system that remains. jaxls does this automatically via a
+<p>Many least squares problems have a dominant variable type whose own Hessian
+block is block-diagonal, meaning variables of that type never couple to each
+other, only to the rest of the problem. When that block is large, eliminating
+it and solving the smaller, better-conditioned system that remains is much
+cheaper than solving the full system. jaxls does this automatically with a
 Schur-complement elimination.</p>
 <p>This page discusses:</p>
 <ul class="simple">
@@ -464,9 +464,9 @@ equations, written in block form as</p>
 \end{split}\]</div>
 <p>where <span class="math notranslate nohighlight">\(H = J^\top J + \lambda I\)</span> is the damped Hessian and <span class="math notranslate nohighlight">\(b = -J^\top r\)</span> is the
 gradient. The block <span class="math notranslate nohighlight">\(V\)</span> is the Hessian of the eliminated variables among
-themselves. The structure jaxls exploits is this: when no single cost couples
-two eliminated variables, <span class="math notranslate nohighlight">\(V\)</span> is block-diagonal: one small block per
-eliminated variable. Block-diagonal matrices are cheap to invert.</p>
+themselves. When no single cost couples two eliminated variables, <span class="math notranslate nohighlight">\(V\)</span> is
+block-diagonal, with one small block per eliminated variable. Elimination
+relies on this, since a block-diagonal matrix is cheap to invert.</p>
 <p>That lets us solve the second block row for <span class="math notranslate nohighlight">\(\Delta l\)</span> and substitute it into
 the first, leaving a smaller <em>reduced</em> (or <em>Schur-complement</em>) system in
 <span class="math notranslate nohighlight">\(\Delta c\)</span> alone:</p>
@@ -544,18 +544,6 @@ a handful of cameras, many points, each point seen by a few cameras.</p>
 </pre></div>
 </div>
 </div>
-<div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0619 03:21:42.908476 1018465 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.910351 1018464 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.914509 1018463 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.921053 1018466 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.924540 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.925406 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.926260 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-W0619 03:21:42.927125 1018336 cuda_executor.cc:1802] GPU interconnect information not available: INTERNAL: NVML doesn&#39;t support extracting fabric info or NVLink is not used by the device.
-</pre></div>
-</div>
-</div>
 </div>
 <p>We build a single batched cost over all observations, plus the variables:</p>
 <div class="cell docutils container">
@@ -581,9 +569,9 @@ W0619 03:21:42.927125 1018336 cuda_executor.cc:1802] GPU interconnect informatio
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Green">2026-06-19 03:21:43.252</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">231</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
-<span class=" -Color -Color-Green">2026-06-19 03:21:43.739</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">358</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
-<span class=" -Color -Color-Green">2026-06-19 03:21:44.405</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">450</span> - <span class=" -Color -Color-Bold">Variable elimination: eliminating PointVar (180 of 228 tangent dims); reduced system is 48-dimensional</span>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Green">2026-06-19 22:55:44.891</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">237</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
+<span class=" -Color -Color-Green">2026-06-19 22:55:45.359</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">364</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
+<span class=" -Color -Color-Green">2026-06-19 22:55:46.009</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">456</span> - <span class=" -Color -Color-Bold">Variable elimination: eliminating PointVar (180 of 228 tangent dims); reduced system is 48-dimensional</span>
 </pre></div>
 </div>
 </div>
@@ -622,9 +610,13 @@ block-diagonal. In a pose graph, where a cost couples two poses, the pose type
 is <em>not</em> eligible, so no elimination happens and the full system is solved.</p></li>
 <li><p>jaxls eliminates a <em>set</em> of eligible types, not just one: it adds them
 greedily by total tangent size (preferring many small variables), as long
-as the combined block stays block-diagonal, and always keeps at least one
-type for the reduced system. In bundle adjustment with both 3D points and
-per-point colors, for instance, both can be eliminated together.</p></li>
+as the combined block stays block-diagonal, and normally keeps at least
+one type for the reduced system. In bundle adjustment with both 3D points
+and per-point colors, for instance, both can be eliminated together.</p></li>
+<li><p>The exception is a fully decoupled problem, where no cost couples two
+variables: the whole Hessian is block-diagonal, so every type is
+eliminated. The reduced system is then empty and the step is an exact
+per-variable blockwise inverse, so the linear solver is not used.</p></li>
 <li><p>Elimination is only used if the eliminated block covers at least 5% of
 the tangent dimension. Below that, the per-iteration bookkeeping starts
 to outweigh the smaller system, so the full solve is used instead.</p></li>
@@ -643,7 +635,9 @@ eliminate exactly those types. Each must be block-diagonal, or <code class="docu
 raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
 </ul>
 <p>Multiple types can be eliminated at once (as the tuple form and the automatic
-rule above both allow); they are removed together in one Schur step. What is
+rule above both allow); they are removed together in one Schur step. Even
+eliminating <em>every</em> type is allowed when the problem is fully decoupled: the
+reduced system is empty and the solve is a pure blockwise inverse. What is
 <em>not</em> supported is nested elimination: eliminating a further type from the
 already-reduced system in a second step.</p>
 <div class="cell docutils container">
@@ -667,11 +661,11 @@ already-reduced system in a second step.</p>
 plan when off:         None
 </pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Green">2026-06-19 03:21:44.418</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">231</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
-<span class=" -Color -Color-Green">2026-06-19 03:21:44.425</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">358</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
-<span class=" -Color -Color-Green">2026-06-19 03:21:44.440</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">450</span> - <span class=" -Color -Color-Bold">Variable elimination: eliminating PointVar (180 of 228 tangent dims); reduced system is 48-dimensional</span>
-<span class=" -Color -Color-Green">2026-06-19 03:21:44.441</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">231</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
-<span class=" -Color -Color-Green">2026-06-19 03:21:44.445</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">358</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Green">2026-06-19 22:55:46.022</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">237</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
+<span class=" -Color -Color-Green">2026-06-19 22:55:46.029</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">364</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
+<span class=" -Color -Color-Green">2026-06-19 22:55:46.043</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">456</span> - <span class=" -Color -Color-Bold">Variable elimination: eliminating PointVar (180 of 228 tangent dims); reduced system is 48-dimensional</span>
+<span class=" -Color -Color-Green">2026-06-19 22:55:46.044</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">237</span> - <span class=" -Color -Color-Bold">Building optimization problem with 180 terms and 68 variables: 180 costs, 0 eq_zero, 0 leq_zero, 0 geq_zero</span>
+<span class=" -Color -Color-Green">2026-06-19 22:55:46.047</span> | <span class=" -Color -Color-Bold">INFO    </span> | <span class=" -Color -Color-Cyan">jaxls._problem</span>:<span class=" -Color -Color-Cyan">analyze</span>:<span class=" -Color -Color-Cyan">364</span> - <span class=" -Color -Color-Bold">Vectorizing group with 180 costs, 2 variables each: reprojection_cost</span>
 </pre></div>
 </div>
 </div>
@@ -740,7 +734,7 @@ elimination turned off.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>max relative cost-trajectory difference: 6.81e-13
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>max relative cost-trajectory difference: 5.46e-13
 </pre></div>
 </div>
 </div>

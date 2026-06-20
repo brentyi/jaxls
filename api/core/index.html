@@ -31,7 +31,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css?v=6644e6bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=2a1f1aab" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
@@ -571,6 +571,11 @@ eliminated types are removed in one Schur step and the remaining
 types form the reduced system. (Nested / multi-level elimination,
 eliminating further types from the already-reduced system, is
 not implemented.)</p>
+<p>When no cost couples two variables the whole Hessian is
+block-diagonal, and <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> eliminates every type: the
+reduced system is then empty and the step is an exact
+per-variable blockwise inverse, so the <code class="docutils literal notranslate"><span class="pre">linear_solver</span></code> choice
+has no effect.</p>
 </p></li>
 </ul>
 </dd>
