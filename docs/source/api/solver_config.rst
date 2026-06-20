@@ -16,3 +16,8 @@ Solver configuration
 .. autoclass:: jaxls.AugmentedLagrangianConfig
    :members:
    :undoc-members:
+
+Instrumentation
+---------------
+
+.. autofunction:: jaxls.record_iteration_times

@@ -161,16 +161,16 @@ class LeastSquaresProblem:
                 When a dominant block-diagonal variable type is eliminated (for
                 example, landmarks in bundle adjustment), solves run on the much
                 smaller, better-conditioned reduced system and then
-                back-substitute the eliminated variables. All three linear
-                solvers use the plan: "dense_cholesky" and "conjugate_gradient"
-                solve the reduced system densely / matrix-free, and "cholmod"
-                factors it sparse-directly.
+                back-substitute the eliminated variables. Every ``linear_solver``
+                applies elimination, differing only in how it solves the reduced
+                system: "dense_cholesky" factors it densely, "conjugate_gradient"
+                solves it matrix-free, and "cholmod" factors it sparse-directly.
 
                 - ``"auto"`` (default): automatically eliminate a dominant
                   block-diagonal variable type if one exists, otherwise solve
                   the full system.
-                - ``"off"``: skip elimination and solve the full system —
-                  useful for debugging or benchmarking against the
+                - ``"off"``: skip elimination and solve the full system.
+                  Useful for debugging or benchmarking against the
                   non-eliminated solve.
                 - a tuple of variable types, e.g. ``(LandmarkVar,)``: eliminate
                   exactly these types. Each must be block-diagonal (no single
@@ -179,9 +179,15 @@ class LeastSquaresProblem:
 
                 Only a single level of elimination is currently supported: the
                 eliminated types are removed in one Schur step and the remaining
-                types form the reduced system. (Nested / multi-level elimination
-                — eliminating further types from the already-reduced system — is
+                types form the reduced system. (Nested / multi-level elimination,
+                eliminating further types from the already-reduced system, is
                 not implemented.)
+
+                When no cost couples two variables the whole Hessian is
+                block-diagonal, and ``"auto"`` eliminates every type: the
+                reduced system is then empty and the step is an exact
+                per-variable blockwise inverse, so the ``linear_solver`` choice
+                has no effect.
 
         Returns:
             An AnalyzedLeastSquaresProblem ready for solving.
@@ -455,6 +461,13 @@ class LeastSquaresProblem:
                     analyzed._tangent_dim,
                     elimination.reduced_dim,
                 )
+                if elimination.reduced_dim == 0:
+                    logger.info(
+                        "Variable elimination: every type was eliminated, so "
+                        "the Hessian is fully block-diagonal; the step is an "
+                        "exact blockwise inverse and the linear_solver choice "
+                        "is ignored."
+                    )
                 with jdc.copy_and_mutate(analyzed, validate=False) as analyzed:
                     analyzed._elimination = elimination
         return analyzed
@@ -532,11 +545,14 @@ class AnalyzedLeastSquaresProblem:
             initial_vals: Initial values for the variables. If None, default values will be used.
             linear_solver: The linear solver to use. When a dominant
                 block-diagonal variable type exists (for example, landmarks
-                in bundle adjustment), "conjugate_gradient" and
-                "dense_cholesky" automatically eliminate it via the Schur
-                complement and solve the much smaller, better-conditioned
-                reduced system instead; the decision is logged. "cholmod"
-                always factors the full system.
+                in bundle adjustment), all three solvers automatically
+                eliminate it via the Schur complement and run on the much
+                smaller, better-conditioned reduced system; the decision is
+                logged. They differ only in how they solve that reduced
+                system: "conjugate_gradient" matrix-free, "dense_cholesky"
+                dense, and "cholmod" sparse-direct. See
+                :meth:`LeastSquaresProblem.analyze` to control or disable
+                elimination.
             trust_region: Configuration for Levenberg-Marquardt trust region.
             termination: Configuration for termination criteria.
             sparse_mode: The representation to use for sparse matrix
@@ -582,6 +598,18 @@ class AnalyzedLeastSquaresProblem:
         # paths are supported: dense Cholesky, matrix-free CG, and CHOLMOD
         # (sparse-direct on the reduced system, the Ceres/g2o combination).
         elimination = self._elimination
+
+        # If every type was eliminated (a fully block-diagonal Hessian), the
+        # reduced system is empty and the step is an exact blockwise inverse, so
+        # `linear_solver` has no effect. Note it at the call site (the analyze()
+        # log says the same, but the user passes `linear_solver` here).
+        if verbose and elimination is not None and elimination.reduced_dim == 0:
+            logger.info(
+                "The Hessian is fully block-diagonal (every variable type was "
+                "eliminated), so linear_solver={!r} is ignored; the step is "
+                "solved by exact blockwise inversion.",
+                linear_solver,
+            )
 
         # Create unified solver (handles both constrained and unconstrained).
         solver = NonlinearSolver(
@@ -861,6 +889,7 @@ class AnalyzedLeastSquaresProblem:
             vals: Variable values at which to compute covariance (typically
                 the solution from solve()).
             method: Covariance computation method. Options:
+
                 - None (default): Use CG with block-Jacobi preconditioning.
                   GPU-friendly and adapts to problem structure.
                 - LinearSolverCovarianceEstimatorConfig: Custom linear solver config.

@@ -322,6 +322,13 @@ class LeastSquaresProblem:
                     analyzed._tangent_dim,
                     elimination.reduced_dim,
                 )
+                if elimination.reduced_dim == 0:
+                    logger.info(
+                        "Variable elimination: every type was eliminated, so "
+                        "the Hessian is fully block-diagonal; the step is an "
+                        "exact blockwise inverse and the linear_solver choice "
+                        "is ignored."
+                    )
                 with jdc.copy_and_mutate(analyzed, validate=False) as analyzed:
                     analyzed._elimination = elimination
         return analyzed
@@ -371,6 +378,14 @@ class AnalyzedLeastSquaresProblem:
             linear_solver = "conjugate_gradient"
 
         elimination = self._elimination
+
+        if verbose and elimination is not None and elimination.reduced_dim == 0:
+            logger.info(
+                "The Hessian is fully block-diagonal (every variable type was "
+                "eliminated), so linear_solver={!r} is ignored; the step is "
+                "solved by exact blockwise inversion.",
+                linear_solver,
+            )
 
         solver = NonlinearSolver(
             linear_solver,

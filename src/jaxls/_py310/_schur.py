@@ -9,7 +9,12 @@ import jax_dataclasses as jdc
 import numpy as onp
 from jax import numpy as jnp
 
-from .utils import _batched_gram, _batched_matmul, _batched_outer_last
+from .utils import (
+    _batched_gram,
+    _batched_matmul,
+    _batched_outer_last,
+    tikhonov_floor,
+)
 
 
 class _TracedVariableIdsError(ValueError):
@@ -96,6 +101,9 @@ def infer_eliminate(
 
     candidates = sorted(sizes, key=lambda t: sizes[t], reverse=True)
 
+    if len(candidates) > 0 and total_elim_slots_ok(candidates):
+        return tuple(candidates)
+
     chosen = list()
     for var_type in candidates:
         if len(chosen) + 1 == len(candidates):
@@ -104,7 +112,8 @@ def infer_eliminate(
             chosen.append(var_type)
 
     eliminated_dim = sum(sizes[t][0] for t in chosen)
-    if eliminated_dim * 2 < problem._tangent_dim:
+
+    if eliminated_dim * 20 < problem._tangent_dim:
         return ()
     return tuple(chosen)
 
@@ -165,12 +174,6 @@ def build_elimination_plan(
                 )
             )
             reduced_dim += count * var_type.tangent_dim
-
-    if len(kept_types) == 0:
-        raise ValueError(
-            "All variable types were marked for elimination; at least one "
-            "type must be kept to form the reduced system."
-        )
 
     group_slots = list()
     slot_indices_onp = list()
@@ -385,12 +388,11 @@ def prepare_schur(
             parts[0] if len(parts) == 1 else jnp.concatenate(parts, axis=0)
         )
 
-    b_keep = jnp.concatenate(
-        [
-            ATb[info.orig_start : info.orig_start + info.count * info.dim]
-            for info in plan.kept_types
-        ]
-    )
+    kept_b = [
+        ATb[info.orig_start : info.orig_start + info.count * info.dim]
+        for info in plan.kept_types
+    ]
+    b_keep = jnp.concatenate(kept_b) if kept_b else jnp.zeros((0,), dtype=dtype)
     b_elim = tuple(
         ATb[info.orig_start : info.orig_start + info.count * info.dim].reshape(
             (info.count, info.dim)
@@ -714,12 +716,15 @@ def _solve_spd_scaled(S: Any, b: Any) -> Any:
 
     scale = jnp.sqrt(jnp.maximum(jnp.abs(diag), jnp.finfo(S.dtype).tiny))
     S_scaled = S / (scale[:, None] * scale[None, :])
-    eps = jnp.finfo(S.dtype).eps
-    floor = eps * (2e4 if S.dtype == jnp.float32 else 4.0)
+    floor = tikhonov_floor(S.dtype)
     diag_idx = jnp.arange(S.shape[0])
     S_scaled = S_scaled.at[diag_idx, diag_idx].add(floor)
     factor = jax.scipy.linalg.cho_factor(S_scaled)
     return jax.scipy.linalg.cho_solve(factor, b / scale) / scale
+
+
+def _empty_dc(factors: Any) -> Any:
+    return jnp.zeros((0,), dtype=factors.b_keep.dtype)
 
 
 def _back_substitute(factors: Any, vinv: Any, dc: Any) -> Any:
@@ -752,6 +757,8 @@ def _back_substitute(factors: Any, vinv: Any, dc: Any) -> Any:
 
 def solve_schur_dense(factors: Any, lambd: Any) -> Any:
     vinv = _damped_vinv(factors, lambd)
+    if factors.plan.reduced_dim == 0:
+        return _back_substitute(factors, vinv, _empty_dc(factors))
     b_red = _reduced_rhs(factors, vinv)
     S = _assemble_dense_S(factors, lambd, vinv)
     dc = _solve_spd_scaled(S, b_red)
@@ -770,6 +777,8 @@ def solve_schur_cholmod(factors: Any, lambd: Any) -> Any:
 
     lam_eff = jnp.asarray(lambd) + 1e-5
     vinv = _damped_vinv(factors, lam_eff)
+    if plan.reduced_dim == 0:
+        return _back_substitute(factors, vinv, _empty_dc(factors))
     b_red = _reduced_rhs(factors, vinv)
     s_values = _assemble_S_values(factors, lam_eff, vinv)
     dc = _cholmod_solve_symmetric(
@@ -790,6 +799,8 @@ def solve_schur_cg(
 
     lam_eff = lambd + 1e-5
     vinv = _damped_vinv(factors, lam_eff)
+    if plan.reduced_dim == 0:
+        return _back_substitute(factors, vinv, _empty_dc(factors)), prev_state
     b_red = _reduced_rhs(factors, vinv)
 
     if cg_config.preconditioner is None:

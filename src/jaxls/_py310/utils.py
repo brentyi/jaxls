@@ -1,13 +1,19 @@
-from typing import Any
 import contextlib
 import inspect
 import time
 from functools import partial
+from typing import Any
 
 import jax
+import numpy as onp
 import termcolor
 from jax import numpy as jnp
 from loguru import logger
+
+
+def tikhonov_floor(dtype: Any) -> Any:
+    eps = float(onp.finfo(dtype).eps)
+    return eps * (2e4 if onp.dtype(dtype) == onp.float32 else 4.0)
 
 
 def _batched_gram(a: Any, b: Any) -> Any:

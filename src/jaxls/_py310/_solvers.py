@@ -33,7 +33,7 @@ from ._schur import (
     solve_schur_dense,
 )
 from ._sparse_matrices import SparseCooMatrix, SparseCsrMatrix
-from .utils import jax_log
+from .utils import _log, jax_log, tikhonov_floor
 
 
 _cholmod_analyze_cache: Any = {}
@@ -115,10 +115,19 @@ def _cholmod_solve_symmetric_on_host(
 
     rows_onp = onp.asarray(rows)
     cols_onp = onp.asarray(cols)
+    b_onp = onp.asarray(b)
+    dtype = b_onp.dtype
     S = scipy.sparse.coo_matrix(
         (onp.asarray(s_values), (rows_onp, cols_onp)),
         shape=(reduced_dim, reduced_dim),
     ).tocsc()
+
+    diag = S.diagonal()
+    inv_scale = 1.0 / onp.sqrt(onp.maximum(onp.abs(diag), onp.finfo(dtype).tiny))
+    D = scipy.sparse.diags(inv_scale, format="csc")
+
+    S = D @ S @ D
+    S.setdiag(S.diagonal() + tikhonov_floor(dtype))
 
     cache_key = (rows_onp.tobytes(), cols_onp.tobytes(), reduced_dim)
     factor = _cholmod_symmetric_analyze_cache.get(cache_key, None)
@@ -133,7 +142,7 @@ def _cholmod_solve_symmetric_on_host(
             )
 
     factor = factor.cholesky(S)
-    return factor.solve_A(onp.asarray(b))
+    return (inv_scale * factor.solve_A(inv_scale * b_onp)).astype(dtype)
 
 
 _active_iteration_time_recorder: Any = None
@@ -168,6 +177,31 @@ def _record_iteration_time(anchor: Any) -> Any:
             _active_iteration_time_recorder.append(time.perf_counter())
 
     jax.debug.callback(_stamp, anchor)
+
+
+_solve_start_time: Any = None
+
+
+def _record_solve_start(anchor: Any) -> Any:
+
+    def _stamp(_anchor: Any) -> Any:
+        global _solve_start_time
+        _solve_start_time = time.perf_counter()
+
+    jax.debug.callback(_stamp, anchor)
+
+
+def _log_terminated(
+    fmt: Any,
+    *args: Any,
+) -> Any:
+
+    def _emit(*host_args: Any) -> Any:
+        start = _solve_start_time
+        elapsed = time.perf_counter() - start if start is not None else float("nan")
+        _log(fmt + " (solved in {:.4f} sec)", *host_args, elapsed)
+
+    jax.debug.callback(_emit, *args)
 
 
 def _compute_jacobian_scaler(column_norms: Any) -> Any:
@@ -351,6 +385,9 @@ class NonlinearSolver:
             al_state=al_state,
         )
 
+        if self.verbose:
+            _record_solve_start(cost_info.cost_total)
+
         if self.termination.early_termination:
 
             def should_continue(state: Any) -> Any:
@@ -392,14 +429,15 @@ class NonlinearSolver:
                 init_val=state,
             )
         if self.verbose:
-            jax_log(
-                "Terminated @ iteration #{i}: cost={cost:.4f} criteria={criteria}, term_deltas={cost_delta:.1e},{grad_mag:.1e},{param_delta:.1e}",
-                i=state.summary.iterations,
-                cost=state.solution.cost_info.cost_nonconstraint,
-                criteria=state.summary.termination_criteria.astype(jnp.int32),
-                cost_delta=state.summary.termination_deltas[0],
-                grad_mag=state.summary.termination_deltas[1],
-                param_delta=state.summary.termination_deltas[2],
+            _log_terminated(
+                "Terminated @ iteration #{}: cost={:.4f} criteria={}, "
+                "term_deltas={:.1e},{:.1e},{:.1e}",
+                state.summary.iterations,
+                state.solution.cost_info.cost_nonconstraint,
+                state.summary.termination_criteria.astype(jnp.int32),
+                state.summary.termination_deltas[0],
+                state.summary.termination_deltas[1],
+                state.summary.termination_deltas[2],
             )
 
         if return_summary:
