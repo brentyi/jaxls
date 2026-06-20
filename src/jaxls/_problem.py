@@ -183,6 +183,12 @@ class LeastSquaresProblem:
                 eliminating further types from the already-reduced system, is
                 not implemented.)
 
+                When no cost couples two variables the whole Hessian is
+                block-diagonal, and ``"auto"`` eliminates every type: the
+                reduced system is then empty and the step is an exact
+                per-variable blockwise inverse, so the ``linear_solver`` choice
+                has no effect.
+
         Returns:
             An AnalyzedLeastSquaresProblem ready for solving.
         """
@@ -455,6 +461,13 @@ class LeastSquaresProblem:
                     analyzed._tangent_dim,
                     elimination.reduced_dim,
                 )
+                if elimination.reduced_dim == 0:
+                    logger.info(
+                        "Variable elimination: every type was eliminated, so "
+                        "the Hessian is fully block-diagonal; the step is an "
+                        "exact blockwise inverse and the linear_solver choice "
+                        "is ignored."
+                    )
                 with jdc.copy_and_mutate(analyzed, validate=False) as analyzed:
                     analyzed._elimination = elimination
         return analyzed
@@ -585,6 +598,18 @@ class AnalyzedLeastSquaresProblem:
         # paths are supported: dense Cholesky, matrix-free CG, and CHOLMOD
         # (sparse-direct on the reduced system, the Ceres/g2o combination).
         elimination = self._elimination
+
+        # If every type was eliminated (a fully block-diagonal Hessian), the
+        # reduced system is empty and the step is an exact blockwise inverse, so
+        # `linear_solver` has no effect. Note it at the call site (the analyze()
+        # log says the same, but the user passes `linear_solver` here).
+        if verbose and elimination is not None and elimination.reduced_dim == 0:
+            logger.info(
+                "The Hessian is fully block-diagonal (every variable type was "
+                "eliminated), so linear_solver={!r} is ignored; the step is "
+                "solved by exact blockwise inversion.",
+                linear_solver,
+            )
 
         # Create unified solver (handles both constrained and unconstrained).
         solver = NonlinearSolver(

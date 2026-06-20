@@ -186,13 +186,17 @@ def infer_eliminate(
 
     A set of types is *eligible* when no single cost touches more than one
     variable from it (the eliminated Hessian block is then block-diagonal).
-    Types are added greedily by total tangent size — in bundle adjustment
-    the landmarks, which dominate the problem — preferring many small
-    variables over few large ones on ties, and never eliminating every type.
+    Types are added greedily by total tangent size (in bundle adjustment the
+    landmarks, which dominate the problem), preferring many small variables
+    over few large ones on ties, and normally keeping at least one type.
 
     The chosen set is returned only if it covers at least 5% of the total
     tangent dimension, otherwise this returns `()` (no elimination). See
     benchmarks/results.md, "Elimination threshold", for the measurement.
+
+    The one case that keeps no type is a fully decoupled problem (no cost
+    couples two variables): the whole Hessian is block-diagonal, so every type
+    is eliminated and the step is an exact per-variable blockwise inverse.
 
     Only static structure is inspected, so this is safe to call under
     `jax.jit` tracing.
@@ -219,6 +223,15 @@ def infer_eliminate(
     # Largest tangent block first; prefer many small variables on ties
     # (finer block diagonal -> cheaper to invert).
     candidates = sorted(sizes, key=lambda t: sizes[t], reverse=True)
+
+    # Fully decoupled problem: no cost couples two variables, so the whole
+    # Hessian is block-diagonal. Eliminate everything; the step is then an exact
+    # per-variable blockwise inverse (an empty reduced system, solved by
+    # back-substitution alone), which is far cheaper than factoring the full
+    # matrix. The 5% floor below does not apply here (the eliminated block is
+    # the whole problem).
+    if len(candidates) > 0 and total_elim_slots_ok(candidates):
+        return tuple(candidates)
 
     chosen = list[type[Var[Any]]]()
     for var_type in candidates:
@@ -295,11 +308,10 @@ def build_elimination_plan(
             )
             reduced_dim += count * var_type.tangent_dim
 
-    if len(kept_types) == 0:
-        raise ValueError(
-            "All variable types were marked for elimination; at least one "
-            "type must be kept to form the reduced system."
-        )
+    # An empty kept set is allowed: it means every variable type is eliminated
+    # (a fully block-diagonal Hessian). The reduced system is then 0-dimensional
+    # and the solve is pure back-substitution (an exact blockwise inverse); see
+    # the `reduced_dim == 0` short-circuit in the `solve_schur_*` functions.
 
     # Per-group slots. Iteration order must match how `_compute_jac_values`
     # lays out columns in `blocks_concat`: variable types in tangent order,
@@ -483,7 +495,7 @@ class SchurFactors:
     hcc_dense: jax.Array | None
     """(reduced_dim, reduced_dim) dense H_cc; None for the CG and sparse paths."""
     hcc_offdiag: tuple[jax.Array, ...]
-    """Per off-diagonal kept-kept source (in `_S_block_index_sources` order):
+    """Per off-diagonal kept-kept source (in `_iter_S_block_sources` order):
     (K, dim_a, dim_b) H_cc coupling blocks, for the sparse (CHOLMOD) path.
     Empty for the dense and CG paths."""
     keep_jacs: tuple[jax.Array | None, ...]
@@ -549,13 +561,13 @@ def prepare_schur(
             parts[0] if len(parts) == 1 else jnp.concatenate(parts, axis=0)
         )
 
-    # Gradient slices, rearranged into the reduced/eliminated layouts.
-    b_keep = jnp.concatenate(
-        [
-            ATb[info.orig_start : info.orig_start + info.count * info.dim]
-            for info in plan.kept_types
-        ]
-    )
+    # Gradient slices, rearranged into the reduced/eliminated layouts. b_keep is
+    # length 0 when every type is eliminated (fully block-diagonal Hessian).
+    kept_b = [
+        ATb[info.orig_start : info.orig_start + info.count * info.dim]
+        for info in plan.kept_types
+    ]
+    b_keep = jnp.concatenate(kept_b) if kept_b else jnp.zeros((0,), dtype=dtype)
     b_elim = tuple(
         ATb[info.orig_start : info.orig_start + info.count * info.dim].reshape(
             (info.count, info.dim)
@@ -566,7 +578,7 @@ def prepare_schur(
     # H_cc off-diagonal kept-kept couplings within each cost group. Needed by
     # both direct paths: the dense path scatters them into `hcc_dense`, the
     # sparse (CHOLMOD) path keeps them as blocks in `hcc_offdiag` (in the same
-    # order as `_S_block_index_sources`).
+    # order as `_iter_S_block_sources`).
     hcc_offdiag = list[jax.Array]()
     if need_dense or need_sparse:
         for g, slots in enumerate(plan.group_slots):
@@ -966,6 +978,13 @@ def _solve_spd_scaled(S: jax.Array, b: jax.Array) -> jax.Array:
     return jax.scipy.linalg.cho_solve(factor, b / scale) / scale
 
 
+def _empty_dc(factors: SchurFactors) -> jax.Array:
+    """A length-0 kept-update vector, for the fully-eliminated case where the
+    reduced system is 0-dimensional. `_back_substitute` only indexes `dc` for
+    kept types (none here), so an empty array carries the right dtype through."""
+    return jnp.zeros((0,), dtype=factors.b_keep.dtype)
+
+
 def _back_substitute(
     factors: SchurFactors, vinv: list[jax.Array], dc: jax.Array
 ) -> jax.Array:
@@ -1004,6 +1023,10 @@ def solve_schur_dense(factors: SchurFactors, lambd: jax.Array | float) -> jax.Ar
     in float32 the deliberate ~2e-3 Tikhonov floor in `_solve_spd_scaled`
     makes the two paths diverge measurably)."""
     vinv = _damped_vinv(factors, lambd)
+    if factors.plan.reduced_dim == 0:
+        # Fully block-diagonal Hessian: no reduced system to form. The step is
+        # the exact blockwise inverse, produced by back-substitution alone.
+        return _back_substitute(factors, vinv, _empty_dc(factors))
     b_red = _reduced_rhs(factors, vinv)
     S = _assemble_dense_S(factors, lambd, vinv)
     dc = _solve_spd_scaled(S, b_red)
@@ -1038,6 +1061,10 @@ def solve_schur_cholmod(factors: SchurFactors, lambd: jax.Array | float) -> jax.
     # complement equal to the Schur complement of that regularized full system.
     lam_eff = jnp.asarray(lambd) + 1e-5
     vinv = _damped_vinv(factors, lam_eff)
+    if plan.reduced_dim == 0:
+        # Fully block-diagonal Hessian: nothing for CHOLMOD to factor. The step
+        # is the exact blockwise inverse, produced by back-substitution alone.
+        return _back_substitute(factors, vinv, _empty_dc(factors))
     b_red = _reduced_rhs(factors, vinv)
     s_values = _assemble_S_values(factors, lam_eff, vinv)
     dc = _cholmod_solve_symmetric(
@@ -1062,6 +1089,11 @@ def solve_schur_cg(
     # Match the regularization of the full-system CG path.
     lam_eff = lambd + 1e-5
     vinv = _damped_vinv(factors, lam_eff)
+    if plan.reduced_dim == 0:
+        # Fully block-diagonal Hessian: no reduced system for CG to iterate on.
+        # The step is the exact blockwise inverse (back-substitution alone), so
+        # there is no CG state to advance; pass `prev_state` through unchanged.
+        return _back_substitute(factors, vinv, _empty_dc(factors)), prev_state
     b_red = _reduced_rhs(factors, vinv)
 
     # Preconditioner on the (approximate) block diagonal of S, honoring the

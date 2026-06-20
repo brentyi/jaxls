@@ -620,11 +620,102 @@ def test_plan_rejects_absent_type() -> None:
         _schur.build_elimination_plan(problem, (ColorVar,))
 
 
-def test_plan_rejects_eliminating_everything() -> None:
-    """Eliminating every variable type must raise."""
+def test_eliminate_all_rejected_when_types_couple() -> None:
+    """Eliminating every type is only valid when no cost couples two variables.
+    In the BA fixture the reprojection cost couples CamVar and PointVar, so
+    eliminating both is still rejected (the eliminated block is not
+    block-diagonal)."""
     problem, _ = _make_ba_problem()
-    with pytest.raises(ValueError, match="at least one"):
+    with pytest.raises(ValueError, match="couples multiple eliminated"):
         _schur.build_elimination_plan(problem, (CamVar, PointVar))
+
+
+def _make_decoupled_problem(
+    n: int = 6,
+    schur_elimination: Literal["auto", "off"] | tuple[type[jaxls.Var], ...] = "auto",
+) -> tuple[jaxls.AnalyzedLeastSquaresProblem, jaxls.VarValues, jax.Array]:
+    """A fully decoupled problem: n independent PointVars, each with its own
+    unary prior cost. The whole Hessian is block-diagonal, so every type is
+    eliminable. Returns (problem, init, targets)."""
+    rng = onp.random.default_rng(2)
+    targets = jnp.array(rng.normal(0.0, 1.0, (n, 3)))
+    costs = [
+        jaxls.Cost(
+            lambda vals, pt, target: vals[pt] - target,
+            (PointVar(jnp.arange(n)), targets),
+        )
+    ]
+    problem = jaxls.LeastSquaresProblem(costs, [PointVar(jnp.arange(n))]).analyze(
+        schur_elimination=schur_elimination
+    )
+    init = jaxls.VarValues.make([PointVar(jnp.arange(n)).with_value(jnp.zeros((n, 3)))])
+    return problem, init, targets
+
+
+def test_eliminate_all_auto_infers_every_type() -> None:
+    """A fully decoupled problem auto-eliminates every type, leaving a
+    0-dimensional reduced system."""
+    problem, _, _ = _make_decoupled_problem()
+    assert _schur.infer_eliminate(problem) == (PointVar,)
+    assert problem._elimination is not None
+    assert problem._elimination.reduced_dim == 0
+
+
+def test_eliminate_all_single_step_exactness() -> None:
+    """With every type eliminated the damped step is a pure blockwise inverse;
+    it must equal the explicit full dense solve for all three linear solvers,
+    over a sweep of damping values."""
+    problem, init, _ = _make_decoupled_problem(schur_elimination=(PointVar,))
+    plan = problem._elimination
+    assert plan is not None and plan.reduced_dim == 0
+
+    cost_info = problem._compute_cost_info(init)
+    A = problem._compute_jac_values(init, cost_info.jac_cache)
+    A_dense = A.to_dense()
+    ATb = -A_dense.T @ cost_info.residual_vector
+
+    factors_dense = _schur.prepare_schur(plan, A, ATb, linear_solver="dense_cholesky")
+    for lambd in (0.0, 1e-4, 1e-2, 1.0):
+        ATA = A_dense.T @ A_dense + lambd * jnp.eye(A_dense.shape[1])
+        ref = jnp.linalg.solve(ATA, ATb)
+        step = _schur.solve_schur_dense(factors_dense, lambd)
+        rel = float(jnp.linalg.norm(step - ref) / (jnp.linalg.norm(ref) + 1e-30))
+        assert rel < 1e-8, f"lambda={lambd}: relative step difference {rel}"
+
+
+def test_eliminate_all_converges_matches_full() -> None:
+    """End-to-end: the eliminate-all solve reaches the same optimum as the
+    full (non-eliminated) solve, and recovers the per-point targets."""
+    problem, init, targets = _make_decoupled_problem(schur_elimination=(PointVar,))
+    _, summary_schur = problem.solve(
+        init, linear_solver="dense_cholesky", **_solve_kwargs()
+    )
+    problem_off, init_off, _ = _make_decoupled_problem(schur_elimination="off")
+    assert problem_off._elimination is None
+    _, summary_full = problem_off.solve(
+        init_off, linear_solver="dense_cholesky", **_solve_kwargs()
+    )
+    c_schur = _cost_history(summary_schur, 10)
+    c_full = _cost_history(summary_full, 10)
+    # This problem converges to cost 0 (the priors are exactly satisfiable), so
+    # compare with an absolute floor rather than a pure relative difference.
+    diff = onp.abs(c_schur - c_full) / (onp.abs(c_full) + 1e-8)
+    assert diff.max() < 1e-6, f"max cost-trajectory difference {diff.max()}"
+
+    sol, _ = problem.solve(init, linear_solver="dense_cholesky", **_solve_kwargs())
+    recovered = onp.asarray(sol[PointVar(jnp.arange(targets.shape[0]))])
+    assert onp.max(onp.abs(recovered - onp.asarray(targets))) < 1e-6
+
+
+def test_eliminate_all_single_variable() -> None:
+    """The degenerate single-variable problem: eliminating its only type leaves
+    nothing to keep, which is allowed and solved by blockwise inversion."""
+    problem, init, target = _make_decoupled_problem(n=1, schur_elimination=(PointVar,))
+    assert problem._elimination is not None
+    assert problem._elimination.reduced_dim == 0
+    sol = problem.solve(init, linear_solver="dense_cholesky", verbose=False)
+    recovered = onp.asarray(sol[PointVar(jnp.arange(1))])
+    assert onp.max(onp.abs(recovered - onp.asarray(target))) < 1e-6
 
 
 def test_traced_problem_uses_prebuilt_plan() -> None:
