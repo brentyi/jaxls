@@ -744,6 +744,149 @@ def test_traced_problem_uses_prebuilt_plan() -> None:
     assert cost_after < cost_before
 
 
+def _batched_inits(
+    init: jaxls.VarValues, n_batch: int, seed: int = 0
+) -> tuple[list[jaxls.VarValues], jaxls.VarValues]:
+    """A batch of initial guesses that share the fixture's topology (so one
+    shared elimination plan covers every lane) and differ only in their float
+    values. Returns (per-element list, tree-stacked batched VarValues).
+
+    Integer leaves (variable IDs) are broadcast unchanged: they ARE the
+    incidence structure the plan's static indices were built from, so they must
+    be identical across the batch for vmap to be well-defined."""
+    rng = onp.random.default_rng(seed)
+    per_elem = list[jaxls.VarValues]()
+    for _ in range(n_batch):
+
+        def perturb(x: jax.Array) -> jax.Array:
+            x_onp = onp.asarray(x)
+            if onp.issubdtype(x_onp.dtype, onp.floating):
+                return jnp.asarray(x_onp + rng.normal(0, 0.02, x_onp.shape))
+            return jnp.asarray(x_onp)
+
+        per_elem.append(jax.tree.map(perturb, init))
+    batched = jax.tree.map(lambda *xs: jnp.stack(xs, axis=0), *per_elem)
+    return per_elem, batched
+
+
+def _solve_fn(problem, linear_solver, max_iterations: int = 10):
+    """A single-problem solve closure (returns a VarValues) suitable for
+    `jax.vmap` over a batch of initial values; the problem (and its shared
+    elimination plan) is closed over, not batched."""
+
+    def solve_one(init_single: jaxls.VarValues) -> jaxls.VarValues:
+        return problem.solve(
+            init_single,
+            linear_solver=linear_solver,
+            termination=jaxls.TerminationConfig(
+                max_iterations=max_iterations, early_termination=False
+            ),
+            verbose=False,
+        )
+
+    return solve_one
+
+
+def _per_lane_costs(problem, batched_sol: jaxls.VarValues) -> onp.ndarray:
+    """Final total cost of every lane of a vmapped solution."""
+    return onp.asarray(
+        jax.vmap(lambda v: problem._compute_cost_info(v).cost_total)(batched_sol)
+    )
+
+
+@pytest.mark.parametrize("linear_solver", ["dense_cholesky", "conjugate_gradient"])
+def test_vmap_matches_sequential(linear_solver: str) -> None:
+    """vmapping `solve` over a batch of initial values (one shared elimination
+    plan, so the plan's `jdc.Static` indices are shared static aux across the
+    batch) must reproduce, lane for lane, the per-element sequential solves.
+    Exercises the dense-Cholesky and matrix-free CG reduced paths.
+
+    This is the regression guard for the two properties of the Schur statics:
+    a leaked tracer in a static slot, or a data-dependent branch in the solve
+    path, would make vmap raise here rather than match the reference."""
+    problem, init = _make_ba_problem()
+    assert problem._elimination is not None
+    per_elem, batched = _batched_inits(init, n_batch=4)
+
+    solve_one = _solve_fn(problem, linear_solver, max_iterations=20)
+    batched_sol = jax.vmap(solve_one)(batched)
+    seq_sols = [solve_one(i) for i in per_elem]
+
+    # Every lane is a real solve: cost strictly decreased from its init.
+    init_costs = onp.array(
+        [float(problem._compute_cost_info(i).cost_total) for i in per_elem]
+    )
+    vmap_costs = _per_lane_costs(problem, batched_sol)
+    assert onp.all(vmap_costs < init_costs)
+
+    seq_costs = onp.array(
+        [float(problem._compute_cost_info(s).cost_total) for s in seq_sols]
+    )
+    assert onp.allclose(vmap_costs, seq_costs, rtol=1e-6, atol=1e-9), (
+        f"{linear_solver}: vmap per-lane costs {vmap_costs} != sequential "
+        f"{seq_costs}"
+    )
+
+    # Dense is the exact reduced solve, so it must match lane-for-lane on the
+    # full solution, not just on the cost. (CG's batched while_loop is masked
+    # per lane, so it matches too, but the cost check above is the robust one.)
+    # The tolerance is loose because batched vs unbatched floating-point
+    # reductions reorder slightly and the difference compounds over the 20-step
+    # LM trajectory; the point of this check is that the lanes don't *diverge*
+    # (a static/tracer bug would), not bitwise reproducibility.
+    if linear_solver == "dense_cholesky":
+        seq_stacked = jax.tree.map(lambda *xs: jnp.stack(xs, 0), *seq_sols)
+        for a, b in zip(jax.tree.leaves(batched_sol), jax.tree.leaves(seq_stacked)):
+            a_onp, b_onp = onp.asarray(a), onp.asarray(b)
+            if onp.issubdtype(a_onp.dtype, onp.floating):
+                assert onp.allclose(a_onp, b_onp, rtol=1e-5, atol=1e-6)
+
+
+@requires_cholmod
+def test_vmap_cholmod_matches_sequential() -> None:
+    """The CHOLMOD reduced path uses a host `jax.pure_callback`, made
+    vmap-safe with `vmap_method="sequential"` (the callback is looped over the
+    batch on the host). vmapping it must run and match the per-element
+    sequential solves lane for lane."""
+    problem, init = _make_ba_problem()
+    assert problem._elimination is not None
+    per_elem, batched = _batched_inits(init, n_batch=4)
+
+    solve_one = _solve_fn(problem, "cholmod", max_iterations=10)
+    batched_sol = jax.vmap(solve_one)(batched)
+    seq_sols = [solve_one(i) for i in per_elem]
+
+    vmap_costs = _per_lane_costs(problem, batched_sol)
+    seq_costs = onp.array(
+        [float(problem._compute_cost_info(s).cost_total) for s in seq_sols]
+    )
+    init_costs = onp.array(
+        [float(problem._compute_cost_info(i).cost_total) for i in per_elem]
+    )
+    assert onp.all(vmap_costs < init_costs)
+    assert onp.allclose(vmap_costs, seq_costs, rtol=1e-6, atol=1e-9), (
+        f"cholmod: vmap per-lane costs {vmap_costs} != sequential {seq_costs}"
+    )
+
+
+def test_vmap_eliminate_all() -> None:
+    """The fully-eliminated (reduced_dim == 0) path is pure blockwise back-
+    substitution with no reduced solve; it must also vmap cleanly and match the
+    sequential solves."""
+    problem, init, _ = _make_decoupled_problem(schur_elimination=(PointVar,))
+    assert problem._elimination is not None and problem._elimination.reduced_dim == 0
+    per_elem, batched = _batched_inits(init, n_batch=4)
+
+    solve_one = _solve_fn(problem, "dense_cholesky", max_iterations=10)
+    batched_sol = jax.vmap(solve_one)(batched)
+    seq_sols = [solve_one(i) for i in per_elem]
+    seq_stacked = jax.tree.map(lambda *xs: jnp.stack(xs, 0), *seq_sols)
+    for a, b in zip(jax.tree.leaves(batched_sol), jax.tree.leaves(seq_stacked)):
+        a_onp, b_onp = onp.asarray(a), onp.asarray(b)
+        if onp.issubdtype(a_onp.dtype, onp.floating):
+            assert onp.allclose(a_onp, b_onp, rtol=1e-7, atol=1e-9)
+
+
 def test_solve_spd_scaled_float64_exact() -> None:
     """The robust SPD solve must not perturb well-conditioned float64 solves."""
     rng = onp.random.default_rng(0)
