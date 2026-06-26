@@ -67,6 +67,9 @@ docs = [
     "graphviz",
     "viser>=1.0.19",
 ]
+examples = [
+    "optax>=0.2.6",
+]
 cholmod = ["scikit-sparse"]
 # Docs plus a CUDA-enabled jaxlib, so the docs build executes notebooks on the
 # GPU (the default `docs` extra is CPU-only and portable for CI / GPU-less

@@ -1051,3 +1051,70 @@ class AnalyzedLeastSquaresProblem:
 
         else:
             raise ValueError(f"Unknown covariance method: {method}")
+
+    def solve_differentiable(
+        self,
+        initial_vals: VarValues | None = None,
+        *,
+        linear_solver: Literal["conjugate_gradient", "dense_cholesky"]
+        | ConjugateGradientConfig = "conjugate_gradient",
+        trust_region: TrustRegionConfig | None = TrustRegionConfig(),
+        termination: TerminationConfig = TerminationConfig(),
+        sparse_mode: Literal["blockrow", "coo", "csr"] = "blockrow",
+        verbose: bool = False,
+    ) -> VarValues:
+        """Solve with gradient support for problem parameters using adjoint method.
+
+        This enables backpropagation through the optimization by using implicit
+        differentiation. Instead of unrolling through iterations (which requires
+        O(iterations * n) memory), the backward pass solves a single linear system.
+
+        Use this when you need to differentiate through the solve, e.g., for:
+        - Sensor calibration (learning measurement offsets)
+        - Hyperparameter optimization
+        - End-to-end differentiable pipelines
+
+        Args:
+            initial_vals: Initial values for the variables. If None, default values
+                will be used.
+            linear_solver: The linear solver to use. Note: "cholmod" is NOT supported
+                for differentiable solve due to pure_callback limitations.
+            trust_region: Configuration for Levenberg-Marquardt trust region.
+                If None, uses Gauss-Newton (no damping).
+            termination: Configuration for termination criteria.
+            sparse_mode: The representation to use for sparse matrix multiplication.
+            verbose: Whether to print verbose output during optimization.
+
+        Returns:
+            Optimized variable values with gradient support.
+
+        Raises:
+            ValueError: If the problem has constraints (not yet supported).
+            ValueError: If "cholmod" linear solver is requested.
+
+        Example:
+            >>> @jaxls.Cost.factory
+            ... def prior_cost(vals, var, target):
+            ...     return vals[var] - target
+            >>>
+            >>> var = ScalarVar(0)
+            >>>
+            >>> def loss_fn(target):
+            ...     costs = [prior_cost(var, target)]
+            ...     problem = jaxls.LeastSquaresProblem(costs, [var]).analyze()
+            ...     solution = problem.solve_differentiable()
+            ...     return jnp.sum(solution[var] ** 2)
+            >>>
+            >>> grad = jax.grad(loss_fn)(target)  # Gradient flows through solve
+        """
+        from ._differentiable_solve import solve_differentiable
+
+        return solve_differentiable(
+            problem=self,
+            initial_vals=initial_vals,
+            linear_solver=linear_solver,
+            trust_region=trust_region,
+            termination=termination,
+            sparse_mode=sparse_mode,
+            verbose=verbose,
+        )

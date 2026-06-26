@@ -720,3 +720,25 @@ class AnalyzedLeastSquaresProblem:
 
         else:
             raise ValueError(f"Unknown covariance method: {method}")
+
+    def solve_differentiable(
+        self,
+        initial_vals: Any = None,
+        *,
+        linear_solver: Any = "conjugate_gradient",
+        trust_region: Any = TrustRegionConfig(),
+        termination: Any = TerminationConfig(),
+        sparse_mode: Any = "blockrow",
+        verbose: Any = False,
+    ) -> Any:
+        from ._differentiable_solve import solve_differentiable
+
+        return solve_differentiable(
+            problem=self,
+            initial_vals=initial_vals,
+            linear_solver=linear_solver,
+            trust_region=trust_region,
+            termination=termination,
+            sparse_mode=sparse_mode,
+            verbose=verbose,
+        )
