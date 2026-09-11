@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dis
 import functools
+import re
 from typing import Any
 
 import jax
@@ -24,6 +25,13 @@ from ._sparse_matrices import (
     SparseCsrCoordinates,
 )
 from ._variables import VarTypeOrdering, VarValues, sort_and_stack_vars
+
+
+_FUNCTION_ADDRESS = re.compile(r" at 0x[0-9a-fA-F]+")
+
+
+def _sort_key(x: Any) -> Any:
+    return _FUNCTION_ADDRESS.sub("", str(x))
 
 
 @jdc.pytree_dataclass
@@ -135,9 +143,6 @@ class LeastSquaresProblem:
         )
 
         tangent_start_from_var_type = dict()
-
-        def _sort_key(x: Any) -> Any:
-            return str(x)
 
         count_from_var_type = dict()
         for var in variables:
