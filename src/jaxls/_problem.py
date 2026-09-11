@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dis
 import functools
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -40,6 +41,24 @@ from ._variables import Var, VarTypeOrdering, VarValues, sort_and_stack_vars
 if TYPE_CHECKING:
     from ._augmented_lagrangian import AugmentedLagrangianConfig
     from ._covariance import CovarianceEstimator, LinearSolverCovarianceEstimatorConfig
+
+
+_FUNCTION_ADDRESS = re.compile(r" at 0x[0-9a-fA-F]+")
+
+
+def _sort_key(x: Any) -> str:
+    """Sort variable / cost types by name, so that reordering costs or
+    variables doesn't re-compile.
+
+    A cost's pytree structure stringifies its residual as
+    ``<function ... at 0x7f...>``, and that address sorts ahead of the
+    cost's name. Costs built from the same factory are identical up to
+    the address, so without stripping it the group order would follow
+    wherever the functions happened to be allocated, and differ between
+    processes -- which also means a persistent compilation cache written
+    by one process never matches the next.
+    """
+    return _FUNCTION_ADDRESS.sub("", str(x))
 
 
 @jdc.pytree_dataclass
@@ -248,11 +267,6 @@ class LeastSquaresProblem:
         # Create storage layout: this describes which parts of our tangent
         # vector is allocated to each variable.
         tangent_start_from_var_type = dict[type[Var[Any]], int]()
-
-        def _sort_key(x: Any) -> str:
-            """We're going to sort variable / cost types by name. This should
-            prevent re-compiling when costs or variables are reordered."""
-            return str(x)
 
         # Count variables of each type.
         count_from_var_type = dict[type[Var[Any]], int]()
