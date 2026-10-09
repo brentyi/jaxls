@@ -537,7 +537,7 @@ class NonlinearSolver:
             step_quality = actual_reduction / predicted_reduction
             accepted = ~jnp.isnan(proposed_cost_info.cost_total) & (
                 step_quality >= self.trust_region.step_quality_min
-            ) & predicted_reduction > 0
+            ) & (predicted_reduction > 0)
 
         iterations = inner_state.summary.iterations + 1
         term_criteria, term_deltas = self.termination._check_convergence(
